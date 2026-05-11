@@ -233,7 +233,12 @@
         function inDock(el) {
           while (el) {
             var cs = el.nodeType === 1 ? getComputedStyle(el) : null;
-            if (cs && cs.position === 'fixed' && parseFloat(cs.bottom) === 0) return true;
+            if (cs && (cs.position === 'fixed' || cs.position === 'sticky') && parseFloat(cs.bottom) <= 0) return true;
+            if (el.tagName === 'NAV' && el.parentElement && el.parentElement.tagName === 'BODY') return true;
+            if (el.tagName === 'NAV' && el.nextElementSibling === null) {
+              var rect = el.getBoundingClientRect();
+              if (rect.bottom >= window.innerHeight - 80) return true;
+            }
             el = el.parentElement;
           }
           return false;
