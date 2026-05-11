@@ -130,11 +130,31 @@
         z-index: 60 !important;
       }
       header { position: relative !important; }
-      /* Make the whole page scroll instead of inner main, so header scrolls away */
+      /* Make the whole app one normal scrolling document; no locked header/nav areas */
       html, body { height: auto !important; min-height: 100% !important; overflow-y: auto !important; }
-      #root > div, #root > div > div { min-height: 0 !important; }
-      main { overflow: visible !important; min-height: 0 !important; height: auto !important; }
-      main > div { overflow: visible !important; max-height: none !important; height: auto !important; }
+      #root, #root > div, .ios-stage, .ios-phone-shell {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      .ios-stage { display: block !important; }
+      .ios-phone-shell { display: block !important; }
+      main, .ios-main, main > div, .ios-main > div {
+        flex: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        overscroll-behavior: auto !important;
+      }
+      .ios-bottom-tabs, nav[class*="bottom-0"], [class*="fixed bottom-0"] {
+        position: relative !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        transform: none !important;
+      }
       .ios-status-row { display: none !important; }
       .ios-header-row {
         display: flex !important;
