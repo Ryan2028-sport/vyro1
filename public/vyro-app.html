@@ -240,33 +240,24 @@
       /* Hide athlete profile name + sport line */
       .vyro-athlete-meta-hidden { display: none !important; }
 
-      /* Bottom nav — black bar, 4 buttons visible */
-      [class*="fixed bottom-0"] {
-        position: relative !important;
-        left: auto !important; right: auto !important; bottom: auto !important;
-        background: #000 !important;
-        border-top: 1px solid rgba(255,255,255,0.1) !important;
-        color: #fff !important;
-        padding: 12px !important;
-        display: grid !important;
-        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-        gap: 8px !important;
-        margin-top: 16px !important;
+      /* Hide bottom dock text labels — icons only */
+      body > div > nav:last-of-type *,
+      [class*="fixed bottom-0"] * {
+        font-size: 0 !important;
+        color: transparent !important;
       }
-      [class*="fixed bottom-0"] button {
-        color: #fff !important;
-        background: rgba(255,255,255,0.05) !important;
-        border: 1px solid rgba(255,255,255,0.15) !important;
-        border-radius: 14px !important;
-        font-size: 11px !important;
-        padding: 8px 4px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        gap: 4px !important;
-        min-height: 52px !important;
+      body > div > nav:last-of-type svg,
+      body > div > nav:last-of-type img,
+      [class*="fixed bottom-0"] svg,
+      [class*="fixed bottom-0"] img {
+        font-size: 12px !important;
+        color: inherit !important;
       }
-      [class*="fixed bottom-0"] svg { width: 18px !important; height: 18px !important; color: #fff !important; }
+      body > div > nav:last-of-type [aria-selected="true"] svg,
+      body > div > nav:last-of-type .active svg,
+      body > div > nav:last-of-type [data-active="true"] svg {
+        color: var(--vyro-positive) !important;
+      }
 
       /* Module rail nav (first nav) */
       body > div > nav:first-of-type {
