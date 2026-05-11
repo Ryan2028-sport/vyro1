@@ -66,6 +66,9 @@
   --color-vyro-recovery: var(--vyro-recovery);
   --color-vyro-spatial: var(--vyro-spatial);
   --color-vyro-fatigue: var(--vyro-fatigue);
+  /* Aliases matching tailwind.config naming */
+  --color-vyro-positive: var(--vyro-recovery);
+  --color-vyro-alert: var(--vyro-fatigue);
 }
 
 :root {
