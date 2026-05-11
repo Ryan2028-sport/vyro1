@@ -70,7 +70,9 @@
         -webkit-backdrop-filter: saturate(180%) blur(20px);
         backdrop-filter: saturate(180%) blur(20px);
       }
-      /* === Bottom tab bar (LAST nav only) — frosted iOS === */
+      /* Light, iOS-flavored polish — keep the bundle's own layout intact, only restyle. */
+
+      /* Bottom tab bar (last nav) — frosted */
       body > div > nav:last-of-type,
       [class*="fixed bottom-0"], [class*="sticky bottom-0"] {
         background-color: rgba(255,255,255,0.85) !important;
@@ -80,127 +82,35 @@
         color: #111 !important;
       }
 
-      /* === Top header — slim white pill + big "Athlete" hero === */
+      /* Header — keep original layout, just light/clean colors */
       header {
-        display: block !important;
         background: transparent !important;
         border: 0 !important;
         box-shadow: none !important;
-        padding: 10px 14px 4px !important;
-        min-height: 0 !important;
-        overflow: visible !important;
         color: #111 !important;
       }
       header * { color: #111 !important; }
-      /* First row of header = the "WATCH LIVE" pill bar */
-      header > div:first-child {
-        display: flex !important;
-        align-items: center !important;
-        gap: 10px !important;
-        background: #fff !important;
-        border: 1px solid rgba(0,0,0,0.06) !important;
-        border-radius: 999px !important;
-        padding: 8px 14px !important;
-        min-height: 44px !important;
-        box-shadow: 0 4px 14px -6px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.04) !important;
-        font-size: 12px !important;
-        font-weight: 700 !important;
-        letter-spacing: .04em !important;
-      }
-      header > div:first-child button {
-        order: -1;
-        background: transparent !important;
-        padding: 0 !important;
-        width: 22px !important; height: 22px !important;
-        box-shadow: none !important;
-      }
-      header > div:first-child img {
-        width: 18px !important; height: 18px !important;
-        filter: none !important;
-      }
-      /* The WATCH LIVE chip — last text node area */
-      header > div:first-child > :last-child,
-      header > div:first-child :where(span,div):last-child {
-        margin-left: auto;
-      }
+      header img { filter: none !important; }
 
-      /* Second row = VYRO IOS eyebrow + huge Athlete h1 + RC avatar */
-      header > div:nth-child(2) {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        padding: 14px 4px 6px !important;
-        background: transparent !important;
-      }
-      header h1 {
-        font-size: 44px !important;
-        font-weight: 900 !important;
-        line-height: 1 !important;
-        letter-spacing: -0.035em !important;
-        color: #111 !important;
-        margin-top: 2px !important;
-      }
-      header h1 + *, header div > div > div:first-child:not(:has(h1)) {
-        font-size: 10px !important;
-        font-weight: 800 !important;
-        letter-spacing: .14em !important;
-        color: #8a8f98 !important;
-        text-transform: uppercase !important;
-      }
-
-      /* === Module rail (FIRST nav: TRENDS / SESSION / COACH / SOCIAL) === */
-      body > div > nav:first-of-type,
-      header + nav, main ~ nav:first-of-type {
-        position: static !important;
-        display: flex !important;
-        flex-direction: row !important;
-        gap: 8px !important;
-        padding: 6px 14px 12px !important;
-        margin: 0 !important;
+      /* Module rail nav (first nav) — keep horizontal pills, transparent bg */
+      body > div > nav:first-of-type {
         background: transparent !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
         border: 0 !important;
-        overflow-x: auto !important;
-        overflow-y: visible !important;
-        height: auto !important;
-        width: auto !important;
-        scrollbar-width: none;
       }
-      body > div > nav:first-of-type::-webkit-scrollbar { display: none; }
       body > div > nav:first-of-type button {
-        flex: 0 0 auto !important;
         background: #fff !important;
         border: 1px solid rgba(0,0,0,0.08) !important;
         border-radius: 999px !important;
-        padding: 11px 18px !important;
-        font-size: 12px !important;
-        font-weight: 800 !important;
-        letter-spacing: .1em !important;
         color: #111 !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
-        min-height: 42px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-        text-transform: uppercase !important;
-      }
-      body > div > nav:first-of-type button img,
-      body > div > nav:first-of-type button svg {
-        width: 16px !important; height: 16px !important;
-        filter: none !important;
       }
 
-      /* === Main page content === */
-      main { padding: 6px 14px 96px !important; background: var(--vyro-canvas) !important; }
-      main h1 {
-        font-size: 28px !important;
-        font-weight: 900 !important;
-        line-height: 1.05 !important;
-        letter-spacing: -0.03em !important;
-        color: #111 !important;
-      }
-      main p { font-size: 13px !important; line-height: 1.4 !important; color: #6b7280 !important; }
+      /* Main canvas */
+      main { background: var(--vyro-canvas) !important; }
+      main p { color: #6b7280 !important; }
+
 
 
       /* iOS-style refinements: softer surfaces, hairline borders, gentle shadows */
