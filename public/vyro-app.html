@@ -71,12 +71,13 @@
         backdrop-filter: saturate(180%) blur(20px);
       }
       /* === Bottom tab bar — floating white iOS pill (matches reference design) === */
-      body > div > nav:last-of-type,
-      [class*="fixed bottom-0"], [class*="sticky bottom-0"] {
+      /* Module rail lives inside <header>; bottom dock is the only OTHER <nav> */
+      nav:not(header nav) {
         position: fixed !important;
         left: 12px !important;
         right: 12px !important;
         bottom: max(env(safe-area-inset-bottom), 12px) !important;
+        top: auto !important;
         width: auto !important;
         background: #fff !important;
         -webkit-backdrop-filter: saturate(180%) blur(28px);
@@ -86,14 +87,16 @@
         box-shadow: 0 8px 28px -10px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.06) !important;
         padding: 10px 14px !important;
         min-height: 64px !important;
+        height: auto !important;
         display: flex !important;
         align-items: center !important;
         justify-content: space-around !important;
         gap: 4px !important;
         color: #b8bcc4 !important;
+        z-index: 50 !important;
       }
-      body > div > nav:last-of-type button,
-      [class*="fixed bottom-0"] button {
+      nav:not(header nav) button,
+      nav:not(header nav) a {
         background: transparent !important;
         box-shadow: none !important;
         border: 0 !important;
@@ -111,34 +114,42 @@
         flex: 1 1 0 !important;
         min-height: 0 !important;
       }
-      body > div > nav:last-of-type button svg,
-      body > div > nav:last-of-type button img {
+      nav:not(header nav) button svg,
+      nav:not(header nav) button img,
+      nav:not(header nav) a svg,
+      nav:not(header nav) a img {
         width: 22px !important; height: 22px !important;
         color: #b8bcc4 !important;
         stroke: currentColor !important;
         opacity: 1 !important;
+        filter: none !important;
       }
-      /* Active tab — green (matches "ATHLETE" in reference) */
-      body > div > nav:last-of-type button[aria-selected="true"],
-      body > div > nav:last-of-type button.active,
-      body > div > nav:last-of-type button[data-active="true"],
-      body > div > nav:last-of-type button[aria-current],
-      body > div > nav:last-of-type a[aria-current],
-      body > div > nav:last-of-type [data-state="active"] {
+      /* Active tab — green */
+      nav:not(header nav) button[aria-selected="true"],
+      nav:not(header nav) button.active,
+      nav:not(header nav) button[data-active="true"],
+      nav:not(header nav) button[aria-current],
+      nav:not(header nav) a[aria-current],
+      nav:not(header nav) [data-state="active"],
+      nav:not(header nav) [class*="text-emerald"],
+      nav:not(header nav) [class*="text-green"] {
         color: #34C759 !important;
       }
-      body > div > nav:last-of-type button[aria-selected="true"] svg,
-      body > div > nav:last-of-type button.active svg,
-      body > div > nav:last-of-type button[data-active="true"] svg,
-      body > div > nav:last-of-type button[aria-current] svg,
-      body > div > nav:last-of-type a[aria-current] svg,
-      body > div > nav:last-of-type [data-state="active"] svg {
+      nav:not(header nav) button[aria-selected="true"] svg,
+      nav:not(header nav) button.active svg,
+      nav:not(header nav) button[data-active="true"] svg,
+      nav:not(header nav) button[aria-current] svg,
+      nav:not(header nav) a[aria-current] svg,
+      nav:not(header nav) [data-state="active"] svg,
+      nav:not(header nav) [class*="text-emerald"] svg,
+      nav:not(header nav) [class*="text-green"] svg {
         color: #34C759 !important;
         stroke: #34C759 !important;
       }
 
       /* Add bottom padding so content isn't hidden behind floating dock */
-      main { padding-bottom: 110px !important; }
+      main { padding-bottom: 110px !important; background: var(--vyro-canvas) !important; }
+      main p { color: #6b7280 !important; }
 
 
       /* === Top header — clean iOS, no chrome === */
