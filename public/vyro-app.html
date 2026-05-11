@@ -227,7 +227,11 @@
           /6[\s-]*axis\s*IMU/i,
           /Vitals\s*[—–-]\s*live\s*from/i,
           /^\s*VYRO\s*iOS\s*$/i,
-          /^\s*RC\s*$/
+          /^\s*RC\s*$/,
+          /^\s*Athlete\s*$/,
+          /^\s*Sport\s*$/,
+          /^\s*Recovery\s*$/,
+          /^\s*Sleep\s*$/
         ];
         function pass() {
           var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
