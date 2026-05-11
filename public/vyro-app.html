@@ -61,7 +61,7 @@
         --vyro-red:    4 100% 59%  !important; /* fatigue alert #FF3B30 */
         --vyro-amber: 36 100% 50%  !important; /* warning amber */
       }
-      html, body { background: var(--vyro-canvas) !important; color: #111 !important; }
+      html, body, #root { background: var(--vyro-canvas) !important; color: #111 !important; }
       /* Neutralize the prototype's dark surfaces to the new bento system */
       .bg-black, .bg-black\/80, .bg-black\/70, .bg-black\/60, .bg-black\/50, .bg-black\/40,
       .bg-neutral-900, .bg-neutral-950, .bg-zinc-900, .bg-zinc-950,
@@ -100,6 +100,78 @@
       }
       header h1, header h2, [class*="sticky top-0"] h1, [class*="sticky top-0"] h2 {
         font-size: 15px !important; font-weight: 600 !important; letter-spacing: -0.01em !important;
+      }
+
+      /* Mobile shell cleanup: solid iOS chrome, compact non-floating header, no duplicate title text */
+      .ios-stage,
+      .ios-phone-shell {
+        background: var(--vyro-canvas) !important;
+        box-shadow: none !important;
+      }
+      .ios-topbar {
+        position: static !important;
+        min-height: 0 !important;
+        padding: calc(5px + env(safe-area-inset-top)) 12px 0 !important;
+        background: var(--vyro-canvas) !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+        box-shadow: none !important;
+      }
+      .ios-status-row,
+      .ios-module-title {
+        display: none !important;
+      }
+      .ios-header-row {
+        min-height: 34px !important;
+        gap: 8px !important;
+      }
+      .ios-logo-slot {
+        min-width: 70px !important;
+      }
+      .ios-topbar .vyro-logo-mark {
+        width: 70px !important;
+        height: 22px !important;
+        transform: none !important;
+      }
+      .ios-topbar .vyro-logo-img {
+        width: 70px !important;
+        max-height: 20px !important;
+        object-fit: contain !important;
+        object-position: left center !important;
+      }
+      .ios-athlete-pill {
+        min-height: 28px !important;
+        padding: 0 9px !important;
+        font-size: 9px !important;
+        letter-spacing: .06em !important;
+      }
+      .ios-icon-btn {
+        width: 32px !important;
+        height: 32px !important;
+        background: var(--vyro-canvas) !important;
+        box-shadow: none !important;
+      }
+      .ios-module-rail {
+        justify-content: flex-start !important;
+        margin: 0 -12px !important;
+        padding: 8px 12px 9px !important;
+        background: var(--vyro-canvas) !important;
+        border-top: 0 !important;
+      }
+      .page-header {
+        align-items: flex-start !important;
+        margin: 8px 0 14px !important;
+      }
+      .page-header .eyebrow,
+      .page-header p,
+      .page-header > .flex.gap-2 {
+        display: none !important;
+      }
+      .page-header h1 {
+        font-size: 22px !important;
+        line-height: 1.08 !important;
+        letter-spacing: -0.02em !important;
       }
 
       /* iOS-style refinements: softer surfaces, hairline borders, gentle shadows */
