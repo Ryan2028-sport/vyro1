@@ -356,12 +356,11 @@
               greetingTitle = tx;
               var prev = h1s[i].previousElementSibling;
               if (prev) eyebrow = (prev.textContent || '').trim();
-              // Walk up and hide the whole PageHeader wrapper (title + eyebrow + subtitle)
-              var wrap = h1s[i].parentElement;
-              for (var k = 0; k < 3 && wrap; k++) {
-                wrap.classList.add('vyro-pageheader-hidden');
-                wrap = wrap.parentElement;
-              }
+              // Hide eyebrow, h1, and subtitle (next sibling) individually
+              if (prev) prev.classList.add('vyro-pageheader-hidden');
+              h1s[i].classList.add('vyro-pageheader-hidden');
+              var nxt = h1s[i].nextElementSibling;
+              if (nxt) nxt.classList.add('vyro-pageheader-hidden');
               break;
             }
           }
