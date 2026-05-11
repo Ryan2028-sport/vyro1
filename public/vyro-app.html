@@ -111,16 +111,32 @@
         border-bottom: 1px solid rgba(0,0,0,0.05) !important;
         box-shadow: none !important;
         color: #111 !important;
-        padding: 2px 12px !important;
+        padding: 6px 14px !important;
         min-height: 0 !important;
+        gap: 10px !important;
       }
-      header img { max-height: 29px !important; width: auto !important; filter: none !important; }
+      header img { max-height: 35px !important; width: auto !important; filter: none !important; }
       header button, header [role="button"] {
-        padding: 3px 9px !important;
-        font-size: 10px !important;
+        padding: 5px 11px !important;
+        font-size: 12px !important;
         line-height: 1.2 !important;
       }
       header * { color: #111 !important; }
+      /* Greeting injected into header */
+      #vyro-header-greeting {
+        font-family: 'Satoshi', system-ui, sans-serif;
+        font-weight: 800;
+        font-size: 14px;
+        color: #111;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        text-align: center;
+      }
+      /* Hide the original PageHeader greeting block on home (now in header) */
+      main > div:first-child > div:first-child:has(> h1),
+      main header { display: none !important; }
 
       /* Hide bottom dock text labels — icons only */
       body > div > nav:last-of-type *,
@@ -260,10 +276,39 @@
             if (el) el.style.display = 'none';
           });
         }
-        // Run a few times as React hydrates / streams in
-        setTimeout(pass, 100);
-        setTimeout(pass, 500);
-        setTimeout(pass, 1500);
+        function injectGreeting() {
+          var hdr = document.querySelector('header');
+          if (!hdr) return;
+          var existing = hdr.querySelector('#vyro-header-greeting');
+          // Find the greeting text in the page (h1 with "Good morning")
+          var h1s = document.querySelectorAll('main h1, main h2');
+          var greetingText = '';
+          for (var i = 0; i < h1s.length; i++) {
+            var tx = (h1s[i].textContent || '').trim();
+            if (/good\s+(morning|afternoon|evening)/i.test(tx)) {
+              greetingText = tx;
+              // hide the whole PageHeader block (parent that also contains eyebrow/subtitle)
+              var block = h1s[i].closest('div');
+              if (block && block.parentElement) block.parentElement.style.display = 'none';
+              break;
+            }
+          }
+          if (!greetingText) greetingText = 'Good morning, Ryan.';
+          if (existing) { existing.textContent = greetingText; return; }
+          var span = document.createElement('div');
+          span.id = 'vyro-header-greeting';
+          span.textContent = greetingText;
+          // Insert before the last child (bell button) so order = logo | greeting | button | bell
+          var children = hdr.children;
+          if (children.length >= 2) {
+            hdr.insertBefore(span, children[children.length - 1]);
+          } else {
+            hdr.appendChild(span);
+          }
+        }
+        setTimeout(function(){ pass(); injectGreeting(); }, 100);
+        setTimeout(function(){ pass(); injectGreeting(); }, 500);
+        setTimeout(function(){ pass(); injectGreeting(); }, 1500);
       });
     </script>
     <script type="module">
