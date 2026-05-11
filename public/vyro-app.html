@@ -210,8 +210,7 @@
           return false;
         }
         function scrub(root) {
-          if (!root || !root.querySelectorAll) return;
-          // Walk text nodes
+          if (!root) return;
           var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
           var hits = [];
           var n;
@@ -219,16 +218,13 @@
             if (shouldKill(n.textContent)) hits.push(n);
           }
           hits.forEach(function (node) {
-            var el = node.parentElement;
-            if (!el) return;
-            // Walk up to find the row container (max 3 levels)
-            var target = el;
-            for (var i = 0; i < 3 && target.parentElement; i++) {
-              if (target.children && target.children.length <= 3) {
-                target = target.parentElement;
-              } else break;
+            // Just blank the text node — safe, doesn't disturb layout/listeners
+            node.textContent = '';
+            // Hide its immediate parent if it now has no visible text
+            var p = node.parentElement;
+            if (p && !p.textContent.trim() && p.children.length === 0) {
+              p.style.display = 'none';
             }
-            (target || el).style.display = 'none';
           });
         }
         var run = function () { scrub(document.body); };
