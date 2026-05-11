@@ -55,11 +55,11 @@ export function ScoreRing({
 }) {
   // Map label → semantic color
   const lbl = metric.label.toLowerCase();
-  let ringColor = "var(--vyro-spatial)";
-  if (lbl.includes("fatigue")) ringColor = "var(--vyro-alert)";
-  else if (lbl.includes("recovery")) ringColor = "var(--vyro-positive)";
-  else if (lbl.includes("agility")) ringColor = "var(--vyro-spatial)";
-  else if (lbl.includes("sleep")) ringColor = "var(--vyro-session)";
+  let ringColor = "var(--color-vyro-spatial)";
+  if (lbl.includes("fatigue")) ringColor = "var(--color-vyro-alert)";
+  else if (lbl.includes("recovery")) ringColor = "var(--color-vyro-positive)";
+  else if (lbl.includes("agility")) ringColor = "var(--color-vyro-spatial)";
+  else if (lbl.includes("sleep")) ringColor = "var(--color-vyro-session)";
 
   return (
     <button
