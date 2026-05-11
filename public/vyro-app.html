@@ -102,7 +102,7 @@
         width: 22px !important; height: 22px !important;
       }
 
-      /* === Top header — single compact row: logo | greeting === */
+      /* === Top header — compact app chrome with title + module buttons inside === */
       header {
         background: rgba(255,255,255,0.92) !important;
         -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -111,34 +111,91 @@
         border-bottom: 1px solid rgba(0,0,0,0.06) !important;
         box-shadow: none !important;
         color: #111 !important;
-        padding: 6px 12px !important;
+        padding: 5px 10px 7px !important;
         min-height: 0 !important;
-        gap: 10px !important;
+        gap: 5px !important;
       }
-      header img { max-height: 26px !important; width: auto !important; filter: none !important; }
+      header img { max-height: 24px !important; width: auto !important; filter: none !important; }
       header button, header [role="button"] {
-        padding: 4px 10px !important;
-        font-size: 11px !important;
+        padding: 3px 6px !important;
+        font-size: 9px !important;
         line-height: 1.15 !important;
         border-radius: 999px !important;
       }
       header * { color: #111 !important; }
-      /* Hide bell (icon-only) and WATCH LIVE button in header */
+      header.ios-topbar {
+        display: flex !important;
+        flex-direction: column !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 60 !important;
+      }
+      .ios-status-row { display: none !important; }
+      .ios-header-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        min-height: 26px !important;
+      }
+      .ios-logo-slot { min-width: 64px !important; flex: 0 0 64px !important; overflow: hidden !important; }
+      .ios-topbar .vyro-logo-mark { transform: none !important; }
+      .ios-athlete-pill {
+        margin-left: auto !important;
+        min-height: 24px !important;
+        padding: 0 8px !important;
+        font-size: 8px !important;
+        letter-spacing: 0.04em !important;
+        white-space: nowrap !important;
+      }
+      .ios-icon-btn[data-testid="button-notifications"],
+      header button[aria-label="Notifications"] { display: none !important; }
+      .ios-module-title {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        padding-top: 0 !important;
+        gap: 6px !important;
+        min-height: 18px !important;
+      }
+      .ios-avatar { display: none !important; }
+      .ios-module-rail {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 5px !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+      }
+      .ios-rail-btn {
+        min-width: 0 !important;
+        min-height: 28px !important;
+        width: 100% !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        padding: 0 4px !important;
+        font-size: 9px !important;
+        white-space: nowrap !important;
+      }
+      .ios-rail-btn svg { width: 12px !important; height: 12px !important; flex: 0 0 auto !important; }
+      .ios-rail-btn span { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+      .ios-main .vyro-page { padding-top: 8px !important; }
+      /* Hide only the bell icon button in header */
       .vyro-hdr-hide { display: none !important; }
 
       /* Greeting block in header */
       #vyro-header-greeting {
         font-family: 'Satoshi', system-ui, sans-serif;
         flex: 1; min-width: 0;
-        display: flex; flex-direction: column; line-height: 1.05;
+        display: flex; align-items: baseline; gap: 6px; line-height: 1.05;
       }
       #vyro-header-greeting .eyebrow {
         font-family: 'JetBrains Mono', monospace;
-        font-size: 8px; letter-spacing: 0.18em;
+        font-size: 8px; letter-spacing: 0.08em;
         text-transform: uppercase; color: #6b7280;
       }
       #vyro-header-greeting .title {
-        font-weight: 800; font-size: 13px; color: #111;
+        font-weight: 900; font-size: 13px; color: #111;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
 
