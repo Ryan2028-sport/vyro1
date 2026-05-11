@@ -70,152 +70,138 @@
         -webkit-backdrop-filter: saturate(180%) blur(20px);
         backdrop-filter: saturate(180%) blur(20px);
       }
-      /* iOS-style frosted nav (bottom only) */
-      nav, [class*="fixed bottom-0"], [class*="sticky bottom-0"] {
-        background-color: rgba(255,255,255,0.78) !important;
+      /* === Bottom tab bar (LAST nav only) — frosted iOS === */
+      body > div > nav:last-of-type,
+      [class*="fixed bottom-0"], [class*="sticky bottom-0"] {
+        background-color: rgba(255,255,255,0.85) !important;
         -webkit-backdrop-filter: saturate(180%) blur(24px);
         backdrop-filter: saturate(180%) blur(24px);
         border-color: rgba(0,0,0,0.06) !important;
         color: #111 !important;
       }
-      /* Shrink + de-blacken the top header into a slim iOS status bar */
-      header, [class*="fixed top-0"], [class*="sticky top-0"] {
-        background-color: rgba(255,255,255,0.72) !important;
-        -webkit-backdrop-filter: saturate(180%) blur(24px);
-        backdrop-filter: saturate(180%) blur(24px);
-        border-bottom: 1px solid rgba(0,0,0,0.05) !important;
-        color: #111 !important;
-        min-height: 44px !important;
-        padding-top: 6px !important;
-        padding-bottom: 6px !important;
+
+      /* === Top header — slim white pill + big "Athlete" hero === */
+      header {
+        display: block !important;
+        background: transparent !important;
+        border: 0 !important;
         box-shadow: none !important;
-      }
-      header *, [class*="fixed top-0"] * , [class*="sticky top-0"] * {
+        padding: 10px 14px 4px !important;
+        min-height: 0 !important;
+        overflow: visible !important;
         color: #111 !important;
       }
-      /* Trim oversized header logos / titles */
-      header img, [class*="sticky top-0"] img, [class*="fixed top-0"] img {
-        max-height: 22px !important; width: auto !important;
-        filter: invert(1) brightness(0);
-      }
-      header h1, header h2, [class*="sticky top-0"] h1, [class*="sticky top-0"] h2 {
-        font-size: 15px !important; font-weight: 600 !important; letter-spacing: -0.01em !important;
-      }
-
-      /* === iPhone-optimized home screen — matches design reference === */
-      .ios-stage, .ios-phone-shell {
-        background: var(--vyro-canvas) !important;
-        box-shadow: none !important;
-      }
-
-      /* Slim white floating pill topbar (bell + title + WATCH LIVE) */
-      .ios-topbar {
+      header * { color: #111 !important; }
+      /* First row of header = the "WATCH LIVE" pill bar */
+      header > div:first-child {
         display: flex !important;
-        position: sticky !important;
-        top: 8px !important;
-        z-index: 30 !important;
-        margin: 8px 12px 10px !important;
-        padding: 8px 12px !important;
-        min-height: 44px !important;
+        align-items: center !important;
+        gap: 10px !important;
         background: #fff !important;
         border: 1px solid rgba(0,0,0,0.06) !important;
         border-radius: 999px !important;
+        padding: 8px 14px !important;
+        min-height: 44px !important;
         box-shadow: 0 4px 14px -6px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.04) !important;
-        align-items: center !important;
-        gap: 10px !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        letter-spacing: .04em !important;
       }
-      .ios-topbar * { color: #111 !important; }
-      .ios-status-row { display: none !important; }
-      .ios-header-row {
-        display: flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-        min-height: 28px !important;
-      }
-      .ios-module-title { display: block !important; font-size: 11px !important; }
-      .ios-icon-btn {
-        width: 30px !important; height: 30px !important;
+      header > div:first-child button {
+        order: -1;
         background: transparent !important;
+        padding: 0 !important;
+        width: 22px !important; height: 22px !important;
         box-shadow: none !important;
       }
-      .ios-icon-btn svg { width: 16px !important; height: 16px !important; color: #111 !important; }
-      .ios-logo-slot { min-width: 0 !important; }
-      .ios-topbar .vyro-logo-mark,
-      .ios-topbar .vyro-logo-img { display: none !important; }
-      .ios-athlete-pill {
-        margin-left: auto !important;
-        min-height: 26px !important;
-        padding: 0 10px !important;
-        font-size: 9px !important;
-        font-weight: 800 !important;
-        letter-spacing: .08em !important;
-        background: rgba(52,199,89,0.10) !important;
-        color: #1a7f37 !important;
-        border: 1px solid rgba(52,199,89,0.25) !important;
-        border-radius: 999px !important;
+      header > div:first-child img {
+        width: 18px !important; height: 18px !important;
+        filter: none !important;
       }
-      .ios-athlete-pill * { color: #1a7f37 !important; }
+      /* The WATCH LIVE chip — last text node area */
+      header > div:first-child > :last-child,
+      header > div:first-child :where(span,div):last-child {
+        margin-left: auto;
+      }
 
-      /* Module rail (TRENDS / SESSION / COACH) — pill chips */
-      .ios-module-rail {
-        justify-content: flex-start !important;
-        margin: 4px 0 14px !important;
-        padding: 2px 12px 4px !important;
+      /* Second row = VYRO IOS eyebrow + huge Athlete h1 + RC avatar */
+      header > div:nth-child(2) {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 14px 4px 6px !important;
         background: transparent !important;
-        border: 0 !important;
-        gap: 8px !important;
-        overflow-x: auto !important;
       }
-      .ios-module-rail > * {
+      header h1 {
+        font-size: 44px !important;
+        font-weight: 900 !important;
+        line-height: 1 !important;
+        letter-spacing: -0.035em !important;
+        color: #111 !important;
+        margin-top: 2px !important;
+      }
+      header h1 + *, header div > div > div:first-child:not(:has(h1)) {
+        font-size: 10px !important;
+        font-weight: 800 !important;
+        letter-spacing: .14em !important;
+        color: #8a8f98 !important;
+        text-transform: uppercase !important;
+      }
+
+      /* === Module rail (FIRST nav: TRENDS / SESSION / COACH / SOCIAL) === */
+      body > div > nav:first-of-type,
+      header + nav, main ~ nav:first-of-type {
+        position: static !important;
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 8px !important;
+        padding: 6px 14px 12px !important;
+        margin: 0 !important;
+        background: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        border: 0 !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        height: auto !important;
+        width: auto !important;
+        scrollbar-width: none;
+      }
+      body > div > nav:first-of-type::-webkit-scrollbar { display: none; }
+      body > div > nav:first-of-type button {
         flex: 0 0 auto !important;
         background: #fff !important;
         border: 1px solid rgba(0,0,0,0.08) !important;
         border-radius: 999px !important;
-        padding: 9px 14px !important;
-        font-size: 11px !important;
+        padding: 11px 18px !important;
+        font-size: 12px !important;
         font-weight: 800 !important;
-        letter-spacing: .08em !important;
+        letter-spacing: .1em !important;
         color: #111 !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
-        min-height: 36px !important;
+        min-height: 42px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        text-transform: uppercase !important;
+      }
+      body > div > nav:first-of-type button img,
+      body > div > nav:first-of-type button svg {
+        width: 16px !important; height: 16px !important;
+        filter: none !important;
       }
 
-      /* Page body padding */
-      .ios-main .vyro-page { padding: 0 14px 24px !important; }
-      .ios-main .vyro-page::before { content: none !important; display: none !important; }
-
-      /* Greeting / page header block — show eyebrow + h1 + subtitle */
-      .page-header {
-        display: block !important;
-        position: relative !important;
-        padding: 4px 0 10px !important;
-        background: transparent !important;
-        margin: 0 0 12px !important;
-      }
-      .page-header .eyebrow {
-        display: block !important;
-        font-size: 10px !important;
-        font-weight: 800 !important;
-        letter-spacing: .12em !important;
-        color: #8a8f98 !important;
-        margin-bottom: 4px !important;
-      }
-      .page-header h1 {
-        display: block !important;
-        color: #111 !important;
-        font-size: 26px !important;
+      /* === Main page content === */
+      main { padding: 6px 14px 96px !important; background: var(--vyro-canvas) !important; }
+      main h1 {
+        font-size: 28px !important;
         font-weight: 900 !important;
         line-height: 1.05 !important;
-        letter-spacing: -0.025em !important;
-        margin-bottom: 6px !important;
+        letter-spacing: -0.03em !important;
+        color: #111 !important;
       }
-      .page-header p {
-        display: block !important;
-        color: #6b7280 !important;
-        font-size: 13px !important;
-        line-height: 1.35 !important;
-      }
-      .page-header > .flex.gap-2 { display: flex !important; }
+      main p { font-size: 13px !important; line-height: 1.4 !important; color: #6b7280 !important; }
+
 
       /* iOS-style refinements: softer surfaces, hairline borders, gentle shadows */
       .rounded-xl, .rounded-2xl, .rounded-3xl {
