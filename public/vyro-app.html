@@ -363,16 +363,25 @@
           if (!greetingTitle) greetingTitle = 'Good morning, Ryan.';
           if (!eyebrow) eyebrow = 'Athlete Dashboard';
 
-          // 2) Hide every header button: bell (icon-only) AND WATCH LIVE / connected pill
-          var hdrButtons = hdr.querySelectorAll(':scope > button, :scope > [role="button"], :scope > a');
-          hdrButtons.forEach(function (b) { b.classList.add('vyro-hdr-hide'); });
+          // 2) Hide only the notification bell button; keep Watch Live and the 4 module buttons
+          var hdrButtons = hdr.querySelectorAll('button, [role="button"], a');
+          hdrButtons.forEach(function (b) {
+            var label = (b.getAttribute('aria-label') || b.textContent || '').trim();
+            if (/notifications?/i.test(label) || (b.querySelector('svg') && !b.textContent.trim())) {
+              b.classList.add('vyro-hdr-hide');
+            } else {
+              b.classList.remove('vyro-hdr-hide');
+            }
+          });
 
           // 3) Inject greeting block once
           if (!hdr.querySelector('#vyro-header-greeting')) {
             var greet = document.createElement('div');
             greet.id = 'vyro-header-greeting';
             greet.innerHTML = '<span class="eyebrow"></span><span class="title"></span>';
-            hdr.appendChild(greet);
+            var titleRow = hdr.querySelector('.ios-module-title');
+            if (titleRow) titleRow.insertBefore(greet, titleRow.firstChild);
+            else hdr.appendChild(greet);
           }
           var g = hdr.querySelector('#vyro-header-greeting');
           if (g) {
@@ -380,7 +389,7 @@
             g.querySelector('.title').textContent = greetingTitle;
           }
 
-          // 4) Hide athlete profile meta line (e.g. "Ryan Chen · Squash · D1 National")
+          // 4) Keep the original page header hidden now that its text is in the top header
           var nameRe = /(Ryan\s*Chen|Squash|D1\s*National|National\s*team)/i;
           var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
           var node;
