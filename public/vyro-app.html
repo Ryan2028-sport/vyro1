@@ -123,10 +123,16 @@
       header * { color: #111 !important; }
 
       /* Hide bottom dock text labels — icons only */
-      body > div > nav:last-of-type button > span,
-      [class*="fixed bottom-0"] button > span,
-      [class*="sticky bottom-0"] button > span {
-        display: none !important;
+      body > div > nav:last-of-type button,
+      [class*="fixed bottom-0"] button,
+      [class*="sticky bottom-0"] button {
+        font-size: 0 !important;
+      }
+      body > div > nav:last-of-type button svg,
+      body > div > nav:last-of-type button img,
+      [class*="fixed bottom-0"] button svg,
+      [class*="fixed bottom-0"] button img {
+        font-size: 12px !important;
       }
 
       /* Module rail nav (first nav) */
