@@ -155,7 +155,8 @@
   }
 
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    @apply bg-vyro-canvas text-gray-900;
+    margin: 0;
+    padding: 0;
   }
 }
