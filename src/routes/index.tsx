@@ -15,11 +15,9 @@ export const Route = createFileRoute("/")({
 });
 
 function App() {
-  return (
-    <iframe
-      src="/vyro-app.html"
-      title="VYRO Athlete OS"
-      className="fixed inset-0 h-screen w-screen border-0"
-    />
-  );
+  if (typeof window !== "undefined") {
+    window.location.replace("/vyro-app.html");
+  }
+
+  return null;
 }
