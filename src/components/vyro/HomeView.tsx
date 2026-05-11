@@ -8,8 +8,8 @@ export function HomeView({ jump }: { jump: (v: ViewId, tab?: string) => void }) 
         eyebrow="Athlete Dashboard"
         title="Good morning, Ryan."
         subtitle="Tactical performance intelligence synced from your VYRO watch."
-        action={<Pill>watch connected · 94%</Pill>}
       />
+
       <div className="mb-4 grid grid-cols-4 gap-3">
         {heroMetrics.map((m) => (
           <ScoreRing key={m.id} metric={m} onClick={() => jump(m.target, m.tab)} />
