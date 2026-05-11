@@ -240,29 +240,33 @@
       /* Hide athlete profile name + sport line */
       .vyro-athlete-meta-hidden { display: none !important; }
 
-      /* Bottom nav — visible, inline, icons + labels */
+      /* Bottom nav — black bar, 4 buttons visible */
       [class*="fixed bottom-0"] {
         position: relative !important;
         left: auto !important; right: auto !important; bottom: auto !important;
-        background: #ffffff !important;
-        border-top: 1px solid #e5e7eb !important;
-        color: #111 !important;
-        padding: 10px 12px !important;
+        background: #000 !important;
+        border-top: 1px solid rgba(255,255,255,0.1) !important;
+        color: #fff !important;
+        padding: 12px !important;
         display: grid !important;
         grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
         gap: 8px !important;
+        margin-top: 16px !important;
       }
       [class*="fixed bottom-0"] button {
-        color: #111 !important;
-        background: transparent !important;
-        border: 1px solid transparent !important;
+        color: #fff !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: 1px solid rgba(255,255,255,0.15) !important;
+        border-radius: 14px !important;
         font-size: 11px !important;
+        padding: 8px 4px !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
         gap: 4px !important;
+        min-height: 52px !important;
       }
-      [class*="fixed bottom-0"] svg { width: 18px !important; height: 18px !important; color: #111 !important; }
+      [class*="fixed bottom-0"] svg { width: 18px !important; height: 18px !important; color: #fff !important; }
 
       /* Module rail nav (first nav) */
       body > div > nav:first-of-type {
