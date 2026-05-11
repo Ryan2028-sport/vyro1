@@ -310,7 +310,9 @@
           /6[\s-]*axis\s*IMU/i,
           /Vitals\s*[—–-]\s*live\s*from/i,
           /^\s*VYRO\s*iOS\s*$/i,
-          /^\s*RC\s*$/
+          /^\s*RC\s*$/,
+          /watch\s*connected/i,
+          /^\s*\d+%\s*$/
         ];
         var DOCK_LABELS = /^\s*(Athlete|Sport|Recovery|Sleep)\s*$/;
         function inDock(el) {
