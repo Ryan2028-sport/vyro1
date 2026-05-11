@@ -111,8 +111,17 @@
         border-bottom: 1px solid rgba(0,0,0,0.05) !important;
         box-shadow: none !important;
         color: #111 !important;
-        padding-top: max(env(safe-area-inset-top), 6px) !important;
+        padding-top: max(env(safe-area-inset-top), 2px) !important;
+        padding-bottom: 4px !important;
+        min-height: 0 !important;
+        transform: scale(0.5);
+        transform-origin: top left;
+        width: 200% !important;
       }
+      /* Compensate for scaled header so content isn't covered */
+      header + * { margin-top: 0 !important; }
+      header img, header svg { max-height: 18px !important; width: auto !important; }
+      header button, header [role="button"] { min-height: 0 !important; padding: 4px 8px !important; font-size: 10px !important; }
       header * { color: #111 !important; }
       header img { filter: none !important; }
 
