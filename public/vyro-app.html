@@ -240,33 +240,63 @@
       /* Hide athlete profile name + sport line */
       .vyro-athlete-meta-hidden { display: none !important; }
 
-      /* Bottom nav — black bar, 4 buttons visible */
+      /* Bottom nav — floating white pill bar */
       [class*="fixed bottom-0"] {
-        position: relative !important;
-        left: auto !important; right: auto !important; bottom: auto !important;
-        background: #000 !important;
-        border-top: 1px solid rgba(255,255,255,0.1) !important;
-        color: #fff !important;
-        padding: 12px !important;
+        position: fixed !important;
+        left: 50% !important;
+        right: auto !important;
+        bottom: 16px !important;
+        transform: translateX(-50%) !important;
+        width: calc(100% - 24px) !important;
+        max-width: 420px !important;
+        background: #ffffff !important;
+        border: 1px solid rgba(0,0,0,0.06) !important;
+        border-radius: 999px !important;
+        box-shadow: 0 10px 30px -8px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.06) !important;
+        color: #9ca3af !important;
+        padding: 10px 8px !important;
         display: grid !important;
         grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-        gap: 8px !important;
-        margin-top: 16px !important;
+        gap: 4px !important;
+        margin: 0 !important;
+        z-index: 50 !important;
       }
       [class*="fixed bottom-0"] button {
-        color: #fff !important;
-        background: rgba(255,255,255,0.05) !important;
-        border: 1px solid rgba(255,255,255,0.15) !important;
-        border-radius: 14px !important;
-        font-size: 11px !important;
-        padding: 8px 4px !important;
+        color: #9ca3af !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 999px !important;
+        font-size: 10px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        padding: 6px 4px !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
+        justify-content: center !important;
         gap: 4px !important;
-        min-height: 52px !important;
+        min-height: 48px !important;
       }
-      [class*="fixed bottom-0"] svg { width: 18px !important; height: 18px !important; color: #fff !important; }
+      [class*="fixed bottom-0"] svg {
+        width: 22px !important; height: 22px !important;
+        color: #9ca3af !important;
+        stroke-width: 2 !important;
+      }
+      [class*="fixed bottom-0"] button[aria-current="page"],
+      [class*="fixed bottom-0"] button.is-active,
+      [class*="fixed bottom-0"] button[data-active="true"],
+      [class*="fixed bottom-0"] button[aria-selected="true"] {
+        color: #17c8a4 !important;
+      }
+      [class*="fixed bottom-0"] button[aria-current="page"] svg,
+      [class*="fixed bottom-0"] button.is-active svg,
+      [class*="fixed bottom-0"] button[data-active="true"] svg,
+      [class*="fixed bottom-0"] button[aria-selected="true"] svg {
+        color: #17c8a4 !important;
+      }
+      /* Leave room for the floating bar */
+      main { padding-bottom: 96px !important; }
 
       /* Module rail nav (first nav) */
       body > div > nav:first-of-type {
