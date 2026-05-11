@@ -29,6 +29,11 @@ export const Route = createFileRoute("/")({
 
 function App() {
   const [view, setView] = useState<ViewId>("home");
+  const [selectedSport, setSelectedSport] = useState("Squash");
+  const [sportTab, setSportTab] = useState<"database" | "agility" | "swing">("database");
+  const [recoveryTab, setRecoveryTab] = useState<"live" | "ingame" | "fatigue" | "overnight">("live");
+  const [sleepTab, setSleepTab] = useState<"overall" | "timeline" | "wakeups" | "performance">("overall");
+  const [socialTab, setSocialTab] = useState<"feed" | "profile" | "group" | "compete">("feed");
 
   const jump = (v: ViewId, _tab?: string) => setView(v);
 
@@ -37,11 +42,18 @@ function App() {
       {view === "home" && <HomeView jump={jump} />}
       {view === "trends" && <TrendsView />}
       {view === "session" && <SessionView />}
-      {view === "sport" && <SportView />}
-      {view === "recovery" && <RecoveryView />}
-      {view === "sleep" && <SleepView />}
+      {view === "sport" && (
+        <SportView
+          selectedSport={selectedSport}
+          setSelectedSport={setSelectedSport}
+          sportTab={sportTab}
+          setSportTab={setSportTab}
+        />
+      )}
+      {view === "recovery" && <RecoveryView recoveryTab={recoveryTab} setRecoveryTab={setRecoveryTab} />}
+      {view === "sleep" && <SleepView sleepTab={sleepTab} setSleepTab={setSleepTab} />}
       {view === "coach" && <CoachView />}
-      {view === "social" && <SocialView />}
+      {view === "social" && <SocialView socialTab={socialTab} setSocialTab={setSocialTab} />}
       {view === "diet" && <DietView />}
       {view === "video" && <VideoView />}
     </Layout>
