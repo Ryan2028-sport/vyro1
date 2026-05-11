@@ -14,8 +14,12 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-import { HomeView } from "@/components/vyro/HomeView";
-
 function App() {
-  return <HomeView />;
+  return (
+    <iframe
+      src="/vyro-app.html"
+      title="VYRO Athlete OS"
+      className="fixed inset-0 h-screen w-screen border-0"
+    />
+  );
 }
