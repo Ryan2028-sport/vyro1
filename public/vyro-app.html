@@ -109,25 +109,7 @@
         box-shadow: none !important;
       }
       .ios-topbar {
-        position: sticky !important;
-        top: 0 !important;
-        min-height: 0 !important;
-        padding: 8px 12px 0 !important;
-        background: var(--vyro-canvas) !important;
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
-        border-bottom: 1px solid rgba(0,0,0,0.06) !important;
-        box-shadow: none !important;
-      }
-      .ios-topbar::before {
-        content: "Good morning, Ryan.";
-        display: block;
-        margin: 0 0 8px;
-        color: #111;
-        font-size: 21px;
-        font-weight: 900;
-        line-height: 1.05;
-        letter-spacing: -0.02em;
+        display: none !important;
       }
       .ios-status-row,
       .ios-header-row,
@@ -175,7 +157,7 @@
         padding-top: 10px !important;
       }
       .ios-main .vyro-page::before {
-        content: "Good morning, Ryan.";
+        content: none;
         display: none;
         margin: 0 0 12px;
         color: #111;
@@ -185,11 +167,11 @@
         letter-spacing: -0.02em;
       }
       .page-header {
-        display: none !important;
+        display: block !important;
         position: relative !important;
         z-index: 1 !important;
         align-items: flex-start !important;
-        margin: 4px 0 14px !important;
+        margin: 0 0 14px !important;
       }
       .page-header .eyebrow,
       .page-header p,
