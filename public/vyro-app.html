@@ -504,9 +504,26 @@
             }
           }
         }
-        setTimeout(function(){ pass(); rebuildHeader(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); }, 1500);
+        function tagWatchCard() {
+          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          var node;
+          while ((node = w.nextNode())) {
+            var tt = (node.textContent || '');
+            if (/VYRO\s*Watch/i.test(tt)) {
+              var card = node.parentElement;
+              for (var i = 0; i < 6 && card; i++) {
+                if (card.tagName === 'SECTION' || card.tagName === 'ARTICLE' ||
+                    /rounded|border|card/i.test(card.className || '')) break;
+                card = card.parentElement;
+              }
+              if (card) card.classList.add('vyro-watch-card');
+              break;
+            }
+          }
+        }
+        setTimeout(function(){ pass(); rebuildHeader(); tagWatchCard(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); tagWatchCard(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); tagWatchCard(); }, 1500);
       });
     </script>
     <script type="module">
