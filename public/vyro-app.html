@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
@@ -29,6 +29,30 @@
         --vyro-positive: #34C759;
         --vyro-spatial: #007AFF;
         --vyro-alert: #FF3B30;
+        /* Override prototype's HSL design-system tokens to light mode */
+        --background: 0 0% 100% !important;
+        --foreground: 0 0% 7% !important;
+        --card: 240 5% 96% !important;
+        --card-foreground: 0 0% 7% !important;
+        --card-border: 240 5% 90% !important;
+        --border: 240 5% 90% !important;
+        --popover: 0 0% 100% !important;
+        --popover-foreground: 0 0% 7% !important;
+        --muted: 240 5% 96% !important;
+        --muted-foreground: 240 4% 40% !important;
+        --secondary: 240 5% 96% !important;
+        --secondary-foreground: 0 0% 7% !important;
+        --accent: 240 5% 96% !important;
+        --accent-foreground: 0 0% 7% !important;
+        --primary: 211 100% 50% !important;
+        --primary-foreground: 0 0% 100% !important;
+        --sidebar: 0 0% 100% !important;
+        --sidebar-foreground: 0 0% 7% !important;
+        --sidebar-border: 240 5% 90% !important;
+        --button-outline: rgba(0,0,0,.08) !important;
+        --badge-outline: rgba(0,0,0,.06) !important;
+        --elevate-1: rgba(0,0,0,.03) !important;
+        --elevate-2: rgba(0,0,0,.06) !important;
       }
       html, body { background: var(--vyro-canvas) !important; color: #111 !important; }
       /* Neutralize the prototype's dark surfaces to the new bento system */
