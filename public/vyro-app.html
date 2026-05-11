@@ -113,14 +113,20 @@
         color: #111 !important;
         padding: 4px 12px !important;
       }
-      header img { max-height: 18px !important; width: auto !important; }
+      header img { max-height: 29px !important; width: auto !important; filter: none !important; }
       header button, header [role="button"] {
-        padding: 4px 10px !important;
+        padding: 3px 9px !important;
         font-size: 10px !important;
         line-height: 1.2 !important;
       }
       header * { color: #111 !important; }
-      header img { filter: none !important; }
+
+      /* Hide bottom dock text labels — icons only */
+      body > div > nav:last-of-type button > span,
+      [class*="fixed bottom-0"] button > span,
+      [class*="sticky bottom-0"] button > span {
+        display: none !important;
+      }
 
       /* Module rail nav (first nav) */
       body > div > nav:first-of-type {
