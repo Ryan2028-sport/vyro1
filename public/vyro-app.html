@@ -370,6 +370,30 @@
       /* Slim scrollbar */
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { scrollbar-width: none; }
+
+      /* Session view: keep Start session button inside the device card */
+      [data-testid="card-device"] > div {
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+      }
+      [data-testid="card-device"] [data-testid="button-start-session"],
+      [data-testid="card-device"] [data-testid="button-end-session"],
+      [data-testid="card-device"] [data-testid="button-new-session"] {
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+      }
+      @media (max-width: 520px) {
+        [data-testid="card-device"] > div > div:last-child {
+          width: 100% !important;
+          margin-left: 0 !important;
+        }
+        [data-testid="card-device"] [data-testid="button-start-session"],
+        [data-testid="card-device"] [data-testid="button-end-session"],
+        [data-testid="card-device"] [data-testid="button-new-session"] {
+          width: 100% !important;
+          justify-content: center !important;
+        }
+      }
     </style>
   </head>
   <body>
