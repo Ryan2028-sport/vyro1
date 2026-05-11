@@ -213,7 +213,9 @@
           /^\s*LTE\s*[·•]?\s*\d+%\s*$/i,
           /Goodix\s*GH3026/i,
           /6[\s-]*axis\s*IMU/i,
-          /Vitals\s*[—–-]\s*live\s*from/i
+          /Vitals\s*[—–-]\s*live\s*from/i,
+          /^\s*VYRO\s*iOS\s*$/i,
+          /^\s*RC\s*$/
         ];
         function pass() {
           var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
