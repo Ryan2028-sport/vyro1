@@ -37,7 +37,6 @@ export function SessionView() {
       <PageHeader
         eyebrow="Session · T-Control Tracking"
         title="Court session"
-        subtitle="Goodix PPG + ST 6-axis IMU streaming live."
         action={
           live ? (
             <button
