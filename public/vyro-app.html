@@ -102,7 +102,7 @@
         width: 22px !important; height: 22px !important;
       }
 
-      /* === Top header — packed: logo, athlete+greeting, pill rail, watch live === */
+      /* === Top header — single compact row: logo | greeting === */
       header {
         background: rgba(255,255,255,0.92) !important;
         -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -111,28 +111,20 @@
         border-bottom: 1px solid rgba(0,0,0,0.06) !important;
         box-shadow: none !important;
         color: #111 !important;
-        padding: 6px 10px 8px !important;
+        padding: 6px 12px !important;
         min-height: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 6px !important;
+        gap: 10px !important;
       }
-      /* Header row 1 wrapper (built by JS) */
-      #vyro-hdr-row1 {
-        display: flex; align-items: center; gap: 8px; width: 100%;
-      }
-      #vyro-hdr-row1 > .vyro-hdr-orig { display: flex; align-items: center; gap: 8px; }
-      header img { max-height: 22px !important; width: auto !important; filter: none !important; }
+      header img { max-height: 26px !important; width: auto !important; filter: none !important; }
       header button, header [role="button"] {
-        padding: 4px 9px !important;
-        font-size: 10px !important;
+        padding: 4px 10px !important;
+        font-size: 11px !important;
         line-height: 1.15 !important;
         border-radius: 999px !important;
       }
       header * { color: #111 !important; }
-      /* Hide bell icon (last button in header) */
-      #vyro-bell-hidden { display: none !important; }
+      /* Hide bell (icon-only) and WATCH LIVE button in header */
+      .vyro-hdr-hide { display: none !important; }
 
       /* Greeting block in header */
       #vyro-header-greeting {
@@ -146,33 +138,14 @@
         text-transform: uppercase; color: #6b7280;
       }
       #vyro-header-greeting .title {
-        font-weight: 800; font-size: 12px; color: #111;
+        font-weight: 800; font-size: 13px; color: #111;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
 
-      /* Pill rail moved into header */
-      #vyro-hdr-rail {
-        display: flex; gap: 6px; width: 100%;
-        overflow-x: auto; -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-      }
-      #vyro-hdr-rail::-webkit-scrollbar { display: none; }
-      #vyro-hdr-rail button {
-        flex: 1 1 0; min-width: 0;
-        padding: 5px 6px !important;
-        font-size: 10px !important;
-        font-weight: 600 !important;
-        background: #fff !important;
-        border: 1px solid rgba(0,0,0,0.08) !important;
-        border-radius: 999px !important;
-        color: #111 !important;
-        white-space: nowrap;
-      }
-
-      /* Hide the original PageHeader greeting block + original module rail */
-      main > div:first-child > div:first-child:has(> h1),
-      main header { display: none !important; }
-      body > div > nav:first-of-type.vyro-rail-relocated { display: none !important; }
+      /* Hide the original PageHeader greeting block (now in header) */
+      .vyro-pageheader-hidden { display: none !important; }
+      /* Hide athlete profile name + sport line */
+      .vyro-athlete-meta-hidden { display: none !important; }
 
       /* Hide bottom dock text labels — icons only */
       body > div > nav:last-of-type *,
