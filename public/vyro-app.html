@@ -126,10 +126,10 @@
       header.ios-topbar {
         display: flex !important;
         flex-direction: column !important;
-        position: sticky !important;
-        top: 0 !important;
+        position: relative !important;
         z-index: 60 !important;
       }
+      header { position: relative !important; }
       .ios-status-row { display: none !important; }
       .ios-header-row {
         display: flex !important;
@@ -356,8 +356,11 @@
               greetingTitle = tx;
               var prev = h1s[i].previousElementSibling;
               if (prev) eyebrow = (prev.textContent || '').trim();
-              var block = h1s[i].closest('div');
-              if (block && block.parentElement) block.parentElement.classList.add('vyro-pageheader-hidden');
+              // Hide eyebrow, h1, and subtitle (next sibling) individually
+              if (prev) prev.classList.add('vyro-pageheader-hidden');
+              h1s[i].classList.add('vyro-pageheader-hidden');
+              var nxt = h1s[i].nextElementSibling;
+              if (nxt) nxt.classList.add('vyro-pageheader-hidden');
               break;
             }
           }
