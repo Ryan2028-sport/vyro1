@@ -78,6 +78,24 @@
       .bg-sky-500, .bg-blue-500, .bg-blue-400 { background-color: var(--vyro-spatial) !important; }
       .text-red-400, .text-red-500, .text-rose-400, .text-rose-500 { color: var(--vyro-alert) !important; }
       .bg-red-500, .bg-rose-500 { background-color: var(--vyro-alert) !important; }
+
+      /* Dial / gauge SVG strokes — prototype uses white on dark; recolor for light bento */
+      svg circle[stroke="white"], svg circle[stroke="#fff"], svg circle[stroke="#FFFFFF"],
+      svg path[stroke="white"], svg path[stroke="#fff"], svg path[stroke="#FFFFFF"] {
+        stroke: var(--vyro-spatial) !important;
+      }
+      /* Dial track rings (low-opacity white) become subtle gray */
+      svg [stroke-opacity], svg circle[stroke-opacity] { stroke-opacity: 1 !important; }
+      svg circle[stroke="rgba(255,255,255,0.1)"], svg circle[stroke="rgba(255,255,255,0.08)"],
+      svg circle[stroke="rgba(255,255,255,0.15)"], svg circle[stroke="rgba(255,255,255,0.2)"] {
+        stroke: rgba(0,0,0,0.08) !important;
+      }
+      /* Pill chrome — translucent white pills become surface chips */
+      .bg-white\/5, .bg-white\/10, .bg-white\/15, .bg-white\/20 {
+        background-color: var(--vyro-surface) !important;
+      }
+      .ring-white\/10, .ring-white\/15, .ring-white\/20 { --tw-ring-color: rgba(0,0,0,0.06) !important; }
+
       /* Standardized bento curvature */
       .rounded-2xl, .rounded-3xl { border-radius: 1.5rem !important; }
     </style>
