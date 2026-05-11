@@ -87,7 +87,7 @@ export function Layout({
         </aside>
 
         <main className="relative flex min-h-screen flex-1 flex-col pb-24 lg:pb-0">
-          <header className="sticky top-0 z-30 border-b border-white/10 bg-black/75 px-4 py-3 backdrop-blur-xl lg:px-8">
+          <header className="relative z-30 border-b border-white/10 bg-black/75 px-4 py-3 backdrop-blur-xl lg:px-8">
             <div className="flex items-center justify-between gap-3">
               <div className="lg:hidden">
                 <Logo className="h-14" />
