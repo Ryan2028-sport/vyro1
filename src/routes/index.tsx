@@ -14,12 +14,8 @@ export const Route = createFileRoute("/")({
   }),
 });
 
+import VyroApp from "@/components/VyroApp";
+
 function App() {
-  return (
-    <iframe
-      src="/vyro-app.html"
-      title="VYRO Athlete OS"
-      className="fixed inset-0 h-screen w-screen border-0"
-    />
-  );
+  return <VyroApp />;
 }
