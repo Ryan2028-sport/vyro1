@@ -192,48 +192,35 @@
   <body>
     <div id="root"></div>
     <script>
-      // Strip fake iOS status bar (9:41 / LTE) and the GH3026/IMU vitals caption.
-      // Real iPhone status bar shows the real time.
-      (function () {
-        var KILL_PATTERNS = [
-          /^\s*9:41\s*$/i,
+      // Hide fake iOS status bar (9:41 / LTE) and the Goodix vitals caption.
+      // Runs after React mounts; no observer to avoid re-render loops.
+      window.addEventListener('load', function () {
+        var KILL = [
+          /^\s*9:41\s*$/,
           /^\s*LTE\s*[·•]?\s*\d+%\s*$/i,
           /Goodix\s*GH3026/i,
           /6[\s-]*axis\s*IMU/i,
           /Vitals\s*[—–-]\s*live\s*from/i
         ];
-        function shouldKill(text) {
-          if (!text) return false;
-          for (var i = 0; i < KILL_PATTERNS.length; i++) {
-            if (KILL_PATTERNS[i].test(text)) return true;
-          }
-          return false;
-        }
-        function scrub(root) {
-          if (!root) return;
-          var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-          var hits = [];
-          var n;
-          while ((n = walker.nextNode())) {
-            if (shouldKill(n.textContent)) hits.push(n);
+        function pass() {
+          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          var n, hits = [];
+          while ((n = w.nextNode())) {
+            var t = n.textContent || '';
+            for (var i = 0; i < KILL.length; i++) {
+              if (KILL[i].test(t)) { hits.push(n); break; }
+            }
           }
           hits.forEach(function (node) {
-            // Just blank the text node — safe, doesn't disturb layout/listeners
-            node.textContent = '';
-            // Hide its immediate parent if it now has no visible text
-            var p = node.parentElement;
-            if (p && !p.textContent.trim() && p.children.length === 0) {
-              p.style.display = 'none';
-            }
+            var el = node.parentElement;
+            if (el) el.style.display = 'none';
           });
         }
-        var run = function () { scrub(document.body); };
-        run();
-        new MutationObserver(run).observe(document.documentElement, {
-          childList: true, subtree: true, characterData: true
-        });
-        document.addEventListener('DOMContentLoaded', run);
-      })();
+        // Run a few times as React hydrates / streams in
+        setTimeout(pass, 100);
+        setTimeout(pass, 500);
+        setTimeout(pass, 1500);
+      });
     </script>
     <script type="module">
 
