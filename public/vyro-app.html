@@ -109,14 +109,25 @@
         box-shadow: none !important;
       }
       .ios-topbar {
-        position: static !important;
+        position: sticky !important;
+        top: 0 !important;
         min-height: 0 !important;
-        padding: 4px 12px 0 !important;
+        padding: 8px 12px 0 !important;
         background: var(--vyro-canvas) !important;
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
         border-bottom: 1px solid rgba(0,0,0,0.06) !important;
         box-shadow: none !important;
+      }
+      .ios-topbar::before {
+        content: "Good morning, Ryan.";
+        display: block;
+        margin: 0 0 8px;
+        color: #111;
+        font-size: 21px;
+        font-weight: 900;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
       }
       .ios-status-row,
       .ios-header-row,
@@ -165,7 +176,7 @@
       }
       .ios-main .vyro-page::before {
         content: "Good morning, Ryan.";
-        display: block;
+        display: none;
         margin: 0 0 12px;
         color: #111;
         font-size: 22px;
