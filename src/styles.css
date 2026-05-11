@@ -69,13 +69,7 @@
   /* Aliases matching tailwind.config naming */
   --color-vyro-positive: var(--vyro-recovery);
   --color-vyro-alert: var(--vyro-fatigue);
-  --color-vyro-session: var(--vyro-session);
-  --color-vyro-coach: var(--vyro-coach);
 }
-
-/* Slim scrollbar for a "thin" feel */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { scrollbar-width: none; }
 
 :root {
   --radius: 0.625rem;
@@ -118,8 +112,6 @@
   --vyro-recovery: oklch(0.723 0.182 144.5);  /* #34C759 */
   --vyro-spatial: oklch(0.623 0.214 259.8);   /* #007AFF */
   --vyro-fatigue: oklch(0.637 0.237 25.3);    /* #FF3B30 */
-  --vyro-session: oklch(0.606 0.234 312.4);   /* #AF52DE */
-  --vyro-coach:   oklch(0.762 0.171 65.5);    /* #FF9500 */
 }
 
 .dark {

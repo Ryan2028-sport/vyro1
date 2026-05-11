@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import VyroApp from "@/components/VyroApp";
 
 export const Route = createFileRoute("/")({
-  component: VyroApp,
+  component: App,
   head: () => ({
     meta: [
       { title: "VYRO · Athlete Intelligence for Racket Sports" },
@@ -14,3 +13,13 @@ export const Route = createFileRoute("/")({
     ],
   }),
 });
+
+function App() {
+  return (
+    <iframe
+      src="/vyro-app.html"
+      title="VYRO Athlete OS"
+      className="fixed inset-0 h-screen w-screen border-0"
+    />
+  );
+}
