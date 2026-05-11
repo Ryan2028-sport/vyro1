@@ -102,7 +102,7 @@
         width: 22px !important; height: 22px !important;
       }
 
-      /* === Top header — packed: logo, athlete+greeting, pill rail, watch live === */
+      /* === Top header — single compact row: logo | greeting === */
       header {
         background: rgba(255,255,255,0.92) !important;
         -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -111,28 +111,20 @@
         border-bottom: 1px solid rgba(0,0,0,0.06) !important;
         box-shadow: none !important;
         color: #111 !important;
-        padding: 6px 10px 8px !important;
+        padding: 6px 12px !important;
         min-height: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 6px !important;
+        gap: 10px !important;
       }
-      /* Header row 1 wrapper (built by JS) */
-      #vyro-hdr-row1 {
-        display: flex; align-items: center; gap: 8px; width: 100%;
-      }
-      #vyro-hdr-row1 > .vyro-hdr-orig { display: flex; align-items: center; gap: 8px; }
-      header img { max-height: 22px !important; width: auto !important; filter: none !important; }
+      header img { max-height: 26px !important; width: auto !important; filter: none !important; }
       header button, header [role="button"] {
-        padding: 4px 9px !important;
-        font-size: 10px !important;
+        padding: 4px 10px !important;
+        font-size: 11px !important;
         line-height: 1.15 !important;
         border-radius: 999px !important;
       }
       header * { color: #111 !important; }
-      /* Hide bell icon (last button in header) */
-      #vyro-bell-hidden { display: none !important; }
+      /* Hide bell (icon-only) and WATCH LIVE button in header */
+      .vyro-hdr-hide { display: none !important; }
 
       /* Greeting block in header */
       #vyro-header-greeting {
@@ -146,33 +138,14 @@
         text-transform: uppercase; color: #6b7280;
       }
       #vyro-header-greeting .title {
-        font-weight: 800; font-size: 12px; color: #111;
+        font-weight: 800; font-size: 13px; color: #111;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
 
-      /* Pill rail moved into header */
-      #vyro-hdr-rail {
-        display: flex; gap: 6px; width: 100%;
-        overflow-x: auto; -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-      }
-      #vyro-hdr-rail::-webkit-scrollbar { display: none; }
-      #vyro-hdr-rail button {
-        flex: 1 1 0; min-width: 0;
-        padding: 5px 6px !important;
-        font-size: 10px !important;
-        font-weight: 600 !important;
-        background: #fff !important;
-        border: 1px solid rgba(0,0,0,0.08) !important;
-        border-radius: 999px !important;
-        color: #111 !important;
-        white-space: nowrap;
-      }
-
-      /* Hide the original PageHeader greeting block + original module rail */
-      main > div:first-child > div:first-child:has(> h1),
-      main header { display: none !important; }
-      body > div > nav:first-of-type.vyro-rail-relocated { display: none !important; }
+      /* Hide the original PageHeader greeting block (now in header) */
+      .vyro-pageheader-hidden { display: none !important; }
+      /* Hide athlete profile name + sport line */
+      .vyro-athlete-meta-hidden { display: none !important; }
 
       /* Hide bottom dock text labels — icons only */
       body > div > nav:last-of-type *,
@@ -316,49 +289,33 @@
           var hdr = document.querySelector('header');
           if (!hdr) return;
 
-          // 1) Find greeting + eyebrow from the page
+          // 1) Find greeting + eyebrow from the page; hide that PageHeader block
           var greetingTitle = '', eyebrow = '';
           var h1s = document.querySelectorAll('main h1, main h2');
           for (var i = 0; i < h1s.length; i++) {
             var tx = (h1s[i].textContent || '').trim();
             if (/good\s+(morning|afternoon|evening)/i.test(tx)) {
               greetingTitle = tx;
-              var block = h1s[i].closest('div');
-              // eyebrow = sibling above h1 (small uppercase)
               var prev = h1s[i].previousElementSibling;
               if (prev) eyebrow = (prev.textContent || '').trim();
-              if (block && block.parentElement) block.parentElement.style.display = 'none';
+              var block = h1s[i].closest('div');
+              if (block && block.parentElement) block.parentElement.classList.add('vyro-pageheader-hidden');
               break;
             }
           }
           if (!greetingTitle) greetingTitle = 'Good morning, Ryan.';
           if (!eyebrow) eyebrow = 'Athlete Dashboard';
 
-          // 2) Hide the bell (last button in header)
-          var hdrButtons = hdr.querySelectorAll(':scope > button, :scope > [role="button"]');
-          if (hdrButtons.length) {
-            var bell = hdrButtons[hdrButtons.length - 1];
-            // bell has only an svg/icon, no text
-            if (!(bell.textContent || '').trim()) bell.id = 'vyro-bell-hidden';
-          }
+          // 2) Hide every header button: bell (icon-only) AND WATCH LIVE / connected pill
+          var hdrButtons = hdr.querySelectorAll(':scope > button, :scope > [role="button"], :scope > a');
+          hdrButtons.forEach(function (b) { b.classList.add('vyro-hdr-hide'); });
 
-          // 3) Build row1: logo | greeting | watch live
-          if (!hdr.querySelector('#vyro-hdr-row1')) {
-            var row1 = document.createElement('div');
-            row1.id = 'vyro-hdr-row1';
-            // move all current header children into row1
-            while (hdr.firstChild) row1.appendChild(hdr.firstChild);
-
-            // insert greeting between logo (first img/link) and the first button
+          // 3) Inject greeting block once
+          if (!hdr.querySelector('#vyro-header-greeting')) {
             var greet = document.createElement('div');
             greet.id = 'vyro-header-greeting';
             greet.innerHTML = '<span class="eyebrow"></span><span class="title"></span>';
-            // find first button child to insert before
-            var firstBtn = row1.querySelector('button, [role="button"]');
-            if (firstBtn) row1.insertBefore(greet, firstBtn);
-            else row1.appendChild(greet);
-
-            hdr.appendChild(row1);
+            hdr.appendChild(greet);
           }
           var g = hdr.querySelector('#vyro-header-greeting');
           if (g) {
@@ -366,17 +323,16 @@
             g.querySelector('.title').textContent = greetingTitle;
           }
 
-          // 4) Move the module pill rail (first nav) into header as row2
-          if (!hdr.querySelector('#vyro-hdr-rail')) {
-            var rail = document.querySelector('body > div > nav');
-            if (rail) {
-              var clone = document.createElement('div');
-              clone.id = 'vyro-hdr-rail';
-              // move buttons from rail into clone
-              var rbtns = rail.querySelectorAll('button');
-              rbtns.forEach(function(b){ clone.appendChild(b); });
-              hdr.appendChild(clone);
-              rail.classList.add('vyro-rail-relocated');
+          // 4) Hide athlete profile meta line (e.g. "Ryan Chen · Squash · D1 National")
+          var nameRe = /(Ryan\s*Chen|Squash|D1\s*National|National\s*team)/i;
+          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          var node;
+          while ((node = w.nextNode())) {
+            var tt = (node.textContent || '').trim();
+            if (!tt) continue;
+            if (nameRe.test(tt) && !hdr.contains(node)) {
+              var p = node.parentElement;
+              if (p) p.classList.add('vyro-athlete-meta-hidden');
             }
           }
         }
