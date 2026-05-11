@@ -1,47 +1,43 @@
 import type { ReactNode } from "react";
 import {
   Activity,
-  Apple,
   Bell,
-  Dumbbell,
   HeartPulse,
   Home,
   Moon,
   Share2,
   TrendingUp,
   Trophy,
-  Users,
-  Video,
+  Dumbbell,
 } from "lucide-react";
 import type { ViewId } from "@/lib/vyro-data";
-import { viewTitles } from "@/lib/vyro-data";
-import { Pill } from "./shared";
+import { ActionPill } from "./shared";
 
-const navItems: { id: ViewId; label: string; icon: typeof Home }[] = [
+const bottomNav: { id: ViewId; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Athlete", icon: Home },
-  { id: "trends", label: "Trends", icon: TrendingUp },
-  { id: "session", label: "Session", icon: Activity },
   { id: "sport", label: "Sport", icon: Trophy },
   { id: "recovery", label: "Recovery", icon: HeartPulse },
   { id: "sleep", label: "Sleep", icon: Moon },
-  { id: "coach", label: "Coach", icon: Dumbbell },
-  { id: "social", label: "Social", icon: Share2 },
-  { id: "video", label: "AI Video", icon: Video },
-  { id: "diet", label: "Diet Coach", icon: Apple },
 ];
 
-const topMobile: ViewId[] = ["trends", "session", "coach", "social"];
-const bottomMobile: ViewId[] = ["home", "sport", "recovery", "sleep"];
+const topActions: {
+  id: ViewId;
+  label: string;
+  color: "spatial" | "session" | "coach" | "alert";
+  icon: typeof Home;
+}[] = [
+  { id: "trends", label: "Trends", color: "spatial", icon: TrendingUp },
+  { id: "session", label: "Session", color: "session", icon: Activity },
+  { id: "coach", label: "Coach", color: "coach", icon: Dumbbell },
+  { id: "social", label: "Social", color: "alert", icon: Share2 },
+];
 
-function Logo({ className = "h-16" }: { className?: string }) {
+function VyroMark() {
   return (
-    <div className={`${className} flex flex-col justify-center`}>
-      <svg viewBox="0 0 210 70" className="h-full w-[150px] text-white">
-        <path d="M4 34h45l8-19 10 38 12-27 8 8h119" fill="none" stroke="currentColor" strokeWidth="4" />
-        <text x="2" y="62" fill="currentColor" fontSize="24" fontFamily="monospace" letterSpacing="12">VYRO</text>
-        <text x="76" y="69" fill="currentColor" fontSize="8" fontFamily="monospace" letterSpacing="2">OWN THE EDGE</text>
-      </svg>
-    </div>
+    <svg viewBox="0 0 210 70" className="h-6 w-auto text-neutral-900">
+      <path d="M4 34h45l8-19 10 38 12-27 8 8h119" fill="none" stroke="currentColor" strokeWidth="4" />
+      <text x="2" y="62" fill="currentColor" fontSize="22" fontFamily="monospace" letterSpacing="10">VYRO</text>
+    </svg>
   );
 }
 
@@ -55,94 +51,61 @@ export function Layout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.10),transparent_28%),linear-gradient(180deg,#080808,#000)] text-white">
-      <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col lg:flex-row">
-        <aside className="hidden w-[260px] shrink-0 border-r border-white/10 bg-white/[0.035] p-5 lg:flex lg:flex-col">
-          <Logo />
-          <div className="mt-8 space-y-1">
-            {navItems.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setView(id)}
-                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-sm transition-colors ${
-                  activeView === id
-                    ? "border-white/25 bg-white/15 text-white"
-                    : "border-transparent text-white/55 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-          <div className="mt-auto rounded-2xl border border-white/10 bg-white/[0.05] p-3">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/10 text-xs font-black">RC</div>
-              <div>
-                <div className="text-sm font-bold">Ryan Chen</div>
-                <div className="font-mono text-[10px] text-white/45">Squash · D1 / National</div>
-              </div>
-            </div>
-          </div>
-        </aside>
+    <div className="relative min-h-screen bg-vyro-canvas text-neutral-900">
+      {/* Floating glass header pill */}
+      <header className="fixed inset-x-3 top-3 z-40 flex items-center justify-between gap-3 rounded-full border border-black/5 bg-white/72 px-4 py-2 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.18)] backdrop-blur-xl backdrop-saturate-150">
+        <div className="flex items-center gap-2">
+          <VyroMark />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-vyro-positive/30 bg-vyro-positive/10 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-vyro-positive">
+            <span className="h-1.5 w-1.5 rounded-full bg-vyro-positive" />
+            Watch live
+          </span>
+          <button className="grid h-8 w-8 place-items-center rounded-full border border-black/5 bg-vyro-surface text-neutral-700">
+            <Bell className="h-4 w-4" />
+          </button>
+          <div className="grid h-8 w-8 place-items-center rounded-full bg-vyro-positive text-[10px] font-black text-white">RC</div>
+        </div>
+      </header>
 
-        <main className="relative flex min-h-screen flex-1 flex-col pb-24 lg:pb-0">
-          <header className="sticky top-0 z-30 border-b border-white/10 bg-black/75 px-4 py-3 backdrop-blur-xl lg:px-8">
-            <div className="flex items-center justify-between gap-3">
-              <div className="lg:hidden">
-                <Logo className="h-14" />
-              </div>
-              <div className="hidden lg:block">
-                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">VYRO Performance OS</div>
-                <h1 className="text-2xl font-black">{viewTitles[activeView]}</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <Pill>watch live</Pill>
-                <button className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.06]">
-                  <Bell className="h-4 w-4" />
-                </button>
-                <div className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.08] text-xs font-black">RC</div>
-              </div>
-            </div>
-            <nav className="mt-3 flex justify-center gap-2 overflow-x-auto lg:hidden">
-              {topMobile.map((id) => (
-                <button
-                  key={id}
-                  onClick={() => setView(id)}
-                  className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold ${
-                    activeView === id ? "border-white/25 bg-white/15" : "border-white/10 bg-white/[0.04] text-white/70"
-                  }`}
-                >
-                  {viewTitles[id]}
-                </button>
-              ))}
-            </nav>
-          </header>
+      <main className="px-4 pt-20 pb-28">
+        {/* Colorful action row */}
+        <nav className="no-scrollbar -mx-4 mb-5 flex gap-2 overflow-x-auto px-4">
+          {topActions.map(({ id, label, color, icon }) => (
+            <ActionPill
+              key={id}
+              label={label}
+              color={color}
+              icon={icon}
+              onClick={() => setView(id)}
+            />
+          ))}
+        </nav>
 
-          <div className="flex-1 overflow-y-auto px-4 py-5 lg:px-8">{children}</div>
+        {children}
+      </main>
 
-          <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 gap-2 border-t border-white/10 bg-black/85 p-3 backdrop-blur-xl lg:hidden">
-            {bottomMobile.map((id) => {
-              const item = navItems.find((n) => n.id === id)!;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={id}
-                  onClick={() => setView(id)}
-                  className={`rounded-2xl border py-2 text-center text-xs ${
-                    activeView === id ? "border-white/30 bg-white/15 text-white" : "border-transparent text-white/55"
-                  }`}
-                >
-                  <div className="mx-auto mb-1 w-fit">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
-        </main>
-      </div>
+      {/* Floating bottom nav pill */}
+      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 gap-1 rounded-full border border-black/5 bg-white/72 p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.22)] backdrop-blur-xl backdrop-saturate-150">
+        {bottomNav.map(({ id, label, icon: Icon }) => {
+          const active = activeView === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setView(id)}
+              className={`flex flex-col items-center justify-center gap-0.5 rounded-full py-2 text-[10px] font-semibold transition-colors ${
+                active
+                  ? "bg-vyro-positive/10 text-vyro-positive"
+                  : "text-neutral-500"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }
