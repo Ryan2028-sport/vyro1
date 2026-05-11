@@ -123,20 +123,22 @@
       header * { color: #111 !important; }
 
       /* Hide bottom dock text labels — icons only */
-      body > div > nav:last-of-type button *,
-      [class*="fixed bottom-0"] button *,
-      [class*="sticky bottom-0"] button * {
+      body > div > nav:last-of-type *,
+      [class*="fixed bottom-0"] * {
         font-size: 0 !important;
         color: transparent !important;
       }
-      body > div > nav:last-of-type button svg,
-      body > div > nav:last-of-type button img,
-      [class*="fixed bottom-0"] button svg,
-      [class*="fixed bottom-0"] button img,
-      [class*="sticky bottom-0"] button svg,
-      [class*="sticky bottom-0"] button img {
+      body > div > nav:last-of-type svg,
+      body > div > nav:last-of-type img,
+      [class*="fixed bottom-0"] svg,
+      [class*="fixed bottom-0"] img {
         font-size: 12px !important;
         color: inherit !important;
+      }
+      body > div > nav:last-of-type [aria-selected="true"] svg,
+      body > div > nav:last-of-type .active svg,
+      body > div > nav:last-of-type [data-active="true"] svg {
+        color: var(--vyro-positive) !important;
       }
 
       /* Module rail nav (first nav) */
