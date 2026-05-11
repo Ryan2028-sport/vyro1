@@ -369,25 +369,6 @@
       /* Slim scrollbar */
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { scrollbar-width: none; }
-
-      /* Watch connection card — clean horizontal layout (no awkward column wraps) */
-      .vyro-watch-card {
-        display: flex !important;
-        align-items: center !important;
-        gap: 14px !important;
-        padding: 14px 16px !important;
-      }
-      .vyro-watch-card > * { min-width: 0 !important; }
-      .vyro-watch-card .grid,
-      .vyro-watch-card [class*="grid-cols"] {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 4px 10px !important;
-        grid-template-columns: none !important;
-      }
-      .vyro-watch-card p,
-      .vyro-watch-card span { white-space: normal !important; }
-      .vyro-watch-card button { flex: 0 0 auto !important; white-space: nowrap !important; }
     </style>
   </head>
   <body>
@@ -399,12 +380,8 @@
         var KILL = [
           /^\s*9:41\s*$/,
           /^\s*LTE\s*[·•]?\s*\d+%\s*$/i,
-          /Goodix/i,
-          /GH3026/i,
-          /photoplethysmograph/i,
-          /LSM6DSO/i,
+          /Goodix\s*GH3026/i,
           /6[\s-]*axis\s*IMU/i,
-          /streaming\s*live/i,
           /Vitals\s*[—–-]\s*live\s*from/i,
           /^\s*VYRO\s*iOS\s*$/i,
           /^\s*RC\s*$/,
@@ -504,26 +481,9 @@
             }
           }
         }
-        function tagWatchCard() {
-          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-          var node;
-          while ((node = w.nextNode())) {
-            var tt = (node.textContent || '');
-            if (/VYRO\s*Watch/i.test(tt)) {
-              var card = node.parentElement;
-              for (var i = 0; i < 6 && card; i++) {
-                if (card.tagName === 'SECTION' || card.tagName === 'ARTICLE' ||
-                    /rounded|border|card/i.test(card.className || '')) break;
-                card = card.parentElement;
-              }
-              if (card) card.classList.add('vyro-watch-card');
-              break;
-            }
-          }
-        }
-        setTimeout(function(){ pass(); rebuildHeader(); tagWatchCard(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); tagWatchCard(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); tagWatchCard(); }, 1500);
+        setTimeout(function(){ pass(); rebuildHeader(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); }, 1500);
       });
     </script>
     <script type="module">
