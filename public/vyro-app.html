@@ -61,8 +61,21 @@
       }
       html, body { background: var(--vyro-canvas) !important; color: #111 !important; }
       /* Neutralize the prototype's dark surfaces to the new bento system */
-      .bg-black, .bg-neutral-900, .bg-neutral-950, .bg-zinc-900, .bg-zinc-950, .bg-slate-900, .bg-slate-950, .bg-gray-900, .bg-gray-950 {
-        background-color: var(--vyro-canvas) !important;
+      .bg-black, .bg-black\/80, .bg-black\/70, .bg-black\/60, .bg-black\/50, .bg-black\/40,
+      .bg-neutral-900, .bg-neutral-950, .bg-zinc-900, .bg-zinc-950,
+      .bg-slate-900, .bg-slate-950, .bg-gray-900, .bg-gray-950 {
+        background-color: rgba(255,255,255,0.72) !important;
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        backdrop-filter: saturate(180%) blur(20px);
+      }
+      /* Slim the iOS-style status header & glass nav */
+      header, nav, [class*="fixed top-0"], [class*="sticky top-0"],
+      [class*="fixed bottom-0"], [class*="sticky bottom-0"] {
+        background-color: rgba(255,255,255,0.72) !important;
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        backdrop-filter: saturate(180%) blur(20px);
+        border-color: rgba(0,0,0,0.06) !important;
+        color: #111 !important;
       }
       .bg-neutral-800, .bg-zinc-800, .bg-slate-800, .bg-gray-800, .bg-white\/5, .bg-white\/10 {
         background-color: var(--vyro-surface) !important;
