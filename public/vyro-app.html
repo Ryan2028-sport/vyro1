@@ -119,6 +119,7 @@
         box-shadow: none !important;
       }
       .ios-status-row,
+      .ios-header-row,
       .ios-module-title {
         display: none !important;
       }
@@ -155,12 +156,25 @@
       .ios-module-rail {
         justify-content: flex-start !important;
         margin: 0 -12px !important;
-        padding: 8px 12px 9px !important;
+        padding: 6px 12px 8px !important;
         background: var(--vyro-canvas) !important;
         border-top: 0 !important;
       }
+      .ios-main .vyro-page {
+        padding-top: 10px !important;
+      }
+      .ios-main .vyro-page::before {
+        content: "Good morning, Ryan.";
+        display: block;
+        margin: 0 0 12px;
+        color: #111;
+        font-size: 22px;
+        font-weight: 900;
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+      }
       .page-header {
-        display: block !important;
+        display: none !important;
         position: relative !important;
         z-index: 1 !important;
         align-items: flex-start !important;
