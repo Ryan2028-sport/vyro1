@@ -31,14 +31,14 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
 }
 
 /* ---------- Bar ---------- */
-export function Bar({ value, color = "spatial" }: { value: number; color?: "spatial" | "amber" | "red" | "positive" }) {
+export function Bar({ value, color = "spatial" }: { value: number; color?: "spatial" | "amber" | "red" | "positive" | "white" }) {
   const fill =
     color === "amber" ? "bg-vyro-coach" :
     color === "red" ? "bg-vyro-alert" :
     color === "positive" ? "bg-vyro-positive" :
     "bg-vyro-spatial";
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-black/6">
+    <div className="h-2 w-full overflow-hidden rounded-full bg-black/10">
       <div className={`h-full rounded-full ${fill}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
     </div>
   );
