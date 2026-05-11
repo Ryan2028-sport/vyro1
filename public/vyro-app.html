@@ -111,16 +111,35 @@
         border-bottom: 1px solid rgba(0,0,0,0.05) !important;
         box-shadow: none !important;
         color: #111 !important;
-        padding: 4px 12px !important;
+        padding: 2px 12px !important;
+        min-height: 0 !important;
       }
-      header img { max-height: 18px !important; width: auto !important; }
+      header img { max-height: 29px !important; width: auto !important; filter: none !important; }
       header button, header [role="button"] {
-        padding: 4px 10px !important;
+        padding: 3px 9px !important;
         font-size: 10px !important;
         line-height: 1.2 !important;
       }
       header * { color: #111 !important; }
-      header img { filter: none !important; }
+
+      /* Hide bottom dock text labels — icons only */
+      body > div > nav:last-of-type *,
+      [class*="fixed bottom-0"] * {
+        font-size: 0 !important;
+        color: transparent !important;
+      }
+      body > div > nav:last-of-type svg,
+      body > div > nav:last-of-type img,
+      [class*="fixed bottom-0"] svg,
+      [class*="fixed bottom-0"] img {
+        font-size: 12px !important;
+        color: inherit !important;
+      }
+      body > div > nav:last-of-type [aria-selected="true"] svg,
+      body > div > nav:last-of-type .active svg,
+      body > div > nav:last-of-type [data-active="true"] svg {
+        color: var(--vyro-positive) !important;
+      }
 
       /* Module rail nav (first nav) */
       body > div > nav:first-of-type {
@@ -206,16 +225,35 @@
           /^\s*LTE\s*[·•]?\s*\d+%\s*$/i,
           /Goodix\s*GH3026/i,
           /6[\s-]*axis\s*IMU/i,
-          /Vitals\s*[—–-]\s*live\s*from/i
+          /Vitals\s*[—–-]\s*live\s*from/i,
+          /^\s*VYRO\s*iOS\s*$/i,
+          /^\s*RC\s*$/
         ];
+        var DOCK_LABELS = /^\s*(Athlete|Sport|Recovery|Sleep)\s*$/;
+        function inDock(el) {
+          while (el) {
+            var cs = el.nodeType === 1 ? getComputedStyle(el) : null;
+            if (cs && (cs.position === 'fixed' || cs.position === 'sticky') && parseFloat(cs.bottom) <= 0) return true;
+            if (el.tagName === 'NAV' && el.parentElement && el.parentElement.tagName === 'BODY') return true;
+            if (el.tagName === 'NAV' && el.nextElementSibling === null) {
+              var rect = el.getBoundingClientRect();
+              if (rect.bottom >= window.innerHeight - 80) return true;
+            }
+            el = el.parentElement;
+          }
+          return false;
+        }
         function pass() {
           var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
           var n, hits = [];
           while ((n = w.nextNode())) {
             var t = n.textContent || '';
+            var matched = false;
             for (var i = 0; i < KILL.length; i++) {
-              if (KILL[i].test(t)) { hits.push(n); break; }
+              if (KILL[i].test(t)) { matched = true; break; }
             }
+            if (!matched && DOCK_LABELS.test(t) && inDock(n.parentElement)) matched = true;
+            if (matched) hits.push(n);
           }
           hits.forEach(function (node) {
             var el = node.parentElement;
