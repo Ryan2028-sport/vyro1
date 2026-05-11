@@ -205,7 +205,17 @@
       }
       .ios-rail-btn svg { width: 12px !important; height: 12px !important; flex: 0 0 auto !important; }
       .ios-rail-btn span { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-      .ios-main .vyro-page { padding-top: 8px !important; }
+      .ios-main .vyro-page {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 18px !important;
+        padding: 14px 12px 22px !important;
+      }
+      .ios-main .vyro-page > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+      .ios-main .ios-score-row { margin-top: 2px !important; margin-bottom: 0 !important; }
+      .ios-main .dashboard-vitals-grid { margin-top: 0 !important; row-gap: 10px !important; }
+      .ios-main .card-elev, .ios-main section, .ios-main button { min-height: max-content !important; }
+      .ios-main .ios-vitals-title { margin-top: 6px !important; padding-bottom: 0 !important; }
       /* Hide only the bell icon button in header */
       .vyro-hdr-hide { display: none !important; }
 
