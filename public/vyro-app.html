@@ -130,6 +130,11 @@
         z-index: 60 !important;
       }
       header { position: relative !important; }
+      /* Make the whole page scroll instead of inner main, so header scrolls away */
+      html, body { height: auto !important; min-height: 100% !important; overflow-y: auto !important; }
+      #root > div, #root > div > div { min-height: 0 !important; }
+      main { overflow: visible !important; min-height: 0 !important; height: auto !important; }
+      main > div { overflow: visible !important; max-height: none !important; height: auto !important; }
       .ios-status-row { display: none !important; }
       .ios-header-row {
         display: flex !important;
