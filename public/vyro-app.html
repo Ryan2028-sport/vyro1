@@ -289,49 +289,33 @@
           var hdr = document.querySelector('header');
           if (!hdr) return;
 
-          // 1) Find greeting + eyebrow from the page
+          // 1) Find greeting + eyebrow from the page; hide that PageHeader block
           var greetingTitle = '', eyebrow = '';
           var h1s = document.querySelectorAll('main h1, main h2');
           for (var i = 0; i < h1s.length; i++) {
             var tx = (h1s[i].textContent || '').trim();
             if (/good\s+(morning|afternoon|evening)/i.test(tx)) {
               greetingTitle = tx;
-              var block = h1s[i].closest('div');
-              // eyebrow = sibling above h1 (small uppercase)
               var prev = h1s[i].previousElementSibling;
               if (prev) eyebrow = (prev.textContent || '').trim();
-              if (block && block.parentElement) block.parentElement.style.display = 'none';
+              var block = h1s[i].closest('div');
+              if (block && block.parentElement) block.parentElement.classList.add('vyro-pageheader-hidden');
               break;
             }
           }
           if (!greetingTitle) greetingTitle = 'Good morning, Ryan.';
           if (!eyebrow) eyebrow = 'Athlete Dashboard';
 
-          // 2) Hide the bell (last button in header)
-          var hdrButtons = hdr.querySelectorAll(':scope > button, :scope > [role="button"]');
-          if (hdrButtons.length) {
-            var bell = hdrButtons[hdrButtons.length - 1];
-            // bell has only an svg/icon, no text
-            if (!(bell.textContent || '').trim()) bell.id = 'vyro-bell-hidden';
-          }
+          // 2) Hide every header button: bell (icon-only) AND WATCH LIVE / connected pill
+          var hdrButtons = hdr.querySelectorAll(':scope > button, :scope > [role="button"], :scope > a');
+          hdrButtons.forEach(function (b) { b.classList.add('vyro-hdr-hide'); });
 
-          // 3) Build row1: logo | greeting | watch live
-          if (!hdr.querySelector('#vyro-hdr-row1')) {
-            var row1 = document.createElement('div');
-            row1.id = 'vyro-hdr-row1';
-            // move all current header children into row1
-            while (hdr.firstChild) row1.appendChild(hdr.firstChild);
-
-            // insert greeting between logo (first img/link) and the first button
+          // 3) Inject greeting block once
+          if (!hdr.querySelector('#vyro-header-greeting')) {
             var greet = document.createElement('div');
             greet.id = 'vyro-header-greeting';
             greet.innerHTML = '<span class="eyebrow"></span><span class="title"></span>';
-            // find first button child to insert before
-            var firstBtn = row1.querySelector('button, [role="button"]');
-            if (firstBtn) row1.insertBefore(greet, firstBtn);
-            else row1.appendChild(greet);
-
-            hdr.appendChild(row1);
+            hdr.appendChild(greet);
           }
           var g = hdr.querySelector('#vyro-header-greeting');
           if (g) {
@@ -339,17 +323,16 @@
             g.querySelector('.title').textContent = greetingTitle;
           }
 
-          // 4) Move the module pill rail (first nav) into header as row2
-          if (!hdr.querySelector('#vyro-hdr-rail')) {
-            var rail = document.querySelector('body > div > nav');
-            if (rail) {
-              var clone = document.createElement('div');
-              clone.id = 'vyro-hdr-rail';
-              // move buttons from rail into clone
-              var rbtns = rail.querySelectorAll('button');
-              rbtns.forEach(function(b){ clone.appendChild(b); });
-              hdr.appendChild(clone);
-              rail.classList.add('vyro-rail-relocated');
+          // 4) Hide athlete profile meta line (e.g. "Ryan Chen · Squash · D1 National")
+          var nameRe = /(Ryan\s*Chen|Squash|D1\s*National|National\s*team)/i;
+          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          var node;
+          while ((node = w.nextNode())) {
+            var tt = (node.textContent || '').trim();
+            if (!tt) continue;
+            if (nameRe.test(tt) && !hdr.contains(node)) {
+              var p = node.parentElement;
+              if (p) p.classList.add('vyro-athlete-meta-hidden');
             }
           }
         }
