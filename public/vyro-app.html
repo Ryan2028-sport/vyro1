@@ -421,19 +421,25 @@
           overflow: visible !important;
           background: #ffffff !important;
         }
-        #root > div > div,
-        .ios-stage,
-        .ios-phone-shell {
+        .ios-stage {
           display: flex !important;
-          flex-direction: row !important;
           align-items: stretch !important;
+          justify-content: center !important;
+          padding: 0 !important;
+        }
+        .ios-phone-shell {
+          display: grid !important;
+          grid-template-columns: 264px minmax(0, 1fr) !important;
+          grid-template-rows: 76px minmax(0, 1fr) !important;
+          grid-template-areas: "sidebar topbar" "sidebar main" !important;
         }
 
         /* Desktop navigation: force the sidebar on at 900px, not Tailwind's 1024px. */
-        aside {
+        aside, .desktop-sidebar {
           display: flex !important;
           flex: 0 0 264px !important;
           width: 264px !important;
+          grid-area: sidebar !important;
           min-height: 100vh !important;
           position: sticky !important;
           top: 0 !important;
@@ -451,18 +457,21 @@
         }
 
         main, .ios-main {
+          grid-area: main !important;
           flex: 1 1 auto !important;
           width: auto !important;
           min-width: 0 !important;
           min-height: 100vh !important;
           display: flex !important;
           flex-direction: column !important;
+          overflow-y: auto !important;
           background: #ffffff !important;
         }
 
         /* Compact desktop header; sidebar owns navigation, so remove duplicate rails. */
         header.ios-topbar,
         header {
+          grid-area: topbar !important;
           position: sticky !important;
           top: 0 !important;
           z-index: 50 !important;
