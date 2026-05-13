@@ -398,6 +398,45 @@
       }
 
       /* Desktop breakpoint lowered so real desktop layout starts in preview-width desktop windows. */
+      @media (min-width: 900px) {
+        html, body, #root { background: #ffffff !important; padding-bottom: 0 !important; }
+        .ios-stage {
+          padding: 0 !important;
+          background: #ffffff !important;
+          overflow: hidden !important;
+        }
+        .ios-phone-shell {
+          width: 100vw !important;
+          min-height: 100vh !important;
+          max-height: 100vh !important;
+          grid-template-columns: 288px minmax(0, 1fr) !important;
+          border: 0 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          background: #ffffff !important;
+        }
+        .desktop-sidebar,
+        .desktop-topbar,
+        .ios-main {
+          background: #ffffff !important;
+          color: #111111 !important;
+        }
+        .desktop-sidebar {
+          border-right: 1px solid rgba(0,0,0,0.08) !important;
+          border-radius: 0 !important;
+        }
+        .desktop-topbar {
+          border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+          box-shadow: none !important;
+        }
+        .ios-main .vyro-page {
+          max-width: none !important;
+          padding: 24px 28px 40px !important;
+        }
+        .ios-main .dashboard-vitals-grid {
+          grid-template-columns: 1.25fr repeat(4, minmax(0, 1fr)) !important;
+        }
+      }
     </style>
   </head>
   <body>
