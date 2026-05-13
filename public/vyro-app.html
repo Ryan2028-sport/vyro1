@@ -396,68 +396,121 @@
       }
 
       /* =====================================================================
-         DESKTOP OPTIMIZATIONS (>= 1024px) — does not affect mobile/tablet
+         DESKTOP OPTIMIZATIONS (>= 900px) — mobile styles below this are untouched
          ===================================================================== */
       @media (min-width: 900px) {
-        /* Center the whole app inside a polished, max-width canvas */
-        body {
-          padding-bottom: 0 !important;
-          background:
-            radial-gradient(1200px 600px at 10% -10%, rgba(29,185,84,0.08), transparent 60%),
-            radial-gradient(900px 500px at 100% 0%, rgba(59,130,246,0.06), transparent 60%),
-            #f4f6f8 !important;
+        html, body, #root {
+          width: 100% !important;
+          min-height: 100vh !important;
+          overflow-x: hidden !important;
+          background: #f4f6f8 !important;
         }
+        body { padding-bottom: 0 !important; }
+
+        /* Use the full desktop canvas instead of a centered phone-sized shell. */
         #root > div,
+        #root > div > div,
         .ios-stage,
         .ios-phone-shell {
-          max-width: 1280px !important;
-          margin: 0 auto !important;
+          width: 100% !important;
+          max-width: none !important;
+          min-height: 100vh !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          overflow: visible !important;
           background: #ffffff !important;
-          border-radius: 24px !important;
-          box-shadow: 0 30px 80px -30px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.05) !important;
-          overflow: hidden !important;
-          margin-top: 24px !important;
-          margin-bottom: 40px !important;
+        }
+        #root > div > div,
+        .ios-stage,
+        .ios-phone-shell {
+          display: flex !important;
+          flex-direction: row !important;
+          align-items: stretch !important;
         }
 
-        /* Header: roomier app chrome on desktop */
+        /* Desktop navigation: force the sidebar on at 900px, not Tailwind's 1024px. */
+        aside {
+          display: flex !important;
+          flex: 0 0 264px !important;
+          width: 264px !important;
+          min-height: 100vh !important;
+          position: sticky !important;
+          top: 0 !important;
+          align-self: flex-start !important;
+          flex-direction: column !important;
+          padding: 26px 16px !important;
+          border-right: 1px solid rgba(0,0,0,0.08) !important;
+          background: #ffffff !important;
+          z-index: 45 !important;
+        }
+        aside button {
+          min-height: 40px !important;
+          border-radius: 12px !important;
+          justify-content: flex-start !important;
+        }
+
+        main, .ios-main {
+          flex: 1 1 auto !important;
+          width: auto !important;
+          min-width: 0 !important;
+          min-height: 100vh !important;
+          display: flex !important;
+          flex-direction: column !important;
+          background: #ffffff !important;
+        }
+
+        /* Compact desktop header; sidebar owns navigation, so remove duplicate rails. */
         header.ios-topbar,
         header {
-          padding: 14px 28px 16px !important;
-          gap: 12px !important;
-          border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+          position: sticky !important;
+          top: 0 !important;
+          z-index: 50 !important;
+          padding: 18px 36px !important;
+          min-height: 76px !important;
+          border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+          background: rgba(255,255,255,0.94) !important;
+          backdrop-filter: saturate(180%) blur(22px) !important;
+          -webkit-backdrop-filter: saturate(180%) blur(22px) !important;
         }
-        header img { max-height: 36px !important; }
-        header button, header [role="button"] {
+        header nav,
+        .ios-module-rail { display: none !important; }
+        header > div,
+        .ios-header-row,
+        .ios-module-title {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          gap: 16px !important;
+          width: 100% !important;
+        }
+        header button, header [role="button"], .ios-athlete-pill {
+          min-height: 34px !important;
           padding: 8px 14px !important;
-          font-size: 12px !important;
-          border-radius: 999px !important;
-        }
-        #vyro-header-greeting .eyebrow { font-size: 11px !important; letter-spacing: 0.14em !important; }
-        #vyro-header-greeting .title { font-size: 20px !important; }
-        .ios-athlete-pill {
-          min-height: 32px !important;
-          padding: 0 14px !important;
           font-size: 11px !important;
+          border-radius: 999px !important;
+          white-space: nowrap !important;
+        }
+        #vyro-header-greeting { gap: 10px !important; }
+        #vyro-header-greeting .eyebrow { font-size: 10px !important; letter-spacing: 0.16em !important; }
+        #vyro-header-greeting .title { font-size: 22px !important; }
+
+        /* Remove the empty hidden page-header spacer and bring cards to the top. */
+        .ios-main .vyro-page > :has(.vyro-pageheader-hidden),
+        main > div > :has(.vyro-pageheader-hidden) {
+          display: none !important;
         }
 
-        /* Module rail: wider, breathing room, larger touch targets */
-        .ios-module-rail {
-          gap: 10px !important;
-          max-width: 760px !important;
-        }
-        .ios-rail-btn {
-          min-height: 40px !important;
-          font-size: 12px !important;
-          padding: 0 14px !important;
-          gap: 8px !important;
-        }
-        .ios-rail-btn svg { width: 16px !important; height: 16px !important; }
-
-        /* Main content gets generous desktop padding and a multi-column grid */
+        /* Content: wide dashboard grid that fills desktop real estate. */
+        main > div,
         .ios-main .vyro-page {
-          padding: 28px 36px 48px !important;
+          width: 100% !important;
+          max-width: none !important;
+          padding: 28px 36px 56px !important;
+          margin: 0 !important;
           gap: 24px !important;
+        }
+        .ios-main .vyro-page {
           display: grid !important;
           grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
           align-items: start !important;
@@ -466,75 +519,42 @@
           grid-column: span 6 !important;
           min-width: 0 !important;
         }
-        /* Hero / score / device cards span full width */
         .ios-main .vyro-page > .ios-score-row,
-        .ios-main .vyro-page > [data-testid="card-device"],
         .ios-main .vyro-page > .dashboard-vitals-grid,
-        .ios-main .vyro-page > section:first-child,
-        .ios-main .vyro-page > h1,
-        .ios-main .vyro-page > h2 {
-          grid-column: span 12 !important;
+        .ios-main .vyro-page > [data-testid="card-device"] {
+          grid-column: 1 / -1 !important;
         }
-        /* Vitals already a grid — let it expand */
+        .ios-main .ios-score-row,
         .ios-main .dashboard-vitals-grid {
+          display: grid !important;
           grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-          row-gap: 16px !important;
-          column-gap: 16px !important;
+          gap: 16px !important;
+          width: 100% !important;
         }
-
-        /* Card refinements on desktop */
         .ios-main .card-elev,
         .ios-main section {
-          padding: 20px !important;
-          border-radius: 20px !important;
+          padding: 22px !important;
+          border-radius: 18px !important;
         }
 
-        /* Bottom tab dock: floating, centered pill instead of edge-to-edge */
+        /* Bottom mobile dock is not part of desktop. */
         .ios-bottom-tabs,
         nav[class*="bottom-0"],
-        [class*="fixed bottom-0"] {
-          left: 50% !important;
-          right: auto !important;
-          bottom: 24px !important;
-          transform: translateX(-50%) !important;
-          width: auto !important;
-          min-width: 480px !important;
-          padding: 12px 16px !important;
-          gap: 8px !important;
-        }
-        .ios-bottom-tabs > button,
-        nav[class*="bottom-0"] > button,
-        [class*="fixed bottom-0"] > button {
-          padding: 8px 18px !important;
-          font-size: 11px !important;
-          flex-direction: row !important;
-          gap: 8px !important;
-        }
-        .ios-bottom-tabs > button svg,
-        nav[class*="bottom-0"] > button svg,
-        [class*="fixed bottom-0"] > button svg {
-          width: 18px !important;
-          height: 18px !important;
-        }
+        [class*="fixed bottom-0"] { display: none !important; }
 
-        /* Hover affordances (desktop only) */
-        button:hover, [role="button"]:hover {
-          opacity: 0.92;
-        }
-        .ios-rail-btn:hover {
-          background: #f4f6f8 !important;
-          border-color: rgba(0,0,0,0.14) !important;
-        }
+        button:hover, [role="button"]:hover { opacity: 0.92; }
       }
 
-      /* Extra-wide screens: a touch more breathing room */
       @media (min-width: 1440px) {
-        #root > div,
-        .ios-stage,
-        .ios-phone-shell {
-          max-width: 1360px !important;
+        aside {
+          flex-basis: 288px !important;
+          width: 288px !important;
+          padding: 30px 18px !important;
         }
-        .ios-main .vyro-page { padding: 32px 48px 56px !important; }
+        main > div,
+        .ios-main .vyro-page { padding: 34px 48px 64px !important; }
+        .ios-main .ios-score-row,
+        .ios-main .dashboard-vitals-grid { gap: 20px !important; }
       }
     </style>
   </head>
