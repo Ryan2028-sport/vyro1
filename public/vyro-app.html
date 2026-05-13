@@ -540,10 +540,97 @@
             }
           }
         }
-        setTimeout(function(){ pass(); rebuildHeader(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); }, 1500);
-        setInterval(function(){ pass(); }, 800);
+        function enhanceRecovery() {
+          // Mock heart-rate (bpm) recovery between points across 12 rallies
+          var hr = [178, 162, 148, 138, 132, 128, 178, 168, 156, 146, 140, 136];
+          // Speed recovery (% baseline 5-10m sprint) across 8 rallies under fatigue
+          var spd = [100, 96, 92, 88, 84, 80, 76, 73];
+
+          function buildLineSvg(data, color, yLabelMin, yLabelMax) {
+            var w = 320, h = 140, pad = 24;
+            var min = Math.min.apply(null, data), max = Math.max.apply(null, data);
+            var span = Math.max(1, max - min);
+            var step = (w - pad * 2) / (data.length - 1);
+            var pts = data.map(function (v, i) {
+              var x = pad + i * step;
+              var y = pad + (1 - (v - min) / span) * (h - pad * 2);
+              return x.toFixed(1) + ',' + y.toFixed(1);
+            });
+            var line = pts.join(' ');
+            var area = 'M' + pts[0] + ' L' + line.replace(/^[^ ]+ /, '') +
+                       ' L' + (pad + (data.length - 1) * step).toFixed(1) + ',' + (h - pad) +
+                       ' L' + pad + ',' + (h - pad) + ' Z';
+            var dots = data.map(function (v, i) {
+              var x = pad + i * step;
+              var y = pad + (1 - (v - min) / span) * (h - pad * 2);
+              return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.5" fill="' + color + '"/>';
+            }).join('');
+            return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="140" preserveAspectRatio="none" style="display:block">' +
+              '<defs><linearGradient id="vyroGrad-' + color.replace('#','') + '" x1="0" x2="0" y1="0" y2="1">' +
+              '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.35"/>' +
+              '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
+              '<line x1="' + pad + '" y1="' + (h - pad) + '" x2="' + (w - pad) + '" y2="' + (h - pad) + '" stroke="rgba(255,255,255,0.12)"/>' +
+              '<line x1="' + pad + '" y1="' + pad + '" x2="' + (w - pad) + '" y2="' + pad + '" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2 4"/>' +
+              '<path d="' + area + '" fill="url(#vyroGrad-' + color.replace('#','') + ')"/>' +
+              '<polyline fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="' + line + '"/>' +
+              dots +
+              '<text x="' + (pad - 4) + '" y="' + (pad + 4) + '" text-anchor="end" fill="rgba(255,255,255,0.5)" font-size="9" font-family="monospace">' + yLabelMax + '</text>' +
+              '<text x="' + (pad - 4) + '" y="' + (h - pad + 3) + '" text-anchor="end" fill="rgba(255,255,255,0.5)" font-size="9" font-family="monospace">' + yLabelMin + '</text>' +
+              '</svg>';
+          }
+
+          // Find the "Between-point HR drop" card and inject the chart inside it
+          var headers = document.querySelectorAll('h3, h2, h4');
+          var hrCard = null, hrHeader = null;
+          for (var i = 0; i < headers.length; i++) {
+            var t = (headers[i].textContent || '').trim();
+            if (/between.?point\s+hr\s+drop/i.test(t)) {
+              hrHeader = headers[i];
+              hrCard = headers[i].parentElement;
+              break;
+            }
+          }
+          if (hrCard && !hrCard.querySelector('[data-vyro-hr-chart]')) {
+            var box = document.createElement('div');
+            box.setAttribute('data-vyro-hr-chart', '1');
+            box.style.marginTop = '12px';
+            box.innerHTML =
+              '<div style="display:flex;justify-content:space-between;align-items:baseline;font-family:monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:6px">' +
+                '<span>bpm · last 12 rallies</span><span style="color:#5cffb1">avg drop 38 bpm</span>' +
+              '</div>' +
+              buildLineSvg(hr, '#5cffb1', '120', '180') +
+              '<div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.55);line-height:1.4">' +
+                'HR drops from peak (~178 bpm) to ~128 bpm within ~18s between points. Faster drops = better cardiac recovery.' +
+              '</div>';
+            // Replace any existing tiny spark line for clarity
+            var existingSvg = hrCard.querySelector('svg:not([data-vyro-hr-chart] svg)');
+            if (existingSvg && existingSvg !== box.querySelector('svg')) existingSvg.remove();
+            hrCard.appendChild(box);
+          }
+
+          // Add a "Speed recovery under fatigue" card next to it if missing
+          if (hrCard && hrCard.parentElement && !document.querySelector('[data-vyro-speed-card]')) {
+            var card = document.createElement('div');
+            card.setAttribute('data-vyro-speed-card', '1');
+            // Mirror the sibling card's class list so styling matches
+            var sibling = hrCard;
+            card.className = sibling.className;
+            card.innerHTML =
+              '<h3 class="font-black">Speed recovery under fatigue</h3>' +
+              '<div style="display:flex;justify-content:space-between;align-items:baseline;font-family:monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin:10px 0 6px">' +
+                '<span>% baseline sprint · 8 rallies</span><span style="color:#ffb020">-27% by R8</span>' +
+              '</div>' +
+              buildLineSvg(spd, '#ffb020', '70%', '100%') +
+              '<div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.55);line-height:1.4">' +
+                '5-10m sprint speed degrades as cardiac load accumulates — early indicator of neuromuscular fatigue before HR signals it.' +
+              '</div>';
+            hrCard.parentElement.appendChild(card);
+          }
+        }
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); }, 1500);
+        setInterval(function(){ pass(); enhanceRecovery(); }, 800);
       });
     </script>
     <script type="module">
