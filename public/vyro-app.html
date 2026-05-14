@@ -151,9 +151,10 @@
         filter: brightness(0) !important;
         display: block !important;
       }
-      /* Add breathing room below the 4-tab nav row inside the header */
-      header > nav { margin-bottom: 14px !important; }
-      header + * , main > div:first-child { margin-top: 8px !important; }
+      /* Push the 4-tab nav row down ~10% and remove any divider lines */
+      header > nav { margin-top: 14px !important; margin-bottom: 14px !important; border: 0 !important; box-shadow: none !important; }
+      header, header * { box-shadow: none !important; }
+      main, main > div:first-child { border-top: 0 !important; box-shadow: none !important; }
       /* Default header buttons (Watch Live pill style) */
       header > div:first-child button,
       header > div:first-child [role="button"] {
