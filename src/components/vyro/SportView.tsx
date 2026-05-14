@@ -127,8 +127,8 @@ function SportDatabase({ profile, selectedSport }: { profile: SportProfile; sele
 
 function SportAgility({ selectedSport }: { selectedSport: string }) {
   const isSquash = selectedSport === "Squash";
-  const baseLabel = isSquash ? "T" : selectedSport === "Tennis" ? "center mark" : "center";
-  const returnLabel = isSquash ? "Return-to-T" : selectedSport === "Tennis" ? "Return-to-center-mark" : "Return-to-base";
+  const baseLabel = isSquash ? "T" : "middle of the court";
+  const returnLabel = isSquash ? "Return-to-T" : "Return-to-middle";
   const items = [
     "First-step burst 88",
     "Acceleration 86",
