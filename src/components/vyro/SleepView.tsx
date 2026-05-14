@@ -16,7 +16,7 @@ export function SleepView({ sleepTab, setSleepTab }: { sleepTab: Tab; setSleepTa
         title="Sleep architecture"
         subtitle="WHOOP-style sleep breakdown for duration, zones, wakeups, and next-session readiness."
       />
-      <div className="mb-5 flex gap-2 overflow-x-auto">
+      <div className="no-scrollbar mb-5 flex gap-2 overflow-x-auto">
         {tabs.map(([id, label]) => (
           <button
             key={id}
