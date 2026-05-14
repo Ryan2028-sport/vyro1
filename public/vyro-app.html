@@ -605,9 +605,15 @@
                 '<span>Mock HR recovery curve</span><span style="color:#10b981">178 → 138 bpm</span>' +
               '</div>' +
               buildLineSvg(hr, '#10b981', 120, 185);
-            // Try to insert before the P1..P12 axis row so chart sits above it
+            // Put the new graph before the original blank SVG chart, so it occupies the empty graph slot above P1..P12.
+            var originalSvg = targetCard.querySelector('svg');
+            if (originalSvg && originalSvg.parentElement) {
+              originalSvg.parentElement.insertBefore(box, originalSvg);
+              originalSvg.style.display = 'none';
+              return;
+            }
             var axisRow = null;
-            var kids = targetCard.querySelectorAll('div, ul');
+            var kids = targetCard.querySelectorAll('div, ul, svg');
             for (var k = 0; k < kids.length; k++) {
               var kt = (kids[k].textContent || '').trim();
               if (/^P1\s*P2\s*P3/i.test(kt) || /^P1[\s,]+P2[\s,]+P3/i.test(kt.replace(/\s+/g, ' '))) {
