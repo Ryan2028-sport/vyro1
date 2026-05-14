@@ -604,12 +604,23 @@
               '<div style="display:flex;justify-content:space-between;align-items:baseline;font-family:monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(20,24,30,0.52);margin-bottom:4px;padding:0 2px">' +
                 '<span>Mock HR recovery curve</span><span style="color:#10b981">178 → 138 bpm</span>' +
               '</div>' +
-              buildLineSvg(hr, '#10b981', 120, 185);
-            // Put the new graph before the original blank SVG chart, so it occupies the empty graph slot above P1..P12.
-            var originalSvg = targetCard.querySelector('svg');
-            if (originalSvg && originalSvg.parentElement) {
-              originalSvg.parentElement.insertBefore(box, originalSvg);
-              originalSvg.style.display = 'none';
+              buildLineSvg(hr, '#10b981', 120, 185) +
+              '<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:0;margin-top:2px;font:9px monospace;color:rgba(20,24,30,0.46);text-align:center">' +
+                '<span>P1</span><span>P2</span><span>P3</span><span>P4</span><span>P5</span><span>P6</span><span>P7</span><span>P8</span><span>P9</span><span>P10</span><span>P11</span><span>P12</span>' +
+              '</div>';
+            // Replace the original blank bar-chart slot, so the line graph appears above the P1..P12 axis area.
+            var graphSlot = null;
+            var direct = targetCard.children;
+            for (var d = 0; d < direct.length; d++) {
+              var dt = (direct[d].textContent || '').replace(/\s+/g, ' ');
+              if (/P1/i.test(dt) && /P12/i.test(dt) && !/mock hr recovery curve/i.test(dt)) {
+                graphSlot = direct[d];
+                break;
+              }
+            }
+            if (graphSlot) {
+              targetCard.insertBefore(box, graphSlot);
+              graphSlot.style.display = 'none';
               return;
             }
             var axisRow = null;
