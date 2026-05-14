@@ -676,10 +676,52 @@
             }
           }
         }
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); }, 1500);
-        setInterval(function(){ pass(); enhanceRecovery(); }, 800);
+        // Hide recovery-specific sections from the Athlete tab; they belong on the Recovery tab only.
+        function hideRecoverySectionsOnAthlete() {
+          var SECTION_RE = /(How it.{0,3}s calculated|Recovery Score|AI Summary|Cardio Recovery|Muscle Readiness|Load Debt|Environment|Confidence|Today.{0,3}s plan|7[\s-]?day Recovery|Multimodal LIVE Recovery|interval ghosting|Match practice|Mobility \+ breath)/i;
+          // Detect active tab: look for the nav button whose text is "Athlete" and that has an active style
+          var navBtns = document.querySelectorAll('nav button, nav a, [role="tablist"] button');
+          var onAthlete = false;
+          for (var i = 0; i < navBtns.length; i++) {
+            var b = navBtns[i];
+            var label = (b.textContent || '').trim();
+            if (/^Athlete$/i.test(label)) {
+              var cls = b.className || '';
+              var aria = b.getAttribute('aria-selected') || b.getAttribute('aria-current') || '';
+              var styleBg = (b.style && b.style.backgroundColor) || '';
+              if (/active|selected|bg-(white|black)|border-white/.test(cls) || /true|page/.test(aria) || styleBg) {
+                onAthlete = true;
+              }
+              // Fallback: if no active marker found, treat first nav button as athlete only when URL hash empty
+              if (!onAthlete && (!location.hash || location.hash === '#' || location.hash === '#home')) onAthlete = true;
+              break;
+            }
+          }
+          // Mark/unmark candidate section roots on every pass
+          var main = document.querySelector('main') || document.body;
+          var candidates = main.querySelectorAll('section, article, .vyro-card, [class*="card"], [class*="Card"], div');
+          candidates.forEach(function (el) {
+            // Avoid hiding the whole page wrapper: only consider blocks with limited size
+            if (el.children.length > 12) return;
+            var txt = (el.textContent || '').trim();
+            if (!txt || txt.length > 800) return;
+            if (SECTION_RE.test(txt)) {
+              // Find the closest "card-like" ancestor and hide that, not nested children
+              var card = el.closest('[class*="card"], [class*="Card"], section, article') || el;
+              if (onAthlete) {
+                card.setAttribute('data-vyro-recovery-only', '1');
+                card.style.display = 'none';
+              } else if (card.getAttribute('data-vyro-recovery-only') === '1') {
+                card.style.display = '';
+              }
+            }
+          });
+        }
+
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); hideRecoverySectionsOnAthlete(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); hideRecoverySectionsOnAthlete(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); hideRecoverySectionsOnAthlete(); }, 1500);
+        setInterval(function(){ pass(); enhanceRecovery(); hideRecoverySectionsOnAthlete(); }, 800);
       });
     </script>
     <script type="module">
