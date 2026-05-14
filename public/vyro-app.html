@@ -151,8 +151,8 @@
         filter: brightness(0) !important;
         display: block !important;
       }
-      /* Push the 4-tab nav row down and keep labels fully visible */
-      header > nav { margin-top: 34px !important; margin-bottom: 28px !important; padding-top: 4px !important; padding-bottom: 10px !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; }
+      /* Push the 4-tab nav row down ~10% and remove any divider lines */
+      header > nav { margin-top: 28px !important; margin-bottom: 28px !important; padding-bottom: 8px !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; }
       header, header * { box-shadow: none !important; }
       main, main > div:first-child { border-top: 0 !important; box-shadow: none !important; padding-top: 16px !important; }
       .ios-main .vyro-page, .ios-main > div { padding-top: 12px !important; }
@@ -299,24 +299,21 @@
         gap: 5px !important;
         width: 100% !important;
         margin: 0 !important;
-        padding: 2px 0 4px !important;
+        padding: 0 !important;
         overflow: visible !important;
       }
       .ios-rail-btn {
         min-width: 0 !important;
-        min-height: 38px !important;
-        height: auto !important;
+        min-height: 28px !important;
         width: 100% !important;
         justify-content: center !important;
         gap: 3px !important;
-        padding: 7px 3px !important;
+        padding: 0 4px !important;
         font-size: 9px !important;
-        line-height: 1.15 !important;
         white-space: nowrap !important;
-        overflow: visible !important;
       }
       .ios-rail-btn svg { width: 12px !important; height: 12px !important; flex: 0 0 auto !important; }
-      .ios-rail-btn span { min-width: 0 !important; max-width: 100% !important; overflow: visible !important; text-overflow: clip !important; white-space: nowrap !important; line-height: 1.15 !important; }
+      .ios-rail-btn span { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
       .ios-main .vyro-page {
         display: flex !important;
         flex-direction: column !important;
