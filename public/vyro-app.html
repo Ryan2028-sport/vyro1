@@ -2,7 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="VYRO" />
+    <meta name="theme-color" content="#ffffff" />
     <title>VYRO · Athlete Intelligence for Racket Sports</title>
     <meta name="description" content="VYRO — tactical performance intelligence for squash and tennis athletes. Live recovery, T-control tracking, court heatmaps, AI video analysis." />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 6 L16 26 L29 6' stroke='%2317c8a4' stroke-width='3' fill='none'/%3E%3C/svg%3E" />
@@ -103,7 +108,7 @@
         width: 22px !important; height: 22px !important;
       }
 
-      /* === Top header — compact app chrome with title + module buttons inside === */
+      /* === Top header — iOS-optimized app chrome with safe-area inset === */
       header {
         background: rgba(255,255,255,0.92) !important;
         -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -112,16 +117,18 @@
         border-bottom: 1px solid rgba(0,0,0,0.06) !important;
         box-shadow: none !important;
         color: #111 !important;
-        padding: 5px 10px 7px !important;
-        min-height: 0 !important;
-        gap: 5px !important;
+        padding: calc(env(safe-area-inset-top, 0px) + 12px) max(env(safe-area-inset-right, 0px), 16px) 12px max(env(safe-area-inset-left, 0px), 16px) !important;
+        min-height: calc(env(safe-area-inset-top, 0px) + 56px) !important;
+        gap: 10px !important;
       }
-      header img { max-height: 24px !important; width: auto !important; filter: none !important; }
+      header img { max-height: 36px !important; width: auto !important; filter: none !important; }
       header button, header [role="button"] {
-        padding: 3px 6px !important;
-        font-size: 9px !important;
-        line-height: 1.15 !important;
+        padding: 6px 12px !important;
+        font-size: 11px !important;
+        line-height: 1.2 !important;
+        font-weight: 600 !important;
         border-radius: 999px !important;
+        min-height: 32px !important;
       }
       header * { color: #111 !important; }
       header.ios-topbar {
