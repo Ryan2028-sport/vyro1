@@ -676,10 +676,65 @@
             }
           }
         }
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); }, 1500);
-        setInterval(function(){ pass(); enhanceRecovery(); }, 800);
+        function enhanceCoach() {
+          // Find the Coach view by looking for the unique "Squash roster" / "Coach's iPad" markers
+          var rosterEl = null;
+          var all = document.querySelectorAll('h1,h2,h3,h4,div');
+          for (var i = 0; i < all.length; i++) {
+            var t = (all[i].textContent || '').trim();
+            if (/^Squash roster$/i.test(t)) { rosterEl = all[i]; break; }
+          }
+          if (!rosterEl) return;
+          // Walk up to find the grid container (parent that holds multiple cards)
+          var grid = rosterEl;
+          for (var g = 0; g < 8 && grid; g++) {
+            if (grid.children && grid.children.length >= 2) {
+              var cs = window.getComputedStyle(grid);
+              if (cs.display === 'grid' || cs.display === 'flex') break;
+            }
+            grid = grid.parentElement;
+          }
+          if (!grid) grid = rosterEl.parentElement;
+          if (!grid || grid.querySelector('[data-vyro-coach-agility]')) return;
+
+          var card = document.createElement('div');
+          card.setAttribute('data-vyro-coach-agility', '1');
+          card.style.cssText = 'grid-column:1 / -1;border-radius:18px;border:1px solid rgba(0,0,0,0.08);background:#fff;padding:18px;box-shadow:0 1px 2px rgba(0,0,0,0.04);color:#111;font-family:inherit';
+          var rows = [
+            ['First-step burst', 'T split-step → first push', 88],
+            ['Acceleration', 'Drive phase to front/back corners', 86],
+            ['Deceleration', 'Brake into corner without over-running', 82],
+            ['Change of direction', 'Corner exit angle back to T', 84],
+            ['Return control', 'Return-to-T time + body balance', 79]
+          ];
+          var rowsHtml = rows.map(function(r){
+            return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(0,0,0,0.06)">' +
+                     '<div style="flex:1;min-width:0">' +
+                       '<div style="font-weight:700;font-size:13px">'+r[0]+'</div>' +
+                       '<div style="font-size:11px;color:rgba(0,0,0,0.55)">'+r[1]+'</div>' +
+                     '</div>' +
+                     '<div style="flex:1;height:6px;background:rgba(0,0,0,0.06);border-radius:999px;overflow:hidden;max-width:160px">' +
+                       '<div style="width:'+r[2]+'%;height:100%;background:#10b981"></div>' +
+                     '</div>' +
+                     '<div style="font-family:monospace;font-weight:700;font-size:13px;width:28px;text-align:right">'+r[2]+'</div>' +
+                   '</div>';
+          }).join('');
+          card.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">' +
+              '<div>' +
+                '<div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,0,0,0.5);font-family:monospace">Squash movement score</div>' +
+                '<h3 style="margin:2px 0 0;font-size:16px;font-weight:800">Squash agility score</h3>' +
+              '</div>' +
+              '<span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#10b981;font-family:monospace">Live</span>' +
+            '</div>' +
+            '<p style="margin:6px 0 8px;font-size:12px;color:rgba(0,0,0,0.6);line-height:1.45">Burst acceleration to corners is sharp. Deceleration quality returning to T is your edge today — keep cuts under 0.42s.</p>' +
+            rowsHtml;
+          grid.appendChild(card);
+        }
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); }, 1500);
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); }, 800);
       });
     </script>
     <script type="module">
