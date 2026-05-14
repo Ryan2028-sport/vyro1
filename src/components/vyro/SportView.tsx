@@ -77,7 +77,7 @@ export function SportView({
         ))}
       </div>
       {sportTab === "database" && <SportDatabase profile={profile} selectedSport={selectedSport} />}
-      {sportTab === "agility" && <SportAgility />}
+      {sportTab === "agility" && <SportAgility selectedSport={selectedSport} />}
       {sportTab === "swing" && <SportSwing profile={profile} />}
     </>
   );
@@ -125,7 +125,10 @@ function SportDatabase({ profile, selectedSport }: { profile: SportProfile; sele
   );
 }
 
-function SportAgility() {
+function SportAgility({ selectedSport }: { selectedSport: string }) {
+  const isSquash = selectedSport === "Squash";
+  const baseLabel = isSquash ? "T" : selectedSport === "Tennis" ? "center mark" : "center";
+  const returnLabel = isSquash ? "Return-to-T" : selectedSport === "Tennis" ? "Return-to-center-mark" : "Return-to-base";
   const items = [
     "First-step burst 88",
     "Acceleration 86",
@@ -153,9 +156,9 @@ function SportAgility() {
       <Card>
         <h3 className="text-lg font-black">Movement technique</h3>
         <div className="mt-4 space-y-3 text-sm text-white/65">
-          <div>First step from center/T: 2.4 ft</div>
+          <div>First step from {baseLabel}: 2.4 ft</div>
           <div>Steps to target zone: 3.1 avg</div>
-          <div>Return-to-base: 1.37s</div>
+          <div>{returnLabel}: 1.37s</div>
           <div>Critical point movement decay: 8%</div>
         </div>
       </Card>
