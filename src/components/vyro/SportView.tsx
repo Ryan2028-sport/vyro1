@@ -77,7 +77,7 @@ export function SportView({
         ))}
       </div>
       {sportTab === "database" && <SportDatabase profile={profile} selectedSport={selectedSport} />}
-      {sportTab === "agility" && <SportAgility />}
+      {sportTab === "agility" && <SportAgility selectedSport={selectedSport} />}
       {sportTab === "swing" && <SportSwing profile={profile} />}
     </>
   );
