@@ -2,7 +2,13 @@ import { Bar, Card, PageHeader, ScoreRing, Spark } from "./shared";
 
 type Tab = "live" | "ingame" | "fatigue" | "overnight";
 
-export function RecoveryView({ recoveryTab, setRecoveryTab }: { recoveryTab: Tab; setRecoveryTab: (t: Tab) => void }) {
+export function RecoveryView({
+  recoveryTab,
+  setRecoveryTab,
+}: {
+  recoveryTab: Tab;
+  setRecoveryTab: (t: Tab) => void;
+}) {
   const tabs: [Tab, string][] = [
     ["live", "LIVE Recovery"],
     ["ingame", "In-Game"],
@@ -67,8 +73,8 @@ function RecoveryLive() {
       <Card className="lg:col-span-3">
         <h3 className="font-black text-[#ffb020]">HR-only trap detected</h3>
         <p className="mt-2 text-sm text-white/60">
-          Heart rate has recovered to within 6 bpm of baseline, but muscle readiness is still 64/100 after long Z5
-          rallies. VYRO sees the load debt.
+          Heart rate has recovered to within 6 bpm of baseline, but muscle readiness is still 64/100
+          after long Z5 rallies. VYRO sees the load debt.
         </p>
       </Card>
     </div>
@@ -109,38 +115,67 @@ function RecoveryInGame() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-black">Between-point HR drop · current match</h3>
-            <p className="mt-1 text-sm text-white/45">Mock rally recovery from peak HR to ready state.</p>
+            <p className="mt-1 text-sm text-white/45">
+              Mock rally recovery from peak HR to ready state.
+            </p>
           </div>
           <div className="text-right">
             <div className="text-3xl font-black tabular-nums">30</div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">bpm drop</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+              bpm drop
+            </div>
           </div>
         </div>
-        <MatchLineChart data={hrDrops} min={120} max={190} unit="bpm" className="mt-5 text-vyro-recovery" />
+        <MatchLineChart
+          data={hrDrops}
+          min={120}
+          max={190}
+          unit="bpm"
+          className="mt-5 text-vyro-recovery"
+        />
         <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-white/55">
-          <div className="rounded-2xl bg-white/[0.06] p-3"><span className="block text-lg font-black text-white">178</span>peak</div>
-          <div className="rounded-2xl bg-white/[0.06] p-3"><span className="block text-lg font-black text-white">148</span>recovered</div>
-          <div className="rounded-2xl bg-white/[0.06] p-3"><span className="block text-lg font-black text-white">0:42</span>time</div>
+          <div className="rounded-2xl bg-white/[0.06] p-3">
+            <span className="block text-lg font-black text-white">178</span>peak
+          </div>
+          <div className="rounded-2xl bg-white/[0.06] p-3">
+            <span className="block text-lg font-black text-white">148</span>recovered
+          </div>
+          <div className="rounded-2xl bg-white/[0.06] p-3">
+            <span className="block text-lg font-black text-white">0:42</span>time
+          </div>
         </div>
       </Card>
       <Card className="min-h-[260px]">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-black">Recovery speed under fatigue</h3>
-            <p className="mt-1 text-sm text-white/45">Mock late-match recovery speed trend by rally block.</p>
+            <p className="mt-1 text-sm text-white/45">
+              Mock late-match recovery speed trend by rally block.
+            </p>
           </div>
           <div className="text-right">
             <div className="text-3xl font-black tabular-nums">68%</div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">speed</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+              speed
+            </div>
           </div>
         </div>
-        <MatchLineChart data={fatigueRecovery} min={60} max={100} unit="%" className="mt-5 text-vyro-fatigue" />
+        <MatchLineChart
+          data={fatigueRecovery}
+          min={60}
+          max={100}
+          unit="%"
+          className="mt-5 text-vyro-fatigue"
+        />
         <div className="mt-4 space-y-3 text-sm text-white/65">
           <div>
             Fast recovery reserve
             <Bar value={68} color="amber" />
           </div>
-          <p className="text-xs leading-relaxed text-white/45">Recovery is slowing after repeated Zone 5 points; flag substitution, hydration, or tactical pacing.</p>
+          <p className="text-xs leading-relaxed text-white/45">
+            Recovery is slowing after repeated Zone 5 points; flag substitution, hydration, or
+            tactical pacing.
+          </p>
         </div>
       </Card>
       <Card className="lg:col-span-2">
@@ -183,22 +218,86 @@ function MatchLineChart({
 
   return (
     <div className={className}>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[150px] w-full overflow-visible" role="img" aria-label={`${unit} recovery chart`}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-[150px] w-full overflow-visible"
+        role="img"
+        aria-label={`${unit} recovery chart`}
+      >
         <line x1={left} y1={top} x2={left} y2={height - bottom} stroke="rgba(255,255,255,0.14)" />
-        <line x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} stroke="rgba(255,255,255,0.14)" />
+        <line
+          x1={left}
+          y1={height - bottom}
+          x2={width - right}
+          y2={height - bottom}
+          stroke="rgba(255,255,255,0.14)"
+        />
         {[0.25, 0.5, 0.75].map((tick) => {
           const y = top + tick * plotHeight;
-          return <line key={tick} x1={left} y1={y} x2={width - right} y2={y} stroke="rgba(255,255,255,0.08)" strokeDasharray="4 6" />;
+          return (
+            <line
+              key={tick}
+              x1={left}
+              y1={y}
+              x2={width - right}
+              y2={y}
+              stroke="rgba(255,255,255,0.08)"
+              strokeDasharray="4 6"
+            />
+          );
         })}
         <polygon points={area} fill="currentColor" opacity="0.12" />
-        <polyline points={line} fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <polyline
+          points={line}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
         {points.map((point, index) => (
-          <circle key={`${point.value}-${index}`} cx={point.x} cy={point.y} r="4" fill="currentColor" stroke="#0b0b0c" strokeWidth="2" />
+          <circle
+            key={`${point.value}-${index}`}
+            cx={point.x}
+            cy={point.y}
+            r="4"
+            fill="currentColor"
+            stroke="#0b0b0c"
+            strokeWidth="2"
+          />
         ))}
-        <text x="0" y={top + 4} fill="rgba(255,255,255,0.45)" fontSize="10" fontFamily="monospace">{max}{unit}</text>
-        <text x="0" y={height - bottom + 3} fill="rgba(255,255,255,0.45)" fontSize="10" fontFamily="monospace">{min}{unit}</text>
-        <text x={left} y={height - 2} fill="rgba(255,255,255,0.45)" fontSize="10" fontFamily="monospace">R1</text>
-        <text x={width - right - 20} y={height - 2} fill="rgba(255,255,255,0.45)" fontSize="10" fontFamily="monospace">R{data.length}</text>
+        <text x="0" y={top + 4} fill="rgba(255,255,255,0.45)" fontSize="10" fontFamily="monospace">
+          {max}
+          {unit}
+        </text>
+        <text
+          x="0"
+          y={height - bottom + 3}
+          fill="rgba(255,255,255,0.45)"
+          fontSize="10"
+          fontFamily="monospace"
+        >
+          {min}
+          {unit}
+        </text>
+        <text
+          x={left}
+          y={height - 2}
+          fill="rgba(255,255,255,0.45)"
+          fontSize="10"
+          fontFamily="monospace"
+        >
+          R1
+        </text>
+        <text
+          x={width - right - 20}
+          y={height - 2}
+          fill="rgba(255,255,255,0.45)"
+          fontSize="10"
+          fontFamily="monospace"
+        >
+          R{data.length}
+        </text>
       </svg>
     </div>
   );
