@@ -548,27 +548,8 @@
           var hdr = document.querySelector('header');
           if (!hdr) return;
 
-          // 1) Find greeting + eyebrow from the page; hide that PageHeader block
-          var greetingTitle = '', eyebrow = '';
-          var h1s = document.querySelectorAll('main h1, main h2');
-          for (var i = 0; i < h1s.length; i++) {
-            var tx = (h1s[i].textContent || '').trim();
-            if (/good\s+(morning|afternoon|evening)/i.test(tx)) {
-              greetingTitle = tx;
-              var prev = h1s[i].previousElementSibling;
-              if (prev) eyebrow = (prev.textContent || '').trim();
-              // Hide eyebrow, h1, and subtitle (next sibling) individually
-              if (prev) prev.classList.add('vyro-pageheader-hidden');
-              h1s[i].classList.add('vyro-pageheader-hidden');
-              var nxt = h1s[i].nextElementSibling;
-              if (nxt) nxt.classList.add('vyro-pageheader-hidden');
-              break;
-            }
-          }
-          if (!greetingTitle) greetingTitle = 'Good morning, Ryan.';
-          if (!eyebrow) eyebrow = 'Athlete Dashboard';
-
-          // 2) Hide only the notification bell button; keep Watch Live and the 4 module buttons
+          // Keep the original PageHeader greeting visible above the rings (do not hide it)
+          // Hide only the notification bell button; keep Watch Live and the 4 module buttons
           var hdrButtons = hdr.querySelectorAll('button, [role="button"], a');
           hdrButtons.forEach(function (b) {
             var label = (b.getAttribute('aria-label') || b.textContent || '').trim();
@@ -579,23 +560,12 @@
             }
           });
 
-          // 3) Inject greeting block once
-          if (!hdr.querySelector('#vyro-header-greeting')) {
-            var greet = document.createElement('div');
-            greet.id = 'vyro-header-greeting';
-            greet.innerHTML = '<span class="eyebrow"></span><span class="title"></span>';
-            var titleRow = hdr.querySelector('.ios-module-title');
-            if (titleRow) titleRow.insertBefore(greet, titleRow.firstChild);
-            else hdr.appendChild(greet);
-          }
-          var g = hdr.querySelector('#vyro-header-greeting');
-          if (g) {
-            g.querySelector('.eyebrow').textContent = eyebrow;
-            g.querySelector('.title').textContent = greetingTitle;
-          }
+          // Remove any previously-injected in-header greeting
+          var prevGreet = hdr.querySelector('#vyro-header-greeting');
+          if (prevGreet) prevGreet.remove();
 
-          // 4) Keep the original page header hidden now that its text is in the top header
-          var nameRe = /(Ryan\s*Chen|Squash|D1\s*National|National\s*team)/i;
+          // Hide the athlete meta row (Ryan Chen · Squash · D1 National) only, not the greeting
+          var nameRe = /(Ryan\s*Chen.*Squash|Squash.*D1|National\s*team)/i;
           var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
           var node;
           while ((node = w.nextNode())) {
