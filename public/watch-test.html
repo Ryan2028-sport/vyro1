@@ -916,10 +916,12 @@ function startWatchMotionAssist() {
   court.watchMotionAssistTimer = setInterval(() => {
     if (!court.running || court.source !== 'watch') return;
     const now = performance.now();
-    const phoneSilent = !court.lastLiveMoveMs || (now - court.lastLiveMoveMs) > 900;
-    const streamFresh = (now - (court.lastWatchPacketMs || 0)) < 2200 || (now - (court.lastHrMs || 0)) < 2200;
-    if (phoneSilent && streamFresh) forceWatchCourtMove('WATCH STREAM FALLBACK', 0.38 + Math.min(0.32, (court.currentHr || 80) / 450));
-  }, 420);
+    // Desktop / no-IMU mode: if we've never received a devicemotion event since session start, treat phone as permanently silent.
+    const noPhoneIMU = !court.lastMotionEventMs || (now - court.startMs) > 2500 && (!court.lastLiveMoveMs);
+    const phoneSilent = noPhoneIMU || !court.lastLiveMoveMs || (now - court.lastLiveMoveMs) > 900;
+    const streamFresh = (now - (court.lastWatchPacketMs || 0)) < 3000 || (now - (court.lastHrMs || 0)) < 3000;
+    if (phoneSilent && streamFresh) forceWatchCourtMove(noPhoneIMU ? 'DESKTOP WATCH-ONLY' : 'WATCH STREAM FALLBACK', 0.38 + Math.min(0.32, (court.currentHr || 80) / 450));
+  }, 300);
 }
 function updateCourtPosition() {
   const dot = $('playerDot'); const trail = $('playerTrail');
