@@ -393,7 +393,8 @@ async function connect(filtered = false) {
       await sendCmd(buildSetTime()); await sleep(200);
       await sendCmd(buildPacket(CMD.BATTERY)); await sleep(200);
       await sendCmd(buildPacket(CMD.FIRMWARE)); await sleep(200);
-      await sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+      await sendCmd(buildPacket(CMD.STEPS)); await sleep(120);
+      await sendCmd(buildSportsDataRequest(0));
     }
     $('sync').textContent = new Date().toLocaleTimeString();
     if (court.running && court.source !== 'watch') {
@@ -792,7 +793,7 @@ $('connectBtn').onclick = () => connect(false);
 $('connectFilteredBtn').onclick = () => connect(true);
 $('disconnectBtn').onclick = disconnect;
 $('btnBattery').onclick = () => sendCmd(buildPacket(CMD.BATTERY));
-$('btnSteps').onclick   = () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+$('btnSteps').onclick   = async () => { await sendCmd(buildPacket(CMD.STEPS)); await sleep(120); await sendCmd(buildSportsDataRequest(0)); };
 $('btnTime').onclick    = () => sendCmd(buildSetTime());
 $('btnReboot').onclick  = () => sendCmd(buildPacket(CMD.REBOOT, [1]));
 $('btnHrStart').onclick = async () => {
