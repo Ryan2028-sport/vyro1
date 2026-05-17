@@ -223,6 +223,22 @@
   </div>
 
   <div class="panel" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <div class="section-title" style="margin:0">Live decoder · first-byte streams (move your wrist!)</div>
+      <div class="row" style="gap:6px">
+        <button class="ghost" id="decTrigger0c" disabled>Trigger 0x0c</button>
+        <button class="ghost" id="decReset">Reset min/max</button>
+      </div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:8px">
+      Buckets every notification by its first byte and decodes the 14 payload bytes as 6× int16 (LE and BE).
+      <b>If these numbers wiggle when you shake the watch, that stream is raw IMU.</b>
+      If they only change when you press buttons or stay static while moving, it's just status/historical data.
+    </div>
+    <div id="decoderOut" style="font-family:'JetBrains Mono',monospace;font-size:11px;max-height:360px;overflow:auto;background:#000;border:1px solid var(--border);border-radius:10px;padding:8px">no packets yet</div>
+  </div>
+
+  <div class="panel" style="margin-top:16px">
     <div class="row" style="justify-content:space-between;margin-bottom:12px">
       <div class="section-title" style="margin:0">Commands</div>
       <div class="row">
@@ -320,7 +336,7 @@ function setConnected(on) {
   $('connectBtn').disabled = on;
   $('connectFilteredBtn').disabled = on;
   $('disconnectBtn').disabled = !on;
-  ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot','probeStart','probeMonitor']
+  ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot','probeStart','probeMonitor','decTrigger0c']
     .forEach(id => $(id).disabled = !on);
 }
 
@@ -380,6 +396,7 @@ async function connect(filtered = false) {
               log('in', `← ${c.uuid.slice(4,8)} [${data.byteLength}B]: ${hex(data)}`);
               // Feed the opcode/sensor probe accumulator with every notification.
               probeRecord(c.uuid, data);
+              decoderRecord(data);
               if (isStdHr) {
                 try { onStdHr({ target: { value: e.target.value } }); } catch {}
               } else {
@@ -1185,6 +1202,82 @@ $('probeClear').onclick = () => {
   $('probeStatus').textContent = 'cleared.';
 };
 setInterval(() => { if (probeBuckets.size) renderProbeResults(); }, 600);
+
+// ==========================================================================
+// LIVE FIRST-BYTE DECODER — bucket every packet by its first byte and
+// interpret the 14 payload bytes as 6 × int16 (little + big endian). If any
+// stream's numbers wiggle when the wrist moves, that's the IMU.
+// ==========================================================================
+const decBuckets = new Map(); // firstByte → stats
+function decoderRecord(bytes) {
+  if (!bytes || bytes.length < 4) return;
+  const fb = bytes[0];
+  let b = decBuckets.get(fb);
+  const now = performance.now();
+  if (!b) {
+    b = { fb, count: 0, firstMs: now, lastMs: now, last: null,
+          mins: new Array(6).fill( 32767), maxs: new Array(6).fill(-32768),
+          minsBE: new Array(6).fill( 32767), maxsBE: new Array(6).fill(-32768) };
+    decBuckets.set(fb, b);
+  }
+  b.count++; b.lastMs = now; b.last = bytes.slice();
+  // Decode 6 × int16 starting at offset 2 (skip tag + sub-tag), ending before checksum.
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let i = 0; i < 6; i++) {
+    const off = 2 + i * 2;
+    if (off + 2 > bytes.length - 1) break;
+    const le = dv.getInt16(off, true);
+    const be = dv.getInt16(off, false);
+    if (le < b.mins[i]) b.mins[i] = le;
+    if (le > b.maxs[i]) b.maxs[i] = le;
+    if (be < b.minsBE[i]) b.minsBE[i] = be;
+    if (be > b.maxsBE[i]) b.maxsBE[i] = be;
+  }
+}
+function renderDecoder() {
+  if (!decBuckets.size) { $('decoderOut').innerHTML = 'no packets yet'; return; }
+  const now = performance.now();
+  const rows = [...decBuckets.values()].sort((a, b) => b.count - a.count);
+  const html = rows.map(b => {
+    const dur = Math.max(0.001, (b.lastMs - b.firstMs) / 1000);
+    const rate = b.count / dur;
+    const ageS = ((now - b.lastMs) / 1000).toFixed(1);
+    const dv = new DataView(b.last.buffer, b.last.byteOffset, b.last.byteLength);
+    const le = [], be = [], ranges = [];
+    for (let i = 0; i < 6; i++) {
+      const off = 2 + i * 2;
+      if (off + 2 > b.last.length - 1) { le.push('—'); be.push('—'); ranges.push('—'); continue; }
+      le.push(dv.getInt16(off, true).toString().padStart(7));
+      be.push(dv.getInt16(off, false).toString().padStart(7));
+      const span = b.maxs[i] - b.mins[i];
+      const wiggle = span > 50 ? `<span style="color:#39ff88">±${span}</span>` : `<span style="color:var(--muted)">±${span}</span>`;
+      ranges.push(wiggle.padStart(40));
+    }
+    const tag = '0x' + b.fb.toString(16).padStart(2,'0');
+    const live = rate >= 5 && (b.maxs.some((m,i)=>m-b.mins[i]>50));
+    const star = live ? ' <span style="color:#39ff88">⭐MOTION</span>' : '';
+    return `
+<div style="border-bottom:1px solid #222;padding:6px 0;color:#ddd">
+  <div><b style="color:${rate>=5?'#39ff88':'#ffb020'}">first-byte ${tag}</b> · ${b.count} pkts · ${rate.toFixed(1)}Hz · last ${ageS}s ago${star}</div>
+  <div style="font-size:10px;opacity:0.7;margin-top:2px">hex: ${hex(b.last)}</div>
+  <div style="margin-top:4px">LE int16: <span style="color:#9cf">${le.join(' ')}</span></div>
+  <div>BE int16: <span style="color:#fc9">${be.join(' ')}</span></div>
+  <div style="margin-top:2px">range:    ${ranges.join(' ')}</div>
+</div>`;
+  }).join('');
+  $('decoderOut').innerHTML = html;
+}
+setInterval(renderDecoder, 250);
+$('decReset').onclick = () => { decBuckets.clear(); renderDecoder(); };
+$('decTrigger0c').onclick = async () => {
+  if (!writeChar) { log('err','connect first'); return; }
+  // 0x0c with a few payload shapes — one of them kicked the stream during the sweep.
+  for (const shape of [[], [1], [1,1], [0,1,1], [1,0]]) {
+    try { await sendCmd(buildPacket(0x0c, shape)); } catch {}
+    await sleep(150);
+  }
+  log('info','0x0c trigger sent — watch decoder for motion');
+};
 
 // ==========================================================================
 // Court movement / explosive step tracker (phone IMU)
