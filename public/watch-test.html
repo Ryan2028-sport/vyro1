@@ -528,7 +528,8 @@ function parsePacket(p) {
 }
 
 // ----- button wiring -----
-$('connectBtn').onclick = connect;
+$('connectBtn').onclick = () => connect(false);
+$('connectFilteredBtn').onclick = () => connect(true);
 $('disconnectBtn').onclick = disconnect;
 $('btnBattery').onclick = () => sendCmd(buildPacket(CMD.BATTERY));
 $('btnSteps').onclick   = () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
