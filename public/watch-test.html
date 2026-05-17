@@ -927,17 +927,16 @@ function onWatchSteps(totalSteps) {
   $('cCad').textContent = cadSpm;
   $('cadNow').textContent = cadSpm + ' spm';
 
-  // Move the green dot immediately for every watch step burst, not only from HR.
+  // Move the green dot once for every watch step, so dot steps mirror real steps.
   if (!court.calibrating) {
     const pulses = Math.min(6, Math.max(1, deltaSteps));
     for (let i = 0; i < pulses; i++) {
       setTimeout(() => {
         if (!court.running || court.source !== 'watch') return;
-        moveCourtDotLive(Math.min(1, 0.35 + rate * 0.18));
+        takeCourtStep(Math.min(1, 0.32 + rate * 0.16));
         updateCourtVisual();
-      }, i * 90);
+      }, i * 170);
     }
-    pulseCourtDot(deltaSteps);
   }
 
   // explosive: rate ≥ 3 steps/sec → sprint cadence (~180 spm)
