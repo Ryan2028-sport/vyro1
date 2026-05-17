@@ -911,7 +911,7 @@ async function startCourt() {
     // Poll STEPS once a second
     court.watchPollTimer = setInterval(
       () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
-      1000
+      500
     );
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
