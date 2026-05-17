@@ -419,6 +419,7 @@ function onStdHr(e) {
   log('in', `HR: ${bpm} bpm`);
   if (court.running && court.source === 'watch') {
     onWatchHr(bpm);
+    court.lastWatchPacketMs = performance.now();
     inferWatchMotionFromPacket(data, 'standard-hr');
   }
   // Energy expended + RR-intervals could be parsed here too
@@ -1047,6 +1048,7 @@ function onWatchHr(bpm) {
     const rising = bpm >= prevHr + 1;
     const phoneMotionFresh = (now - (court.lastLiveMoveMs || court.lastMoveMs || 0)) < 1200;
     if (rising && phoneMotionFresh) court.lastMoveMs = now;
+    if (rising && !phoneMotionFresh) forceWatchCourtMove('RISING HR FALLBACK', 0.5);
   }
 }
 
