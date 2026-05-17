@@ -1115,6 +1115,12 @@ async function attachPhoneMotion() {
     const dbg = document.getElementById('dbgOverlay'); if (!dbg) return;
     const since = performance.now() - (court.lastMotionEventMs || 0);
     if (since > 1500) {
+      const sinceWatch = performance.now() - (court.lastWatchPacketMs || court.lastHrMs || 0);
+      if (court.source === 'watch' && sinceWatch < 2500) {
+        dbg.style.color = '#0f0';
+        dbg.textContent = `✓ WATCH STREAM LIVE\nphone IMU silent ${Math.round(since)}ms\nwatch packets fresh ${Math.round(sinceWatch)}ms\ndot uses watch fallback movement`;
+        return;
+      }
       dbg.style.color = '#f55';
       dbg.textContent = `⚠ NO MOTION EVENTS for ${Math.round(since)}ms\n` +
         `DeviceMotionEvent permission may be denied,\n` +
