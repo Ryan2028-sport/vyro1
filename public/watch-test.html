@@ -128,7 +128,7 @@
           <polyline id="playerTrail" fill="none" stroke="#39ff88" stroke-width="1.5" opacity="0.4" stroke-linecap="round" stroke-linejoin="round" points=""/>
           <circle id="playerPulse" cx="45" cy="55" r="14" fill="none" stroke="#39ff88" stroke-width="2" opacity="0"/>
           <circle id="playerDot" cx="45" cy="55" r="10" fill="#39ff88"
-                  style="filter:drop-shadow(0 0 8px #39ff88);transition:cx .4s ease-out,cy .4s ease-out,r .3s,opacity .3s,fill .3s" opacity="0.7"/>
+                  style="filter:drop-shadow(0 0 8px #39ff88);transition:cx .08s linear,cy .08s linear,r .18s,opacity .18s,fill .18s" opacity="0.7"/>
         </svg>
         <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
           dot moves on step bursts + rising HR<br/>color & glow = current intensity
@@ -447,7 +447,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function handleWatchPacket(p, uuid = 'watch') {
   parsePacket(p);
-  if (!court.running || court.source !== 'watch' || court.calibrating) return;
+  if (!court.running || court.source !== 'watch') return;
 
   const id = p[0];
   const isKnownPassive =
