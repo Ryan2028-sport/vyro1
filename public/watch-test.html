@@ -131,7 +131,7 @@
                   style="filter:drop-shadow(0 0 14px #39ff88);transition:cx .08s linear,cy .08s linear,r .18s,opacity .18s,fill .18s" opacity="1"/>
         </svg>
         <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
-          dot moves on step bursts + rising HR<br/>color & glow = current intensity
+          dot moves only on live motion / real steps<br/>color & glow = current intensity
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
@@ -167,8 +167,8 @@
     </div>
 
     <div style="margin-top:12px;color:var(--muted);font-size:12px;line-height:1.5">
-      Live data is pulled from the connected watch. Step bursts move the dot;
-      rising heart rate adds short live movement, then stops when you stand still.
+      Live data is pulled from the connected watch. The dot now moves from real motion packets
+      when the watch exposes them, with step-count changes used only as backup.
     </div>
   </div>
 
@@ -479,9 +479,13 @@ function handleWatchPacket(p, uuid = 'watch') {
       onWatchSteps(autoSteps);
       return;
     }
+    inferWatchMotionFromPacket(p, uuid);
+    return;
   }
   if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
     markWatchStreamAlive('HR packet live');
+  } else if (id === CMD.DEVICE_NOTIFY && p[1] !== 4) {
+    inferWatchMotionFromPacket(p, uuid + ':notify-' + p[1]);
   } else if (id !== CMD.STEPS) {
     // Unknown/HR/Battery packets are proof the watch is connected, not proof of
     // movement. Do not convert changing bytes/checksums into fake court steps.
@@ -597,40 +601,39 @@ function markWatchStreamAlive(label = 'WATCH STREAM') {
 
 function inferWatchMotionFromPacket(p, uuid) {
   const now = performance.now();
-  const key = uuid || 'watch';
-  if (court.watchBaseSteps != null) {
-    updateDebugOverlay('watch', false, 'watch packet live · waiting for step change', { score: 0, changed: 0, gap: 0, uuid: key });
-    return;
-  }
+  const key = uuid || 'watch-motion';
   const prev = watchPacketState.get(key);
-  watchPacketState.set(key, { bytes: Array.from(p), ms: now });
   if (!prev) {
-    const moved = markWatchStreamAlive('WATCH FIRST PACKET');
-    updateDebugOverlay('watch', !!moved, moved ? 'WATCH FIRST PACKET' : 'watch packet armed', { score: 1, changed: 1, gap: 0, uuid: key });
+    watchPacketState.set(key, { bytes: Array.from(p), ms: now, noise: 0, samples: 0 });
+    updateDebugOverlay('watch', false, 'motion packet armed · stand still baseline', { score: 0, changed: 0, gap: 0, uuid: key });
     return;
   }
 
-  let changed = 0, score = 0;
+  let changed = 0;
+  let byteScore = 0;
   const len = Math.max(p.length, prev.bytes.length);
   for (let i = 0; i < len; i++) {
     const d = Math.abs((p[i] || 0) - (prev.bytes[i] || 0));
     if (d) changed++;
-    score += Math.min(32, d);
+    byteScore += Math.min(40, d);
   }
   const gap = now - prev.ms;
-  if (gap < 40 || changed < 1 || score < 2) {
-    const moved = markWatchStreamAlive('WATCH STREAM HEARTBEAT');
-    updateDebugOverlay('watch', !!moved, moved ? 'WATCH STREAM HEARTBEAT' : 'watch stream fresh', { score: Math.max(score, 1), changed: Math.max(changed, 1), gap, uuid: key });
+  const score = byteScore;
+  const sessionAge = Date.now() - (court.startMs || Date.now());
+  const noise = prev.samples < 8 ? Math.max(prev.noise || 0, score) : ((prev.noise || 0) * 0.92 + Math.min(score, 60) * 0.08);
+  const threshold = Math.max(42, noise * 3.2 + 18);
+  watchPacketState.set(key, { bytes: Array.from(p), ms: now, noise, samples: (prev.samples || 0) + 1 });
+
+  if (gap < 45 || gap > 1800 || changed < 2) {
+    updateDebugOverlay('watch', false, 'watch motion stream live · no movement', { score, changed, gap, uuid: key });
+    return;
+  }
+  if (sessionAge < 1600 || score < threshold) {
+    updateDebugOverlay('watch', false, `gyro idle · score ${Math.round(score)} < ${Math.round(threshold)}`, { score, changed, gap, uuid: key });
     return;
   }
 
-  const sessionAge = Date.now() - (court.startMs || Date.now());
-  const threshold = sessionAge < 2500 ? 9999 : 18;
-  if (score >= threshold && gap > 90) {
-    forceWatchCourtMove('STEP packet burst', Math.min(1, 0.34 + score / 140));
-  } else {
-    updateDebugOverlay('watch', false, sessionAge < 2500 ? 'learning watch idle noise' : 'watch packet live · no step burst', { score, changed, gap, uuid: key });
-  }
+  forceWatchCourtMove('GYRO / motion packet', Math.min(1, 0.32 + score / 260));
 }
 
 // Scan a 16-byte packet for a monotonically-increasing step counter and lock onto it.
@@ -1064,7 +1067,6 @@ function resetCourt() {
   court._stepTotalToday = null; court._liveNotifySteps = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
   court._autoStepFieldKey = null;
   court.phoneAssistActive = false;
-  court._predictedSteps = 0; court._predictRate = 0; court._lastBurstMs = 0;
   if (court._predictTimer) { clearInterval(court._predictTimer); court._predictTimer = null; }
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
@@ -1243,7 +1245,7 @@ function startWatchMotionAssist() {
   if (court.watchMotionAssistTimer) clearInterval(court.watchMotionAssistTimer);
   court.watchMotionAssistTimer = setInterval(() => {
     if (!court.running || court.source !== 'watch') return;
-    updateDebugOverlay('watch', false, 'watch connected · waiting for steps', { score: 0, changed: 0, gap: 0, uuid: 'watch-step-gate' });
+    updateDebugOverlay('watch', false, 'watch connected · waiting for motion/steps', { score: 0, changed: 0, gap: 0, uuid: 'watch-motion-gate' });
   }, 300);
 }
 function updateCourtPosition() {
@@ -1383,43 +1385,14 @@ function onWatchSteps(totalSteps) {
   $('cCad').textContent = cadSpm;
   $('cadNow').textContent = cadSpm + ' spm';
 
-  // Watch firmware reports steps in BURSTS (every 5-30s), not per step.
-  // To make the dot feel live: (a) spread this burst's pulses across the
-  // real burst interval so motion looks continuous, (b) reconcile with the
-  // between-burst predictor below (court.predicted) so we don't double-move.
-  const predicted = court._predictedSteps || 0;
-  const owedSteps = Math.max(0, deltaSteps - Math.max(0, predicted));
-  court._predictedSteps = Math.max(0, predicted - deltaSteps);
-  const spreadMs = Math.max(400, Math.min(dt * 1000 * 0.9, owedSteps * 260));
-  const interval = owedSteps > 0 ? spreadMs / owedSteps : 0;
-  for (let i = 0; i < owedSteps; i++) {
+  // Do not predict between bursts. If the watch sends real gyro/motion packets,
+  // those packets move the dot live; step-total changes are only a backup signal.
+  for (let i = 0; i < deltaSteps; i++) {
     setTimeout(() => {
-      if (!court.running || court.source !== 'watch') return;
+      if (!court.running || court.source !== 'watch' || court.phoneAssistActive) return;
       takeCourtStep(Math.min(1, 0.32 + rate * 0.16));
       updateCourtVisual();
-    }, Math.round(i * interval));
-  }
-  // Update predictor cadence from observed rate (steps/sec), clamped.
-  court._predictRate = Math.max(0.5, Math.min(4.5, rate));
-  court._lastBurstMs = now;
-  if (!court._predictTimer) {
-    court._predictTimer = setInterval(() => {
-      if (!court.running || court.source !== 'watch') return;
-      const t = performance.now();
-      const sinceBurst = t - (court._lastBurstMs || t);
-      // Don't predict until at least 1s after a burst (let real pulses play out),
-      // and stop predicting if no burst for >20s (athlete likely standing still).
-      if (sinceBurst < 1000 || sinceBurst > 20000) return;
-      const r = court._predictRate || 1.5;
-      const expectedSinceBurst = Math.floor((sinceBurst / 1000) * r);
-      const alreadyPredicted = court._predictedSteps || 0;
-      if (expectedSinceBurst > alreadyPredicted) {
-        court._predictedSteps = alreadyPredicted + 1;
-        takeCourtStep(Math.min(1, 0.30 + r * 0.14));
-        updateCourtVisual();
-        updateDebugOverlay('watch', true, `predicted step (between bursts) · cad≈${Math.round(r*60)} spm`, { score: 1, changed: 1, gap: sinceBurst, uuid: 'watch-predict' });
-      }
-    }, 200);
+    }, i * 80);
   }
 
   // explosive: rate ≥ 3 steps/sec → sprint cadence (~180 spm)
