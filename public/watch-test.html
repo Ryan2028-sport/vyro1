@@ -195,26 +195,50 @@ async function connect() {
     const uuids = services.map(s => s.uuid);
     log('info', 'Services: ' + uuids.join(', '));
 
-    // Prefer QCBand proprietary protocol if present
+    // Auto-enumerate every characteristic on every service, and subscribe to
+    // any that supports notify/indicate. This catches HR/steps regardless of
+    // the watch's protocol family (QCBand / Telink / JL / standard GATT).
+    const writeCandidates = [];
+    for (const svc of services) {
+      let chars = [];
+      try { chars = await svc.getCharacteristics(); } catch { continue; }
+      for (const c of chars) {
+        const p = c.properties;
+        const flags = [
+          p.read && 'R', p.write && 'W', p.writeWithoutResponse && 'Wn',
+          p.notify && 'N', p.indicate && 'I',
+        ].filter(Boolean).join('');
+        log('info', `  ${svc.uuid.slice(4,8)} → char ${c.uuid.slice(4,8)} [${flags}]`);
+        if (p.notify || p.indicate) {
+          try {
+            await c.startNotifications();
+            c.addEventListener('characteristicvaluechanged', (e) => {
+              const data = new Uint8Array(e.target.value.buffer);
+              log('in', `← ${c.uuid.slice(4,8)}: ${hex(data)}`);
+              // try every parser — they no-op if data doesn't match
+              parsePacket(data);
+              try { onStdHr({ target: { value: e.target.value } }); } catch {}
+            });
+          } catch (err) { log('err', `notify ${c.uuid.slice(4,8)}: ${err.message}`); }
+        }
+        if (p.write || p.writeWithoutResponse) writeCandidates.push(c);
+      }
+    }
+    log('info', `Subscribed to all notify chars. ${writeCandidates.length} writable chars available.`);
+
+    // Pick a default write characteristic for the manual command buttons:
+    // prefer QCBand's known UUID, else the first writable char found.
     const qc = services.find(s => s.uuid === SERVICE_UUID);
     const hr = services.find(s => s.uuid === '0000180d-0000-1000-8000-00805f9b34fb');
-
     if (qc) {
       protocol = 'qcband';
-      writeChar  = await qc.getCharacteristic(WRITE_UUID);
-      notifyChar = await qc.getCharacteristic(NOTIFY_UUID);
-      await notifyChar.startNotifications();
-      notifyChar.addEventListener('characteristicvaluechanged', onNotify);
-      log('info', 'QCBand protocol ready.');
+      writeChar = writeCandidates.find(c => c.uuid === WRITE_UUID) || writeCandidates[0];
     } else if (hr) {
       protocol = 'standard-hr';
-      log('info', 'Standard Heart Rate Service detected (0x180D).');
-      const hrm = await hr.getCharacteristic(STD_HR_MEASURE);
-      await hrm.startNotifications();
-      hrm.addEventListener('characteristicvaluechanged', onStdHr);
-      log('info', 'HR notifications started — wear the strap to see bpm.');
     } else {
-      throw new Error('No supported service. Found: ' + uuids.join(', '));
+      protocol = 'generic';
+      writeChar = writeCandidates[0] || null;
+      log('info', `Generic protocol — default write char: ${writeChar?.uuid || 'none'}`);
     }
 
     setStatus('connected', 'on');
