@@ -818,7 +818,7 @@ function tickCourt() {
     $('cCad').textContent = court.currentCad;
     $('cadNow').textContent = court.currentCad + ' spm';
     updateCourtVisual();
-    if (court.recent.length) pulseCourtDot();
+    if (court.recent.length && !court.calibrating) pulseCourtDot(1);
   } else {
     // watch source: decay cadence if no recent step packet
     const stale = (performance.now() - (court.watchLastTickMs || 0)) > 2500;
