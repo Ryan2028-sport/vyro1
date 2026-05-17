@@ -399,6 +399,8 @@ $('btnSteps').onclick   = () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0
 $('btnTime').onclick    = () => sendCmd(buildSetTime());
 $('btnReboot').onclick  = () => sendCmd(buildPacket(CMD.REBOOT, [1]));
 $('btnHrStart').onclick = async () => {
+  hrSamples = [];
+  $('hr').textContent = '…';
   await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
   // ring expects keep-alive ~every 2s for continuous reading
   if (hrInterval) clearInterval(hrInterval);
@@ -406,6 +408,7 @@ $('btnHrStart').onclick = async () => {
 };
 $('btnHrStop').onclick = async () => {
   if (hrInterval) { clearInterval(hrInterval); hrInterval = null; }
+  hrSamples = [];
   await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.STOP));
 };
 $('btnSpo2Start').onclick = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.START));
