@@ -462,9 +462,15 @@ function handleWatchPacket(p, uuid = 'watch') {
     (id === CMD.REAL_TIME_START && (p[1] === RT_TYPE.HEART_RATE || p[1] === RT_TYPE.SPO2));
 
   if (!isKnownPassive) {
-    const genericSteps = readGenericStepTotal(p, uuid);
-    if (genericSteps != null) onWatchSteps(genericSteps);
-    if (id !== CMD.STEPS) inferWatchMotionFromPacket(p, uuid);
+    // Only treat explicit step-response packets as step totals. Unknown live
+    // packets often contain timestamps/HR counters that change while standing
+    // still, so counting those as steps creates false movement on desktop.
+    if (id === CMD.STEPS) {
+      const genericSteps = readGenericStepTotal(p, uuid);
+      if (genericSteps != null) onWatchSteps(genericSteps);
+    } else {
+      inferWatchMotionFromPacket(p, uuid);
+    }
   } else if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
     // Some watches only stream HR/RR packets while active. Use changing live packets
     // as a fallback motion source when the phone IMU is blocked or silent.
@@ -980,6 +986,10 @@ function onWatchSteps(totalSteps) {
   court.watchLastSteps = totalSteps;
   court.watchLastTickMs = now;
   if (deltaSteps <= 0 || dt <= 0) return;
+  if (deltaSteps > 12 || (dt < 2 && deltaSteps > 4)) {
+    updateDebugOverlay('watch', false, 'ignored unrealistic step jump', { score: deltaSteps, changed: deltaSteps, gap: dt * 1000, uuid: 'watch-steps' });
+    return;
+  }
   court.lastMoveMs = now;
   court.lastWatchMotionMs = now;
   court.recent.push(now);
