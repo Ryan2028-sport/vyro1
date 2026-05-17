@@ -1304,6 +1304,63 @@ $('decTrigger0c').onclick = async () => {
 };
 
 // ==========================================================================
+// WRIST MOTION METER — locks on 0x69 stream. Computes a rolling magnitude
+// from sum-of-absolute-deltas across the payload (works regardless of which
+// bytes encode the axis). Renders a live sparkline + bar + numeric value.
+// ==========================================================================
+let motionLockTag = 0x69;       // default to the user-confirmed channel
+let motionPrev = null;
+const motionHist = new Array(200).fill(0);
+let motionMax = 1;
+let motionLastMs = 0;
+function motionRecord(bytes) {
+  if (!bytes || bytes.length < 4 || bytes[0] !== motionLockTag) return;
+  motionLastMs = performance.now();
+  if (motionPrev && motionPrev.length === bytes.length) {
+    let d = 0;
+    // ignore byte 0 (tag) and last byte (CRC/counter)
+    for (let i = 1; i < bytes.length - 1; i++) d += Math.abs(bytes[i] - motionPrev[i]);
+    motionHist.push(d); motionHist.shift();
+    if (d > motionMax) motionMax = d;
+  }
+  motionPrev = bytes.slice();
+}
+function renderMotion() {
+  const v = motionHist[motionHist.length - 1] || 0;
+  const pct = motionMax > 0 ? Math.min(100, (v / motionMax) * 100) : 0;
+  $('motionValue').textContent = v.toString();
+  $('motionBar').style.width = pct.toFixed(0) + '%';
+  const age = motionLastMs ? ((performance.now() - motionLastMs) / 1000).toFixed(1) : '∞';
+  const tag = '0x' + motionLockTag.toString(16).padStart(2, '0');
+  $('motionStatus').textContent = `locked to ${tag} · peak ${motionMax} · last ${age}s ago`;
+  const c = $('motionSpark'); if (!c) return;
+  const ctx = c.getContext('2d'); const w = c.width, h = c.height;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#39ff88'; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let i = 0; i < motionHist.length; i++) {
+    const x = (i / (motionHist.length - 1)) * w;
+    const y = h - (Math.min(motionHist[i], motionMax) / motionMax) * (h - 4) - 2;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // Threshold line at 25%
+  ctx.strokeStyle = '#ffb02055'; ctx.setLineDash([4, 4]); ctx.beginPath();
+  ctx.moveTo(0, h * 0.75); ctx.lineTo(w, h * 0.75); ctx.stroke(); ctx.setLineDash([]);
+}
+setInterval(renderMotion, 80);
+$('motionReset').onclick = () => {
+  motionHist.fill(0); motionMax = 1; motionPrev = null;
+  $('motionStatus').textContent = 'reset.';
+};
+$('motionLock').onclick = () => {
+  // Find the busiest first-byte bucket and lock to it
+  if (!decBuckets.size) { log('err','no packets yet'); return; }
+  const best = [...decBuckets.values()].sort((a,b) => b.count - a.count)[0];
+  motionLockTag = best.fb; motionPrev = null; motionHist.fill(0); motionMax = 1;
+  log('info', `motion meter locked to 0x${best.fb.toString(16).padStart(2,'0')}`);
+};
+
+// ==========================================================================
 // Court movement / explosive step tracker (phone IMU)
 // Peak-picks on the linear accel magnitude. A step = local peak above
 // THRESH_STEP with a refractory period. Explosive step = peak above THRESH_EXP
