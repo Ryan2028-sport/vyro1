@@ -482,9 +482,15 @@ const THRESH_LUNGE = 2.80;      // hard lunge / sprint start
 const REFRACTORY_MS = 260;      // min gap between counted steps
 
 const court = {
-  running: false, startMs: 0, lastStepMs: 0,
+  running: false, source: null, // 'watch' | 'phone'
+  startMs: 0, lastStepMs: 0,
   steps: 0, explosive: 0, lunges: 0, peakG: 0,
-  recent: [], // {t, mag} for cadence
+  recent: [],                  // step timestamps for cadence (last 10s)
+  hrBaseline: null, hrPeak: 0, // for HR-spike detection on watch source
+  watchPollTimer: null,        // periodic STEPS query
+  watchBaseSteps: null,        // watch's step count at session start
+  watchLastSteps: null,
+  watchLastTickMs: 0,
   tickTimer: null, motionHandler: null,
 };
 
@@ -499,6 +505,8 @@ function setCourtStatus(s, kind='') {
 function resetCourt() {
   court.steps = 0; court.explosive = 0; court.lunges = 0; court.peakG = 0;
   court.recent = []; court.lastStepMs = 0;
+  court.hrBaseline = null; court.hrPeak = 0;
+  court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
   $('cSteps').textContent = '0';
   $('cExp').textContent   = '0';
   $('cLunge').textContent = '0';
@@ -508,53 +516,116 @@ function resetCourt() {
   $('cDist').textContent  = '0';
   $('cInt').textContent   = '—';
 }
+
+// ---- watch-source feeders ----
+function onWatchSteps(totalSteps) {
+  const now = performance.now();
+  if (court.watchBaseSteps == null) {
+    court.watchBaseSteps = totalSteps;
+    court.watchLastSteps = totalSteps;
+    court.watchLastTickMs = now;
+    return;
+  }
+  const dt = (now - court.watchLastTickMs) / 1000;
+  const deltaSteps = totalSteps - court.watchLastSteps;
+  court.watchLastSteps = totalSteps;
+  court.watchLastTickMs = now;
+  if (deltaSteps <= 0 || dt <= 0) return;
+
+  // session step count = total - base
+  court.steps = totalSteps - court.watchBaseSteps;
+  $('cSteps').textContent = court.steps;
+  $('cDist').textContent = Math.round(court.steps * STRIDE_M);
+
+  // cadence proxy via instantaneous rate
+  const rate = deltaSteps / dt; // steps per second
+  // cadence in steps/min (rolling: assume rate held)
+  $('cCad').textContent = Math.round(rate * 60);
+
+  // explosive: rate ≥ 3 steps/sec → sprint cadence (~180 spm)
+  // lunge burst: ≥ 5 steps/sec or single-burst with ≥ 4 steps in <1s window
+  if (rate >= 3.0) {
+    court.explosive += deltaSteps;
+    $('cExp').textContent = court.explosive;
+  }
+  if (rate >= 5.0 || (deltaSteps >= 4 && dt < 1.0)) {
+    court.lunges++;
+    $('cLunge').textContent = court.lunges;
+  }
+  // synthetic peak G estimate from cadence (display only)
+  const gEst = Math.min(3.5, 0.8 + rate * 0.45);
+  if (gEst > court.peakG) {
+    court.peakG = gEst;
+    $('cPeak').textContent = gEst.toFixed(2);
+  }
+}
+function onWatchHr(bpm) {
+  // first ~6 readings establish baseline; subsequent +25 bpm spike = explosive moment
+  if (court.hrBaseline == null) { court.hrBaseline = bpm; return; }
+  court.hrBaseline = court.hrBaseline * 0.95 + bpm * 0.05; // slow drift
+  if (bpm > court.hrPeak) court.hrPeak = bpm;
+  // visible in intensity calc via baseline delta (see tickCourt)
+}
+
 function onMotion(e) {
-  // Prefer accelerationIncludingGravity (works on iOS/Android consistently);
-  // subtract ~1g baseline so a stationary phone reads ~0.
   const a = e.accelerationIncludingGravity || e.acceleration;
   if (!a) return;
   const mag = Math.sqrt((a.x||0)**2 + (a.y||0)**2 + (a.z||0)**2) / 9.81;
-  const dyn = Math.abs(mag - 1.0); // g above baseline
+  const dyn = Math.abs(mag - 1.0);
   const now = performance.now();
-
   if (dyn > court.peakG) {
     court.peakG = dyn;
     $('cPeak').textContent = dyn.toFixed(2);
   }
-  // Peak-pick with refractory period
   if (dyn >= THRESH_STEP && (now - court.lastStepMs) >= REFRACTORY_MS) {
     court.lastStepMs = now;
     court.steps++;
     court.recent.push(now);
-    // keep only last 10s of steps for cadence
     while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
-
-    if (dyn >= THRESH_LUNGE) {
-      court.lunges++;
-      $('cLunge').textContent = court.lunges;
-    }
-    if (dyn >= THRESH_EXP) {
-      court.explosive++;
-      $('cExp').textContent = court.explosive;
-    }
+    if (dyn >= THRESH_LUNGE) { court.lunges++; $('cLunge').textContent = court.lunges; }
+    if (dyn >= THRESH_EXP)   { court.explosive++; $('cExp').textContent = court.explosive; }
     $('cSteps').textContent = court.steps;
     $('cDist').textContent = Math.round(court.steps * STRIDE_M);
   }
 }
 function tickCourt() {
   if (!court.running) return;
-  const dt = Date.now() - court.startMs;
-  $('cTime').textContent = fmtTime(dt);
-  // cadence = steps in last 10s × 6
-  const cad = court.recent.length * 6;
-  $('cCad').textContent = cad;
-  const intensity = court.explosive >= 30 ? 'High'
-                  : court.explosive >= 10 ? 'Moderate'
-                  : court.steps     >  0  ? 'Low' : '—';
+  $('cTime').textContent = fmtTime(Date.now() - court.startMs);
+  if (court.source === 'phone') {
+    const now = performance.now();
+    while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
+    $('cCad').textContent = court.recent.length * 6;
+  }
+  const hrDelta = court.hrBaseline ? (court.hrPeak - court.hrBaseline) : 0;
+  const intensity =
+    (court.explosive >= 30 || hrDelta >= 40) ? 'High' :
+    (court.explosive >= 10 || hrDelta >= 20) ? 'Moderate' :
+    (court.steps > 0)                        ? 'Low'      : '—';
   $('cInt').textContent = intensity;
 }
+
 async function startCourt() {
-  // iOS 13+ requires explicit permission
+  resetCourt();
+  // Prefer the watch if it's connected and we have a writeChar for STEPS polling
+  if (device && device.gatt && device.gatt.connected && writeChar && protocol === 'qcband') {
+    court.source = 'watch';
+    court.running = true;
+    court.startMs = Date.now();
+    // Ensure HR stream is running too — adds HR-spike confirmation
+    await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
+    // Poll STEPS once a second
+    court.watchPollTimer = setInterval(
+      () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
+      1000
+    );
+    court.tickTimer = setInterval(tickCourt, 500);
+    $('courtStart').disabled = true;
+    $('courtStop').disabled = false;
+    setCourtStatus('watch · tracking', 'on');
+    log('info', 'Court tracking started — source: WATCH (step deltas + HR spikes).');
+    return;
+  }
+  // Fallback → phone IMU
   try {
     if (typeof DeviceMotionEvent !== 'undefined' &&
         typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -562,11 +633,8 @@ async function startCourt() {
       if (p !== 'granted') { setCourtStatus('permission denied', 'err'); return; }
     }
   } catch (e) { setCourtStatus('motion unavailable', 'err'); return; }
-
-  if (!('DeviceMotionEvent' in window)) {
-    setCourtStatus('no motion sensor', 'err'); return;
-  }
-  resetCourt();
+  if (!('DeviceMotionEvent' in window)) { setCourtStatus('no motion sensor', 'err'); return; }
+  court.source = 'phone';
   court.running = true;
   court.startMs = Date.now();
   court.motionHandler = onMotion;
@@ -574,21 +642,22 @@ async function startCourt() {
   court.tickTimer = setInterval(tickCourt, 500);
   $('courtStart').disabled = true;
   $('courtStop').disabled = false;
-  setCourtStatus('tracking', 'on');
-  log('info', 'Court tracking started (phone IMU).');
+  setCourtStatus('phone · tracking', 'on');
+  log('info', 'Court tracking started — source: PHONE IMU (watch not connected).');
 }
 function stopCourt() {
   court.running = false;
   if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
-  if (court.tickTimer) { clearInterval(court.tickTimer); court.tickTimer = null; }
+  if (court.tickTimer)      { clearInterval(court.tickTimer); court.tickTimer = null; }
+  if (court.watchPollTimer) { clearInterval(court.watchPollTimer); court.watchPollTimer = null; }
   $('courtStart').disabled = false;
   $('courtStop').disabled = true;
   setCourtStatus('stopped');
-  log('info', `Session: ${court.steps} steps · ${court.explosive} explosive · ${court.lunges} lunges · peak ${court.peakG.toFixed(2)}g`);
+  log('info', `Session [${court.source}]: ${court.steps} steps · ${court.explosive} explosive · ${court.lunges} lunges · peak ${court.peakG.toFixed(2)}g`);
 }
 $('courtStart').onclick = startCourt;
 $('courtStop').onclick  = stopCourt;
-$('courtReset').onclick = () => { resetCourt(); court.peakG = 0; };
+$('courtReset').onclick = () => { resetCourt(); };
 
 // ----- env check -----
 if (!navigator.bluetooth) {
