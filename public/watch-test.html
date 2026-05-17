@@ -585,7 +585,7 @@ const court = {
   // visualization
   px: COURT_START.x, py: COURT_START.y,
   trail: [],          // recent {x,y} for trail polyline
-  liveMoveMs: 0,
+  liveMoveMs: 0, lastHrMs: 0,
   // ui
   cadHist: [], hrHist: [], movements: 0, movingMs: 0, stillMs: 0,
   lastTickMs: 0, currentCad: 0, currentHr: 0,
@@ -607,7 +607,7 @@ function resetCourt() {
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
   court.cadHist = []; court.hrHist = [];
   court.movements = 0; court.movingMs = 0; court.stillMs = 0;
-  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0;
+  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0;
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
   updateCourtPosition();
   $('cSteps').textContent = '0';
@@ -828,6 +828,7 @@ function onWatchSteps(totalSteps) {
 }
 function onWatchHr(bpm) {
   court.currentHr = bpm;
+  court.lastHrMs = performance.now();
   $('hrNow').textContent = bpm + ' bpm';
   if (court.calibrating) court.calHr.push(bpm);
   if (court.hrBaseline == null) { court.hrBaseline = bpm; return; }
