@@ -410,13 +410,17 @@ async function connect(filtered = false) {
 // Parse standard 0x2A37 Heart Rate Measurement characteristic
 function onStdHr(e) {
   const v = e.target.value;
+  const data = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
   const flags = v.getUint8(0);
   const hr16 = flags & 0x01;
   const bpm = hr16 ? v.getUint16(1, true) : v.getUint8(1);
   $('hr').textContent = bpm;
   $('sync').textContent = new Date().toLocaleTimeString();
   log('in', `HR: ${bpm} bpm`);
-  if (court.running && court.source === 'watch') onWatchHr(bpm);
+  if (court.running && court.source === 'watch') {
+    onWatchHr(bpm);
+    inferWatchMotionFromPacket(data, 'standard-hr');
+  }
   // Energy expended + RR-intervals could be parsed here too
 }
 async function disconnect() {
@@ -448,6 +452,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function handleWatchPacket(p, uuid = 'watch') {
   parsePacket(p);
   if (!court.running || court.source !== 'watch') return;
+  court.lastWatchPacketMs = performance.now();
 
   const id = p[0];
   const isKnownPassive =
@@ -458,6 +463,10 @@ function handleWatchPacket(p, uuid = 'watch') {
     const genericSteps = readGenericStepTotal(p, uuid);
     if (genericSteps != null) onWatchSteps(genericSteps);
     if (id !== CMD.STEPS) inferWatchMotionFromPacket(p, uuid);
+  } else if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
+    // Some watches only stream HR/RR packets while active. Use changing live packets
+    // as a fallback motion source when the phone IMU is blocked or silent.
+    inferWatchMotionFromPacket(p, uuid + ':hr');
   }
 }
 
