@@ -1878,6 +1878,22 @@ function onMotion(e) {
   imuSampleCount++;
   if (courtCal.capturing) captureCalibrationSample({ ax: gx, ay: gy, az: gz }, lx, ly, lz, linMag);
 
+  // Apply calibrated peak thresholds to push phone-IMU velocity directionally.
+  if (courtCal.baseline && (courtCal.peaks.front || courtCal.peaks.back || courtCal.peaks.side)) {
+    const bl = courtCal.baseline;
+    const blx = gx - bl.x, bly = gy - bl.y;
+    const noise = Math.max(0.04, courtCal.baselineNoise || 0.04);
+    const frontN = courtCal.peaks.front ? Math.max(0, -bly - noise) / courtCal.peaks.front : 0;
+    const backN  = courtCal.peaks.back  ? Math.max(0,  bly - noise) / courtCal.peaks.back  : 0;
+    const sideN  = courtCal.peaks.side  ? (Math.abs(blx) > noise ? (blx > 0 ? 1 : -1) * (Math.abs(blx) - noise) / courtCal.peaks.side : 0) : 0;
+    const A = 0.35;
+    phoneImuState.vx = phoneImuState.vx || 0;
+    phoneImuState.vy = phoneImuState.vy || 0;
+    if (frontN > A) { phoneImuState.vy -= Math.min(1.2, frontN) * 6; court.lastWatchMotionMs = performance.now(); }
+    if (backN  > A) { phoneImuState.vy += Math.min(1.2, backN)  * 6; court.lastWatchMotionMs = performance.now(); }
+    if (Math.abs(sideN) > A) { phoneImuState.vx += Math.max(-1.2, Math.min(1.2, sideN)) * 6; court.lastWatchMotionMs = performance.now(); }
+  }
+
   const mag = Math.sqrt(ax**2 + ay**2 + az**2) / 9.81;
   const dyn = Math.abs(mag - 1.0);
   const now = performance.now();
