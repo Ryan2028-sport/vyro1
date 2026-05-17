@@ -1064,6 +1064,8 @@ function resetCourt() {
   court._stepTotalToday = null; court._liveNotifySteps = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
   court._autoStepFieldKey = null;
   court.phoneAssistActive = false;
+  court._predictedSteps = 0; court._predictRate = 0; court._lastBurstMs = 0;
+  if (court._predictTimer) { clearInterval(court._predictTimer); court._predictTimer = null; }
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
