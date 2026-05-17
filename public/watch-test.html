@@ -1220,6 +1220,7 @@ function onWatchSteps(totalSteps) {
     court.watchLastSteps = base;
     court.watchLastTickMs = now;
     court.watchLastChangeMs = now;
+    lastBySource[detectorSource] = totalSteps;
     if (!(detectorDelta > 0 && detectorPrev != null && !(court.armUntilMs && now < court.armUntilMs))) {
       updateDebugOverlay('watch', false, 'watch baseline set · total=' + totalSteps, { score: 0, changed: 0, gap: 0, uuid: 'watch-base' });
       return;
