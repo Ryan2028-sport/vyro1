@@ -1251,6 +1251,7 @@ async function startCourt() {
     }
     // Also attach the PHONE accelerometer — it drives live dot movement as you move.
     const imuOk = await attachPhoneMotion();
+    startWatchMotionAssist();
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
@@ -1278,6 +1279,7 @@ function stopCourt() {
   if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
   if (court.tickTimer)      { clearInterval(court.tickTimer); court.tickTimer = null; }
   if (court.watchPollTimer) { clearInterval(court.watchPollTimer); court.watchPollTimer = null; }
+  if (court.watchMotionAssistTimer) { clearInterval(court.watchMotionAssistTimer); court.watchMotionAssistTimer = null; }
   $('courtStart').disabled = false;
   $('courtStop').disabled = true;
   $('courtCal').disabled = true;
