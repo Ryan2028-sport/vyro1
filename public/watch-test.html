@@ -894,7 +894,7 @@ function moveCourtDotLive(force = 0.5) {
 function forceWatchCourtMove(reason = 'WATCH STREAM FALLBACK', force = 0.42) {
   const now = performance.now();
   const gap = now - (court.lastStepMs || 0);
-  if (!court.running || court.source !== 'watch' || gap < 260) return false;
+  if (!court.running || court.source !== 'watch' || gap < 180) return false;
   court.lastStepMs = now;
   court.lastMoveMs = now;
   court.lastWatchMotionMs = now;
@@ -916,10 +916,12 @@ function startWatchMotionAssist() {
   court.watchMotionAssistTimer = setInterval(() => {
     if (!court.running || court.source !== 'watch') return;
     const now = performance.now();
-    const phoneSilent = !court.lastLiveMoveMs || (now - court.lastLiveMoveMs) > 900;
-    const streamFresh = (now - (court.lastWatchPacketMs || 0)) < 2200 || (now - (court.lastHrMs || 0)) < 2200;
-    if (phoneSilent && streamFresh) forceWatchCourtMove('WATCH STREAM FALLBACK', 0.38 + Math.min(0.32, (court.currentHr || 80) / 450));
-  }, 420);
+    // Desktop / no-IMU mode: if we've never received a devicemotion event since session start, treat phone as permanently silent.
+    const noPhoneIMU = !court.lastMotionEventMs || (now - court.startMs) > 2500 && (!court.lastLiveMoveMs);
+    const phoneSilent = noPhoneIMU || !court.lastLiveMoveMs || (now - court.lastLiveMoveMs) > 900;
+    const streamFresh = (now - (court.lastWatchPacketMs || 0)) < 3000 || (now - (court.lastHrMs || 0)) < 3000;
+    if (phoneSilent && streamFresh) forceWatchCourtMove(noPhoneIMU ? 'DESKTOP WATCH-ONLY' : 'WATCH STREAM FALLBACK', 0.38 + Math.min(0.32, (court.currentHr || 80) / 450));
+  }, 300);
 }
 function updateCourtPosition() {
   const dot = $('playerDot'); const trail = $('playerTrail');
@@ -1148,9 +1150,14 @@ async function attachPhoneMotion() {
     const since = performance.now() - (court.lastMotionEventMs || 0);
     if (since > 1500) {
       const sinceWatch = performance.now() - (court.lastWatchPacketMs || court.lastHrMs || 0);
-      if (court.source === 'watch' && sinceWatch < 2500) {
+      if (court.source === 'watch' && sinceWatch < 3000) {
         dbg.style.color = '#0f0';
-        dbg.textContent = `✓ WATCH STREAM LIVE\nphone IMU silent ${Math.round(since)}ms\nwatch packets fresh ${Math.round(sinceWatch)}ms\ndot uses watch fallback movement`;
+        dbg.textContent = `✓ WATCH STREAM LIVE (desktop / no phone IMU)\nwatch packets fresh ${Math.round(sinceWatch)}ms\nsteps:${court.steps}  hr:${court.currentHr||'–'}  cad:${court.currentCad}\ndot is driven by watch fallback`;
+        return;
+      }
+      if (court.source === 'watch') {
+        dbg.style.color = '#fb0';
+        dbg.textContent = `⚠ WATCH CONNECTED but no packets for ${Math.round(sinceWatch)}ms\nMove your wrist / check the watch is still paired.\nsteps:${court.steps}  hr:${court.currentHr||'–'}`;
         return;
       }
       dbg.style.color = '#f55';
