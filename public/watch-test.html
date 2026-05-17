@@ -431,7 +431,7 @@ $('btnHrStart').onclick = async () => {
 };
 $('btnHrStop').onclick = async () => {
   if (hrInterval) { clearInterval(hrInterval); hrInterval = null; }
-  hrSamples = [];
+  hrSamples = []; hrDisplayed = null; hrLastUpdate = 0;
   await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.STOP));
 };
 $('btnSpo2Start').onclick = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.START));
