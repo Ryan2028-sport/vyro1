@@ -1283,7 +1283,7 @@ function finishCalibration() {
   }
   const idleSteps = court.steps - (court.calBase || 0);
   court.idleCadFloor = Math.round((idleSteps / elapsedSec) * 60);
-  // reset positional baseline back to back-left starting point
+  // reset positional baseline back to the middle/T starting point
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
   updateCourtPosition();
   setCourtStatus(`calibrated · rest ${court.restHr||'—'} bpm`, 'on');
@@ -1554,7 +1554,7 @@ function tickCourt() {
   const dtMs = court.lastTickMs ? (now - court.lastTickMs) : 500;
   court.lastTickMs = now;
 
-  if (court.source === 'phone' || court.source === 'watch') {
+  if (court.source === 'phone' || court.source === 'watch' || court.source === 'debug') {
     const pn = performance.now();
     while (court.recent.length && court.recent[0] < pn - 10000) court.recent.shift();
     const motionFresh = (pn - (court.lastMoveMs || 0)) < 900;
@@ -1675,6 +1675,8 @@ async function startCourt() {
   court.source = 'phone';
   court.running = true;
   court.startMs = Date.now();
+  court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
+  updateCourtPosition();
   court.tickTimer = setInterval(tickCourt, 500);
   $('courtStart').disabled = true;
   $('courtStop').disabled = false;
