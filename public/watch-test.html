@@ -1039,8 +1039,13 @@ async function startCourt() {
       await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
       court.watchPollTimer = setInterval(
         () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
-        500
+        300
       );
+    } else if (writeChar) {
+      court.watchPollTimer = setInterval(() => {
+        sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+        setTimeout(() => sendCmd(buildPacket(CMD.STEPS)), 120);
+      }, 450);
     }
     // Also attach the PHONE accelerometer — it drives live dot movement as you move.
     const imuOk = await attachPhoneMotion();
@@ -1048,8 +1053,8 @@ async function startCourt() {
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    setCourtStatus(imuOk ? 'watch + phone IMU · tracking' : 'watch · tracking (no phone IMU)', 'on');
-    log('info', `Court tracking — watch (${protocol}) + phone IMU=${imuOk}. Move your phone (in hand/pocket) to see the dot move live.`);
+    setCourtStatus(imuOk ? 'watch motion + phone IMU · live' : 'watch motion · live', 'on');
+    log('info', `Court tracking — using live watch packets/steps (${protocol})${imuOk ? ' + phone IMU assist' : ''}. Take steps with the watch to move the green dot.`);
     return;
   }
   // Fallback → phone IMU only
