@@ -421,7 +421,7 @@ function onStdHr(e) {
   if (court.running && court.source === 'watch') {
     onWatchHr(bpm);
     court.lastWatchPacketMs = performance.now();
-    inferWatchMotionFromPacket(data, 'standard-hr');
+    markWatchStreamAlive('HR packet live');
   }
   // Energy expended + RR-intervals could be parsed here too
 }
@@ -462,19 +462,11 @@ function handleWatchPacket(p, uuid = 'watch') {
     (id === CMD.REAL_TIME_START && (p[1] === RT_TYPE.HEART_RATE || p[1] === RT_TYPE.SPO2));
 
   if (!isKnownPassive) {
-    // Only treat explicit step-response packets as step totals. Unknown live
-    // packets often contain timestamps/HR counters that change while standing
-    // still, so counting those as steps creates false movement on desktop.
-    if (id === CMD.STEPS) {
-      const genericSteps = readGenericStepTotal(p, uuid);
-      if (genericSteps != null) onWatchSteps(genericSteps);
-    } else {
-      inferWatchMotionFromPacket(p, uuid);
-    }
+    // CMD.STEPS is already parsed once in parsePacket(). Do not run the generic
+    // field scanner on it, because checksums/timestamps can look like fake steps.
+    if (id !== CMD.STEPS) inferWatchMotionFromPacket(p, uuid);
   } else if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
-    // Some watches only stream HR/RR packets while active. Use changing live packets
-    // as a fallback motion source when the phone IMU is blocked or silent.
-    inferWatchMotionFromPacket(p, uuid + ':hr');
+    markWatchStreamAlive('HR packet live');
   }
 }
 
