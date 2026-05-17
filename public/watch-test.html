@@ -894,7 +894,7 @@ function moveCourtDotLive(force = 0.5) {
 function forceWatchCourtMove(reason = 'WATCH STREAM FALLBACK', force = 0.42) {
   const now = performance.now();
   const gap = now - (court.lastStepMs || 0);
-  if (!court.running || court.source !== 'watch' || gap < 260) return false;
+  if (!court.running || court.source !== 'watch' || gap < 180) return false;
   court.lastStepMs = now;
   court.lastMoveMs = now;
   court.lastWatchMotionMs = now;
