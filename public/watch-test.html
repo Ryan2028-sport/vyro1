@@ -1030,11 +1030,13 @@ function tickCourt() {
   if (court.source === 'phone') {
     const pn = performance.now();
     while (court.recent.length && court.recent[0] < pn - 10000) court.recent.shift();
-    court.currentCad = court.recent.length * 6;
+    const motionFresh = (pn - (court.lastMoveMs || 0)) < 700;
+    const motionCad = motionFresh ? Math.round(35 + Math.min(1, court.lastMotionScore * 4) * 145) : 0;
+    court.currentCad = Math.max(court.recent.length * 6, motionCad);
     $('cCad').textContent = court.currentCad;
     $('cadNow').textContent = court.currentCad + ' spm';
     updateCourtVisual();
-    if (court.recent.length && !court.calibrating) pulseCourtDot(1);
+    if (motionFresh && !court.calibrating) pulseCourtDot(0.25);
   } else {
     // watch source: decay cadence if no recent step packet
     const stale = (performance.now() - (court.watchLastTickMs || 0)) > 2500;
