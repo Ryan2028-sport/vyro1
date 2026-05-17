@@ -421,7 +421,7 @@ function onStdHr(e) {
   if (court.running && court.source === 'watch') {
     onWatchHr(bpm);
     court.lastWatchPacketMs = performance.now();
-    inferWatchMotionFromPacket(data, 'standard-hr');
+    markWatchStreamAlive('HR packet live');
   }
   // Energy expended + RR-intervals could be parsed here too
 }
@@ -462,19 +462,11 @@ function handleWatchPacket(p, uuid = 'watch') {
     (id === CMD.REAL_TIME_START && (p[1] === RT_TYPE.HEART_RATE || p[1] === RT_TYPE.SPO2));
 
   if (!isKnownPassive) {
-    // Only treat explicit step-response packets as step totals. Unknown live
-    // packets often contain timestamps/HR counters that change while standing
-    // still, so counting those as steps creates false movement on desktop.
-    if (id === CMD.STEPS) {
-      const genericSteps = readGenericStepTotal(p, uuid);
-      if (genericSteps != null) onWatchSteps(genericSteps);
-    } else {
-      inferWatchMotionFromPacket(p, uuid);
-    }
+    // CMD.STEPS is already parsed once in parsePacket(). Do not run the generic
+    // field scanner on it, because checksums/timestamps can look like fake steps.
+    if (id !== CMD.STEPS) inferWatchMotionFromPacket(p, uuid);
   } else if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
-    // Some watches only stream HR/RR packets while active. Use changing live packets
-    // as a fallback motion source when the phone IMU is blocked or silent.
-    inferWatchMotionFromPacket(p, uuid + ':hr');
+    markWatchStreamAlive('HR packet live');
   }
 }
 
@@ -564,6 +556,10 @@ function markWatchStreamAlive(label = 'WATCH STREAM') {
 function inferWatchMotionFromPacket(p, uuid) {
   const now = performance.now();
   const key = uuid || 'watch';
+  if (court.watchBaseSteps != null) {
+    updateDebugOverlay('watch', false, 'watch packet live · waiting for step change', { score: 0, changed: 0, gap: 0, uuid: key });
+    return;
+  }
   const prev = watchPacketState.get(key);
   watchPacketState.set(key, { bytes: Array.from(p), ms: now });
   if (!prev) {
@@ -586,7 +582,13 @@ function inferWatchMotionFromPacket(p, uuid) {
     return;
   }
 
-  updateDebugOverlay('watch', false, 'watch packet changed · waiting for step count', { score, changed, gap, uuid: key });
+  const sessionAge = Date.now() - (court.startMs || Date.now());
+  const threshold = sessionAge < 2500 ? 9999 : 18;
+  if (score >= threshold && gap > 90) {
+    forceWatchCourtMove('STEP packet burst', Math.min(1, 0.34 + score / 140));
+  } else {
+    updateDebugOverlay('watch', false, sessionAge < 2500 ? 'learning watch idle noise' : 'watch packet live · no step burst', { score, changed, gap, uuid: key });
+  }
 }
 
 // ----- parsers -----
@@ -986,7 +988,7 @@ function onWatchSteps(totalSteps) {
   court.watchLastSteps = totalSteps;
   court.watchLastTickMs = now;
   if (deltaSteps <= 0 || dt <= 0) return;
-  if (deltaSteps > 12 || (dt < 2 && deltaSteps > 4)) {
+  if (deltaSteps > 12 || (dt < 0.45 && deltaSteps > 1) || (dt < 2 && deltaSteps > 4)) {
     updateDebugOverlay('watch', false, 'ignored unrealistic step jump', { score: deltaSteps, changed: deltaSteps, gap: dt * 1000, uuid: 'watch-steps' });
     return;
   }
@@ -1042,7 +1044,6 @@ function onWatchHr(bpm) {
   court.currentHr = bpm;
   court.lastHrMs = now;
   court.lastHrValue = bpm;
-  if (prevHr != null && bpm >= prevHr + 1) court.lastMoveMs = court.lastHrMs;
   $('hrNow').textContent = bpm + ' bpm';
   if (court.calibrating) court.calHr.push(bpm);
   if (court.hrBaseline == null) { court.hrBaseline = bpm; return; }
