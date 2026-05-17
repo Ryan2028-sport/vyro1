@@ -206,7 +206,9 @@ const CMD = {
   SET_TIME:        0x01,
   BATTERY:         0x03,
   REBOOT:          0x08,
-  STEPS:           0x15,           // (today)
+  HEART_RATE_LOG:  0x15,           // historical HR log — not movement
+  SPORTS_DATA:     0x43,           // daily sport intervals, exact steps at bytes 9..10
+  STEPS:           0x48,           // today's sport total, exact 24-bit steps at bytes 1..3
   REAL_TIME_START: 0x69,
   REAL_TIME_STOP:  0x6A,
   FIRMWARE:        0xa1,
@@ -229,6 +231,7 @@ function buildSetTime(d = new Date()) {
   return buildPacket(CMD.SET_TIME, [y, d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), 1, 0]);
 }
 function hex(buf) { return [...buf].map(b => b.toString(16).padStart(2, '0')).join(' '); }
+function buildSportsDataRequest(dayOffset = 0) { return buildPacket(CMD.SPORTS_DATA, [dayOffset, 0x0f, 0x00, 0x5f, 0x01]); }
 
 // Standard BLE GATT (used by HRM Dual, Polar H10, Wahoo, generic HRMs)
 const STD_HR_SERVICE   = 0x180D;
@@ -390,7 +393,8 @@ async function connect(filtered = false) {
       await sendCmd(buildSetTime()); await sleep(200);
       await sendCmd(buildPacket(CMD.BATTERY)); await sleep(200);
       await sendCmd(buildPacket(CMD.FIRMWARE)); await sleep(200);
-      await sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+      await sendCmd(buildPacket(CMD.STEPS)); await sleep(120);
+      await sendCmd(buildSportsDataRequest(0));
     }
     $('sync').textContent = new Date().toLocaleTimeString();
     if (court.running && court.source !== 'watch') {
@@ -461,16 +465,12 @@ function handleWatchPacket(p, uuid = 'watch') {
   court.lastWatchPacketMs = performance.now();
 
   const id = p[0];
-  const isKnownPassive =
-    id === CMD.BATTERY || id === CMD.FIRMWARE ||
-    (id === CMD.REAL_TIME_START && (p[1] === RT_TYPE.HEART_RATE || p[1] === RT_TYPE.SPO2));
-
-  if (!isKnownPassive) {
-    // CMD.STEPS is already parsed once in parsePacket(). Do not run the generic
-    // field scanner on it, because checksums/timestamps can look like fake steps.
-    if (id !== CMD.STEPS) inferWatchMotionFromPacket(p, uuid);
-  } else if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
+  if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
     markWatchStreamAlive('HR packet live');
+  } else if (id !== CMD.STEPS) {
+    // Unknown/HR/Battery packets are proof the watch is connected, not proof of
+    // movement. Do not convert changing bytes/checksums into fake court steps.
+    markWatchStreamAlive('watch packet live');
   }
 }
 
@@ -606,6 +606,48 @@ function detectAndReadStepCounter(p, source = 'pkt') {
   court._watchDetectedDelta = 0;
   court._watchDetectedSource = source;
 
+  // Documented Colmi/QCBand layouts. These are exact fields, not guessed bytes.
+  if (source === 'STEPS' && p[0] === CMD.STEPS) {
+    const total = p[1] | (p[2] << 8) | (p[3] << 16);
+    if (total >= 0 && total < 300000) {
+      const prev = court._stepTotalToday;
+      const delta = prev == null ? 0 : total - prev;
+      court._stepTotalToday = total;
+      court._watchDetectedPrevSteps = prev;
+      court._watchDetectedDelta = delta >= 0 && delta <= 30 ? delta : 0;
+      court.lastDetectedWatchSteps = total;
+      return total;
+    }
+    return null;
+  }
+  if (source === 'SPORTS' && p[0] === CMD.SPORTS_DATA) {
+    if (p[1] === 255) return null;
+    if (p[1] === 240) { court._sportsBatch = { bySlot: new Map() }; return null; }
+    if (p[2] < 1 || p[2] > 12 || p[3] < 1 || p[3] > 31 || p[4] > 95) return null;
+    const intervalSteps = p[9] | (p[10] << 8);
+    const batch = court._sportsBatch || { bySlot: new Map() };
+    const slot = `${p[1]}-${p[2]}-${p[3]}-${p[4]}`;
+    batch.bySlot.set(slot, intervalSteps);
+    court._sportsBatch = batch;
+    // Historical sports packets are replayed in batches. Only compare totals
+    // after the batch completes, otherwise old intervals look like new steps.
+    if (!(p[6] > 0 && p[5] === p[6] - 1)) return null;
+    const total = [...batch.bySlot.values()].reduce((sum, v) => sum + v, 0);
+    court._sportsBatch = { bySlot: new Map() };
+    const prev = court._sportsLastCompleteTotal;
+    const delta = prev == null ? 0 : total - prev;
+    court._sportsLastCompleteTotal = total;
+    if (delta >= 0 && delta <= 30) {
+      court._watchDetectedPrevSteps = prev;
+      court._watchDetectedDelta = delta;
+      court.lastDetectedWatchSteps = total;
+      return total;
+    }
+    court._watchDetectedDelta = 0;
+    court.lastDetectedWatchSteps = total;
+    return null;
+  }
+
   const read = (off, size) => size === 3
     ? (p[off] | (p[off + 1] << 8) | (p[off + 2] << 16))
     : (p[off] | (p[off + 1] << 8));
@@ -703,16 +745,33 @@ function parsePacket(p) {
       const rawHex = hex(p);
       if (!court._stepLogThrottle || performance.now() - court._stepLogThrottle > 1500) {
         court._stepLogThrottle = performance.now();
-        log('info', `STEPS raw: ${rawHex}`);
+        log('info', `TODAY STEPS raw: ${rawHex}`);
       }
       const steps = detectAndReadStepCounter(p, 'STEPS');
       if (steps != null) {
         $('steps').textContent = steps.toLocaleString();
         if (court.running && court.source === 'watch') onWatchSteps(steps);
       }
-      const cal = (p[7] | (p[8] << 8)) / 10;
+      const cal = p[7] | (p[8] << 8) | (p[9] << 16);
       if (cal) $('cal').textContent = cal.toFixed(0);
-      const dist = (p[9] | (p[10] << 8));
+      const dist = p[10] | (p[11] << 8) | (p[12] << 16);
+      if (dist) $('dist').textContent = dist.toLocaleString();
+      break;
+    }
+    case CMD.SPORTS_DATA: {
+      const rawHex = hex(p);
+      if (!court._sportsLogThrottle || performance.now() - court._sportsLogThrottle > 1500) {
+        court._sportsLogThrottle = performance.now();
+        log('info', `SPORTS raw: ${rawHex}`);
+      }
+      const steps = detectAndReadStepCounter(p, 'SPORTS');
+      if (steps != null) {
+        $('steps').textContent = steps.toLocaleString();
+        if (court.running && court.source === 'watch') onWatchSteps(steps);
+      }
+      const cal = p[7] | (p[8] << 8);
+      if (cal) $('cal').textContent = cal.toFixed(0);
+      const dist = p[11] | (p[12] << 8);
       if (dist) $('dist').textContent = dist.toLocaleString();
       break;
     }
@@ -720,16 +779,10 @@ function parsePacket(p) {
       // H59 Pro layout: p[1]=type (1=HR, 3=SpO2), p[2]=err/sub,
       // p[6..7] = sensor value, little-endian uint16 (bpm * 10).
       const type = p[1];
-      // Many firmwares also embed a live step counter in the HR-stream packet.
-      // Scan for it and feed it to the court tracker — works even if 0x15 STEPS is silent.
       if (type === RT_TYPE.HEART_RATE) {
         if (!court._hrLogThrottle || performance.now() - court._hrLogThrottle > 2000) {
           court._hrLogThrottle = performance.now();
           log('info', `HR raw: ${hex(p)}`);
-        }
-        const hrSteps = detectAndReadStepCounter(p, 'HR');
-        if (hrSteps != null && court.running && court.source === 'watch') {
-          onWatchSteps(hrSteps);
         }
       }
         const raw = p[6] | (p[7] << 8);
@@ -799,7 +852,7 @@ $('connectBtn').onclick = () => connect(false);
 $('connectFilteredBtn').onclick = () => connect(true);
 $('disconnectBtn').onclick = disconnect;
 $('btnBattery').onclick = () => sendCmd(buildPacket(CMD.BATTERY));
-$('btnSteps').onclick   = () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+$('btnSteps').onclick   = async () => { await sendCmd(buildPacket(CMD.STEPS)); await sleep(120); await sendCmd(buildSportsDataRequest(0)); };
 $('btnTime').onclick    = () => sendCmd(buildSetTime());
 $('btnReboot').onclick  = () => sendCmd(buildPacket(CMD.REBOOT, [1]));
 $('btnHrStart').onclick = async () => {
@@ -887,6 +940,7 @@ function resetCourt() {
   court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0; court.lastMoveMs = 0; court.lastHrValue = null; court.lastWatchMotionMs = 0; court.lastWatchPacketMs = 0;
   court.lastLiveMoveMs = 0; court.lastMotionVector = null; court.lastMotionScore = 0;
   court._watchDetectedPrevSteps = null; court._watchDetectedDelta = 0; court._watchDetectedSource = null; court.lastDetectedWatchSteps = null;
+  court._stepTotalToday = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
@@ -1446,23 +1500,23 @@ async function startCourt() {
     if (writeChar && protocol === 'qcband') {
       await startHeartRateStream();
       court.watchPollTimer = setInterval(
-        () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
-        300
+        () => { sendCmd(buildPacket(CMD.STEPS)); setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120); },
+        1000
       );
     } else if (writeChar) {
       court.watchPollTimer = setInterval(() => {
-        sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
-        setTimeout(() => sendCmd(buildPacket(CMD.STEPS)), 120);
-      }, 450);
+        sendCmd(buildPacket(CMD.STEPS));
+        setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
+      }, 1000);
     }
-    // Also attach the PHONE accelerometer — it drives live dot movement as you move.
-    const imuOk = await attachPhoneMotion();
+    // Watch mode must be step-counter gated. Do not attach the computer/phone IMU
+    // here, because desk vibration or holding the phone still can create false steps.
     startWatchMotionAssist();
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    log('info', `Court tracking — 10s arm-up, then dot moves one step per real watch step (${protocol})${imuOk ? ' + phone IMU assist' : ''}.`);
+    log('info', `Court tracking — 10s arm-up, then dot moves only when the watch step counter increases (${protocol}).`);
     return;
   }
   // Fallback → phone IMU only
