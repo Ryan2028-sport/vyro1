@@ -795,6 +795,16 @@ function parsePacket(p) {
       if (dist) $('dist').textContent = dist.toLocaleString();
       break;
     }
+    case CMD.DEVICE_NOTIFY: {
+      if (p[1] === 4) {
+        const steps = detectAndReadStepCounter(p, 'LIVE');
+        if (steps != null) {
+          $('steps').textContent = steps.toLocaleString();
+          if (court.running && court.source === 'watch') onWatchSteps(steps);
+        }
+      }
+      break;
+    }
     case CMD.REAL_TIME_START: {
       // H59 Pro layout: p[1]=type (1=HR, 3=SpO2), p[2]=err/sub,
       // p[6..7] = sensor value, little-endian uint16 (bpm * 10).
