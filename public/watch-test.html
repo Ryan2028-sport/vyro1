@@ -479,9 +479,13 @@ function handleWatchPacket(p, uuid = 'watch') {
       onWatchSteps(autoSteps);
       return;
     }
+    inferWatchMotionFromPacket(p, uuid);
+    return;
   }
   if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
     markWatchStreamAlive('HR packet live');
+  } else if (id === CMD.DEVICE_NOTIFY && p[1] !== 4) {
+    inferWatchMotionFromPacket(p, uuid + ':notify-' + p[1]);
   } else if (id !== CMD.STEPS) {
     // Unknown/HR/Battery packets are proof the watch is connected, not proof of
     // movement. Do not convert changing bytes/checksums into fake court steps.
