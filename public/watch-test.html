@@ -422,7 +422,7 @@ $('btnSteps').onclick   = () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0
 $('btnTime').onclick    = () => sendCmd(buildSetTime());
 $('btnReboot').onclick  = () => sendCmd(buildPacket(CMD.REBOOT, [1]));
 $('btnHrStart').onclick = async () => {
-  hrSamples = [];
+  hrSamples = []; hrDisplayed = null; hrLastUpdate = 0;
   $('hr').textContent = '…';
   await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
   // ring expects keep-alive ~every 2s for continuous reading
