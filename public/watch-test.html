@@ -420,6 +420,7 @@ async function connect(filtered = false) {
               // Feed the opcode/sensor probe accumulator with every notification.
               probeRecord(c.uuid, data);
               decoderRecord(data);
+              motionRecord(data);
               if (isStdHr) {
                 try { onStdHr({ target: { value: e.target.value } }); } catch {}
               } else {
