@@ -453,31 +453,66 @@ function handleWatchPacket(p, uuid = 'watch') {
     id === CMD.BATTERY || id === CMD.FIRMWARE ||
     (id === CMD.REAL_TIME_START && (p[1] === RT_TYPE.HEART_RATE || p[1] === RT_TYPE.SPO2));
 
-  // Some watches send steps in vendor packets that are not CMD.STEPS. Try all
-  // common little-endian layouts and use any monotonic, plausible step increase.
-  if (id !== CMD.STEPS && !isKnownPassive) {
-    const genericSteps = readGenericStepTotal(p);
+  if (!isKnownPassive) {
+    const genericSteps = readGenericStepTotal(p, uuid);
     if (genericSteps != null) onWatchSteps(genericSteps);
-    inferWatchMotionFromPacket(p, uuid);
+    if (id !== CMD.STEPS) inferWatchMotionFromPacket(p, uuid);
   }
 }
 
-function readGenericStepTotal(p) {
-  const vals = [];
-  for (let o = 1; o < p.length - 1; o++) vals.push(p[o] | (p[o + 1] << 8));
-  for (let o = 1; o < p.length - 2; o++) vals.push(p[o] | (p[o + 1] << 8) | (p[o + 2] << 16));
-  for (let o = 1; o < p.length - 3; o++) vals.push((p[o] | (p[o + 1] << 8) | (p[o + 2] << 16) | (p[o + 3] << 24)) >>> 0);
-  const candidates = vals.filter(v => Number.isFinite(v) && v > 0 && v < 1000000);
+function packetFieldKey(uuid, offset, size, endian) { return `${uuid || 'watch'}:${offset}:${size}:${endian}`; }
+function readField(p, offset, size, endian) {
+  let v = 0;
+  for (let i = 0; i < size; i++) {
+    const b = p[offset + (endian === 'le' ? i : size - 1 - i)] || 0;
+    v |= b << (i * 8);
+  }
+  return v >>> 0;
+}
+function readGenericStepTotal(p, uuid = 'watch') {
+  const candidates = [];
+  const add = (offset, size, endian, weight = 0) => {
+    if (offset < 0 || offset + size > p.length) return;
+    const v = readField(p, offset, size, endian);
+    if (Number.isFinite(v) && v > 0 && v < 1000000) candidates.push({ v, offset, size, endian, weight });
+  };
+  // QCBand packets most often keep today's steps in bytes 3-5 LE, but other
+  // firmwares shift the counter or use big-endian. Track each possible field.
+  add(3, 3, 'le', 6); add(2, 3, 'le', 5); add(4, 3, 'le', 4);
+  for (let size of [2, 3, 4]) {
+    for (let o = 1; o <= p.length - size; o++) {
+      add(o, size, 'le', 0);
+      if (size > 1) add(o, size, 'be', 0);
+    }
+  }
   if (!candidates.length) return null;
 
-  const prev = court.watchLastSteps;
-  if (prev == null) return candidates.sort((a, b) => a - b)[0];
-
-  const plausible = candidates
-    .map(v => ({ v, d: v - prev }))
-    .filter(x => x.d > 0 && x.d <= 40)
-    .sort((a, b) => a.d - b.d);
-  return plausible[0]?.v ?? null;
+  let best = null;
+  for (const c of candidates) {
+    const key = packetFieldKey(uuid, c.offset, c.size, c.endian);
+    const prev = watchStepFieldState.get(key);
+    watchStepFieldState.set(key, { v: c.v, ms: performance.now(), hits: prev?.hits || 0 });
+    if (court.watchLastSteps != null) {
+      const d = c.v - court.watchLastSteps;
+      if (d > 0 && d <= 80) {
+        const score = 1000 - d + c.weight * 20 + (prev?.hits || 0) * 30;
+        if (!best || score > best.score) best = { ...c, score };
+      }
+    } else if (prev) {
+      const d = c.v - prev.v;
+      if (d > 0 && d <= 80) {
+        const score = 700 - d + c.weight * 20 + (prev.hits || 0) * 30;
+        if (!best || score > best.score) best = { ...c, score };
+      }
+    }
+  }
+  if (best) {
+    const key = packetFieldKey(uuid, best.offset, best.size, best.endian);
+    const s = watchStepFieldState.get(key);
+    watchStepFieldState.set(key, { ...s, hits: (s?.hits || 0) + 1 });
+    return best.v;
+  }
+  return null;
 }
 
 function inferWatchMotionFromPacket(p, uuid) {
