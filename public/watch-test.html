@@ -789,6 +789,7 @@ function onWatchSteps(totalSteps) {
   court.watchLastSteps = totalSteps;
   court.watchLastTickMs = now;
   if (deltaSteps <= 0 || dt <= 0) return;
+  court.lastMoveMs = now;
 
   // session step count = total - base
   court.steps = totalSteps - court.watchBaseSteps;
@@ -885,24 +886,25 @@ function tickCourt() {
       $('cadNow').textContent = court.currentCad + ' spm';
       updateCourtVisual();
     }
-    // HR-driven live motion: watches often delay step totals, so move the dot
-    // from the live HR stream immediately, then add bigger jumps on step bursts.
+    // HR assist only runs briefly after a fresh step packet or a rising HR sample.
+    // This prevents the dot from drifting forever while HR stays high after stopping.
     if (!court.calibrating && court.currentHr) {
       const rest = Math.min(court.restHr || 78, court.hrBaseline || court.currentHr || 78);
       const hrDelta = Math.max(0, court.currentHr - rest);
       const hrFresh = (performance.now() - (court.lastHrMs || 0)) < 7000;
-      const intensity = Math.min(1, Math.max(0.12, hrDelta / 45));
-      const synthCad = Math.round(30 + intensity * 170);
-      if (hrFresh && synthCad > court.currentCad) {
+      const activeFresh = (performance.now() - (court.lastMoveMs || 0)) < 2500;
+      const intensity = Math.min(1, Math.max(0, hrDelta / 45));
+      const synthCad = activeFresh ? Math.round(30 + Math.max(0.12, intensity) * 170) : 0;
+      if (hrFresh && activeFresh && synthCad > court.currentCad) {
         court.currentCad = synthCad;
         $('cCad').textContent = synthCad;
         $('cadNow').textContent = synthCad + ' spm';
       }
       court.liveMoveMs += dtMs;
-      const interval = Math.max(160, 650 - intensity * 420);
-      if (hrFresh && court.liveMoveMs >= interval) {
+      const interval = Math.max(180, 700 - intensity * 420);
+      if (hrFresh && activeFresh && intensity >= 0.08 && court.liveMoveMs >= interval) {
         court.liveMoveMs = 0;
-        moveCourtDotLive(intensity);
+        moveCourtDotLive(Math.max(0.12, intensity));
         updateCourtVisual();
       }
     }
