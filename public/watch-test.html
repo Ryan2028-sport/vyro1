@@ -1445,14 +1445,14 @@ async function startCourt() {
         setTimeout(() => sendCmd(buildPacket(CMD.STEPS)), 120);
       }, 450);
     }
-    // Also attach the PHONE accelerometer — it drives live dot movement as you move.
-    const imuOk = await attachPhoneMotion();
+    // Watch mode must be step-counter gated. Do not attach the computer/phone IMU
+    // here, because desk vibration or holding the phone still can create false steps.
     startWatchMotionAssist();
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    log('info', `Court tracking — 10s arm-up, then dot moves one step per real watch step (${protocol})${imuOk ? ' + phone IMU assist' : ''}.`);
+    log('info', `Court tracking — 10s arm-up, then dot moves only when the watch step counter increases (${protocol}).`);
     return;
   }
   // Fallback → phone IMU only
