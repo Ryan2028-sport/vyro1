@@ -965,12 +965,13 @@ function resetCourt() {
   court.recent = []; court.lastStepMs = 0;
   court.hrPeak = 0;
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
+  court.watchLastBySource = {};
   court.cadHist = []; court.hrHist = [];
   court.movements = 0; court.movingMs = 0; court.stillMs = 0;
   court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0; court.lastMoveMs = 0; court.lastHrValue = null; court.lastWatchMotionMs = 0; court.lastWatchPacketMs = 0;
   court.lastLiveMoveMs = 0; court.lastMotionVector = null; court.lastMotionScore = 0;
   court._watchDetectedPrevSteps = null; court._watchDetectedDelta = 0; court._watchDetectedSource = null; court.lastDetectedWatchSteps = null;
-  court._stepTotalToday = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
+  court._stepTotalToday = null; court._liveNotifySteps = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
