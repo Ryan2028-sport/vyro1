@@ -871,6 +871,35 @@ function pulseCourtDot(deltaSteps = 1) {
   updateCourtPosition();
 }
 
+// Cardinal directions: forward (toward front wall), back, left, right.
+const COURT_DIRS = [
+  { dx:  0, dy: -1, name: 'forward' },
+  { dx:  0, dy:  1, name: 'back'    },
+  { dx: -1, dy:  0, name: 'left'    },
+  { dx:  1, dy:  0, name: 'right'   },
+];
+function pickCourtDir() {
+  // Weighted pick that biases away from the wall the dot is closest to,
+  // so the player wanders within the court instead of getting pinned.
+  const w = COURT_DIRS.map(d => {
+    const nx = court.px + d.dx * 18;
+    const ny = court.py + d.dy * 18;
+    let weight = 1;
+    if (nx < COURT_BOUNDS.xMin + 8 || nx > COURT_BOUNDS.xMax - 8) weight *= 0.15;
+    if (ny < COURT_BOUNDS.yMin + 8 || ny > COURT_BOUNDS.yMax - 8) weight *= 0.15;
+    // Slight inertia: prefer continuing in the last chosen direction.
+    if (court.lastDirIdx != null && COURT_DIRS[court.lastDirIdx] === d) weight *= 1.6;
+    return weight;
+  });
+  const total = w.reduce((s, v) => s + v, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < w.length; i++) {
+    r -= w[i];
+    if (r <= 0) { court.lastDirIdx = i; return COURT_DIRS[i]; }
+  }
+  court.lastDirIdx = 0; return COURT_DIRS[0];
+}
+
 function takeCourtStep(force = 0.5) {
   const pulse = $('playerPulse');
   if (pulse) {
@@ -878,17 +907,14 @@ function takeCourtStep(force = 0.5) {
     pulse.setAttribute('r', '11'); pulse.setAttribute('opacity', '0.65');
     pulse.animate([{ r: 11, opacity: 0.65 }, { r: 27, opacity: 0 }], { duration: 520, easing: 'ease-out' });
   }
-  const toT = Math.atan2(COURT_T.y - court.py, COURT_T.x - court.px);
-  const lateral = court.stepSide * (0.45 + Math.min(0.35, force * 0.35));
-  court.stepSide *= -1;
-  const angle = toT + lateral + (Math.random() - 0.5) * 0.25;
-  const travel = 10 + Math.min(13, force * 16);
-  let nx = court.px + Math.cos(angle) * travel;
-  let ny = court.py + Math.sin(angle) * travel;
-  if (ny < COURT_BOUNDS.yMin + 4) ny += travel * 0.8;
+  const dir = pickCourtDir();
+  const travel = 12 + Math.min(10, force * 12); // ~one stride per real step
+  let nx = court.px + dir.dx * travel;
+  let ny = court.py + dir.dy * travel;
   nx = Math.max(COURT_BOUNDS.xMin, Math.min(COURT_BOUNDS.xMax, nx));
   ny = Math.max(COURT_BOUNDS.yMin, Math.min(COURT_BOUNDS.yMax, ny));
   court.px = nx; court.py = ny;
+  court.lastStepDir = dir.name;
   court.trail.push({ x: nx, y: ny });
   if (court.trail.length > 60) court.trail.shift();
   court.movements++;
@@ -988,6 +1014,11 @@ function onWatchSteps(totalSteps) {
   court.watchLastSteps = totalSteps;
   court.watchLastTickMs = now;
   if (deltaSteps <= 0 || dt <= 0) return;
+  // Arm-up: ignore steps while the user walks to the T.
+  if (court.armUntilMs && now < court.armUntilMs) {
+    updateDebugOverlay('watch', false, 'arming · walk to the T', { score: deltaSteps, changed: deltaSteps, gap: dt * 1000, uuid: 'watch-arm' });
+    return;
+  }
   if (deltaSteps > 12 || (dt < 0.45 && deltaSteps > 1) || (dt < 2 && deltaSteps > 4)) {
     updateDebugOverlay('watch', false, 'ignored unrealistic step jump', { score: deltaSteps, changed: deltaSteps, gap: dt * 1000, uuid: 'watch-steps' });
     return;
@@ -1249,6 +1280,27 @@ async function startCourt() {
     court.source = 'watch';
     court.running = true;
     court.startMs = Date.now();
+    // 10-second arm-up: walk to the T. The dot snaps to the T and steps are
+    // ignored until the countdown ends, then every real watch step moves the dot.
+    court.armUntilMs = performance.now() + 10000;
+    court.px = COURT_T.x; court.py = COURT_T.y; court.trail = [];
+    updateCourtPosition();
+    setCourtStatus('arming · walk to the T (10s)…', 'on');
+    if (court.armTimer) clearInterval(court.armTimer);
+    court.armTimer = setInterval(() => {
+      const left = Math.max(0, court.armUntilMs - performance.now());
+      if (left <= 0) {
+        clearInterval(court.armTimer); court.armTimer = null;
+        // Reset step baseline so steps taken during arm-up don't count.
+        court.watchBaseSteps = court.watchLastSteps;
+        court.steps = 0; $('cSteps').textContent = '0'; $('cDist').textContent = '0';
+        court.px = COURT_T.x; court.py = COURT_T.y; court.trail = [];
+        updateCourtPosition();
+        setCourtStatus('watch motion · live (move to track)', 'on');
+      } else {
+        setCourtStatus('arming · walk to the T (' + Math.ceil(left/1000) + 's)…', 'on');
+      }
+    }, 250);
     if (writeChar && protocol === 'qcband') {
       await startHeartRateStream();
       court.watchPollTimer = setInterval(
@@ -1268,8 +1320,7 @@ async function startCourt() {
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    setCourtStatus(imuOk ? 'watch motion + phone IMU · live' : 'watch motion · live', 'on');
-    log('info', `Court tracking — HR + movement linked (${protocol})${imuOk ? ' + phone IMU assist' : ''}. The dot moves from real steps/motion while HR streams.`);
+    log('info', `Court tracking — 10s arm-up, then dot moves one step per real watch step (${protocol})${imuOk ? ' + phone IMU assist' : ''}.`);
     return;
   }
   // Fallback → phone IMU only
@@ -1292,6 +1343,8 @@ function stopCourt() {
   if (court.tickTimer)      { clearInterval(court.tickTimer); court.tickTimer = null; }
   if (court.watchPollTimer) { clearInterval(court.watchPollTimer); court.watchPollTimer = null; }
   if (court.watchMotionAssistTimer) { clearInterval(court.watchMotionAssistTimer); court.watchMotionAssistTimer = null; }
+  if (court.armTimer) { clearInterval(court.armTimer); court.armTimer = null; }
+  court.armUntilMs = 0;
   $('courtStart').disabled = false;
   $('courtStop').disabled = true;
   $('courtCal').disabled = true;
