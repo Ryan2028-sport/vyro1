@@ -210,14 +210,18 @@ async function connect() {
         ].filter(Boolean).join('');
         log('info', `  ${svc.uuid.slice(4,8)} → char ${c.uuid.slice(4,8)} [${flags}]`);
         if (p.notify || p.indicate) {
+          const isStdHr = c.uuid === '00002a37-0000-1000-8000-00805f9b34fb';
           try {
             await c.startNotifications();
             c.addEventListener('characteristicvaluechanged', (e) => {
               const data = new Uint8Array(e.target.value.buffer);
               log('in', `← ${c.uuid.slice(4,8)}: ${hex(data)}`);
-              // try every parser — they no-op if data doesn't match
-              parsePacket(data);
-              try { onStdHr({ target: { value: e.target.value } }); } catch {}
+              if (isStdHr) {
+                try { onStdHr({ target: { value: e.target.value } }); } catch {}
+              } else {
+                // QCBand / vendor framed packets
+                parsePacket(data);
+              }
             });
           } catch (err) { log('err', `notify ${c.uuid.slice(4,8)}: ${err.message}`); }
         }
