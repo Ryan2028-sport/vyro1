@@ -222,6 +222,29 @@
     <div id="probeResults" style="font-family:'JetBrains Mono',monospace;font-size:11px;max-height:240px;overflow:auto;background:#000;border:1px solid var(--border);border-radius:10px;padding:8px"></div>
   </div>
 
+  <div class="panel" style="margin-top:16px;border:1px solid #39ff88">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <div class="section-title" style="margin:0;color:#39ff88">🎯 Wrist Motion Meter (0x69 stream)</div>
+      <div class="row" style="gap:6px">
+        <button class="ghost" id="motionLock" disabled>Lock to 0x69</button>
+        <button class="ghost" id="motionReset">Reset</button>
+      </div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:8px">
+      Live rolling magnitude of the 0x69 payload — should jump when you move your wrist, settle when still.
+    </div>
+    <div class="row" style="gap:12px;align-items:center;margin-bottom:8px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:28px;color:#39ff88;min-width:120px" id="motionValue">0</div>
+      <div style="flex:1">
+        <div style="height:14px;background:#111;border-radius:7px;overflow:hidden">
+          <div id="motionBar" style="height:100%;width:0%;background:linear-gradient(90deg,#39ff88,#ffb020,#ff3a3a);transition:width 80ms"></div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:4px" id="motionStatus">waiting for packets…</div>
+      </div>
+    </div>
+    <canvas id="motionSpark" width="800" height="80" style="width:100%;height:80px;background:#000;border:1px solid var(--border);border-radius:6px"></canvas>
+  </div>
+
   <div class="panel" style="margin-top:16px">
     <div class="row" style="justify-content:space-between;margin-bottom:8px">
       <div class="section-title" style="margin:0">Live decoder · first-byte streams (move your wrist!)</div>
@@ -336,7 +359,7 @@ function setConnected(on) {
   $('connectBtn').disabled = on;
   $('connectFilteredBtn').disabled = on;
   $('disconnectBtn').disabled = !on;
-  ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot','probeStart','probeMonitor','decTrigger0c']
+  ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot','probeStart','probeMonitor','decTrigger0c','motionLock']
     .forEach(id => $(id).disabled = !on);
 }
 
@@ -397,6 +420,7 @@ async function connect(filtered = false) {
               // Feed the opcode/sensor probe accumulator with every notification.
               probeRecord(c.uuid, data);
               decoderRecord(data);
+              motionRecord(data);
               if (isStdHr) {
                 try { onStdHr({ target: { value: e.target.value } }); } catch {}
               } else {
@@ -1277,6 +1301,63 @@ $('decTrigger0c').onclick = async () => {
     await sleep(150);
   }
   log('info','0x0c trigger sent — watch decoder for motion');
+};
+
+// ==========================================================================
+// WRIST MOTION METER — locks on 0x69 stream. Computes a rolling magnitude
+// from sum-of-absolute-deltas across the payload (works regardless of which
+// bytes encode the axis). Renders a live sparkline + bar + numeric value.
+// ==========================================================================
+let motionLockTag = 0x69;       // default to the user-confirmed channel
+let motionPrev = null;
+const motionHist = new Array(200).fill(0);
+let motionMax = 1;
+let motionLastMs = 0;
+function motionRecord(bytes) {
+  if (!bytes || bytes.length < 4 || bytes[0] !== motionLockTag) return;
+  motionLastMs = performance.now();
+  if (motionPrev && motionPrev.length === bytes.length) {
+    let d = 0;
+    // ignore byte 0 (tag) and last byte (CRC/counter)
+    for (let i = 1; i < bytes.length - 1; i++) d += Math.abs(bytes[i] - motionPrev[i]);
+    motionHist.push(d); motionHist.shift();
+    if (d > motionMax) motionMax = d;
+  }
+  motionPrev = bytes.slice();
+}
+function renderMotion() {
+  const v = motionHist[motionHist.length - 1] || 0;
+  const pct = motionMax > 0 ? Math.min(100, (v / motionMax) * 100) : 0;
+  $('motionValue').textContent = v.toString();
+  $('motionBar').style.width = pct.toFixed(0) + '%';
+  const age = motionLastMs ? ((performance.now() - motionLastMs) / 1000).toFixed(1) : '∞';
+  const tag = '0x' + motionLockTag.toString(16).padStart(2, '0');
+  $('motionStatus').textContent = `locked to ${tag} · peak ${motionMax} · last ${age}s ago`;
+  const c = $('motionSpark'); if (!c) return;
+  const ctx = c.getContext('2d'); const w = c.width, h = c.height;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#39ff88'; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let i = 0; i < motionHist.length; i++) {
+    const x = (i / (motionHist.length - 1)) * w;
+    const y = h - (Math.min(motionHist[i], motionMax) / motionMax) * (h - 4) - 2;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // Threshold line at 25%
+  ctx.strokeStyle = '#ffb02055'; ctx.setLineDash([4, 4]); ctx.beginPath();
+  ctx.moveTo(0, h * 0.75); ctx.lineTo(w, h * 0.75); ctx.stroke(); ctx.setLineDash([]);
+}
+setInterval(renderMotion, 80);
+$('motionReset').onclick = () => {
+  motionHist.fill(0); motionMax = 1; motionPrev = null;
+  $('motionStatus').textContent = 'reset.';
+};
+$('motionLock').onclick = () => {
+  // Find the busiest first-byte bucket and lock to it
+  if (!decBuckets.size) { log('err','no packets yet'); return; }
+  const best = [...decBuckets.values()].sort((a,b) => b.count - a.count)[0];
+  motionLockTag = best.fb; motionPrev = null; motionHist.fill(0); motionMax = 1;
+  log('info', `motion meter locked to 0x${best.fb.toString(16).padStart(2,'0')}`);
 };
 
 // ==========================================================================
