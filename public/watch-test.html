@@ -1007,20 +1007,34 @@ function onWatchSteps(totalSteps) {
     court.watchBaseSteps = totalSteps;
     court.watchLastSteps = totalSteps;
     court.watchLastTickMs = now;
+    court.watchLastChangeMs = now;
+    updateDebugOverlay('watch', false, 'watch baseline set · total=' + totalSteps, { score: 0, changed: 0, gap: 0, uuid: 'watch-base' });
     return;
   }
-  const dt = (now - court.watchLastTickMs) / 1000;
   const deltaSteps = totalSteps - court.watchLastSteps;
+  // Arm-up: keep tracking baseline but ignore movement.
+  if (court.armUntilMs && now < court.armUntilMs) {
+    court.watchLastSteps = totalSteps;
+    court.watchLastTickMs = now;
+    if (deltaSteps > 0) court.watchLastChangeMs = now;
+    updateDebugOverlay('watch', false, 'arming · walk to the T (Δ=' + deltaSteps + ')', { score: deltaSteps, changed: deltaSteps, gap: 0, uuid: 'watch-arm' });
+    return;
+  }
+  if (deltaSteps <= 0) {
+    updateDebugOverlay('watch', false, 'watch poll · no new steps (total=' + totalSteps + ')', { score: 0, changed: 0, gap: now - (court.watchLastChangeMs || now), uuid: 'watch-idle' });
+    court.watchLastTickMs = now;
+    return;
+  }
+  // dt from the last actual step change, not from the last poll —
+  // watch firmware reports steps in bursts every 1-2s even though we poll faster.
+  const lastChange = court.watchLastChangeMs || court.watchLastTickMs || now;
+  const dt = Math.max(0.05, (now - lastChange) / 1000);
   court.watchLastSteps = totalSteps;
   court.watchLastTickMs = now;
-  if (deltaSteps <= 0 || dt <= 0) return;
-  // Arm-up: ignore steps while the user walks to the T.
-  if (court.armUntilMs && now < court.armUntilMs) {
-    updateDebugOverlay('watch', false, 'arming · walk to the T', { score: deltaSteps, changed: deltaSteps, gap: dt * 1000, uuid: 'watch-arm' });
-    return;
-  }
-  if (deltaSteps > 12 || (dt < 0.45 && deltaSteps > 1) || (dt < 2 && deltaSteps > 4)) {
-    updateDebugOverlay('watch', false, 'ignored unrealistic step jump', { score: deltaSteps, changed: deltaSteps, gap: dt * 1000, uuid: 'watch-steps' });
+  court.watchLastChangeMs = now;
+  // Only reject truly absurd jumps (firmware glitches, resync after disconnect).
+  if (deltaSteps > 30) {
+    updateDebugOverlay('watch', false, 'ignored huge step jump Δ=' + deltaSteps, { score: deltaSteps, changed: deltaSteps, gap: dt * 1000, uuid: 'watch-steps' });
     return;
   }
   court.lastMoveMs = now;
