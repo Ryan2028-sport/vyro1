@@ -1454,6 +1454,7 @@ function processImuSample(st, s, uuid) {
 let lastImuSample = null;
 let imuSampleCount = 0;
 let imuRateHz = 0;
+const phoneImuState = { gravity: null };
 const courtCal = {
   baseline: null,      // {x,y,z} — captured average raw accel at rest
   baselineNoise: 0,    // std-dev of |linear accel| during center capture
