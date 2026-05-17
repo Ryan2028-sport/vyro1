@@ -1166,14 +1166,15 @@ async function attachPhoneMotion() {
     const since = performance.now() - (court.lastMotionEventMs || 0);
     if (since > 1500) {
       const sinceWatch = performance.now() - (court.lastWatchPacketMs || court.lastHrMs || 0);
-      if (court.source === 'watch' && sinceWatch < 3000) {
+      const watchConnected = !!(device && device.gatt && device.gatt.connected);
+      if ((court.source === 'watch' || watchConnected) && sinceWatch < 5000) {
         dbg.style.color = '#0f0';
-        dbg.textContent = `✓ WATCH STREAM LIVE (desktop / no phone IMU)\nwatch packets fresh ${Math.round(sinceWatch)}ms\nsteps:${court.steps}  hr:${court.currentHr||'–'}  cad:${court.currentCad}\ndot is driven by watch fallback`;
+        dbg.textContent = `✓ WATCH STREAM LIVE (desktop / no phone IMU)\nwatch packets fresh ${Math.round(sinceWatch)}ms\nsteps:${court.steps}  moves:${court.movements}  hr:${court.currentHr||'–'}\ndot is driven by watch packets`;
         return;
       }
-      if (court.source === 'watch') {
+      if (court.source === 'watch' || watchConnected) {
         dbg.style.color = '#fb0';
-        dbg.textContent = `⚠ WATCH CONNECTED but no packets for ${Math.round(sinceWatch)}ms\nMove your wrist / check the watch is still paired.\nsteps:${court.steps}  hr:${court.currentHr||'–'}`;
+        dbg.textContent = `⚠ WATCH CONNECTED but no live packets for ${Math.round(sinceWatch)}ms\nChrome desktop has no phone motion; waiting for watch packets/HR.\nsteps:${court.steps}  moves:${court.movements}  hr:${court.currentHr||'–'}`;
         return;
       }
       dbg.style.color = '#f55';
