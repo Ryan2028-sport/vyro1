@@ -1007,7 +1007,7 @@ function onMotion(e) {
   }
   // Step-accurate movement: trigger off the raw motionScore peak so the dot reacts the instant
   // the phone accelerates, matching the responsiveness of HR-driven updates.
-  if (!court.calibrating && motionScore > PHONE_STEP_RELEASE) {
+  if (motionScore > PHONE_STEP_RELEASE) {
     court.lastMoveMs = now;
     if (!court.sustainedMotionStartMs) court.sustainedMotionStartMs = now;
   } else if (motionScore < PHONE_STEP_RELEASE * 0.6) {
@@ -1016,13 +1016,14 @@ function onMotion(e) {
   }
 
   const peakStep = court.stepArmed && motionScore >= THRESH_STEP;
-  const sustainedStep = court.sustainedMotionStartMs && motionScore >= MOTION_MOVE_THRESHOLD && (now - court.lastStepMs) >= 380;
+  const liveMove = motionScore >= MOTION_MOVE_THRESHOLD;
+  const sustainedStep = court.sustainedMotionStartMs && liveMove && (now - court.lastStepMs) >= 160;
   const gap = now - court.lastStepMs;
   const refractoryOk = gap >= REFRACTORY_MS;
   let reason = '';
   let moved = false;
-  if ((peakStep || sustainedStep) && refractoryOk) {
-    const force = Math.min(1, 0.24 + motionScore * 2.8);
+  if ((peakStep || sustainedStep || liveMove) && refractoryOk) {
+    const force = Math.min(1, 0.30 + motionScore * 3.8);
     const lastGap = court.lastStepMs ? gap : 500;
     court.lastStepMs = now;
     court.lastLiveMoveMs = now;
@@ -1040,11 +1041,10 @@ function onMotion(e) {
     takeCourtStep(force);
     updateCourtVisual();
     moved = true;
-    reason = peakStep ? 'PEAK STEP' : 'SUSTAINED';
+    reason = peakStep ? 'PEAK STEP' : (sustainedStep ? 'SUSTAINED' : 'LIVE MOTION');
   } else {
-    if (court.calibrating) reason = 'calibrating';
-    else if (!refractoryOk) reason = `refractory ${Math.round(REFRACTORY_MS - gap)}ms`;
-    else if (motionScore < THRESH_STEP) reason = `score<${THRESH_STEP}`;
+    if (!refractoryOk) reason = `refractory ${Math.round(REFRACTORY_MS - gap)}ms`;
+    else if (motionScore < MOTION_MOVE_THRESHOLD) reason = `score<live ${MOTION_MOVE_THRESHOLD}`;
     else if (!court.stepArmed) reason = 'not armed (release below ' + (PHONE_STEP_RELEASE*0.6).toFixed(3) + ')';
     else reason = 'no trigger';
   }
@@ -1053,7 +1053,7 @@ function onMotion(e) {
     dbg.style.color = moved ? '#0f0' : '#ff0';
     dbg.textContent =
       `${moved ? '✓ MOVED' : '· idle'}  ${reason}\n` +
-      `score   ${motionScore.toFixed(3)}  (step≥${THRESH_STEP})\n` +
+      `score   ${motionScore.toFixed(3)}  (live≥${MOTION_MOVE_THRESHOLD} step≥${THRESH_STEP})\n` +
       `dyn ${dyn.toFixed(3)}  jerk ${jerk.toFixed(3)}\n` +
       `armed:${court.stepArmed}  side:${court.stepSide}\n` +
       `gap ${Math.round(gap)}ms / ${REFRACTORY_MS}ms\n` +
