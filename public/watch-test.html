@@ -1450,6 +1450,151 @@ function processImuSample(st, s, uuid) {
   }
 }
 
+// ---- Calibration & diagnostics ----
+let lastImuSample = null;
+let imuSampleCount = 0;
+let imuRateHz = 0;
+const courtCal = {
+  baseline: null,      // {x,y,z} — captured average raw accel at rest
+  baselineNoise: 0,    // std-dev of |linear accel| during center capture
+  peaks: { front: 0, back: 0, side: 0 },
+  capturing: null,     // 'center' | 'front' | 'back' | 'sides' | null
+  capStartMs: 0,
+  capBuf: [],
+};
+function captureCalibrationSample(s, lx, ly, lz, mag) {
+  courtCal.capBuf.push({ ax: s.ax, ay: s.ay, az: s.az, lx, ly, lz, mag, t: performance.now() });
+}
+function beginCalibration(kind, durationMs, promptText) {
+  if (!lastImuSample) {
+    $('calibPrompt').textContent = '⚠ no IMU stream — connect the watch first';
+    return;
+  }
+  courtCal.capturing = kind;
+  courtCal.capStartMs = performance.now();
+  courtCal.capBuf = [];
+  $('calibPrompt').textContent = promptText;
+  ['calCenter','calFront','calBack','calSides'].forEach(id => $(id).disabled = true);
+  const t0 = performance.now();
+  const tick = setInterval(() => {
+    const elapsed = performance.now() - t0;
+    const sec = Math.max(0, Math.ceil((durationMs - elapsed) / 1000));
+    if (elapsed >= durationMs) {
+      clearInterval(tick);
+      finishCalibration(kind);
+    } else {
+      $('calibPrompt').textContent = `${promptText} (${sec}s)`;
+    }
+  }, 100);
+}
+function finishCalibration(kind) {
+  const buf = courtCal.capBuf;
+  courtCal.capturing = null;
+  if (!buf.length) {
+    $('calibPrompt').textContent = '⚠ no samples captured — is the IMU streaming?';
+    refreshCalibBtns();
+    return;
+  }
+  if (kind === 'center') {
+    const avg = buf.reduce((a, s) => { a.x += s.ax; a.y += s.ay; a.z += s.az; return a; },
+                          { x: 0, y: 0, z: 0 });
+    avg.x /= buf.length; avg.y /= buf.length; avg.z /= buf.length;
+    courtCal.baseline = avg;
+    // noise = mean |linear accel| measured against this baseline
+    const noise = buf.reduce((a, s) =>
+      a + Math.hypot(s.ax - avg.x, s.ay - avg.y, s.az - avg.z), 0) / buf.length;
+    courtCal.baselineNoise = noise;
+    $('calVC').textContent = `${(noise*1000)|0}mg`;
+    $('calibPrompt').textContent = 'Step 2 · take a hard lunge toward the FRONT wall, then tap Calibrate Front Wall.';
+  } else {
+    // Peak linear accel along the relevant axis, vs the captured baseline.
+    const bl = courtCal.baseline || { x: 0, y: 0, z: 0 };
+    let peak = 0;
+    for (const s of buf) {
+      const blx = s.ax - bl.x, bly = s.ay - bl.y;
+      if (kind === 'front') peak = Math.max(peak, Math.max(0, -bly));
+      if (kind === 'back')  peak = Math.max(peak, Math.max(0,  bly));
+      if (kind === 'sides') peak = Math.max(peak, Math.abs(blx));
+    }
+    // Floor so a weak/no-motion capture doesn't divide by ~0.
+    peak = Math.max(0.15, peak);
+    if (kind === 'front') { courtCal.peaks.front = peak; $('calVF').textContent = peak.toFixed(2) + 'g'; }
+    if (kind === 'back')  { courtCal.peaks.back  = peak; $('calVB').textContent = peak.toFixed(2) + 'g'; }
+    if (kind === 'sides') { courtCal.peaks.side  = peak; $('calVS').textContent = peak.toFixed(2) + 'g'; }
+    const next = !courtCal.peaks.front ? 'FRONT wall'
+              : !courtCal.peaks.back  ? 'BACK wall'
+              : !courtCal.peaks.side  ? 'a SIDEWALL'
+              : null;
+    $('calibPrompt').textContent = next
+      ? `Now tap Calibrate ${next} and lunge in that direction.`
+      : '✓ Calibration complete — dot will scale to your real lunges.';
+  }
+  refreshCalibBtns();
+}
+function refreshCalibBtns() {
+  $('calCenter').disabled = false;
+  const hasBase = !!courtCal.baseline;
+  $('calFront').disabled = !hasBase;
+  $('calBack').disabled  = !hasBase;
+  $('calSides').disabled = !hasBase;
+}
+function resetCalibration() {
+  courtCal.baseline = null; courtCal.baselineNoise = 0;
+  courtCal.peaks = { front: 0, back: 0, side: 0 };
+  ['calVC','calVF','calVB','calVS'].forEach(id => $(id).textContent = '—');
+  $('calibPrompt').textContent = 'Step 1 · stand still on the T, then tap Calibrate Center.';
+  refreshCalibBtns();
+}
+// Diagnostics tick — 10Hz refresh of the X/Y/Z bars + freshness warning.
+function renderSensorBar(axis, value, peak) {
+  const pct = Math.max(-1, Math.min(1, value / Math.max(0.05, peak || 1.2)));
+  const w = Math.abs(pct) * 50; // half-bar
+  const color = axis === 'x' ? '#ff8a3a' : axis === 'y' ? '#39ff88' : '#3aa3ff';
+  const left = pct < 0 ? (50 - w) : 50;
+  return `<div style="display:flex;align-items:center;gap:8px">
+    <span style="width:14px;color:var(--muted)">${axis.toUpperCase()}</span>
+    <div style="flex:1;position:relative;height:14px;background:rgba(255,255,255,0.05);border-radius:7px;overflow:hidden">
+      <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2)"></div>
+      <div style="position:absolute;top:2px;bottom:2px;left:${left}%;width:${w}%;background:${color};border-radius:5px;opacity:0.85"></div>
+    </div>
+    <span style="width:64px;text-align:right;color:${color}">${value >= 0 ? '+' : ''}${value.toFixed(2)}g</span>
+  </div>`;
+}
+let lastRateMs = performance.now(), lastRateCount = 0;
+setInterval(() => {
+  const rows = $('sensorRows'); if (!rows) return;
+  const s = lastImuSample;
+  const stale = !s || (performance.now() - s.ms) > 1500;
+  const warn = $('sensorWarn');
+  if (warn) warn.style.display = stale ? 'block' : 'none';
+  const ax = s ? s.ax : 0, ay = s ? s.ay : 0, az = s ? s.az : 0;
+  const peak = Math.max(1.2, courtCal.peaks.front, courtCal.peaks.back, courtCal.peaks.side);
+  rows.innerHTML = renderSensorBar('x', ax, peak) + renderSensorBar('y', ay, peak) + renderSensorBar('z', az, peak);
+  // rolling sample-rate estimate
+  const now = performance.now();
+  if (now - lastRateMs > 1000) {
+    imuRateHz = Math.round((imuSampleCount - lastRateCount) * 1000 / (now - lastRateMs));
+    lastRateMs = now; lastRateCount = imuSampleCount;
+  }
+  const meta = $('sensorMeta');
+  if (meta) {
+    const ago = s ? Math.round((performance.now() - s.ms)) : '—';
+    meta.textContent = `mode: ${s?.mode || '—'} · rate: ${imuRateHz} Hz · last: ${ago === '—' ? '—' : ago + 'ms'}`;
+  }
+}, 100);
+// Wire up buttons once the DOM is parsed (this script is at end of body).
+window.addEventListener('DOMContentLoaded', () => {
+  $('calCenter').onclick = () => beginCalibration('center', 3000,
+    'Hold the watch arm still on the T — capturing baseline…');
+  $('calFront').onclick = () => beginCalibration('front', 3000,
+    'Lunge HARD toward the FRONT wall a couple of times…');
+  $('calBack').onclick = () => beginCalibration('back', 3000,
+    'Lunge HARD toward the BACK wall a couple of times…');
+  $('calSides').onclick = () => beginCalibration('sides', 3000,
+    'Lunge HARD to the LEFT and RIGHT a couple of times…');
+  $('calReset').onclick = resetCalibration;
+});
+
 // 30Hz physics loop — drains velocity from any locked IMU source onto the dot.
 let imuTickTimer = null;
 function startImuTick() {
@@ -1464,9 +1609,19 @@ function startImuTick() {
       st.vy *= IMU_CFG.velocityDamp;
       active++;
     }
-    if (!active || (Math.abs(totalVx) < 0.05 && Math.abs(totalVy) < 0.05)) return;
-    let nx = court.px + totalVx / active;
-    let ny = court.py + totalVy / active;
+    let nx = court.px, ny = court.py;
+    const idle = (performance.now() - (court.lastWatchMotionMs || 0)) > 800;
+    if (active && (Math.abs(totalVx) >= 0.05 || Math.abs(totalVy) >= 0.05)) {
+      nx += totalVx / active;
+      ny += totalVy / active;
+    } else if (idle) {
+      // Drift smoothly back to the T when motion has fallen to baseline.
+      nx += (COURT_T.x - court.px) * 0.06;
+      ny += (COURT_T.y - court.py) * 0.06;
+      if (Math.hypot(nx - COURT_T.x, ny - COURT_T.y) < 0.4) { nx = COURT_T.x; ny = COURT_T.y; }
+    } else {
+      return;
+    }
     nx = Math.max(COURT_BOUNDS.xMin, Math.min(COURT_BOUNDS.xMax, nx));
     ny = Math.max(COURT_BOUNDS.yMin, Math.min(COURT_BOUNDS.yMax, ny));
     court.px = nx; court.py = ny;
