@@ -942,6 +942,7 @@ $('courtReset').onclick = () => { resetCourt(); };
 if (!navigator.bluetooth) {
   $('warn').style.display = 'block';
   $('connectBtn').disabled = true;
+  $('connectFilteredBtn').disabled = true;
 }
 log('info', 'Ready. Click "Connect Watch" to begin.');
 </script>
