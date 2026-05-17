@@ -345,11 +345,25 @@ function parsePacket(p) {
       break;
     }
     case CMD.REAL_TIME_START: {
-      // p[1] = type (1=HR, 3=SpO2), p[2] = error code (0 = OK), p[3] = value
-      const type = p[1], err = p[2], value = p[3];
-      if (err !== 0) { log('err', `Measurement error (type=${type} code=${err})`); break; }
-      if (type === RT_TYPE.HEART_RATE && value > 0) $('hr').textContent = value;
-      if (type === RT_TYPE.SPO2 && value > 0) $('spo2').textContent = value;
+      // H59 Pro layout: p[1]=type (1=HR, 3=SpO2), p[2]=err/sub,
+      // p[6..7] = sensor value, little-endian uint16.
+      // Empirically this is bpm * 10 (e.g. 0x03f7 = 1015 -> 101.5 bpm).
+      const type = p[1];
+      const raw = p[6] | (p[7] << 8);
+      if (raw === 0) break; // no reading yet
+      if (type === RT_TYPE.HEART_RATE) {
+        const bpm = Math.round(raw / 10);
+        if (bpm >= 30 && bpm <= 220) {
+          $('hr').textContent = bpm;
+          $('sync').textContent = new Date().toLocaleTimeString();
+        } else {
+          // fallback: treat as raw if /10 looks bogus
+          $('hr').textContent = raw;
+        }
+      } else if (type === RT_TYPE.SPO2) {
+        const v = Math.round(raw / 10);
+        if (v >= 70 && v <= 100) $('spo2').textContent = v;
+      }
       break;
     }
     case CMD.FIRMWARE: {
