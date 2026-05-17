@@ -78,6 +78,33 @@
     <div class="stat"><div class="k">Last sync</div><div><span class="v" id="sync" style="font-size:18px">—</span></div></div>
   </div>
 
+  <div class="section-title" style="margin-top:24px">Court movement · explosive tracking</div>
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;margin-bottom:14px">
+      <div class="row">
+        <button id="courtStart" class="cta">Start court tracking</button>
+        <button id="courtStop" class="ghost" disabled>Stop</button>
+        <button id="courtReset" class="ghost">Reset</button>
+      </div>
+      <div id="courtStatus" class="status"><span class="dot"></span><span id="courtStatusText">idle</span></div>
+    </div>
+    <div class="grid">
+      <div class="stat"><div class="k">Steps (session)</div><div><span class="v" id="cSteps">0</span></div></div>
+      <div class="stat"><div class="k">Explosive steps</div><div><span class="v" id="cExp" style="color:var(--accent)">0</span></div></div>
+      <div class="stat"><div class="k">Lunges / sprints</div><div><span class="v" id="cLunge">0</span></div></div>
+      <div class="stat"><div class="k">Peak G</div><div><span class="v" id="cPeak">0.0</span><span class="u">g</span></div></div>
+      <div class="stat"><div class="k">Avg cadence</div><div><span class="v" id="cCad">0</span><span class="u">spm</span></div></div>
+      <div class="stat"><div class="k">Active time</div><div><span class="v" id="cTime" style="font-size:24px">0:00</span></div></div>
+      <div class="stat"><div class="k">Court distance</div><div><span class="v" id="cDist">0</span><span class="u">m</span></div></div>
+      <div class="stat"><div class="k">Intensity</div><div><span class="v" id="cInt" style="font-size:22px">—</span></div></div>
+    </div>
+    <div style="margin-top:12px;color:var(--muted);font-size:12px;line-height:1.5">
+      Uses the phone's motion sensor (worn or pocketed) as a court-movement proxy.
+      A step is registered on each vertical accel peak; <span style="color:var(--accent)">explosive steps</span>
+      are peaks above 2.2g (push-offs, splits, lunges to the corners).
+    </div>
+  </div>
+
   <div class="panel" style="margin-top:16px">
     <div class="row" style="justify-content:space-between;margin-bottom:12px">
       <div class="section-title" style="margin:0">Commands</div>
