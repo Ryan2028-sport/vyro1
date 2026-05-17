@@ -970,6 +970,7 @@ const court = {
   restHr: null, idleCadFloor: 0,
   // watch polling
   watchPollTimer: null,
+  sportsPollTimer: null,
   watchBaseSteps: null, watchLastSteps: null, watchLastTickMs: 0,
   // visualization
   px: COURT_START.x, py: COURT_START.y,
@@ -1603,6 +1604,7 @@ function stopCourt() {
   if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
   if (court.tickTimer)      { clearInterval(court.tickTimer); court.tickTimer = null; }
   if (court.watchPollTimer) { clearInterval(court.watchPollTimer); court.watchPollTimer = null; }
+  if (court.sportsPollTimer) { clearInterval(court.sportsPollTimer); court.sportsPollTimer = null; }
   if (court.watchMotionAssistTimer) { clearInterval(court.watchMotionAssistTimer); court.watchMotionAssistTimer = null; }
   if (court.armTimer) { clearInterval(court.armTimer); court.armTimer = null; }
   court.armUntilMs = 0;
