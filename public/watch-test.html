@@ -1386,43 +1386,14 @@ function onWatchSteps(totalSteps) {
   $('cCad').textContent = cadSpm;
   $('cadNow').textContent = cadSpm + ' spm';
 
-  // Watch firmware reports steps in BURSTS (every 5-30s), not per step.
-  // To make the dot feel live: (a) spread this burst's pulses across the
-  // real burst interval so motion looks continuous, (b) reconcile with the
-  // between-burst predictor below (court.predicted) so we don't double-move.
-  const predicted = court._predictedSteps || 0;
-  const owedSteps = Math.max(0, deltaSteps - Math.max(0, predicted));
-  court._predictedSteps = Math.max(0, predicted - deltaSteps);
-  const spreadMs = Math.max(400, Math.min(dt * 1000 * 0.9, owedSteps * 260));
-  const interval = owedSteps > 0 ? spreadMs / owedSteps : 0;
-  for (let i = 0; i < owedSteps; i++) {
+  // Do not predict between bursts. If the watch sends real gyro/motion packets,
+  // those packets move the dot live; step-total changes are only a backup signal.
+  for (let i = 0; i < deltaSteps; i++) {
     setTimeout(() => {
-      if (!court.running || court.source !== 'watch') return;
+      if (!court.running || court.source !== 'watch' || court.phoneAssistActive) return;
       takeCourtStep(Math.min(1, 0.32 + rate * 0.16));
       updateCourtVisual();
-    }, Math.round(i * interval));
-  }
-  // Update predictor cadence from observed rate (steps/sec), clamped.
-  court._predictRate = Math.max(0.5, Math.min(4.5, rate));
-  court._lastBurstMs = now;
-  if (!court._predictTimer) {
-    court._predictTimer = setInterval(() => {
-      if (!court.running || court.source !== 'watch') return;
-      const t = performance.now();
-      const sinceBurst = t - (court._lastBurstMs || t);
-      // Don't predict until at least 1s after a burst (let real pulses play out),
-      // and stop predicting if no burst for >20s (athlete likely standing still).
-      if (sinceBurst < 1000 || sinceBurst > 20000) return;
-      const r = court._predictRate || 1.5;
-      const expectedSinceBurst = Math.floor((sinceBurst / 1000) * r);
-      const alreadyPredicted = court._predictedSteps || 0;
-      if (expectedSinceBurst > alreadyPredicted) {
-        court._predictedSteps = alreadyPredicted + 1;
-        takeCourtStep(Math.min(1, 0.30 + r * 0.14));
-        updateCourtVisual();
-        updateDebugOverlay('watch', true, `predicted step (between bursts) · cad≈${Math.round(r*60)} spm`, { score: 1, changed: 1, gap: sinceBurst, uuid: 'watch-predict' });
-      }
-    }, 200);
+    }, i * 80);
   }
 
   // explosive: rate ≥ 3 steps/sec → sprint cadence (~180 spm)
