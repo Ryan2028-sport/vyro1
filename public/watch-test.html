@@ -320,7 +320,7 @@ function setConnected(on) {
   $('connectBtn').disabled = on;
   $('connectFilteredBtn').disabled = on;
   $('disconnectBtn').disabled = !on;
-  ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot']
+  ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot','probeStart','probeMonitor']
     .forEach(id => $(id).disabled = !on);
 }
 
