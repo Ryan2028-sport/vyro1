@@ -881,24 +881,24 @@ function tickCourt() {
       $('cadNow').textContent = court.currentCad + ' spm';
       updateCourtVisual();
     }
-    // HR-driven motion fallback: many ring firmwares only push step totals
-    // every few seconds, so drive continuous drift from HR delta above rest.
-    // Each tick (0.5s) nudge the dot proportional to (HR - restHR).
+    // HR-driven live motion: watches often delay step totals, so move the dot
+    // from the live HR stream immediately, then add bigger jumps on step bursts.
     if (!court.calibrating && court.currentHr) {
-      const rest = court.restHr || court.hrBaseline || 70;
+      const rest = Math.min(court.restHr || 78, court.hrBaseline || court.currentHr || 78);
       const hrDelta = Math.max(0, court.currentHr - rest);
-      if (hrDelta >= 8) {
-        // 8 bpm above rest = light jog drift; 60+ = sprint-level drift
-        const intensity = Math.min(1, hrDelta / 60);
-        // synthetic cadence floor so visualization & sparkline reflect effort
-        const synthCad = Math.round(40 + intensity * 160);
-        if (synthCad > court.currentCad) {
-          court.currentCad = synthCad;
-          $('cCad').textContent = synthCad;
-          $('cadNow').textContent = synthCad + ' spm';
-        }
-        // pulse + drift the dot every tick
-        pulseCourtDot(0.4 + intensity * 2.5);
+      const hrFresh = (performance.now() - (court.lastHrMs || 0)) < 7000;
+      const intensity = Math.min(1, Math.max(0.12, hrDelta / 45));
+      const synthCad = Math.round(30 + intensity * 170);
+      if (hrFresh && synthCad > court.currentCad) {
+        court.currentCad = synthCad;
+        $('cCad').textContent = synthCad;
+        $('cadNow').textContent = synthCad + ' spm';
+      }
+      court.liveMoveMs += dtMs;
+      const interval = Math.max(160, 650 - intensity * 420);
+      if (hrFresh && court.liveMoveMs >= interval) {
+        court.liveMoveMs = 0;
+        moveCourtDotLive(intensity);
         updateCourtVisual();
       }
     }
