@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VYRO · Watch Test</title>
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@500,700,900,400&f[]=jetbrains-mono@500,700&display=swap" />
+<style>
+  :root { --bg:#000; --fg:#fff; --panel:rgba(255,255,255,0.05); --border:rgba(255,255,255,0.10); --muted:rgba(255,255,255,0.55); --accent:#39ff88; --warn:#ff6b6b; }
+  *{box-sizing:border-box} html,body{margin:0;background:radial-gradient(circle at top left,rgba(255,255,255,.1),transparent 30%),linear-gradient(180deg,#080808,#000);color:var(--fg);font-family:"Satoshi",system-ui,sans-serif;min-height:100vh}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px}
+  .logo{font-family:"JetBrains Mono",monospace;font-weight:700;letter-spacing:.3em;font-size:14px}
+  .back{font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:8px 14px;border-radius:999px}
+  .back:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+  h1{font-size:32px;font-weight:900;margin:0 0 6px}
+  .sub{color:var(--muted);font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:24px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:20px;margin-bottom:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  button.cta{font-family:inherit;font-weight:700;font-size:14px;background:#fff;color:#000;border:none;border-radius:999px;padding:14px 24px;cursor:pointer;transition:transform .15s}
+  button.cta:hover{transform:translateY(-1px)}
+  button.cta:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  button.ghost{font-family:inherit;font-weight:600;font-size:13px;background:transparent;color:#fff;border:1px solid var(--border);border-radius:999px;padding:10px 18px;cursor:pointer}
+  button.ghost:hover{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.05)}
+  button.ghost:disabled{opacity:.3;cursor:not-allowed}
+  .status{display:inline-flex;align-items:center;gap:8px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;padding:6px 12px;border-radius:999px;border:1px solid var(--border)}
+  .dot{width:8px;height:8px;border-radius:50%;background:#666;box-shadow:0 0 8px #666}
+  .status.on .dot{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+  .status.err .dot{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:18px}
+  .stat .k{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  .stat .v{font-size:36px;font-weight:900;line-height:1}
+  .stat .u{font-size:12px;color:var(--muted);margin-left:4px;font-weight:500}
+  .log{font-family:"JetBrains Mono",monospace;font-size:11px;background:#000;border:1px solid var(--border);border-radius:14px;padding:14px;height:240px;overflow:auto;white-space:pre-wrap;line-height:1.6;color:rgba(255,255,255,.7)}
+  .log .out{color:#7dd3fc}.log .in{color:#86efac}.log .err{color:#fca5a5}.log .info{color:#fde68a}
+  .section-title{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+  .pulse{display:inline-block;width:10px;height:10px;background:var(--warn);border-radius:50%;margin-right:6px;animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+  .warning{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.3);color:#ffb4b4;padding:14px 16px;border-radius:14px;font-size:13px;line-height:1.6;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">VYRO · WATCH TEST</div>
+    <a class="back" href="/vyro-app.html">← Back to app</a>
+  </header>
+
+  <h1>Connect your watch</h1>
+  <div class="sub">QCBand / Colmi compatible · Web Bluetooth</div>
+
+  <div id="warn" class="warning" style="display:none">
+    ⚠️ Web Bluetooth not available. Use Chrome, Edge, or Opera on desktop or Android. iOS Safari is not supported.
+  </div>
+
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <button id="connectBtn" class="cta">Connect Watch</button>
+        <button id="disconnectBtn" class="ghost" disabled>Disconnect</button>
+      </div>
+      <div id="status" class="status"><span class="dot"></span><span id="statusText">disconnected</span></div>
+    </div>
+    <div id="deviceInfo" style="margin-top:14px;color:var(--muted);font-size:13px;display:none"></div>
+  </div>
+
+  <div class="section-title">Live data</div>
+  <div class="grid">
+    <div class="stat"><div class="k">Battery</div><div><span class="v" id="battery">—</span><span class="u">%</span></div></div>
+    <div class="stat"><div class="k">Heart rate</div><div><span class="v" id="hr">—</span><span class="u">bpm</span></div></div>
+    <div class="stat"><div class="k">Steps today</div><div><span class="v" id="steps">—</span></div></div>
+    <div class="stat"><div class="k">Calories</div><div><span class="v" id="cal">—</span><span class="u">kcal</span></div></div>
+    <div class="stat"><div class="k">Distance</div><div><span class="v" id="dist">—</span><span class="u">m</span></div></div>
+    <div class="stat"><div class="k">Blood oxygen</div><div><span class="v" id="spo2">—</span><span class="u">%</span></div></div>
+    <div class="stat"><div class="k">Firmware</div><div><span class="v" id="fw" style="font-size:18px">—</span></div></div>
+    <div class="stat"><div class="k">Last sync</div><div><span class="v" id="sync" style="font-size:18px">—</span></div></div>
+  </div>
+
+  <div class="panel" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <div class="section-title" style="margin:0">Commands</div>
+      <div class="row">
+        <button class="ghost" id="btnBattery" disabled>Battery</button>
+        <button class="ghost" id="btnSteps" disabled>Steps</button>
+        <button class="ghost" id="btnHrStart" disabled>Start HR</button>
+        <button class="ghost" id="btnHrStop" disabled>Stop HR</button>
+        <button class="ghost" id="btnSpo2Start" disabled>Start SpO₂</button>
+        <button class="ghost" id="btnSpo2Stop" disabled>Stop SpO₂</button>
+        <button class="ghost" id="btnTime" disabled>Set time</button>
+        <button class="ghost" id="btnReboot" disabled>Reboot</button>
+      </div>
+    </div>
+    <div class="section-title">Packet log</div>
+    <div id="log" class="log"></div>
+  </div>
+</div>
+
+<script>
+// ==========================================================================
+// QCBand / Colmi BLE protocol (Nordic UART-style)
+// Service: 6e40fff0-...   Write: 6e400002-...   Notify: 6e400003-...
+// 16-byte packets: [cmdId][...data...][checksum]  checksum = sum mod 256
+// ==========================================================================
+const SERVICE_UUID = '6e40fff0-b5a3-f393-e0a9-e50e24dcca9e';
+const WRITE_UUID   = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const NOTIFY_UUID  = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+
+// Command IDs (from public Colmi protocol)
+const CMD = {
+  SET_TIME:        0x01,
+  BATTERY:         0x03,
+  REBOOT:          0x08,
+  STEPS:           0x15,           // (today)
+  REAL_TIME_START: 0x69,
+  REAL_TIME_STOP:  0x6A,
+  FIRMWARE:        0xa1,
+};
+const RT_TYPE = { HEART_RATE: 1, SPO2: 3 };
+const RT_ACT  = { START: 1, STOP: 2, CONTINUE: 3 };
+
+// ----- helpers -----
+function buildPacket(cmdId, sub = []) {
+  const p = new Uint8Array(16);
+  p[0] = cmdId;
+  for (let i = 0; i < sub.length && i < 14; i++) p[i + 1] = sub[i];
+  let sum = 0; for (let i = 0; i < 15; i++) sum += p[i];
+  p[15] = sum & 0xff;
+  return p;
+}
+function buildRealTime(type, action) { return buildPacket(CMD.REAL_TIME_START, [type, action]); }
+function buildSetTime(d = new Date()) {
+  const y = d.getFullYear() - 2000;
+  return buildPacket(CMD.SET_TIME, [y, d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), 1, 0]);
+}
+function hex(buf) { return [...buf].map(b => b.toString(16).padStart(2, '0')).join(' '); }
+
+// ----- state -----
+let device = null, server = null, writeChar = null, notifyChar = null;
+let hrInterval = null;
+
+// ----- UI helpers -----
+const $ = id => document.getElementById(id);
+function log(kind, msg) {
+  const el = $('log'); const time = new Date().toLocaleTimeString();
+  el.innerHTML += `<span class="${kind}">[${time}] ${msg}</span>\n`;
+  el.scrollTop = el.scrollHeight;
+}
+function setStatus(s, kind = '') {
+  $('statusText').textContent = s;
+  $('status').className = 'status ' + kind;
+}
+function setConnected(on) {
+  $('connectBtn').disabled = on;
+  $('disconnectBtn').disabled = !on;
+  ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot']
+    .forEach(id => $(id).disabled = !on);
+}
+
+// ----- BLE flow -----
+async function connect() {
+  try {
+    log('info', 'Requesting device…');
+    device = await navigator.bluetooth.requestDevice({
+      filters: [
+        { services: [SERVICE_UUID] },
+        { namePrefix: 'R0' }, { namePrefix: 'QCBand' }, { namePrefix: 'Colmi' },
+        { namePrefix: 'RY0' }, { namePrefix: 'VK' },
+      ],
+      optionalServices: [SERVICE_UUID, 'battery_service', 'device_information'],
+    });
+    log('info', `Selected: ${device.name || '(unnamed)'} [${device.id}]`);
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    setStatus('connecting…');
+    server = await device.gatt.connect();
+    log('info', 'GATT connected, getting service…');
+    const svc = await server.getPrimaryService(SERVICE_UUID);
+    writeChar  = await svc.getCharacteristic(WRITE_UUID);
+    notifyChar = await svc.getCharacteristic(NOTIFY_UUID);
+    await notifyChar.startNotifications();
+    notifyChar.addEventListener('characteristicvaluechanged', onNotify);
+    log('info', 'Notifications started.');
+    setStatus('connected', 'on');
+    setConnected(true);
+    $('deviceInfo').style.display = 'block';
+    $('deviceInfo').textContent = `${device.name || 'Watch'} · ${device.id}`;
+
+    // Auto-fetch initial data
+    await sendCmd(buildSetTime());
+    await sleep(200);
+    await sendCmd(buildPacket(CMD.BATTERY));
+    await sleep(200);
+    await sendCmd(buildPacket(CMD.FIRMWARE));
+    await sleep(200);
+    await sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+    $('sync').textContent = new Date().toLocaleTimeString();
+  } catch (e) {
+    log('err', 'Connect failed: ' + e.message);
+    setStatus('error', 'err');
+  }
+}
+async function disconnect() {
+  try {
+    if (hrInterval) { clearInterval(hrInterval); hrInterval = null; }
+    if (device && device.gatt.connected) device.gatt.disconnect();
+  } catch (e) { log('err', e.message); }
+}
+function onDisconnected() {
+  log('info', 'Disconnected.');
+  setStatus('disconnected'); setConnected(false);
+  $('deviceInfo').style.display = 'none';
+  if (hrInterval) { clearInterval(hrInterval); hrInterval = null; }
+}
+async function sendCmd(packet) {
+  if (!writeChar) return;
+  log('out', '→ ' + hex(packet));
+  try { await writeChar.writeValueWithoutResponse(packet); }
+  catch { await writeChar.writeValue(packet); }
+}
+function onNotify(e) {
+  const data = new Uint8Array(e.target.value.buffer);
+  log('in', '← ' + hex(data));
+  parsePacket(data);
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ----- parsers -----
+function parsePacket(p) {
+  const id = p[0];
+  switch (id) {
+    case CMD.BATTERY: {
+      // payload byte 1 = battery %, byte 2 = charging flag
+      const pct = p[1];
+      $('battery').textContent = pct;
+      break;
+    }
+    case CMD.STEPS: {
+      // Step packets — varies by firmware. Common layout: bytes 3-5 = steps LE
+      const steps = p[3] | (p[4] << 8) | (p[5] << 16);
+      if (steps && steps < 1000000) $('steps').textContent = steps.toLocaleString();
+      const cal = (p[7] | (p[8] << 8)) / 10;
+      if (cal) $('cal').textContent = cal.toFixed(0);
+      const dist = (p[9] | (p[10] << 8));
+      if (dist) $('dist').textContent = dist.toLocaleString();
+      break;
+    }
+    case CMD.REAL_TIME_START: {
+      // p[1] = type (1=HR, 3=SpO2), p[2] = error code (0 = OK), p[3] = value
+      const type = p[1], err = p[2], value = p[3];
+      if (err !== 0) { log('err', `Measurement error (type=${type} code=${err})`); break; }
+      if (type === RT_TYPE.HEART_RATE && value > 0) $('hr').textContent = value;
+      if (type === RT_TYPE.SPO2 && value > 0) $('spo2').textContent = value;
+      break;
+    }
+    case CMD.FIRMWARE: {
+      // ASCII firmware string in bytes 1..14
+      const txt = new TextDecoder().decode(p.slice(1, 15)).replace(/\0+$/, '').trim();
+      if (txt) $('fw').textContent = txt;
+      break;
+    }
+    default:
+      // unknown / unhandled — already logged
+      break;
+  }
+}
+
+// ----- button wiring -----
+$('connectBtn').onclick = connect;
+$('disconnectBtn').onclick = disconnect;
+$('btnBattery').onclick = () => sendCmd(buildPacket(CMD.BATTERY));
+$('btnSteps').onclick   = () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+$('btnTime').onclick    = () => sendCmd(buildSetTime());
+$('btnReboot').onclick  = () => sendCmd(buildPacket(CMD.REBOOT, [1]));
+$('btnHrStart').onclick = async () => {
+  await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
+  // ring expects keep-alive ~every 2s for continuous reading
+  if (hrInterval) clearInterval(hrInterval);
+  hrInterval = setInterval(() => sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.CONTINUE)), 2000);
+};
+$('btnHrStop').onclick = async () => {
+  if (hrInterval) { clearInterval(hrInterval); hrInterval = null; }
+  await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.STOP));
+};
+$('btnSpo2Start').onclick = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.START));
+$('btnSpo2Stop').onclick  = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.STOP));
+
+// ----- env check -----
+if (!navigator.bluetooth) {
+  $('warn').style.display = 'block';
+  $('connectBtn').disabled = true;
+}
+log('info', 'Ready. Click "Connect Watch" to begin.');
+</script>
+</body>
+</html>
