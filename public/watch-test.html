@@ -591,6 +591,58 @@ function inferWatchMotionFromPacket(p, uuid) {
   }
 }
 
+// Scan a 16-byte packet for a monotonically-increasing step counter and lock onto it.
+// Shared across STEPS (0x15) responses AND the HR realtime stream (0x69) — many
+// QCBand firmwares embed live step count in HR notification bytes, so we don't
+// have to wait for a STEPS poll.
+function detectAndReadStepCounter(p, source = 'pkt') {
+  const now = performance.now();
+  // 3-byte LE candidates
+  for (let off = 1; off <= 12; off++) {
+    const v = p[off] | (p[off + 1] << 8) | (p[off + 2] << 16);
+    if (v < 0 || v > 200000) continue;
+    const key = `${source}:${off}:3`;
+    const st = watchStepFieldState.get(key) || { last: v, increases: 0, monotonic: true };
+    if (v > st.last) { st.increases++; }
+    else if (v < st.last - 8) { st.monotonic = false; }
+    st.last = v;
+    watchStepFieldState.set(key, st);
+  }
+  // 2-byte LE candidates
+  for (let off = 1; off <= 13; off++) {
+    const v = p[off] | (p[off + 1] << 8);
+    if (v < 0 || v > 60000) continue;
+    const key = `${source}:${off}:2`;
+    const st = watchStepFieldState.get(key) || { last: v, increases: 0, monotonic: true };
+    if (v > st.last) { st.increases++; }
+    else if (v < st.last - 8) { st.monotonic = false; }
+    st.last = v;
+    watchStepFieldState.set(key, st);
+  }
+  // Pick best locked field — most increases among monotonic fields for this source
+  const lockKey = `_stepFieldKey_${source}`;
+  let bestKey = court[lockKey] || null;
+  const bestSt = bestKey ? watchStepFieldState.get(bestKey) : null;
+  if (!bestKey || !bestSt || !bestSt.monotonic || bestSt.increases < 2) {
+    let bestScore = 1; // require at least 2 increases before locking
+    for (const [key, st] of watchStepFieldState.entries()) {
+      if (!key.startsWith(source + ':')) continue;
+      if (!st.monotonic) continue;
+      if (st.increases > bestScore) { bestScore = st.increases; bestKey = key; }
+    }
+    if (bestKey && bestKey !== court[lockKey]) {
+      court[lockKey] = bestKey;
+      log('info', `${source} step-field locked at ${bestKey} (auto-detected after ${bestScore} increases).`);
+    }
+  }
+  if (!bestKey) return null;
+  const parts = bestKey.split(':');
+  const off = +parts[1], size = +parts[2];
+  return size === 3
+    ? (p[off] | (p[off + 1] << 8) | (p[off + 2] << 16))
+    : (p[off] | (p[off + 1] << 8));
+}
+
 // ----- parsers -----
 function parsePacket(p) {
   const id = p[0];
