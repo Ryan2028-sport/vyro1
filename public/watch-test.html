@@ -575,11 +575,13 @@ function setCourtStatus(s, kind='') {
 function resetCourt() {
   court.steps = 0; court.explosive = 0; court.lunges = 0; court.peakG = 0;
   court.recent = []; court.lastStepMs = 0;
-  court.hrBaseline = null; court.hrPeak = 0;
+  court.hrPeak = 0;
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
   court.cadHist = []; court.hrHist = [];
   court.movements = 0; court.movingMs = 0; court.stillMs = 0;
   court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0;
+  court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
+  updateCourtPosition();
   $('cSteps').textContent = '0';
   $('cExp').textContent   = '0';
   $('cLunge').textContent = '0';
