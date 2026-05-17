@@ -478,6 +478,7 @@ function parsePacket(p) {
           else if (raw > 300)                  bpm = raw / 10;      // bpm*10
           else                                 bpm = raw;           // raw bpm
           if (bpm < 30 || bpm > 220) break;
+          if (court.running && court.source === 'watch') onWatchHr(Math.round(bpm));
 
         const now = Date.now();
         // Drop samples that arrive too fast (<400ms apart → likely duplicate frame)
@@ -928,24 +929,27 @@ function tickCourt() {
 
 async function startCourt() {
   resetCourt();
-  // Prefer the watch if it's connected and we have a writeChar for STEPS polling
-  if (device && device.gatt && device.gatt.connected && writeChar && protocol === 'qcband') {
+  // Use the connected watch first. QCBand gets active HR + step polling; standard
+  // HR / generic watches use the live notification stream we subscribed to.
+  if (device && device.gatt && device.gatt.connected) {
     court.source = 'watch';
     court.running = true;
     court.startMs = Date.now();
-    // Ensure HR stream is running too — adds HR-spike confirmation
-    await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
-    // Poll STEPS once a second
-    court.watchPollTimer = setInterval(
-      () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
-      500
-    );
+    if (writeChar && protocol === 'qcband') {
+      // Ensure HR stream is running too — adds HR-spike confirmation
+      await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
+      // Poll STEPS twice a second
+      court.watchPollTimer = setInterval(
+        () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
+        500
+      );
+    }
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
     setCourtStatus('watch · tracking', 'on');
-    log('info', 'Court tracking started — source: WATCH (step deltas + HR spikes). Watch is on back-left.');
+    log('info', `Court tracking started — source: WATCH (${protocol}). HR moves the dot live; step packets add jumps. Watch is on back-left.`);
     return;
   }
   // Fallback → phone IMU
