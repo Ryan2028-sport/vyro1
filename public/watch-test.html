@@ -248,6 +248,7 @@ const STD_MFR_NAME     = 0x2A29;
 let device = null, server = null, writeChar = null, notifyChar = null;
 let hrInterval = null;
 let protocol = null; // 'qcband' | 'standard-hr'
+let writeQueue = Promise.resolve();
 let hrSamples = []; // rolling buffer for median/avg smoothing
 let hrDisplayed = null; // EMA-smoothed displayed bpm
 let hrLastUpdate = 0;   // ms timestamp of last accepted sample
@@ -446,11 +447,16 @@ function onDisconnected() {
   $('deviceInfo').style.display = 'none';
   if (hrInterval) { clearInterval(hrInterval); hrInterval = null; }
 }
-async function sendCmd(packet) {
-  if (!writeChar) return;
-  log('out', '→ ' + hex(packet));
-  try { await writeChar.writeValueWithoutResponse(packet); }
-  catch { await writeChar.writeValue(packet); }
+function sendCmd(packet) {
+  if (!writeChar) return Promise.resolve();
+  const run = async () => {
+    if (!writeChar) return;
+    log('out', '→ ' + hex(packet));
+    try { await writeChar.writeValueWithoutResponse(packet); }
+    catch { await writeChar.writeValue(packet); }
+  };
+  writeQueue = writeQueue.then(run, run);
+  return writeQueue;
 }
 function onNotify(e) {
   const v = e.target.value;
@@ -466,6 +472,14 @@ function handleWatchPacket(p, uuid = 'watch') {
   court.lastWatchPacketMs = performance.now();
 
   const id = p[0];
+  if (id !== CMD.STEPS && id !== CMD.SPORTS_DATA && id !== CMD.DEVICE_NOTIFY && id !== CMD.REAL_TIME_START && id !== CMD.BATTERY && id !== CMD.FIRMWARE) {
+    const autoSteps = detectAutoStepCounter(p, uuid);
+    if (autoSteps != null) {
+      $('steps').textContent = autoSteps.toLocaleString();
+      onWatchSteps(autoSteps);
+      return;
+    }
+  }
   if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
     markWatchStreamAlive('HR packet live');
   } else if (id !== CMD.STEPS) {
@@ -484,50 +498,73 @@ function readField(p, offset, size, endian) {
   }
   return v >>> 0;
 }
-function readGenericStepTotal(p, uuid = 'watch') {
+function detectAutoStepCounter(p, uuid = 'watch') {
+  const now = performance.now();
+  const id = p[0] ?? 0;
+  const packetTag = `${uuid || 'watch'}:${id}:${p[1] ?? 0}`;
   const candidates = [];
+  const highConfidencePacket = id === CMD.STEPS || (id === CMD.DEVICE_NOTIFY && p[1] === 4);
   const add = (offset, size, endian, weight = 0) => {
-    if (offset < 0 || offset + size > p.length) return;
+    const checksumLimit = p.length === 16 ? 15 : p.length;
+    if (offset < 1 || offset + size > checksumLimit) return;
+    if (id === CMD.REAL_TIME_START && offset <= 7 && offset + size >= 6) return; // HR/RR bytes, not steps
     const v = readField(p, offset, size, endian);
-    if (Number.isFinite(v) && v > 0 && v < 1000000) candidates.push({ v, offset, size, endian, weight });
+    if (Number.isFinite(v) && v > 0 && v < 300000) candidates.push({ v, offset, size, endian, weight });
   };
-  // QCBand packets most often keep today's steps in bytes 3-5 LE, but other
-  // firmwares shift the counter or use big-endian. Track each possible field.
-  add(3, 3, 'le', 6); add(2, 3, 'le', 5); add(4, 3, 'le', 4);
-  for (let size of [2, 3, 4]) {
+
+  if (id === CMD.STEPS) {
+    add(1, 3, 'le', 120); add(3, 3, 'le', 95); add(2, 3, 'le', 80);
+    add(1, 2, 'le', 55); add(3, 2, 'le', 45);
+  } else if (id === CMD.DEVICE_NOTIFY && p[1] === 4) {
+    add(2, 3, 'le', 130); add(3, 3, 'le', 100); add(2, 2, 'le', 75); add(3, 2, 'le', 60);
+  }
+  for (const size of [2, 3, 4]) {
     for (let o = 1; o <= p.length - size; o++) {
       add(o, size, 'le', 0);
-      if (size > 1) add(o, size, 'be', 0);
+      if (size > 1) add(o, size, 'be', -8);
     }
   }
-  if (!candidates.length) return null;
 
   let best = null;
   for (const c of candidates) {
-    const key = packetFieldKey(uuid, c.offset, c.size, c.endian);
-    const prev = watchStepFieldState.get(key);
-    watchStepFieldState.set(key, { v: c.v, ms: performance.now(), hits: prev?.hits || 0 });
-    if (court.watchLastSteps != null) {
-      const d = c.v - court.watchLastSteps;
-      if (d > 0 && d <= 80) {
-        const score = 1000 - d + c.weight * 20 + (prev?.hits || 0) * 30;
-        if (!best || score > best.score) best = { ...c, score };
-      }
-    } else if (prev) {
-      const d = c.v - prev.v;
-      if (d > 0 && d <= 80) {
-        const score = 700 - d + c.weight * 20 + (prev.hits || 0) * 30;
-        if (!best || score > best.score) best = { ...c, score };
-      }
+    const key = `AUTO:${packetFieldKey(packetTag, c.offset, c.size, c.endian)}`;
+    const st = watchStepFieldState.get(key) || { last: c.v, increases: 0, seen: 0, suspicious: 0, monotonic: true, lastMs: now };
+    const delta = c.v - st.last;
+    const gap = now - (st.lastMs || now);
+    if (delta > 0 && delta <= 30 && gap >= 120 && st.monotonic) {
+      st.increases++;
+      st.lastPrev = st.last;
+      st.lastDelta = delta;
+      st.lastChangeMs = now;
+    } else if (delta < -40) {
+      st.monotonic = false;
+      st.suspicious += 2;
+    } else if (delta > 30 || (delta > 0 && gap < 120)) {
+      st.suspicious++;
+    }
+    st.last = c.v;
+    st.lastMs = now;
+    st.seen++;
+    watchStepFieldState.set(key, st);
+
+    const locked = court._autoStepFieldKey === key;
+    const canUse = locked || highConfidencePacket || (st.increases >= (id === CMD.REAL_TIME_START ? 4 : 2) && st.suspicious < 2);
+    if (delta > 0 && delta <= 30 && canUse) {
+      const score = c.weight + st.increases * 45 - st.suspicious * 80 - delta * 2;
+      if (!best || score > best.score) best = { ...c, key, prev: st.lastPrev, delta, score, increases: st.increases };
     }
   }
-  if (best) {
-    const key = packetFieldKey(uuid, best.offset, best.size, best.endian);
-    const s = watchStepFieldState.get(key);
-    watchStepFieldState.set(key, { ...s, hits: (s?.hits || 0) + 1 });
-    return best.v;
+
+  if (!best) return null;
+  if (!court._autoStepFieldKey || court._autoStepFieldKey !== best.key) {
+    court._autoStepFieldKey = best.key;
+    log('info', `Live step field locked: offset ${best.offset}, ${best.size}-byte ${best.endian}, Δ=${best.delta}.`);
   }
-  return null;
+  court._watchDetectedPrevSteps = best.prev;
+  court._watchDetectedDelta = best.delta;
+  court._watchDetectedSource = `AUTO-${id.toString(16)}`;
+  court.lastDetectedWatchSteps = best.v;
+  return best.v;
 }
 
 function updateDebugOverlay(source, moved, reason, m = {}) {
@@ -610,6 +647,8 @@ function detectAndReadStepCounter(p, source = 'pkt') {
   // Documented Colmi/QCBand layouts. These are exact fields, not guessed bytes.
   if (source === 'STEPS' && p[0] === CMD.STEPS) {
     const total = p[1] | (p[2] << 8) | (p[3] << 16);
+    const autoTotal = detectAutoStepCounter(p, 'steps-packet');
+    if (autoTotal != null && court._watchDetectedDelta > 0) return autoTotal;
     if (total >= 0 && total < 300000) {
       const prev = court._stepTotalToday;
       const delta = prev == null ? 0 : total - prev;
@@ -622,6 +661,8 @@ function detectAndReadStepCounter(p, source = 'pkt') {
     return null;
   }
   if (source === 'LIVE' && p[0] === CMD.DEVICE_NOTIFY && p[1] === 4) {
+    const autoTotal = detectAutoStepCounter(p, 'live-notify');
+    if (autoTotal != null && court._watchDetectedDelta > 0) return autoTotal;
     const candidates = [
       p[2] | (p[3] << 8) | (p[4] << 16),
       p[3] | (p[4] << 8) | (p[5] << 16),
@@ -929,6 +970,7 @@ const court = {
   restHr: null, idleCadFloor: 0,
   // watch polling
   watchPollTimer: null,
+  sportsPollTimer: null,
   watchBaseSteps: null, watchLastSteps: null, watchLastTickMs: 0,
   // visualization
   px: COURT_START.x, py: COURT_START.y,
@@ -972,6 +1014,7 @@ function resetCourt() {
   court.lastLiveMoveMs = 0; court.lastMotionVector = null; court.lastMotionScore = 0;
   court._watchDetectedPrevSteps = null; court._watchDetectedDelta = 0; court._watchDetectedSource = null; court.lastDetectedWatchSteps = null;
   court._stepTotalToday = null; court._liveNotifySteps = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
+  court._autoStepFieldKey = null;
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
@@ -1514,42 +1557,23 @@ async function startCourt() {
     court.source = 'watch';
     court.running = true;
     court.startMs = Date.now();
-    // 10-second arm-up: walk to the T. The dot snaps to the T and steps are
-    // ignored until the countdown ends, then every real watch step moves the dot.
-    court.armUntilMs = performance.now() + 10000;
+    // Start live immediately: the first packet is only a baseline, then every
+    // real step-counter increase moves the dot one court step.
+    court.armUntilMs = 0;
     court.px = COURT_T.x; court.py = COURT_T.y; court.trail = [];
     updateCourtPosition();
-    setCourtStatus('arming · walk to the T (10s)…', 'on');
-    if (court.armTimer) clearInterval(court.armTimer);
-    court.armTimer = setInterval(() => {
-      const left = Math.max(0, court.armUntilMs - performance.now());
-      if (left <= 0) {
-        clearInterval(court.armTimer); court.armTimer = null;
-        // Reset step baseline so steps taken during arm-up don't count.
-        court.watchBaseSteps = court.watchLastSteps;
-        court.steps = 0; $('cSteps').textContent = '0'; $('cDist').textContent = '0';
-        court.px = COURT_T.x; court.py = COURT_T.y; court.trail = [];
-        updateCourtPosition();
-        setCourtStatus('watch motion · live (move to track)', 'on');
-      } else {
-        setCourtStatus('arming · walk to the T (' + Math.ceil(left/1000) + 's)…', 'on');
-      }
-    }, 250);
+    setCourtStatus('watch motion · live (take a step)', 'on');
     if (writeChar && protocol === 'qcband') {
       await startHeartRateStream();
       await sendCmd(buildPacket(CMD.STEPS));
-      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
-      court.watchPollTimer = setInterval(
-        () => { sendCmd(buildPacket(CMD.STEPS)); setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120); },
-        700
-      );
+      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 180);
+      court.watchPollTimer = setInterval(() => sendCmd(buildPacket(CMD.STEPS)), 350);
+      court.sportsPollTimer = setInterval(() => sendCmd(buildSportsDataRequest(0)), 5000);
     } else if (writeChar) {
       await sendCmd(buildPacket(CMD.STEPS));
-      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
-      court.watchPollTimer = setInterval(() => {
-        sendCmd(buildPacket(CMD.STEPS));
-        setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
-      }, 700);
+      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 180);
+      court.watchPollTimer = setInterval(() => sendCmd(buildPacket(CMD.STEPS)), 350);
+      court.sportsPollTimer = setInterval(() => sendCmd(buildSportsDataRequest(0)), 5000);
     }
     // Watch mode must be step-counter gated. Do not attach the computer/phone IMU
     // here, because desk vibration or holding the phone still can create false steps.
@@ -1558,7 +1582,7 @@ async function startCourt() {
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    log('info', `Court tracking — 10s arm-up, then dot moves only when the watch step counter increases (${protocol}).`);
+    log('info', `Court tracking live — dot moves only when the watch step counter increases (${protocol}).`);
     return;
   }
   // Fallback → phone IMU only
@@ -1580,6 +1604,7 @@ function stopCourt() {
   if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
   if (court.tickTimer)      { clearInterval(court.tickTimer); court.tickTimer = null; }
   if (court.watchPollTimer) { clearInterval(court.watchPollTimer); court.watchPollTimer = null; }
+  if (court.sportsPollTimer) { clearInterval(court.sportsPollTimer); court.sportsPollTimer = null; }
   if (court.watchMotionAssistTimer) { clearInterval(court.watchMotionAssistTimer); court.watchMotionAssistTimer = null; }
   if (court.armTimer) { clearInterval(court.armTimer); court.armTimer = null; }
   court.armUntilMs = 0;
