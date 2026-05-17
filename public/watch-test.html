@@ -602,9 +602,61 @@ function parsePacket(p) {
       break;
     }
     case CMD.STEPS: {
-      // Step packets — varies by firmware. Common layout: bytes 3-5 = steps LE
-      const steps = p[3] | (p[4] << 8) | (p[5] << 16);
-      if (steps && steps < 1000000) {
+      // Step packets vary by firmware. Auto-detect the step counter by scanning
+      // plausible offsets and locking onto the one that monotonically increases
+      // when the user actually moves. Log every raw response for debugging.
+      const rawHex = hex(p);
+      if (!court._stepLogThrottle || performance.now() - court._stepLogThrottle > 1500) {
+        court._stepLogThrottle = performance.now();
+        log('info', `STEPS raw: ${rawHex}`);
+      }
+      const candidates = [];
+      // 3-byte little-endian counters at every offset 1..12
+      for (let off = 1; off <= 12; off++) {
+        const v = p[off] | (p[off + 1] << 8) | (p[off + 2] << 16);
+        if (v > 0 && v < 200000) candidates.push({ off, size: 3, v });
+      }
+      // 2-byte little-endian counters too (some firmwares use uint16)
+      for (let off = 1; off <= 13; off++) {
+        const v = p[off] | (p[off + 1] << 8);
+        if (v > 0 && v < 60000) candidates.push({ off, size: 2, v });
+      }
+      // Update field-state map and pick a locked offset
+      const now = performance.now();
+      for (const c of candidates) {
+        const key = `${c.off}:${c.size}`;
+        const st = watchStepFieldState.get(key) || { first: c.v, last: c.v, increases: 0, monotonic: true, lastChangeMs: 0 };
+        if (c.v > st.last) { st.increases++; st.lastChangeMs = now; }
+        else if (c.v < st.last - 5) { st.monotonic = false; }
+        st.last = c.v;
+        watchStepFieldState.set(key, st);
+      }
+      // Choose: monotonic field with the most increases (ties broken by smallest offset)
+      let bestKey = court._stepFieldKey || null;
+      if (!bestKey || !watchStepFieldState.get(bestKey)?.monotonic) {
+        let bestScore = -1;
+        for (const [key, st] of watchStepFieldState.entries()) {
+          if (!st.monotonic) continue;
+          const score = st.increases;
+          if (score > bestScore) { bestScore = score; bestKey = key; }
+        }
+        if (bestKey && bestKey !== court._stepFieldKey) {
+          court._stepFieldKey = bestKey;
+          log('info', `STEPS field locked at offset ${bestKey} (auto-detected).`);
+        }
+      }
+      let steps = 0;
+      if (bestKey) {
+        const [offStr, sizeStr] = bestKey.split(':');
+        const off = +offStr, size = +sizeStr;
+        steps = size === 3
+          ? (p[off] | (p[off + 1] << 8) | (p[off + 2] << 16))
+          : (p[off] | (p[off + 1] << 8));
+      } else {
+        // Fallback to old assumption while we wait for a movement to lock the field.
+        steps = p[3] | (p[4] << 8) | (p[5] << 16);
+      }
+      if (steps >= 0 && steps < 1000000) {
         $('steps').textContent = steps.toLocaleString();
         if (court.running && court.source === 'watch') onWatchSteps(steps);
       }
