@@ -713,6 +713,7 @@ const court = {
   px: COURT_START.x, py: COURT_START.y,
   trail: [],          // recent {x,y} for trail polyline
   liveMoveMs: 0, lastHrMs: 0, lastMoveMs: 0, lastHrValue: null, lastWatchMotionMs: 0,
+  lastWatchPacketMs: 0, watchMotionAssistTimer: null,
   // ui
   cadHist: [], hrHist: [], movements: 0, movingMs: 0, stillMs: 0,
   lastTickMs: 0, currentCad: 0, currentHr: 0,
@@ -745,7 +746,7 @@ function resetCourt() {
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
   court.cadHist = []; court.hrHist = [];
   court.movements = 0; court.movingMs = 0; court.stillMs = 0;
-  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0; court.lastMoveMs = 0; court.lastHrValue = null; court.lastWatchMotionMs = 0;
+  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0; court.lastMoveMs = 0; court.lastHrValue = null; court.lastWatchMotionMs = 0; court.lastWatchPacketMs = 0;
   court.lastLiveMoveMs = 0; court.lastMotionVector = null; court.lastMotionScore = 0;
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
