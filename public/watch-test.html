@@ -667,8 +667,14 @@ function onWatchSteps(totalSteps) {
 
   // cadence proxy via instantaneous rate
   const rate = deltaSteps / dt; // steps per second
-  // cadence in steps/min (rolling: assume rate held)
-  $('cCad').textContent = Math.round(rate * 60);
+  const cadSpm = Math.round(rate * 60);
+  court.currentCad = cadSpm;
+  $('cCad').textContent = cadSpm;
+  $('cadNow').textContent = cadSpm + ' spm';
+
+  // count discrete "movements" (each polling burst that contains steps)
+  court.movements++;
+  $('movements').textContent = court.movements;
 
   // explosive: rate ≥ 3 steps/sec → sprint cadence (~180 spm)
   // lunge burst: ≥ 5 steps/sec or single-burst with ≥ 4 steps in <1s window
@@ -686,13 +692,17 @@ function onWatchSteps(totalSteps) {
     court.peakG = gEst;
     $('cPeak').textContent = gEst.toFixed(2);
   }
+
+  // pulse the court diagram + update intensity color
+  pulseCourtDot();
+  updateCourtVisual();
 }
 function onWatchHr(bpm) {
-  // first ~6 readings establish baseline; subsequent +25 bpm spike = explosive moment
+  court.currentHr = bpm;
+  $('hrNow').textContent = bpm + ' bpm';
   if (court.hrBaseline == null) { court.hrBaseline = bpm; return; }
-  court.hrBaseline = court.hrBaseline * 0.95 + bpm * 0.05; // slow drift
+  court.hrBaseline = court.hrBaseline * 0.95 + bpm * 0.05;
   if (bpm > court.hrPeak) court.hrPeak = bpm;
-  // visible in intensity calc via baseline delta (see tickCourt)
 }
 
 function onMotion(e) {
