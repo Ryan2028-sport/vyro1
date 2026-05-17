@@ -1556,42 +1556,23 @@ async function startCourt() {
     court.source = 'watch';
     court.running = true;
     court.startMs = Date.now();
-    // 10-second arm-up: walk to the T. The dot snaps to the T and steps are
-    // ignored until the countdown ends, then every real watch step moves the dot.
-    court.armUntilMs = performance.now() + 10000;
+    // Start live immediately: the first packet is only a baseline, then every
+    // real step-counter increase moves the dot one court step.
+    court.armUntilMs = 0;
     court.px = COURT_T.x; court.py = COURT_T.y; court.trail = [];
     updateCourtPosition();
-    setCourtStatus('arming · walk to the T (10s)…', 'on');
-    if (court.armTimer) clearInterval(court.armTimer);
-    court.armTimer = setInterval(() => {
-      const left = Math.max(0, court.armUntilMs - performance.now());
-      if (left <= 0) {
-        clearInterval(court.armTimer); court.armTimer = null;
-        // Reset step baseline so steps taken during arm-up don't count.
-        court.watchBaseSteps = court.watchLastSteps;
-        court.steps = 0; $('cSteps').textContent = '0'; $('cDist').textContent = '0';
-        court.px = COURT_T.x; court.py = COURT_T.y; court.trail = [];
-        updateCourtPosition();
-        setCourtStatus('watch motion · live (move to track)', 'on');
-      } else {
-        setCourtStatus('arming · walk to the T (' + Math.ceil(left/1000) + 's)…', 'on');
-      }
-    }, 250);
+    setCourtStatus('watch motion · live (take a step)', 'on');
     if (writeChar && protocol === 'qcband') {
       await startHeartRateStream();
       await sendCmd(buildPacket(CMD.STEPS));
-      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
-      court.watchPollTimer = setInterval(
-        () => { sendCmd(buildPacket(CMD.STEPS)); setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120); },
-        700
-      );
+      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 180);
+      court.watchPollTimer = setInterval(() => sendCmd(buildPacket(CMD.STEPS)), 350);
+      court.sportsPollTimer = setInterval(() => sendCmd(buildSportsDataRequest(0)), 5000);
     } else if (writeChar) {
       await sendCmd(buildPacket(CMD.STEPS));
-      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
-      court.watchPollTimer = setInterval(() => {
-        sendCmd(buildPacket(CMD.STEPS));
-        setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
-      }, 700);
+      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 180);
+      court.watchPollTimer = setInterval(() => sendCmd(buildPacket(CMD.STEPS)), 350);
+      court.sportsPollTimer = setInterval(() => sendCmd(buildSportsDataRequest(0)), 5000);
     }
     // Watch mode must be step-counter gated. Do not attach the computer/phone IMU
     // here, because desk vibration or holding the phone still can create false steps.
@@ -1600,7 +1581,7 @@ async function startCourt() {
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    log('info', `Court tracking — 10s arm-up, then dot moves only when the watch step counter increases (${protocol}).`);
+    log('info', `Court tracking live — dot moves only when the watch step counter increases (${protocol}).`);
     return;
   }
   // Fallback → phone IMU only
