@@ -1044,7 +1044,6 @@ function onWatchHr(bpm) {
   court.currentHr = bpm;
   court.lastHrMs = now;
   court.lastHrValue = bpm;
-  if (prevHr != null && bpm >= prevHr + 1) court.lastMoveMs = court.lastHrMs;
   $('hrNow').textContent = bpm + ' bpm';
   if (court.calibrating) court.calHr.push(bpm);
   if (court.hrBaseline == null) { court.hrBaseline = bpm; return; }
