@@ -209,6 +209,7 @@ const CMD = {
   HEART_RATE_LOG:  0x15,           // historical HR log — not movement
   SPORTS_DATA:     0x43,           // daily sport intervals, exact steps at bytes 9..10
   STEPS:           0x48,           // today's sport total, exact 24-bit steps at bytes 1..3
+  DEVICE_NOTIFY:   0x73,           // live device notify; type 4 = steps
   REAL_TIME_START: 0x69,
   REAL_TIME_STOP:  0x6A,
   FIRMWARE:        0xa1,
@@ -620,6 +621,25 @@ function detectAndReadStepCounter(p, source = 'pkt') {
     }
     return null;
   }
+  if (source === 'LIVE' && p[0] === CMD.DEVICE_NOTIFY && p[1] === 4) {
+    const candidates = [
+      p[2] | (p[3] << 8) | (p[4] << 16),
+      p[3] | (p[4] << 8) | (p[5] << 16),
+      p[2] | (p[3] << 8),
+    ].filter(v => v >= 0 && v < 300000);
+    let best = null;
+    for (const total of candidates) {
+      const prev = court._liveNotifySteps;
+      const delta = prev == null ? 0 : total - prev;
+      if (prev == null || (delta >= 0 && delta <= 30)) { best = { total, prev, delta }; break; }
+    }
+    if (!best) return null;
+    court._liveNotifySteps = best.total;
+    court._watchDetectedPrevSteps = best.prev;
+    court._watchDetectedDelta = best.delta;
+    court.lastDetectedWatchSteps = best.total;
+    return best.total;
+  }
   if (source === 'SPORTS' && p[0] === CMD.SPORTS_DATA) {
     if (p[1] === 255) return null;
     if (p[1] === 240) { court._sportsBatch = { bySlot: new Map() }; return null; }
@@ -773,6 +793,16 @@ function parsePacket(p) {
       if (cal) $('cal').textContent = cal.toFixed(0);
       const dist = p[11] | (p[12] << 8);
       if (dist) $('dist').textContent = dist.toLocaleString();
+      break;
+    }
+    case CMD.DEVICE_NOTIFY: {
+      if (p[1] === 4) {
+        const steps = detectAndReadStepCounter(p, 'LIVE');
+        if (steps != null) {
+          $('steps').textContent = steps.toLocaleString();
+          if (court.running && court.source === 'watch') onWatchSteps(steps);
+        }
+      }
       break;
     }
     case CMD.REAL_TIME_START: {
@@ -935,12 +965,13 @@ function resetCourt() {
   court.recent = []; court.lastStepMs = 0;
   court.hrPeak = 0;
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
+  court.watchLastBySource = {};
   court.cadHist = []; court.hrHist = [];
   court.movements = 0; court.movingMs = 0; court.stillMs = 0;
   court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0; court.lastMoveMs = 0; court.lastHrValue = null; court.lastWatchMotionMs = 0; court.lastWatchPacketMs = 0;
   court.lastLiveMoveMs = 0; court.lastMotionVector = null; court.lastMotionScore = 0;
   court._watchDetectedPrevSteps = null; court._watchDetectedDelta = 0; court._watchDetectedSource = null; court.lastDetectedWatchSteps = null;
-  court._stepTotalToday = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
+  court._stepTotalToday = null; court._liveNotifySteps = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
@@ -1175,6 +1206,10 @@ function onWatchSteps(totalSteps) {
   const detectorDelta = court._watchDetectedDelta || 0;
   const detectorPrev = court._watchDetectedPrevSteps;
   const detectorSource = court._watchDetectedSource || 'watch';
+  const lastBySource = court.watchLastBySource || (court.watchLastBySource = {});
+  if (lastBySource[detectorSource] == null) {
+    lastBySource[detectorSource] = detectorPrev != null ? detectorPrev : totalSteps;
+  }
   if (court.watchBaseSteps == null) {
     // If the auto-detector just saw an increase, use the previous value as the
     // baseline so the first real step after arming is not swallowed as setup.
@@ -1185,15 +1220,17 @@ function onWatchSteps(totalSteps) {
     court.watchLastSteps = base;
     court.watchLastTickMs = now;
     court.watchLastChangeMs = now;
+    lastBySource[detectorSource] = totalSteps;
     if (!(detectorDelta > 0 && detectorPrev != null && !(court.armUntilMs && now < court.armUntilMs))) {
       updateDebugOverlay('watch', false, 'watch baseline set · total=' + totalSteps, { score: 0, changed: 0, gap: 0, uuid: 'watch-base' });
       return;
     }
   }
-  let deltaSteps = totalSteps - court.watchLastSteps;
+  let deltaSteps = totalSteps - lastBySource[detectorSource];
   if (detectorDelta > 0 && detectorDelta <= 30) deltaSteps = detectorDelta;
   // Arm-up: keep tracking baseline but ignore movement.
   if (court.armUntilMs && now < court.armUntilMs) {
+    lastBySource[detectorSource] = totalSteps;
     court.watchLastSteps = totalSteps;
     court.watchLastTickMs = now;
     if (deltaSteps > 0) court.watchLastChangeMs = now;
@@ -1209,6 +1246,7 @@ function onWatchSteps(totalSteps) {
   // watch firmware reports steps in bursts every 1-2s even though we poll faster.
   const lastChange = court.watchLastChangeMs || court.watchLastTickMs || now;
   const dt = Math.max(0.05, (now - lastChange) / 1000);
+  lastBySource[detectorSource] = totalSteps;
   court.watchLastSteps = totalSteps;
   court.watchLastTickMs = now;
   court.watchLastChangeMs = now;
@@ -1499,15 +1537,19 @@ async function startCourt() {
     }, 250);
     if (writeChar && protocol === 'qcband') {
       await startHeartRateStream();
+      await sendCmd(buildPacket(CMD.STEPS));
+      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
       court.watchPollTimer = setInterval(
         () => { sendCmd(buildPacket(CMD.STEPS)); setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120); },
-        1000
+        700
       );
     } else if (writeChar) {
+      await sendCmd(buildPacket(CMD.STEPS));
+      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
       court.watchPollTimer = setInterval(() => {
         sendCmd(buildPacket(CMD.STEPS));
         setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
-      }, 1000);
+      }, 700);
     }
     // Watch mode must be step-counter gated. Do not attach the computer/phone IMU
     // here, because desk vibration or holding the phone still can create false steps.
