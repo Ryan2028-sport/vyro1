@@ -353,12 +353,17 @@ function parsePacket(p) {
       // H59 Pro layout: p[1]=type (1=HR, 3=SpO2), p[2]=err/sub,
       // p[6..7] = sensor value, little-endian uint16 (bpm * 10).
       const type = p[1];
-      const raw = p[6] | (p[7] << 8);
-      if (raw === 0) break; // sensor still acquiring
-      if (type === RT_TYPE.HEART_RATE) {
-        // Sensor reports bpm*10. Sometimes firmware sends raw bpm; auto-detect.
-        let bpm = raw > 300 ? raw / 10 : raw;
-        if (bpm < 30 || bpm > 220) break; // discard impossible values
+        const raw = p[6] | (p[7] << 8);
+        if (raw === 0) break; // sensor still acquiring
+        if (type === RT_TYPE.HEART_RATE) {
+          // H59 Pro reports RR-interval in ms (time between beats).
+          // Convert to bpm: 60000 / RR_ms. Fallbacks for firmwares that send
+          // bpm directly or bpm*10.
+          let bpm;
+          if (raw >= 250 && raw <= 2000)       bpm = 60000 / raw;   // RR in ms
+          else if (raw > 300)                  bpm = raw / 10;      // bpm*10
+          else                                 bpm = raw;           // raw bpm
+          if (bpm < 30 || bpm > 220) break;
 
         // Rolling median filter to reject single-sample spikes/dropouts.
         hrSamples.push(bpm);
