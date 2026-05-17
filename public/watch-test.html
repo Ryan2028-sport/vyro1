@@ -530,7 +530,10 @@ function inferWatchMotionFromPacket(p, uuid) {
   const key = uuid || 'watch';
   const prev = watchPacketState.get(key);
   watchPacketState.set(key, { bytes: Array.from(p), ms: now });
-  if (!prev) return;
+  if (!prev) {
+    updateDebugOverlay('watch', false, 'first packet', { score: 0, changed: 0, gap: 0, uuid: key });
+    return;
+  }
 
   let changed = 0, score = 0;
   const len = Math.max(p.length, prev.bytes.length);
@@ -540,12 +543,15 @@ function inferWatchMotionFromPacket(p, uuid) {
     score += Math.min(32, d);
   }
   const gap = now - prev.ms;
-  if (gap < 40 || changed < 2 || score < 10) return;
+  if (gap < 40 || changed < 1 || score < 2) {
+    updateDebugOverlay('watch', false, gap < 40 ? `packet gap ${Math.round(gap)}ms` : `packet score<2`, { score, changed, gap, uuid: key });
+    return;
+  }
 
   court.lastMoveMs = now;
   const prevMotion = court.lastWatchMotionMs || 0;
   const motionGap = now - prevMotion;
-  const force = Math.min(1, 0.18 + score / 90);
+  const force = Math.min(1, 0.22 + score / 70);
   if (motionGap > 110) {
     court.lastWatchMotionMs = now;
     court.currentCad = Math.max(court.currentCad, Math.min(220, Math.round(60000 / Math.max(260, motionGap || 600))));
@@ -555,6 +561,9 @@ function inferWatchMotionFromPacket(p, uuid) {
     while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
     moveCourtDotLive(force);
     updateCourtVisual();
+    updateDebugOverlay('watch', true, 'WATCH LIVE PACKET', { score, changed, gap, uuid: key });
+  } else {
+    updateDebugOverlay('watch', false, `watch refractory ${Math.round(110 - motionGap)}ms`, { score, changed, gap, uuid: key });
   }
 }
 
