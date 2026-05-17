@@ -247,6 +247,7 @@ let hrSamples = []; // rolling buffer for median/avg smoothing
 let hrDisplayed = null; // EMA-smoothed displayed bpm
 let hrLastUpdate = 0;   // ms timestamp of last accepted sample
 const watchPacketState = new Map(); // per-characteristic packet deltas for live watch motion
+const watchStepFieldState = new Map(); // learns which bytes in watch packets are step totals
 
 // ----- UI helpers -----
 const $ = id => document.getElementById(id);
@@ -318,7 +319,8 @@ async function connect(filtered = false) {
           try {
             await c.startNotifications();
             c.addEventListener('characteristicvaluechanged', (e) => {
-              const data = new Uint8Array(e.target.value.buffer);
+              const v = e.target.value;
+              const data = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
               log('in', `← ${c.uuid.slice(4,8)}: ${hex(data)}`);
               if (isStdHr) {
                 try { onStdHr({ target: { value: e.target.value } }); } catch {}
@@ -435,7 +437,8 @@ async function sendCmd(packet) {
   catch { await writeChar.writeValue(packet); }
 }
 function onNotify(e) {
-  const data = new Uint8Array(e.target.value.buffer);
+  const v = e.target.value;
+  const data = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
   log('in', '← ' + hex(data));
   handleWatchPacket(data, 'manual');
 }
