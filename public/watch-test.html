@@ -728,12 +728,44 @@ function onMotion(e) {
 }
 function tickCourt() {
   if (!court.running) return;
-  $('cTime').textContent = fmtTime(Date.now() - court.startMs);
+  const now = Date.now();
+  $('cTime').textContent = fmtTime(now - court.startMs);
+  const dtMs = court.lastTickMs ? (now - court.lastTickMs) : 500;
+  court.lastTickMs = now;
+
   if (court.source === 'phone') {
-    const now = performance.now();
-    while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
-    $('cCad').textContent = court.recent.length * 6;
+    const pn = performance.now();
+    while (court.recent.length && court.recent[0] < pn - 10000) court.recent.shift();
+    court.currentCad = court.recent.length * 6;
+    $('cCad').textContent = court.currentCad;
+    $('cadNow').textContent = court.currentCad + ' spm';
+    updateCourtVisual();
+    if (court.recent.length) pulseCourtDot();
+  } else {
+    // watch source: decay cadence if no recent step packet
+    const stale = (performance.now() - (court.watchLastTickMs || 0)) > 2500;
+    if (stale) {
+      court.currentCad = Math.max(0, Math.round(court.currentCad * 0.6));
+      $('cCad').textContent = court.currentCad;
+      $('cadNow').textContent = court.currentCad + ' spm';
+      updateCourtVisual();
+    }
   }
+
+  // moving vs still
+  if (court.currentCad >= 20) court.movingMs += dtMs;
+  else                        court.stillMs  += dtMs;
+  $('movTime').textContent   = fmtTime(court.movingMs);
+  $('stillTime').textContent = fmtTime(court.stillMs);
+
+  // push to sparkline history (1 sample per tick = 0.5s; keep 120 = 60s)
+  court.cadHist.push(court.currentCad);
+  if (court.cadHist.length > 120) court.cadHist.shift();
+  court.hrHist.push(court.currentHr || 0);
+  if (court.hrHist.length > 120) court.hrHist.shift();
+  drawSpark('cadChart', court.cadHist, intensityColor(court.currentCad), 240);
+  drawSpark('hrChart',  court.hrHist,  '#ff6b6b', 200);
+
   const hrDelta = court.hrBaseline ? (court.hrPeak - court.hrBaseline) : 0;
   const intensity =
     (court.explosive >= 30 || hrDelta >= 40) ? 'High' :
