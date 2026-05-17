@@ -1575,14 +1575,32 @@ async function startCourt() {
       court.watchPollTimer = setInterval(() => sendCmd(buildPacket(CMD.STEPS)), 350);
       court.sportsPollTimer = setInterval(() => sendCmd(buildSportsDataRequest(0)), 5000);
     }
-    // Watch mode must be step-counter gated. Do not attach the computer/phone IMU
-    // here, because desk vibration or holding the phone still can create false steps.
-    startWatchMotionAssist();
+    // Cheap BLE watches (QCBand/Colmi/H59) only push step totals in 5–30s
+    // bursts — that is too laggy for per-footstep dot motion. When the user is
+    // on a phone, also attach the phone IMU so every footfall moves the dot
+    // instantly; the watch step counter then acts as periodic ground-truth
+    // (its totals overwrite session totals when it reports an increase).
+    const ua = navigator.userAgent || '';
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(ua) && ('ontouchstart' in window);
+    if (isMobile) {
+      const phoneOk = await attachPhoneMotion();
+      if (phoneOk) {
+        setCourtStatus('watch + phone motion · live', 'on');
+        log('info', `Court tracking live — phone IMU drives per-step dot, watch step counter syncs totals (${protocol}).`);
+      } else {
+        startWatchMotionAssist();
+        log('info', `Court tracking — watch only (phone motion permission denied). Dot updates when watch reports new steps.`);
+      }
+    } else {
+      // Desktop / no IMU: watch step counter is the only source. It will be
+      // bursty — that is a hardware limit of the watch, not a bug.
+      startWatchMotionAssist();
+      log('info', `Court tracking — watch only (desktop). Dot updates when watch reports new steps (typically every 5–30s).`);
+    }
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    log('info', `Court tracking live — dot moves only when the watch step counter increases (${protocol}).`);
     return;
   }
   // Fallback → phone IMU only
