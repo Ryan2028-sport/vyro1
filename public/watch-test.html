@@ -136,9 +136,20 @@ function buildSetTime(d = new Date()) {
 }
 function hex(buf) { return [...buf].map(b => b.toString(16).padStart(2, '0')).join(' '); }
 
+// Standard BLE GATT (used by HRM Dual, Polar H10, Wahoo, generic HRMs)
+const STD_HR_SERVICE   = 0x180D;
+const STD_HR_MEASURE   = 0x2A37;
+const STD_BODY_SENSOR  = 0x2A38;
+const STD_BATTERY_SVC  = 0x180F;
+const STD_BATTERY_LVL  = 0x2A19;
+const STD_DEVICE_INFO  = 0x180A;
+const STD_FW_REV       = 0x2A26;
+const STD_MFR_NAME     = 0x2A29;
+
 // ----- state -----
 let device = null, server = null, writeChar = null, notifyChar = null;
 let hrInterval = null;
+let protocol = null; // 'qcband' | 'standard-hr'
 
 // ----- UI helpers -----
 const $ = id => document.getElementById(id);
