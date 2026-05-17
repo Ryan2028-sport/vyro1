@@ -981,36 +981,45 @@ function onMotion(e) {
   const prev = court.lastMotionVector;
   const jerk = prev ? Math.sqrt((ax - prev.x)**2 + (ay - prev.y)**2 + (az - prev.z)**2) / 9.81 : 0;
   court.lastMotionVector = { x: ax, y: ay, z: az };
-  const motionScore = Math.max(dyn, jerk * 1.6);
-  court.lastMotionScore = court.lastMotionScore * 0.55 + motionScore * 0.45;
+  const motionScore = Math.max(dyn * 0.9, jerk * 1.9);
+  court.lastMotionScore = court.lastMotionScore * 0.62 + motionScore * 0.38;
   if (motionScore > court.peakG) {
     court.peakG = motionScore;
     $('cPeak').textContent = motionScore.toFixed(2);
   }
-  // Continuous sensitive movement: any real phone motion moves the green dot.
-  // Uses both gravity magnitude change and jerk, so walking with the phone in hand/pocket is detected.
-  if (!court.calibrating && court.lastMotionScore > MOTION_MOVE_THRESHOLD) {
+  // Step-accurate movement: each phone accel footfall counts one step and moves the dot once.
+  // If the phone reports a long smooth motion without distinct peaks, add slow fallback steps while moving.
+  if (!court.calibrating && court.lastMotionScore > PHONE_STEP_RELEASE) {
     court.lastMoveMs = now;
-    if ((now - (court.lastLiveMoveMs || 0)) > 70) {
-      court.lastLiveMoveMs = now;
-      const force = Math.min(1, 0.22 + court.lastMotionScore * 2.4);
-      court.currentCad = Math.max(court.currentCad, Math.min(180, Math.round(35 + force * 135)));
-      $('cCad').textContent = court.currentCad;
-      $('cadNow').textContent = court.currentCad + ' spm';
-      moveCourtDotLive(force);
-      updateCourtVisual();
-    }
+    if (!court.sustainedMotionStartMs) court.sustainedMotionStartMs = now;
+  } else {
+    court.stepArmed = true;
+    court.sustainedMotionStartMs = 0;
   }
-  if (motionScore >= 0.16 && (now - court.lastStepMs) >= REFRACTORY_MS) {
+
+  const peakStep = court.stepArmed && court.lastMotionScore >= THRESH_STEP;
+  const sustainedStep = court.sustainedMotionStartMs && court.lastMotionScore >= MOTION_MOVE_THRESHOLD && (now - court.lastStepMs) >= 560 && (now - court.sustainedMotionStartMs) >= 180;
+  if ((peakStep || sustainedStep) && (now - court.lastStepMs) >= REFRACTORY_MS) {
+    const force = Math.min(1, 0.24 + court.lastMotionScore * 2.8);
+    const lastGap = court.lastStepMs ? (now - court.lastStepMs) : 700;
     court.lastStepMs = now;
+    court.lastLiveMoveMs = now;
+    court.stepArmed = false;
     court.steps++;
     court.recent.push(now);
     while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
     if (motionScore >= THRESH_LUNGE) { court.lunges++; $('cLunge').textContent = court.lunges; }
     if (motionScore >= THRESH_EXP)   { court.explosive++; $('cExp').textContent = court.explosive; }
+    court.currentCad = Math.max(court.currentCad, Math.min(190, Math.round(60000 / Math.max(315, lastGap))));
     $('cSteps').textContent = court.steps;
     $('cDist').textContent = Math.round(court.steps * STRIDE_M);
-    if (!court.calibrating) { pulseCourtDot(1); updateCourtVisual(); }
+    $('cCad').textContent = court.currentCad;
+    $('cadNow').textContent = court.currentCad + ' spm';
+    takeCourtStep(force);
+    updateCourtVisual();
+  }
+  if (court.lastMotionScore < PHONE_STEP_RELEASE) {
+    court.stepArmed = true;
   }
 }
 async function attachPhoneMotion() {
