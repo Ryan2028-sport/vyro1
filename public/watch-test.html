@@ -591,6 +591,58 @@ function inferWatchMotionFromPacket(p, uuid) {
   }
 }
 
+// Scan a 16-byte packet for a monotonically-increasing step counter and lock onto it.
+// Shared across STEPS (0x15) responses AND the HR realtime stream (0x69) — many
+// QCBand firmwares embed live step count in HR notification bytes, so we don't
+// have to wait for a STEPS poll.
+function detectAndReadStepCounter(p, source = 'pkt') {
+  const now = performance.now();
+  // 3-byte LE candidates
+  for (let off = 1; off <= 12; off++) {
+    const v = p[off] | (p[off + 1] << 8) | (p[off + 2] << 16);
+    if (v < 0 || v > 200000) continue;
+    const key = `${source}:${off}:3`;
+    const st = watchStepFieldState.get(key) || { last: v, increases: 0, monotonic: true };
+    if (v > st.last) { st.increases++; }
+    else if (v < st.last - 8) { st.monotonic = false; }
+    st.last = v;
+    watchStepFieldState.set(key, st);
+  }
+  // 2-byte LE candidates
+  for (let off = 1; off <= 13; off++) {
+    const v = p[off] | (p[off + 1] << 8);
+    if (v < 0 || v > 60000) continue;
+    const key = `${source}:${off}:2`;
+    const st = watchStepFieldState.get(key) || { last: v, increases: 0, monotonic: true };
+    if (v > st.last) { st.increases++; }
+    else if (v < st.last - 8) { st.monotonic = false; }
+    st.last = v;
+    watchStepFieldState.set(key, st);
+  }
+  // Pick best locked field — most increases among monotonic fields for this source
+  const lockKey = `_stepFieldKey_${source}`;
+  let bestKey = court[lockKey] || null;
+  const bestSt = bestKey ? watchStepFieldState.get(bestKey) : null;
+  if (!bestKey || !bestSt || !bestSt.monotonic || bestSt.increases < 2) {
+    let bestScore = 1; // require at least 2 increases before locking
+    for (const [key, st] of watchStepFieldState.entries()) {
+      if (!key.startsWith(source + ':')) continue;
+      if (!st.monotonic) continue;
+      if (st.increases > bestScore) { bestScore = st.increases; bestKey = key; }
+    }
+    if (bestKey && bestKey !== court[lockKey]) {
+      court[lockKey] = bestKey;
+      log('info', `${source} step-field locked at ${bestKey} (auto-detected after ${bestScore} increases).`);
+    }
+  }
+  if (!bestKey) return null;
+  const parts = bestKey.split(':');
+  const off = +parts[1], size = +parts[2];
+  return size === 3
+    ? (p[off] | (p[off + 1] << 8) | (p[off + 2] << 16))
+    : (p[off] | (p[off + 1] << 8));
+}
+
 // ----- parsers -----
 function parsePacket(p) {
   const id = p[0];
@@ -602,61 +654,13 @@ function parsePacket(p) {
       break;
     }
     case CMD.STEPS: {
-      // Step packets vary by firmware. Auto-detect the step counter by scanning
-      // plausible offsets and locking onto the one that monotonically increases
-      // when the user actually moves. Log every raw response for debugging.
       const rawHex = hex(p);
       if (!court._stepLogThrottle || performance.now() - court._stepLogThrottle > 1500) {
         court._stepLogThrottle = performance.now();
         log('info', `STEPS raw: ${rawHex}`);
       }
-      const candidates = [];
-      // 3-byte little-endian counters at every offset 1..12
-      for (let off = 1; off <= 12; off++) {
-        const v = p[off] | (p[off + 1] << 8) | (p[off + 2] << 16);
-        if (v > 0 && v < 200000) candidates.push({ off, size: 3, v });
-      }
-      // 2-byte little-endian counters too (some firmwares use uint16)
-      for (let off = 1; off <= 13; off++) {
-        const v = p[off] | (p[off + 1] << 8);
-        if (v > 0 && v < 60000) candidates.push({ off, size: 2, v });
-      }
-      // Update field-state map and pick a locked offset
-      const now = performance.now();
-      for (const c of candidates) {
-        const key = `${c.off}:${c.size}`;
-        const st = watchStepFieldState.get(key) || { first: c.v, last: c.v, increases: 0, monotonic: true, lastChangeMs: 0 };
-        if (c.v > st.last) { st.increases++; st.lastChangeMs = now; }
-        else if (c.v < st.last - 5) { st.monotonic = false; }
-        st.last = c.v;
-        watchStepFieldState.set(key, st);
-      }
-      // Choose: monotonic field with the most increases (ties broken by smallest offset)
-      let bestKey = court._stepFieldKey || null;
-      if (!bestKey || !watchStepFieldState.get(bestKey)?.monotonic) {
-        let bestScore = -1;
-        for (const [key, st] of watchStepFieldState.entries()) {
-          if (!st.monotonic) continue;
-          const score = st.increases;
-          if (score > bestScore) { bestScore = score; bestKey = key; }
-        }
-        if (bestKey && bestKey !== court._stepFieldKey) {
-          court._stepFieldKey = bestKey;
-          log('info', `STEPS field locked at offset ${bestKey} (auto-detected).`);
-        }
-      }
-      let steps = 0;
-      if (bestKey) {
-        const [offStr, sizeStr] = bestKey.split(':');
-        const off = +offStr, size = +sizeStr;
-        steps = size === 3
-          ? (p[off] | (p[off + 1] << 8) | (p[off + 2] << 16))
-          : (p[off] | (p[off + 1] << 8));
-      } else {
-        // Fallback to old assumption while we wait for a movement to lock the field.
-        steps = p[3] | (p[4] << 8) | (p[5] << 16);
-      }
-      if (steps >= 0 && steps < 1000000) {
+      const steps = detectAndReadStepCounter(p, 'STEPS');
+      if (steps != null) {
         $('steps').textContent = steps.toLocaleString();
         if (court.running && court.source === 'watch') onWatchSteps(steps);
       }
@@ -670,6 +674,18 @@ function parsePacket(p) {
       // H59 Pro layout: p[1]=type (1=HR, 3=SpO2), p[2]=err/sub,
       // p[6..7] = sensor value, little-endian uint16 (bpm * 10).
       const type = p[1];
+      // Many firmwares also embed a live step counter in the HR-stream packet.
+      // Scan for it and feed it to the court tracker — works even if 0x15 STEPS is silent.
+      if (type === RT_TYPE.HEART_RATE) {
+        if (!court._hrLogThrottle || performance.now() - court._hrLogThrottle > 2000) {
+          court._hrLogThrottle = performance.now();
+          log('info', `HR raw: ${hex(p)}`);
+        }
+        const hrSteps = detectAndReadStepCounter(p, 'HR');
+        if (hrSteps != null && court.running && court.source === 'watch') {
+          onWatchSteps(hrSteps);
+        }
+      }
         const raw = p[6] | (p[7] << 8);
         if (raw === 0) break; // sensor still acquiring
         if (type === RT_TYPE.HEART_RATE) {
