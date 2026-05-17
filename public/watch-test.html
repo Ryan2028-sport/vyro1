@@ -1043,10 +1043,7 @@ function onWatchHr(bpm) {
   // Use HR only as an activity gate: actual dot steps still come from live
   // phone/watch motion so court movement happens when the athlete moves.
   if (court.running && court.source === 'watch' && prevHr != null) {
-    const rising = bpm >= prevHr + 1;
-    const phoneMotionFresh = (now - (court.lastLiveMoveMs || court.lastMoveMs || 0)) < 1200;
-    if (rising && phoneMotionFresh) court.lastMoveMs = now;
-    if (rising && !phoneMotionFresh) forceWatchCourtMove('RISING HR FALLBACK', 0.5);
+    updateDebugOverlay('watch', false, 'HR live · waiting for step change', { score: bpm, changed: bpm === prevHr ? 0 : 1, gap: now - (court.lastHrMs || now), uuid: 'watch-hr' });
   }
 }
 
