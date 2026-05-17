@@ -647,6 +647,8 @@ function detectAndReadStepCounter(p, source = 'pkt') {
   // Documented Colmi/QCBand layouts. These are exact fields, not guessed bytes.
   if (source === 'STEPS' && p[0] === CMD.STEPS) {
     const total = p[1] | (p[2] << 8) | (p[3] << 16);
+    const autoTotal = detectAutoStepCounter(p, 'steps-packet');
+    if (autoTotal != null && court._watchDetectedDelta > 0) return autoTotal;
     if (total >= 0 && total < 300000) {
       const prev = court._stepTotalToday;
       const delta = prev == null ? 0 : total - prev;
@@ -659,6 +661,8 @@ function detectAndReadStepCounter(p, source = 'pkt') {
     return null;
   }
   if (source === 'LIVE' && p[0] === CMD.DEVICE_NOTIFY && p[1] === 4) {
+    const autoTotal = detectAutoStepCounter(p, 'live-notify');
+    if (autoTotal != null && court._watchDetectedDelta > 0) return autoTotal;
     const candidates = [
       p[2] | (p[3] << 8) | (p[4] << 16),
       p[3] | (p[4] << 8) | (p[5] << 16),
@@ -1009,6 +1013,7 @@ function resetCourt() {
   court.lastLiveMoveMs = 0; court.lastMotionVector = null; court.lastMotionScore = 0;
   court._watchDetectedPrevSteps = null; court._watchDetectedDelta = 0; court._watchDetectedSource = null; court.lastDetectedWatchSteps = null;
   court._stepTotalToday = null; court._liveNotifySteps = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
+  court._autoStepFieldKey = null;
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
