@@ -359,14 +359,12 @@ async function connect(filtered = false) {
               const v = e.target.value;
               const data = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
               log('in', `← ${c.uuid.slice(4,8)} [${data.byteLength}B]: ${hex(data)}`);
+              // Feed the opcode/sensor probe accumulator with every notification.
+              probeRecord(c.uuid, data);
               if (isStdHr) {
                 try { onStdHr({ target: { value: e.target.value } }); } catch {}
               } else {
-                // 1) Try to parse as raw IMU (3-axis accel or 6-axis accel+gyro).
-                //    Watch motion chips (STK8321-W, LSM6DSO, BMI160…) emit fixed-width
-                //    int16 LE frames. We detect by ArrayBuffer byte length.
                 const imuConsumed = tryParseImuPacket(v, c.uuid);
-                // 2) Always also feed QCBand/vendor framed parser so HR/steps/etc still work.
                 handleWatchPacket(data, c.uuid);
                 if (imuConsumed) court.lastWatchPacketMs = performance.now();
               }
