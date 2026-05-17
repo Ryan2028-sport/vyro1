@@ -98,10 +98,61 @@
       <div class="stat"><div class="k">Court distance</div><div><span class="v" id="cDist">0</span><span class="u">m</span></div></div>
       <div class="stat"><div class="k">Intensity</div><div><span class="v" id="cInt" style="font-size:22px">—</span></div></div>
     </div>
+
+    <!-- Live visualization -->
+    <div style="margin-top:18px;display:grid;grid-template-columns:240px 1fr;gap:16px" id="liveViz">
+      <div style="background:#000;border:1px solid var(--border);border-radius:18px;padding:14px;display:flex;flex-direction:column;align-items:center;min-height:300px">
+        <div class="section-title" style="margin:0 0 10px;align-self:flex-start">Court · live</div>
+        <svg id="courtSvg" viewBox="0 0 200 280" style="width:100%;max-width:200px;flex:1">
+          <rect x="10" y="10" width="180" height="260" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+          <line x1="10" y1="180" x2="190" y2="180" stroke="rgba(255,255,255,0.18)"/>
+          <line x1="100" y1="180" x2="100" y2="270" stroke="rgba(255,255,255,0.18)"/>
+          <rect x="55" y="155" width="50" height="25" fill="none" stroke="rgba(255,255,255,0.18)"/>
+          <rect x="95" y="155" width="50" height="25" fill="none" stroke="rgba(255,255,255,0.18)"/>
+          <circle cx="100" cy="180" r="3" fill="rgba(255,255,255,0.4)"/>
+          <circle id="playerDot" cx="100" cy="195" r="10" fill="#39ff88"
+                  style="filter:drop-shadow(0 0 8px #39ff88);transition:r .3s,opacity .3s,fill .3s" opacity="0.5"/>
+          <circle id="playerPulse" cx="100" cy="195" r="14" fill="none" stroke="#39ff88" stroke-width="2" opacity="0"/>
+        </svg>
+        <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
+          dot color & glow = intensity<br/>pulse = step burst from watch
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="background:#000;border:1px solid var(--border);border-radius:18px;padding:12px">
+          <div class="row" style="justify-content:space-between;margin-bottom:6px">
+            <div class="section-title" style="margin:0">Cadence · steps/min (60s)</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)" id="cadNow">0 spm</div>
+          </div>
+          <canvas id="cadChart" width="600" height="90" style="width:100%;height:90px;display:block"></canvas>
+        </div>
+        <div style="background:#000;border:1px solid var(--border);border-radius:18px;padding:12px">
+          <div class="row" style="justify-content:space-between;margin-bottom:6px">
+            <div class="section-title" style="margin:0">Heart rate · bpm (60s)</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#ff6b6b" id="hrNow">— bpm</div>
+          </div>
+          <canvas id="hrChart" width="600" height="90" style="width:100%;height:90px;display:block"></canvas>
+        </div>
+        <div class="row" style="gap:12px">
+          <div style="flex:1;background:#000;border:1px solid var(--border);border-radius:14px;padding:10px 14px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Moving</div>
+            <div style="font-size:22px;font-weight:900" id="movTime">0:00</div>
+          </div>
+          <div style="flex:1;background:#000;border:1px solid var(--border);border-radius:14px;padding:10px 14px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Still on court</div>
+            <div style="font-size:22px;font-weight:900" id="stillTime">0:00</div>
+          </div>
+          <div style="flex:1;background:#000;border:1px solid var(--border);border-radius:14px;padding:10px 14px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Movements</div>
+            <div style="font-size:22px;font-weight:900" id="movements">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div style="margin-top:12px;color:var(--muted);font-size:12px;line-height:1.5">
-      Uses the phone's motion sensor (worn or pocketed) as a court-movement proxy.
-      A step is registered on each vertical accel peak; <span style="color:var(--accent)">explosive steps</span>
-      are peaks above 2.2g (push-offs, splits, lunges to the corners).
+      Live data is pulled from the connected watch (steps + HR). Cadence drives the
+      intensity color; the court diagram pulses on each step burst from the watch.
     </div>
   </div>
 
