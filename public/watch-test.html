@@ -919,9 +919,47 @@ function parsePacket(p) {
 }
 
 // ----- button wiring -----
-$('connectBtn').onclick = () => connect(false);
-$('connectFilteredBtn').onclick = () => connect(true);
+// IMPORTANT: DeviceMotionEvent.requestPermission() must be invoked from the
+// SAME synchronous user-gesture tick on iOS/iPadOS — by the time BLE connect
+// resolves and we call attachPhoneMotion() inside startCourt(), the gesture
+// chain is broken and permission is silently denied. So we pre-request motion
+// permission RIGHT HERE on the Connect tap, before doing any BLE work.
+async function requestMotionUpfront() {
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      const p = await DeviceMotionEvent.requestPermission();
+      court._motionPermission = p;
+      log('info', `Motion permission: ${p}`);
+      return p === 'granted';
+    }
+    // Android / desktop: no permission API, motion events flow by default if available.
+    court._motionPermission = 'granted-implicit';
+    return true;
+  } catch (e) {
+    court._motionPermission = 'error:' + (e && e.message);
+    log('err', 'Motion permission error: ' + (e && e.message));
+    return false;
+  }
+}
+$('connectBtn').onclick = async () => { await requestMotionUpfront(); connect(false); };
+$('connectFilteredBtn').onclick = async () => { await requestMotionUpfront(); connect(true); };
 $('disconnectBtn').onclick = disconnect;
+// Manual test step — verifies the dot/step pipeline regardless of sensors.
+// Tap this to confirm the court rendering works; if the dot moves here but
+// not from real steps, the problem is sensor input, not the visualisation.
+if (!document.getElementById('btnTestStep')) {
+  const tb = document.createElement('button');
+  tb.id = 'btnTestStep';
+  tb.textContent = '👣 Test step (debug)';
+  tb.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:99999;padding:10px 14px;background:#0a0;color:#fff;border:0;border-radius:8px;font:600 13px system-ui;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+  tb.onclick = () => {
+    if (!court.running) { log('err', 'Start court session first.'); return; }
+    forceWatchCourtMove('MANUAL TEST', 0.7);
+    log('info', 'Manual test step fired — if the dot moved, the pipeline is healthy.');
+  };
+  document.body.appendChild(tb);
+}
 $('btnBattery').onclick = () => sendCmd(buildPacket(CMD.BATTERY));
 $('btnSteps').onclick   = async () => { await sendCmd(buildPacket(CMD.STEPS)); await sleep(120); await sendCmd(buildSportsDataRequest(0)); };
 $('btnTime').onclick    = () => sendCmd(buildSetTime());
