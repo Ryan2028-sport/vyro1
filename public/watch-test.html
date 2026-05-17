@@ -371,7 +371,10 @@ function parsePacket(p) {
     case CMD.STEPS: {
       // Step packets — varies by firmware. Common layout: bytes 3-5 = steps LE
       const steps = p[3] | (p[4] << 8) | (p[5] << 16);
-      if (steps && steps < 1000000) $('steps').textContent = steps.toLocaleString();
+      if (steps && steps < 1000000) {
+        $('steps').textContent = steps.toLocaleString();
+        if (court.running && court.source === 'watch') onWatchSteps(steps);
+      }
       const cal = (p[7] | (p[8] << 8)) / 10;
       if (cal) $('cal').textContent = cal.toFixed(0);
       const dist = (p[9] | (p[10] << 8));
