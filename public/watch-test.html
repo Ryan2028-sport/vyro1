@@ -849,10 +849,31 @@ function tickCourt() {
     // watch source: decay cadence if no recent step packet
     const stale = (performance.now() - (court.watchLastTickMs || 0)) > 2500;
     if (stale) {
-      court.currentCad = Math.max(0, Math.round(court.currentCad * 0.6));
+      court.currentCad = Math.max(0, Math.round(court.currentCad * 0.7));
       $('cCad').textContent = court.currentCad;
       $('cadNow').textContent = court.currentCad + ' spm';
       updateCourtVisual();
+    }
+    // HR-driven motion fallback: many ring firmwares only push step totals
+    // every few seconds, so drive continuous drift from HR delta above rest.
+    // Each tick (0.5s) nudge the dot proportional to (HR - restHR).
+    if (!court.calibrating && court.currentHr) {
+      const rest = court.restHr || court.hrBaseline || 70;
+      const hrDelta = Math.max(0, court.currentHr - rest);
+      if (hrDelta >= 8) {
+        // 8 bpm above rest = light jog drift; 60+ = sprint-level drift
+        const intensity = Math.min(1, hrDelta / 60);
+        // synthetic cadence floor so visualization & sparkline reflect effort
+        const synthCad = Math.round(40 + intensity * 160);
+        if (synthCad > court.currentCad) {
+          court.currentCad = synthCad;
+          $('cCad').textContent = synthCad;
+          $('cadNow').textContent = synthCad + ' spm';
+        }
+        // pulse + drift the dot every tick
+        pulseCourtDot(0.4 + intensity * 2.5);
+        updateCourtVisual();
+      }
     }
   }
 
