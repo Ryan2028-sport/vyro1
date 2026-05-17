@@ -1075,6 +1075,7 @@ function resetCourt() {
   if (court._predictTimer) { clearInterval(court._predictTimer); court._predictTimer = null; }
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
+  imuState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
   updateCourtPosition();
   $('cSteps').textContent = '0';
