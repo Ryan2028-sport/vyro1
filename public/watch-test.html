@@ -359,7 +359,7 @@ function setConnected(on) {
   $('connectBtn').disabled = on;
   $('connectFilteredBtn').disabled = on;
   $('disconnectBtn').disabled = !on;
-  ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot','probeStart','probeMonitor','decTrigger0c']
+  ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot','probeStart','probeMonitor','decTrigger0c','motionLock']
     .forEach(id => $(id).disabled = !on);
 }
 
