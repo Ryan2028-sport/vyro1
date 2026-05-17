@@ -166,6 +166,37 @@
       </div>
     </div>
 
+    <!-- Calibration & Diagnostic Tool -->
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px" id="calibPanel">
+      <div style="background:#000;border:1px solid var(--border);border-radius:18px;padding:14px">
+        <div class="section-title" style="margin:0 0 10px">Sensor log · live X/Y/Z</div>
+        <div id="sensorWarn" style="display:none;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ff6b6b;background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.3);border-radius:8px;padding:6px 10px;margin-bottom:10px">⚠ no IMU stream — values frozen at 0</div>
+        <div id="sensorRows" style="display:flex;flex-direction:column;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px">
+          <div class="sRow" data-axis="x"></div>
+          <div class="sRow" data-axis="y"></div>
+          <div class="sRow" data-axis="z"></div>
+        </div>
+        <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)" id="sensorMeta">mode: — · rate: — Hz · last: —</div>
+      </div>
+      <div style="background:#000;border:1px solid var(--border);border-radius:18px;padding:14px">
+        <div class="section-title" style="margin:0 0 10px">Calibration</div>
+        <div id="calibPrompt" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);min-height:32px;line-height:1.5;margin-bottom:10px">Step 1 · stand still on the T, then tap Calibrate Center.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="ghost" id="calCenter">Calibrate Center</button>
+          <button class="ghost" id="calFront" disabled>Calibrate Front Wall</button>
+          <button class="ghost" id="calBack" disabled>Calibrate Back Wall</button>
+          <button class="ghost" id="calSides" disabled>Calibrate Sidewalls</button>
+        </div>
+        <div style="margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">
+          <div>C <span id="calVC" style="color:#39ff88">—</span></div>
+          <div>F <span id="calVF" style="color:#39ff88">—</span></div>
+          <div>B <span id="calVB" style="color:#39ff88">—</span></div>
+          <div>S <span id="calVS" style="color:#39ff88">—</span></div>
+        </div>
+        <button class="ghost" id="calReset" style="margin-top:10px;width:100%">Reset calibration</button>
+      </div>
+    </div>
+
     <div style="margin-top:12px;color:var(--muted);font-size:12px;line-height:1.5">
       Live data is pulled from the connected watch. The dot now moves from real motion packets
       when the watch exposes them, with step-count changes used only as backup.
@@ -1340,6 +1371,12 @@ function processImuSample(st, s, uuid) {
     log('info', `IMU ${uuid.slice(4,8)} calibrated · noise floor ≈ ${(st.noise*1000)|0}mg`);
   }
 
+  // Expose latest sample for the diagnostics card and calibration capture.
+  lastImuSample = { ax: s.ax, ay: s.ay, az: s.az, lx, ly, lz, mag, mode: st.mode, ms: now, uuid };
+  imuSampleCount++;
+  // Feed calibration capture if one is in progress.
+  if (courtCal.capturing) captureCalibrationSample(s, lx, ly, lz, mag);
+
   // Console-log the raw stream so the user can verify chip + values.
   if ((st.samples & 31) === 0) {
     console.log(`[IMU ${st.mode}] a=(${s.ax.toFixed(2)},${s.ay.toFixed(2)},${s.az.toFixed(2)})g`,
@@ -1349,11 +1386,50 @@ function processImuSample(st, s, uuid) {
 
   if (!st.locked || !court.running || court.source !== 'watch') return;
 
-  // 5) If above threshold → inject horizontal accel into velocity.
+  // 5) Movement scaling. If the user has calibrated peak thresholds for the
+  //    four court directions, use them to produce a normalized [0..1] push
+  //    along each calibrated axis. Otherwise fall back to the noise-floor
+  //    heuristic so something still moves before calibration.
+  const cal = courtCal;
+  if (cal.baseline && (cal.peaks.front || cal.peaks.back || cal.peaks.side)) {
+    // Re-center linear accel against the captured baseline gravity so we
+    // measure motion in the calibrated frame, not the drifting LPF frame.
+    const blx = s.ax - cal.baseline.x;
+    const bly = s.ay - cal.baseline.y;
+    const blz = s.az - cal.baseline.z;
+    const noise = Math.max(0.04, cal.baselineNoise || 0.04);
+    // Normalize per direction. Front = -ly, Back = +ly, Side = ±lx.
+    const frontN = cal.peaks.front ? Math.max(0, -bly - noise) / cal.peaks.front : 0;
+    const backN  = cal.peaks.back  ? Math.max(0,  bly - noise) / cal.peaks.back  : 0;
+    const sideN  = cal.peaks.side  ? (Math.abs(blx) > noise ? (blx > 0 ? 1 : -1) * (Math.abs(blx) - noise) / cal.peaks.side : 0) : 0;
+    const ACTIVATION = 0.35;
+    let pushed = false;
+    if (frontN > ACTIVATION) { st.vy -= Math.min(1.2, frontN) * 6; pushed = true; }
+    if (backN  > ACTIVATION) { st.vy += Math.min(1.2, backN)  * 6; pushed = true; }
+    if (Math.abs(sideN) > ACTIVATION) { st.vx += Math.max(-1.2, Math.min(1.2, sideN)) * 6; pushed = true; }
+    if (pushed) {
+      court.lastWatchMotionMs = now;
+      court.lastMotionScore = Math.max(frontN, backN, Math.abs(sideN));
+      const dirName = frontN > backN && frontN > Math.abs(sideN) ? 'FRONT' :
+                      backN  > Math.abs(sideN) ? 'BACK' : (sideN > 0 ? 'RIGHT' : 'LEFT');
+      // Trigger a step impulse on a strong spike (>1.0 normalized).
+      if (court.lastMotionScore > 1.0) {
+        forceWatchCourtMove(`IMU ${dirName} ${(court.lastMotionScore*100)|0}%`, Math.min(0.9, court.lastMotionScore * 0.6));
+      }
+      updateDebugOverlay('watch', true, `IMU ${dirName} · ${(court.lastMotionScore*100)|0}% of peak`,
+        { score: Math.round(court.lastMotionScore * 100), changed: 1, gap: dt*1000|0, uuid });
+    } else {
+      // Below threshold → fade velocity so the dot can drift back to T.
+      st.vx *= 0.7; st.vy *= 0.7;
+      if (Math.abs(st.vx) < 0.05) st.vx = 0;
+      if (Math.abs(st.vy) < 0.05) st.vy = 0;
+    }
+    return;
+  }
+
+  // Fallback (no calibration yet): noise-floor heuristic.
   const threshold = Math.max(0.06, st.noise * IMU_CFG.thresholdK);
   if (mag > threshold) {
-    // Project linear accel onto the horizontal plane (perpendicular to gravity).
-    // Simple approach: use lx as "side" and ly as "forward"; rotate by heading.
     const cos = Math.cos(st.heading), sin = Math.sin(st.heading);
     const hx = lx * cos - ly * sin;
     const hy = lx * sin + ly * cos;
@@ -1361,7 +1437,6 @@ function processImuSample(st, s, uuid) {
     st.vy += hy * dt * IMU_CFG.pxPerMps;
     court.lastWatchMotionMs = now;
     court.lastMotionScore = mag;
-    // Explosive movement on big accel spike → also count as a step impulse.
     if (mag > threshold * 2.5) {
       const impulse = Math.min(IMU_CFG.maxStepImpulse, (mag - threshold) * 0.8);
       forceWatchCourtMove(`IMU spike ${(mag*1000)|0}mg`, impulse);
@@ -1369,12 +1444,156 @@ function processImuSample(st, s, uuid) {
     updateDebugOverlay('watch', true, `IMU ${st.mode} · |a|=${(mag*1000)|0}mg`,
       { score: Math.round(mag*1000), changed: 1, gap: dt*1000|0, uuid });
   } else {
-    // Snap velocity to zero when fully quiet so the dot is rock-still.
     st.vx *= 0.6; st.vy *= 0.6;
     if (Math.abs(st.vx) < 0.05) st.vx = 0;
     if (Math.abs(st.vy) < 0.05) st.vy = 0;
   }
 }
+
+// ---- Calibration & diagnostics ----
+let lastImuSample = null;
+let imuSampleCount = 0;
+let imuRateHz = 0;
+const courtCal = {
+  baseline: null,      // {x,y,z} — captured average raw accel at rest
+  baselineNoise: 0,    // std-dev of |linear accel| during center capture
+  peaks: { front: 0, back: 0, side: 0 },
+  capturing: null,     // 'center' | 'front' | 'back' | 'sides' | null
+  capStartMs: 0,
+  capBuf: [],
+};
+function captureCalibrationSample(s, lx, ly, lz, mag) {
+  courtCal.capBuf.push({ ax: s.ax, ay: s.ay, az: s.az, lx, ly, lz, mag, t: performance.now() });
+}
+function beginCalibration(kind, durationMs, promptText) {
+  if (!lastImuSample) {
+    $('calibPrompt').textContent = '⚠ no IMU stream — connect the watch first';
+    return;
+  }
+  courtCal.capturing = kind;
+  courtCal.capStartMs = performance.now();
+  courtCal.capBuf = [];
+  $('calibPrompt').textContent = promptText;
+  ['calCenter','calFront','calBack','calSides'].forEach(id => $(id).disabled = true);
+  const t0 = performance.now();
+  const tick = setInterval(() => {
+    const elapsed = performance.now() - t0;
+    const sec = Math.max(0, Math.ceil((durationMs - elapsed) / 1000));
+    if (elapsed >= durationMs) {
+      clearInterval(tick);
+      finishCalibration(kind);
+    } else {
+      $('calibPrompt').textContent = `${promptText} (${sec}s)`;
+    }
+  }, 100);
+}
+function finishCalibration(kind) {
+  const buf = courtCal.capBuf;
+  courtCal.capturing = null;
+  if (!buf.length) {
+    $('calibPrompt').textContent = '⚠ no samples captured — is the IMU streaming?';
+    refreshCalibBtns();
+    return;
+  }
+  if (kind === 'center') {
+    const avg = buf.reduce((a, s) => { a.x += s.ax; a.y += s.ay; a.z += s.az; return a; },
+                          { x: 0, y: 0, z: 0 });
+    avg.x /= buf.length; avg.y /= buf.length; avg.z /= buf.length;
+    courtCal.baseline = avg;
+    // noise = mean |linear accel| measured against this baseline
+    const noise = buf.reduce((a, s) =>
+      a + Math.hypot(s.ax - avg.x, s.ay - avg.y, s.az - avg.z), 0) / buf.length;
+    courtCal.baselineNoise = noise;
+    $('calVC').textContent = `${(noise*1000)|0}mg`;
+    $('calibPrompt').textContent = 'Step 2 · take a hard lunge toward the FRONT wall, then tap Calibrate Front Wall.';
+  } else {
+    // Peak linear accel along the relevant axis, vs the captured baseline.
+    const bl = courtCal.baseline || { x: 0, y: 0, z: 0 };
+    let peak = 0;
+    for (const s of buf) {
+      const blx = s.ax - bl.x, bly = s.ay - bl.y;
+      if (kind === 'front') peak = Math.max(peak, Math.max(0, -bly));
+      if (kind === 'back')  peak = Math.max(peak, Math.max(0,  bly));
+      if (kind === 'sides') peak = Math.max(peak, Math.abs(blx));
+    }
+    // Floor so a weak/no-motion capture doesn't divide by ~0.
+    peak = Math.max(0.15, peak);
+    if (kind === 'front') { courtCal.peaks.front = peak; $('calVF').textContent = peak.toFixed(2) + 'g'; }
+    if (kind === 'back')  { courtCal.peaks.back  = peak; $('calVB').textContent = peak.toFixed(2) + 'g'; }
+    if (kind === 'sides') { courtCal.peaks.side  = peak; $('calVS').textContent = peak.toFixed(2) + 'g'; }
+    const next = !courtCal.peaks.front ? 'FRONT wall'
+              : !courtCal.peaks.back  ? 'BACK wall'
+              : !courtCal.peaks.side  ? 'a SIDEWALL'
+              : null;
+    $('calibPrompt').textContent = next
+      ? `Now tap Calibrate ${next} and lunge in that direction.`
+      : '✓ Calibration complete — dot will scale to your real lunges.';
+  }
+  refreshCalibBtns();
+}
+function refreshCalibBtns() {
+  $('calCenter').disabled = false;
+  const hasBase = !!courtCal.baseline;
+  $('calFront').disabled = !hasBase;
+  $('calBack').disabled  = !hasBase;
+  $('calSides').disabled = !hasBase;
+}
+function resetCalibration() {
+  courtCal.baseline = null; courtCal.baselineNoise = 0;
+  courtCal.peaks = { front: 0, back: 0, side: 0 };
+  ['calVC','calVF','calVB','calVS'].forEach(id => $(id).textContent = '—');
+  $('calibPrompt').textContent = 'Step 1 · stand still on the T, then tap Calibrate Center.';
+  refreshCalibBtns();
+}
+// Diagnostics tick — 10Hz refresh of the X/Y/Z bars + freshness warning.
+function renderSensorBar(axis, value, peak) {
+  const pct = Math.max(-1, Math.min(1, value / Math.max(0.05, peak || 1.2)));
+  const w = Math.abs(pct) * 50; // half-bar
+  const color = axis === 'x' ? '#ff8a3a' : axis === 'y' ? '#39ff88' : '#3aa3ff';
+  const left = pct < 0 ? (50 - w) : 50;
+  return `<div style="display:flex;align-items:center;gap:8px">
+    <span style="width:14px;color:var(--muted)">${axis.toUpperCase()}</span>
+    <div style="flex:1;position:relative;height:14px;background:rgba(255,255,255,0.05);border-radius:7px;overflow:hidden">
+      <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2)"></div>
+      <div style="position:absolute;top:2px;bottom:2px;left:${left}%;width:${w}%;background:${color};border-radius:5px;opacity:0.85"></div>
+    </div>
+    <span style="width:64px;text-align:right;color:${color}">${value >= 0 ? '+' : ''}${value.toFixed(2)}g</span>
+  </div>`;
+}
+let lastRateMs = performance.now(), lastRateCount = 0;
+setInterval(() => {
+  const rows = $('sensorRows'); if (!rows) return;
+  const s = lastImuSample;
+  const stale = !s || (performance.now() - s.ms) > 1500;
+  const warn = $('sensorWarn');
+  if (warn) warn.style.display = stale ? 'block' : 'none';
+  const ax = s ? s.ax : 0, ay = s ? s.ay : 0, az = s ? s.az : 0;
+  const peak = Math.max(1.2, courtCal.peaks.front, courtCal.peaks.back, courtCal.peaks.side);
+  rows.innerHTML = renderSensorBar('x', ax, peak) + renderSensorBar('y', ay, peak) + renderSensorBar('z', az, peak);
+  // rolling sample-rate estimate
+  const now = performance.now();
+  if (now - lastRateMs > 1000) {
+    imuRateHz = Math.round((imuSampleCount - lastRateCount) * 1000 / (now - lastRateMs));
+    lastRateMs = now; lastRateCount = imuSampleCount;
+  }
+  const meta = $('sensorMeta');
+  if (meta) {
+    const ago = s ? Math.round((performance.now() - s.ms)) : '—';
+    meta.textContent = `mode: ${s?.mode || '—'} · rate: ${imuRateHz} Hz · last: ${ago === '—' ? '—' : ago + 'ms'}`;
+  }
+}, 100);
+// Wire up buttons once the DOM is parsed (this script is at end of body).
+window.addEventListener('DOMContentLoaded', () => {
+  $('calCenter').onclick = () => beginCalibration('center', 3000,
+    'Hold the watch arm still on the T — capturing baseline…');
+  $('calFront').onclick = () => beginCalibration('front', 3000,
+    'Lunge HARD toward the FRONT wall a couple of times…');
+  $('calBack').onclick = () => beginCalibration('back', 3000,
+    'Lunge HARD toward the BACK wall a couple of times…');
+  $('calSides').onclick = () => beginCalibration('sides', 3000,
+    'Lunge HARD to the LEFT and RIGHT a couple of times…');
+  $('calReset').onclick = resetCalibration;
+});
 
 // 30Hz physics loop — drains velocity from any locked IMU source onto the dot.
 let imuTickTimer = null;
@@ -1390,9 +1609,19 @@ function startImuTick() {
       st.vy *= IMU_CFG.velocityDamp;
       active++;
     }
-    if (!active || (Math.abs(totalVx) < 0.05 && Math.abs(totalVy) < 0.05)) return;
-    let nx = court.px + totalVx / active;
-    let ny = court.py + totalVy / active;
+    let nx = court.px, ny = court.py;
+    const idle = (performance.now() - (court.lastWatchMotionMs || 0)) > 800;
+    if (active && (Math.abs(totalVx) >= 0.05 || Math.abs(totalVy) >= 0.05)) {
+      nx += totalVx / active;
+      ny += totalVy / active;
+    } else if (idle) {
+      // Drift smoothly back to the T when motion has fallen to baseline.
+      nx += (COURT_T.x - court.px) * 0.06;
+      ny += (COURT_T.y - court.py) * 0.06;
+      if (Math.hypot(nx - COURT_T.x, ny - COURT_T.y) < 0.4) { nx = COURT_T.x; ny = COURT_T.y; }
+    } else {
+      return;
+    }
     nx = Math.max(COURT_BOUNDS.xMin, Math.min(COURT_BOUNDS.xMax, nx));
     ny = Math.max(COURT_BOUNDS.yMin, Math.min(COURT_BOUNDS.yMax, ny));
     court.px = nx; court.py = ny;
