@@ -166,6 +166,37 @@
       </div>
     </div>
 
+    <!-- Calibration & Diagnostic Tool -->
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px" id="calibPanel">
+      <div style="background:#000;border:1px solid var(--border);border-radius:18px;padding:14px">
+        <div class="section-title" style="margin:0 0 10px">Sensor log · live X/Y/Z</div>
+        <div id="sensorWarn" style="display:none;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ff6b6b;background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.3);border-radius:8px;padding:6px 10px;margin-bottom:10px">⚠ no IMU stream — values frozen at 0</div>
+        <div id="sensorRows" style="display:flex;flex-direction:column;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px">
+          <div class="sRow" data-axis="x"></div>
+          <div class="sRow" data-axis="y"></div>
+          <div class="sRow" data-axis="z"></div>
+        </div>
+        <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)" id="sensorMeta">mode: — · rate: — Hz · last: —</div>
+      </div>
+      <div style="background:#000;border:1px solid var(--border);border-radius:18px;padding:14px">
+        <div class="section-title" style="margin:0 0 10px">Calibration</div>
+        <div id="calibPrompt" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);min-height:32px;line-height:1.5;margin-bottom:10px">Step 1 · stand still on the T, then tap Calibrate Center.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="ghost" id="calCenter">Calibrate Center</button>
+          <button class="ghost" id="calFront" disabled>Calibrate Front Wall</button>
+          <button class="ghost" id="calBack" disabled>Calibrate Back Wall</button>
+          <button class="ghost" id="calSides" disabled>Calibrate Sidewalls</button>
+        </div>
+        <div style="margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">
+          <div>C <span id="calVC" style="color:#39ff88">—</span></div>
+          <div>F <span id="calVF" style="color:#39ff88">—</span></div>
+          <div>B <span id="calVB" style="color:#39ff88">—</span></div>
+          <div>S <span id="calVS" style="color:#39ff88">—</span></div>
+        </div>
+        <button class="ghost" id="calReset" style="margin-top:10px;width:100%">Reset calibration</button>
+      </div>
+    </div>
+
     <div style="margin-top:12px;color:var(--muted);font-size:12px;line-height:1.5">
       Live data is pulled from the connected watch. The dot now moves from real motion packets
       when the watch exposes them, with step-count changes used only as backup.
