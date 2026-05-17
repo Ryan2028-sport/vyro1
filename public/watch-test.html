@@ -990,10 +990,10 @@ const THRESH_LUNGE = 0.72;      // hard lunge / sprint start
 const REFRACTORY_MS = 110;      // min gap between live dot moves; fast enough to follow walking
 
 // Court coordinate space (matches SVG viewBox 0 0 200 280)
-// Front glass is the top of the court drawing; tracking starts there when the phone is placed up front.
+// Tracking starts in the middle/T of the court so the dot is always visible immediately.
 const COURT_BOUNDS = { xMin: 25, xMax: 175, yMin: 30, yMax: 250 };
-const COURT_START  = { x: 100, y: 36 }; // front glass / front wall start position
 const COURT_T      = { x: 100, y: 180 };
+const COURT_START  = { x: COURT_T.x, y: COURT_T.y };
 const MOTION_MOVE_THRESHOLD = 0.018; // continuous movement: normal walking/phone sway moves the dot
 const PHONE_STEP_RELEASE = 0.014; // re-arm below this so each footfall becomes one dot step
 
@@ -1210,8 +1210,7 @@ function moveCourtDotLive(force = 0.5) {
 function forceWatchCourtMove(reason = 'WATCH STREAM FALLBACK', force = 0.42) {
   const now = performance.now();
   const gap = now - (court.lastStepMs || 0);
-  if (!court.running || court.source !== 'watch' || gap < 180) return false;
-  if (!/STEP/i.test(reason)) return false;
+  if (!court.running || gap < 180) return false;
   court.lastStepMs = now;
   court.lastMoveMs = now;
   court.lastWatchMotionMs = now;
@@ -1225,7 +1224,7 @@ function forceWatchCourtMove(reason = 'WATCH STREAM FALLBACK', force = 0.42) {
   $('cadNow').textContent = court.currentCad + ' spm';
   takeCourtStep(force);
   updateCourtVisual();
-  updateDebugOverlay('watch', true, reason, { score: Math.round(force * 100), changed: 1, gap, uuid: 'watch-assist' });
+  updateDebugOverlay(court.source || 'court', true, reason, { score: Math.round(force * 100), changed: 1, gap, uuid: 'manual-step' });
   return true;
 }
 function startWatchMotionAssist() {
