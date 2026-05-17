@@ -621,6 +621,25 @@ function detectAndReadStepCounter(p, source = 'pkt') {
     }
     return null;
   }
+  if (source === 'LIVE' && p[0] === CMD.DEVICE_NOTIFY && p[1] === 4) {
+    const candidates = [
+      p[2] | (p[3] << 8) | (p[4] << 16),
+      p[3] | (p[4] << 8) | (p[5] << 16),
+      p[2] | (p[3] << 8),
+    ].filter(v => v >= 0 && v < 300000);
+    let best = null;
+    for (const total of candidates) {
+      const prev = court._liveNotifySteps;
+      const delta = prev == null ? 0 : total - prev;
+      if (prev == null || (delta >= 0 && delta <= 30)) { best = { total, prev, delta }; break; }
+    }
+    if (!best) return null;
+    court._liveNotifySteps = best.total;
+    court._watchDetectedPrevSteps = best.prev;
+    court._watchDetectedDelta = best.delta;
+    court.lastDetectedWatchSteps = best.total;
+    return best.total;
+  }
   if (source === 'SPORTS' && p[0] === CMD.SPORTS_DATA) {
     if (p[1] === 255) return null;
     if (p[1] === 240) { court._sportsBatch = { bySlot: new Map() }; return null; }
