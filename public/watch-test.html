@@ -851,6 +851,15 @@ function onMotion(e) {
     court.peakG = dyn;
     $('cPeak').textContent = dyn.toFixed(2);
   }
+  // Continuous live drift driven by raw accel magnitude (any motion moves the dot)
+  if (!court.calibrating && dyn > 0.05) {
+    court.lastMoveMs = now;
+    if ((now - (court.lastLiveMoveMs || 0)) > 120) {
+      court.lastLiveMoveMs = now;
+      moveCourtDotLive(Math.min(1, 0.15 + dyn * 0.6));
+      updateCourtVisual();
+    }
+  }
   if (dyn >= THRESH_STEP && (now - court.lastStepMs) >= REFRACTORY_MS) {
     court.lastStepMs = now;
     court.steps++;
@@ -860,7 +869,22 @@ function onMotion(e) {
     if (dyn >= THRESH_EXP)   { court.explosive++; $('cExp').textContent = court.explosive; }
     $('cSteps').textContent = court.steps;
     $('cDist').textContent = Math.round(court.steps * STRIDE_M);
+    if (!court.calibrating) { pulseCourtDot(1); updateCourtVisual(); }
   }
+}
+async function attachPhoneMotion() {
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      const p = await DeviceMotionEvent.requestPermission();
+      if (p !== 'granted') return false;
+    }
+  } catch (e) { return false; }
+  if (!('DeviceMotionEvent' in window)) return false;
+  if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
+  court.motionHandler = onMotion;
+  window.addEventListener('devicemotion', court.motionHandler);
+  return true;
 }
 function tickCourt() {
   if (!court.running) return;
