@@ -1150,9 +1150,14 @@ async function attachPhoneMotion() {
     const since = performance.now() - (court.lastMotionEventMs || 0);
     if (since > 1500) {
       const sinceWatch = performance.now() - (court.lastWatchPacketMs || court.lastHrMs || 0);
-      if (court.source === 'watch' && sinceWatch < 2500) {
+      if (court.source === 'watch' && sinceWatch < 3000) {
         dbg.style.color = '#0f0';
-        dbg.textContent = `✓ WATCH STREAM LIVE\nphone IMU silent ${Math.round(since)}ms\nwatch packets fresh ${Math.round(sinceWatch)}ms\ndot uses watch fallback movement`;
+        dbg.textContent = `✓ WATCH STREAM LIVE (desktop / no phone IMU)\nwatch packets fresh ${Math.round(sinceWatch)}ms\nsteps:${court.steps}  hr:${court.currentHr||'–'}  cad:${court.currentCad}\ndot is driven by watch fallback`;
+        return;
+      }
+      if (court.source === 'watch') {
+        dbg.style.color = '#fb0';
+        dbg.textContent = `⚠ WATCH CONNECTED but no packets for ${Math.round(sinceWatch)}ms\nMove your wrist / check the watch is still paired.\nsteps:${court.steps}  hr:${court.currentHr||'–'}`;
         return;
       }
       dbg.style.color = '#f55';
