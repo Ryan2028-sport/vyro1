@@ -393,7 +393,11 @@ async function connect(filtered = false) {
       await sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
     }
     $('sync').textContent = new Date().toLocaleTimeString();
-    if (!court.running) startCourt();
+    if (court.running && court.source !== 'watch') {
+      log('info', 'Watch connected — switching court tracking from phone mode to watch mode.');
+      stopCourt();
+    }
+    if (!court.running) await startCourt();
   } catch (e) {
     const msg = e?.message || String(e);
     log('err', 'Connect failed: ' + msg);
