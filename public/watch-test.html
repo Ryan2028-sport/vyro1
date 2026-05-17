@@ -1073,7 +1073,23 @@ async function attachPhoneMotion() {
   if (!('DeviceMotionEvent' in window)) return false;
   if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
   court.motionHandler = onMotion;
-  window.addEventListener('devicemotion', court.motionHandler);
+  court.lastMotionEventMs = performance.now();
+  const wrapped = (e) => { court.lastMotionEventMs = performance.now(); onMotion(e); };
+  court.motionHandler = wrapped;
+  window.addEventListener('devicemotion', wrapped);
+  // Heartbeat: if no devicemotion events arrive, surface that in the overlay.
+  if (court.dbgHeartbeat) clearInterval(court.dbgHeartbeat);
+  court.dbgHeartbeat = setInterval(() => {
+    const dbg = document.getElementById('dbgOverlay'); if (!dbg) return;
+    const since = performance.now() - (court.lastMotionEventMs || 0);
+    if (since > 1500) {
+      dbg.style.color = '#f55';
+      dbg.textContent = `⚠ NO MOTION EVENTS for ${Math.round(since)}ms\n` +
+        `DeviceMotionEvent permission may be denied,\n` +
+        `or the page is not on https / not focused.\n` +
+        `Tap "Start court session" on your phone & allow motion.`;
+    }
+  }, 500);
   return true;
 }
 function tickCourt() {
