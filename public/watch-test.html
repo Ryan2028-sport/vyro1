@@ -484,50 +484,73 @@ function readField(p, offset, size, endian) {
   }
   return v >>> 0;
 }
-function readGenericStepTotal(p, uuid = 'watch') {
+function detectAutoStepCounter(p, uuid = 'watch') {
+  const now = performance.now();
+  const id = p[0] ?? 0;
+  const packetTag = `${uuid || 'watch'}:${id}:${p[1] ?? 0}`;
   const candidates = [];
+  const highConfidencePacket = id === CMD.STEPS || (id === CMD.DEVICE_NOTIFY && p[1] === 4);
   const add = (offset, size, endian, weight = 0) => {
-    if (offset < 0 || offset + size > p.length) return;
+    const checksumLimit = p.length === 16 ? 15 : p.length;
+    if (offset < 1 || offset + size > checksumLimit) return;
+    if (id === CMD.REAL_TIME_START && offset <= 7 && offset + size >= 6) return; // HR/RR bytes, not steps
     const v = readField(p, offset, size, endian);
-    if (Number.isFinite(v) && v > 0 && v < 1000000) candidates.push({ v, offset, size, endian, weight });
+    if (Number.isFinite(v) && v > 0 && v < 300000) candidates.push({ v, offset, size, endian, weight });
   };
-  // QCBand packets most often keep today's steps in bytes 3-5 LE, but other
-  // firmwares shift the counter or use big-endian. Track each possible field.
-  add(3, 3, 'le', 6); add(2, 3, 'le', 5); add(4, 3, 'le', 4);
-  for (let size of [2, 3, 4]) {
+
+  if (id === CMD.STEPS) {
+    add(1, 3, 'le', 120); add(3, 3, 'le', 95); add(2, 3, 'le', 80);
+    add(1, 2, 'le', 55); add(3, 2, 'le', 45);
+  } else if (id === CMD.DEVICE_NOTIFY && p[1] === 4) {
+    add(2, 3, 'le', 130); add(3, 3, 'le', 100); add(2, 2, 'le', 75); add(3, 2, 'le', 60);
+  }
+  for (const size of [2, 3, 4]) {
     for (let o = 1; o <= p.length - size; o++) {
       add(o, size, 'le', 0);
-      if (size > 1) add(o, size, 'be', 0);
+      if (size > 1) add(o, size, 'be', -8);
     }
   }
-  if (!candidates.length) return null;
 
   let best = null;
   for (const c of candidates) {
-    const key = packetFieldKey(uuid, c.offset, c.size, c.endian);
-    const prev = watchStepFieldState.get(key);
-    watchStepFieldState.set(key, { v: c.v, ms: performance.now(), hits: prev?.hits || 0 });
-    if (court.watchLastSteps != null) {
-      const d = c.v - court.watchLastSteps;
-      if (d > 0 && d <= 80) {
-        const score = 1000 - d + c.weight * 20 + (prev?.hits || 0) * 30;
-        if (!best || score > best.score) best = { ...c, score };
-      }
-    } else if (prev) {
-      const d = c.v - prev.v;
-      if (d > 0 && d <= 80) {
-        const score = 700 - d + c.weight * 20 + (prev.hits || 0) * 30;
-        if (!best || score > best.score) best = { ...c, score };
-      }
+    const key = `AUTO:${packetFieldKey(packetTag, c.offset, c.size, c.endian)}`;
+    const st = watchStepFieldState.get(key) || { last: c.v, increases: 0, seen: 0, suspicious: 0, monotonic: true, lastMs: now };
+    const delta = c.v - st.last;
+    const gap = now - (st.lastMs || now);
+    if (delta > 0 && delta <= 30 && gap >= 120 && st.monotonic) {
+      st.increases++;
+      st.lastPrev = st.last;
+      st.lastDelta = delta;
+      st.lastChangeMs = now;
+    } else if (delta < -40) {
+      st.monotonic = false;
+      st.suspicious += 2;
+    } else if (delta > 30 || (delta > 0 && gap < 120)) {
+      st.suspicious++;
+    }
+    st.last = c.v;
+    st.lastMs = now;
+    st.seen++;
+    watchStepFieldState.set(key, st);
+
+    const locked = court._autoStepFieldKey === key;
+    const canUse = locked || highConfidencePacket || (st.increases >= (id === CMD.REAL_TIME_START ? 4 : 2) && st.suspicious < 2);
+    if (delta > 0 && delta <= 30 && canUse) {
+      const score = c.weight + st.increases * 45 - st.suspicious * 80 - delta * 2;
+      if (!best || score > best.score) best = { ...c, key, prev: st.lastPrev, delta, score, increases: st.increases };
     }
   }
-  if (best) {
-    const key = packetFieldKey(uuid, best.offset, best.size, best.endian);
-    const s = watchStepFieldState.get(key);
-    watchStepFieldState.set(key, { ...s, hits: (s?.hits || 0) + 1 });
-    return best.v;
+
+  if (!best) return null;
+  if (!court._autoStepFieldKey || court._autoStepFieldKey !== best.key) {
+    court._autoStepFieldKey = best.key;
+    log('info', `Live step field locked: offset ${best.offset}, ${best.size}-byte ${best.endian}, Δ=${best.delta}.`);
   }
-  return null;
+  court._watchDetectedPrevSteps = best.prev;
+  court._watchDetectedDelta = best.delta;
+  court._watchDetectedSource = `AUTO-${id.toString(16)}`;
+  court.lastDetectedWatchSteps = best.v;
+  return best.v;
 }
 
 function updateDebugOverlay(source, moved, reason, m = {}) {
