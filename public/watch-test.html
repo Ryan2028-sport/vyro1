@@ -597,50 +597,92 @@ function inferWatchMotionFromPacket(p, uuid) {
 // have to wait for a STEPS poll.
 function detectAndReadStepCounter(p, source = 'pkt') {
   const now = performance.now();
-  // 3-byte LE candidates
-  for (let off = 1; off <= 12; off++) {
-    const v = p[off] | (p[off + 1] << 8) | (p[off + 2] << 16);
-    if (v < 0 || v > 200000) continue;
-    const key = `${source}:${off}:3`;
-    const st = watchStepFieldState.get(key) || { last: v, increases: 0, monotonic: true };
-    if (v > st.last) { st.increases++; }
-    else if (v < st.last - 8) { st.monotonic = false; }
-    st.last = v;
-    watchStepFieldState.set(key, st);
-  }
-  // 2-byte LE candidates
-  for (let off = 1; off <= 13; off++) {
-    const v = p[off] | (p[off + 1] << 8);
-    if (v < 0 || v > 60000) continue;
-    const key = `${source}:${off}:2`;
-    const st = watchStepFieldState.get(key) || { last: v, increases: 0, monotonic: true };
-    if (v > st.last) { st.increases++; }
-    else if (v < st.last - 8) { st.monotonic = false; }
-    st.last = v;
-    watchStepFieldState.set(key, st);
-  }
-  // Pick best locked field — most increases among monotonic fields for this source
   const lockKey = `_stepFieldKey_${source}`;
+  court._watchDetectedPrevSteps = null;
+  court._watchDetectedDelta = 0;
+  court._watchDetectedSource = source;
+
+  const read = (off, size) => size === 3
+    ? (p[off] | (p[off + 1] << 8) | (p[off + 2] << 16))
+    : (p[off] | (p[off + 1] << 8));
+  const fieldWeight = (off, size) => {
+    // Known QCBand layouts are preferred, but every offset is still tracked.
+    if (source === 'STEPS' && off === 3 && size === 3) return 80;
+    if (source === 'STEPS' && off === 2 && size === 3) return 55;
+    if (source === 'STEPS' && off === 4 && size === 3) return 45;
+    if (source === 'STEPS' && off === 3 && size === 2) return 35;
+    // In HR realtime packets bytes 6..7 are usually bpm/RR, not steps.
+    if (source === 'HR' && off === 6 && size === 2) return -120;
+    return 0;
+  };
+
+  let bestLive = null;
+  for (const size of [3, 2]) {
+    const maxOff = size === 3 ? 12 : 13;
+    for (let off = 1; off <= maxOff; off++) {
+      const v = read(off, size);
+      if (v < 0 || v > (size === 3 ? 200000 : 60000)) continue;
+      const key = `${source}:${off}:${size}`;
+      const st = watchStepFieldState.get(key) || { last: v, increases: 0, monotonic: true, seen: 0 };
+      const prev = st.last;
+      const delta = v - prev;
+      if (delta > 0 && delta <= 30) {
+        st.increases++;
+        st.lastPrev = prev;
+        st.lastDelta = delta;
+        st.lastChangeMs = now;
+      } else if (delta < -30) {
+        st.monotonic = false;
+      } else if (delta > 30) {
+        st.suspicious = (st.suspicious || 0) + 1;
+      }
+      st.last = v;
+      st.seen++;
+      watchStepFieldState.set(key, st);
+
+      const locked = court[lockKey] === key;
+      const liveStepChange = delta > 0 && delta <= 30 && st.monotonic;
+      // STEPS packets may be the only reliable signal, so use the first plausible
+      // increase. HR packets must prove monotonic first to avoid bpm masquerading as steps.
+      const canUseLive = source === 'STEPS' || locked || st.increases >= 2;
+      if (liveStepChange && canUseLive) {
+        const score = fieldWeight(off, size) + st.increases * 40 - delta - (st.suspicious || 0) * 20;
+        if (!bestLive || score > bestLive.score) bestLive = { key, v, prev, delta, score, increases: st.increases };
+      }
+    }
+  }
+
+  if (bestLive) {
+    if (!court[lockKey] && bestLive.increases >= 2) {
+      court[lockKey] = bestLive.key;
+      log('info', `${source} step-field locked at ${bestLive.key} (auto-detected after ${bestLive.increases} increases).`);
+    }
+    court._watchDetectedPrevSteps = bestLive.prev;
+    court._watchDetectedDelta = bestLive.delta;
+    court.lastDetectedWatchSteps = bestLive.v;
+    return bestLive.v;
+  }
+
   let bestKey = court[lockKey] || null;
   const bestSt = bestKey ? watchStepFieldState.get(bestKey) : null;
   if (!bestKey || !bestSt || !bestSt.monotonic || bestSt.increases < 2) {
-    let bestScore = 1; // require at least 2 increases before locking
+    let bestScore = 1;
     for (const [key, st] of watchStepFieldState.entries()) {
-      if (!key.startsWith(source + ':')) continue;
-      if (!st.monotonic) continue;
-      if (st.increases > bestScore) { bestScore = st.increases; bestKey = key; }
+      if (!key.startsWith(source + ':') || !st.monotonic || st.increases < 2) continue;
+      const [, offRaw, sizeRaw] = key.split(':');
+      const score = st.increases * 40 + fieldWeight(+offRaw, +sizeRaw) - (st.suspicious || 0) * 20;
+      if (score > bestScore) { bestScore = score; bestKey = key; }
     }
     if (bestKey && bestKey !== court[lockKey]) {
       court[lockKey] = bestKey;
-      log('info', `${source} step-field locked at ${bestKey} (auto-detected after ${bestScore} increases).`);
+      log('info', `${source} step-field locked at ${bestKey} (auto-detected).`);
     }
   }
   if (!bestKey) return null;
-  const parts = bestKey.split(':');
-  const off = +parts[1], size = +parts[2];
-  return size === 3
-    ? (p[off] | (p[off + 1] << 8) | (p[off + 2] << 16))
-    : (p[off] | (p[off + 1] << 8));
+  const [, offRaw, sizeRaw] = bestKey.split(':');
+  const v = read(+offRaw, +sizeRaw);
+  court.lastDetectedWatchSteps = v;
+  return v;
 }
 
 // ----- parsers -----
