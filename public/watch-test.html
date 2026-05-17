@@ -537,16 +537,30 @@ const THRESH_EXP  = 2.20;       // explosive push-off threshold (g)
 const THRESH_LUNGE = 2.80;      // hard lunge / sprint start
 const REFRACTORY_MS = 260;      // min gap between counted steps
 
+// Court coordinate space (matches SVG viewBox 0 0 200 280)
+// Back-left corner ≈ (45, 55); front-T ≈ (100, 180); back-right ≈ (155, 55)
+const COURT_BOUNDS = { xMin: 25, xMax: 175, yMin: 30, yMax: 250 };
+const COURT_START  = { x: 45, y: 55 }; // back-left where the watch is now
+const COURT_T      = { x: 100, y: 180 };
+
 const court = {
-  running: false, source: null, // 'watch' | 'phone'
+  running: false, source: null,
   startMs: 0, lastStepMs: 0,
   steps: 0, explosive: 0, lunges: 0, peakG: 0,
-  recent: [],                  // step timestamps for cadence (last 10s)
-  hrBaseline: null, hrPeak: 0, // for HR-spike detection on watch source
-  watchPollTimer: null,        // periodic STEPS query
-  watchBaseSteps: null,        // watch's step count at session start
-  watchLastSteps: null,
-  watchLastTickMs: 0,
+  recent: [],
+  hrBaseline: null, hrPeak: 0,
+  // calibration
+  calibrating: false, calStartMs: 0, calHr: [], calSteps: 0, calBase: null,
+  restHr: null, idleCadFloor: 0,
+  // watch polling
+  watchPollTimer: null,
+  watchBaseSteps: null, watchLastSteps: null, watchLastTickMs: 0,
+  // visualization
+  px: COURT_START.x, py: COURT_START.y,
+  trail: [],          // recent {x,y} for trail polyline
+  // ui
+  cadHist: [], hrHist: [], movements: 0, movingMs: 0, stillMs: 0,
+  lastTickMs: 0, currentCad: 0, currentHr: 0,
   tickTimer: null, motionHandler: null,
 };
 
