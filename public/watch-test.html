@@ -130,7 +130,7 @@
                   style="filter:drop-shadow(0 0 8px #39ff88);transition:cx .4s ease-out,cy .4s ease-out,r .3s,opacity .3s,fill .3s" opacity="0.7"/>
         </svg>
         <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
-          dot moves on each step burst from watch<br/>color & glow = current intensity
+          dot moves from live watch HR + step bursts<br/>color & glow = current intensity
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
@@ -166,8 +166,8 @@
     </div>
 
     <div style="margin-top:12px;color:var(--muted);font-size:12px;line-height:1.5">
-      Live data is pulled from the connected watch (steps + HR). Cadence drives the
-      intensity color; the court diagram pulses on each step burst from the watch.
+      Live data is pulled from the connected watch. Heart rate drives continuous movement;
+      step bursts add bigger jumps when the watch sends them.
     </div>
   </div>
 
@@ -412,6 +412,7 @@ function onStdHr(e) {
   $('hr').textContent = bpm;
   $('sync').textContent = new Date().toLocaleTimeString();
   log('in', `HR: ${bpm} bpm`);
+  if (court.running && court.source === 'watch') onWatchHr(bpm);
   // Energy expended + RR-intervals could be parsed here too
 }
 async function disconnect() {
