@@ -610,36 +610,41 @@ function detectAndReadStepCounter(p, source = 'pkt') {
   if (source === 'STEPS' && p[0] === CMD.STEPS) {
     const total = p[1] | (p[2] << 8) | (p[3] << 16);
     if (total >= 0 && total < 300000) {
-      const prev = court.lastDetectedWatchSteps;
+      const prev = court._stepTotalToday;
       const delta = prev == null ? 0 : total - prev;
-      if (delta >= 0 && delta <= 30) {
-        court._watchDetectedPrevSteps = prev;
-        court._watchDetectedDelta = delta;
-        court.lastDetectedWatchSteps = total;
-        return total;
-      }
+      court._stepTotalToday = total;
+      court._watchDetectedPrevSteps = prev;
+      court._watchDetectedDelta = delta >= 0 && delta <= 30 ? delta : 0;
+      court.lastDetectedWatchSteps = total;
+      return total;
     }
     return null;
   }
   if (source === 'SPORTS' && p[0] === CMD.SPORTS_DATA) {
+    if (p[1] === 255) return null;
+    if (p[1] === 240) { court._sportsBatch = { bySlot: new Map() }; return null; }
+    if (p[2] < 1 || p[2] > 12 || p[3] < 1 || p[3] > 31 || p[4] > 95) return null;
     const intervalSteps = p[9] | (p[10] << 8);
-    const key = 'SPORTS:9:2';
-    const st = watchStepFieldState.get(key) || { total: 0, bySlot: new Map() };
+    const batch = court._sportsBatch || { bySlot: new Map() };
     const slot = `${p[1]}-${p[2]}-${p[3]}-${p[4]}`;
-    const prior = st.bySlot.get(slot);
-    if (prior !== intervalSteps) {
-      st.bySlot.set(slot, intervalSteps);
-      st.total = [...st.bySlot.values()].reduce((sum, v) => sum + v, 0);
-    }
-    watchStepFieldState.set(key, st);
-    const prev = court.lastDetectedWatchSteps;
-    const delta = prev == null ? 0 : st.total - prev;
+    batch.bySlot.set(slot, intervalSteps);
+    court._sportsBatch = batch;
+    // Historical sports packets are replayed in batches. Only compare totals
+    // after the batch completes, otherwise old intervals look like new steps.
+    if (!(p[6] > 0 && p[5] === p[6] - 1)) return null;
+    const total = [...batch.bySlot.values()].reduce((sum, v) => sum + v, 0);
+    court._sportsBatch = { bySlot: new Map() };
+    const prev = court._sportsLastCompleteTotal;
+    const delta = prev == null ? 0 : total - prev;
+    court._sportsLastCompleteTotal = total;
     if (delta >= 0 && delta <= 30) {
       court._watchDetectedPrevSteps = prev;
       court._watchDetectedDelta = delta;
-      court.lastDetectedWatchSteps = st.total;
-      return st.total;
+      court.lastDetectedWatchSteps = total;
+      return total;
     }
+    court._watchDetectedDelta = 0;
+    court.lastDetectedWatchSteps = total;
     return null;
   }
 
