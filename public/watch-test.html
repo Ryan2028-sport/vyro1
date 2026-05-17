@@ -131,7 +131,7 @@
                   style="filter:drop-shadow(0 0 14px #39ff88);transition:cx .08s linear,cy .08s linear,r .18s,opacity .18s,fill .18s" opacity="1"/>
         </svg>
         <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
-          dot moves on step bursts + rising HR<br/>color & glow = current intensity
+          dot moves only on live motion / real steps<br/>color & glow = current intensity
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
@@ -167,8 +167,8 @@
     </div>
 
     <div style="margin-top:12px;color:var(--muted);font-size:12px;line-height:1.5">
-      Live data is pulled from the connected watch. Step bursts move the dot;
-      rising heart rate adds short live movement, then stops when you stand still.
+      Live data is pulled from the connected watch. The dot now moves from real motion packets
+      when the watch exposes them, with step-count changes used only as backup.
     </div>
   </div>
 
