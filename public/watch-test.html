@@ -1371,6 +1371,12 @@ function processImuSample(st, s, uuid) {
     log('info', `IMU ${uuid.slice(4,8)} calibrated · noise floor ≈ ${(st.noise*1000)|0}mg`);
   }
 
+  // Expose latest sample for the diagnostics card and calibration capture.
+  lastImuSample = { ax: s.ax, ay: s.ay, az: s.az, lx, ly, lz, mag, mode: st.mode, ms: now, uuid };
+  imuSampleCount++;
+  // Feed calibration capture if one is in progress.
+  if (courtCal.capturing) captureCalibrationSample(s, lx, ly, lz, mag);
+
   // Console-log the raw stream so the user can verify chip + values.
   if ((st.samples & 31) === 0) {
     console.log(`[IMU ${st.mode}] a=(${s.ax.toFixed(2)},${s.ay.toFixed(2)},${s.az.toFixed(2)})g`,
@@ -1380,11 +1386,50 @@ function processImuSample(st, s, uuid) {
 
   if (!st.locked || !court.running || court.source !== 'watch') return;
 
-  // 5) If above threshold → inject horizontal accel into velocity.
+  // 5) Movement scaling. If the user has calibrated peak thresholds for the
+  //    four court directions, use them to produce a normalized [0..1] push
+  //    along each calibrated axis. Otherwise fall back to the noise-floor
+  //    heuristic so something still moves before calibration.
+  const cal = courtCal;
+  if (cal.baseline && (cal.peaks.front || cal.peaks.back || cal.peaks.side)) {
+    // Re-center linear accel against the captured baseline gravity so we
+    // measure motion in the calibrated frame, not the drifting LPF frame.
+    const blx = s.ax - cal.baseline.x;
+    const bly = s.ay - cal.baseline.y;
+    const blz = s.az - cal.baseline.z;
+    const noise = Math.max(0.04, cal.baselineNoise || 0.04);
+    // Normalize per direction. Front = -ly, Back = +ly, Side = ±lx.
+    const frontN = cal.peaks.front ? Math.max(0, -bly - noise) / cal.peaks.front : 0;
+    const backN  = cal.peaks.back  ? Math.max(0,  bly - noise) / cal.peaks.back  : 0;
+    const sideN  = cal.peaks.side  ? (Math.abs(blx) > noise ? (blx > 0 ? 1 : -1) * (Math.abs(blx) - noise) / cal.peaks.side : 0) : 0;
+    const ACTIVATION = 0.35;
+    let pushed = false;
+    if (frontN > ACTIVATION) { st.vy -= Math.min(1.2, frontN) * 6; pushed = true; }
+    if (backN  > ACTIVATION) { st.vy += Math.min(1.2, backN)  * 6; pushed = true; }
+    if (Math.abs(sideN) > ACTIVATION) { st.vx += Math.max(-1.2, Math.min(1.2, sideN)) * 6; pushed = true; }
+    if (pushed) {
+      court.lastWatchMotionMs = now;
+      court.lastMotionScore = Math.max(frontN, backN, Math.abs(sideN));
+      const dirName = frontN > backN && frontN > Math.abs(sideN) ? 'FRONT' :
+                      backN  > Math.abs(sideN) ? 'BACK' : (sideN > 0 ? 'RIGHT' : 'LEFT');
+      // Trigger a step impulse on a strong spike (>1.0 normalized).
+      if (court.lastMotionScore > 1.0) {
+        forceWatchCourtMove(`IMU ${dirName} ${(court.lastMotionScore*100)|0}%`, Math.min(0.9, court.lastMotionScore * 0.6));
+      }
+      updateDebugOverlay('watch', true, `IMU ${dirName} · ${(court.lastMotionScore*100)|0}% of peak`,
+        { score: Math.round(court.lastMotionScore * 100), changed: 1, gap: dt*1000|0, uuid });
+    } else {
+      // Below threshold → fade velocity so the dot can drift back to T.
+      st.vx *= 0.7; st.vy *= 0.7;
+      if (Math.abs(st.vx) < 0.05) st.vx = 0;
+      if (Math.abs(st.vy) < 0.05) st.vy = 0;
+    }
+    return;
+  }
+
+  // Fallback (no calibration yet): noise-floor heuristic.
   const threshold = Math.max(0.06, st.noise * IMU_CFG.thresholdK);
   if (mag > threshold) {
-    // Project linear accel onto the horizontal plane (perpendicular to gravity).
-    // Simple approach: use lx as "side" and ly as "forward"; rotate by heading.
     const cos = Math.cos(st.heading), sin = Math.sin(st.heading);
     const hx = lx * cos - ly * sin;
     const hy = lx * sin + ly * cos;
@@ -1392,7 +1437,6 @@ function processImuSample(st, s, uuid) {
     st.vy += hy * dt * IMU_CFG.pxPerMps;
     court.lastWatchMotionMs = now;
     court.lastMotionScore = mag;
-    // Explosive movement on big accel spike → also count as a step impulse.
     if (mag > threshold * 2.5) {
       const impulse = Math.min(IMU_CFG.maxStepImpulse, (mag - threshold) * 0.8);
       forceWatchCourtMove(`IMU spike ${(mag*1000)|0}mg`, impulse);
@@ -1400,7 +1444,6 @@ function processImuSample(st, s, uuid) {
     updateDebugOverlay('watch', true, `IMU ${st.mode} · |a|=${(mag*1000)|0}mg`,
       { score: Math.round(mag*1000), changed: 1, gap: dt*1000|0, uuid });
   } else {
-    // Snap velocity to zero when fully quiet so the dot is rock-still.
     st.vx *= 0.6; st.vy *= 0.6;
     if (Math.abs(st.vx) < 0.05) st.vx = 0;
     if (Math.abs(st.vy) < 0.05) st.vy = 0;
