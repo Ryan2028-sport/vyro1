@@ -84,6 +84,7 @@
       <div class="row">
         <button id="courtStart" class="cta">Start court tracking</button>
         <button id="courtStop" class="ghost" disabled>Stop</button>
+        <button id="courtCal" class="ghost" disabled>Calibrate (10s)</button>
         <button id="courtReset" class="ghost">Reset</button>
       </div>
       <div id="courtStatus" class="status"><span class="dot"></span><span id="courtStatusText">idle</span></div>
@@ -109,13 +110,17 @@
           <line x1="100" y1="180" x2="100" y2="270" stroke="rgba(255,255,255,0.18)"/>
           <rect x="55" y="155" width="50" height="25" fill="none" stroke="rgba(255,255,255,0.18)"/>
           <rect x="95" y="155" width="50" height="25" fill="none" stroke="rgba(255,255,255,0.18)"/>
+          <text x="14" y="22" font-size="8" fill="rgba(255,255,255,0.35)" font-family="JetBrains Mono">FRONT</text>
+          <text x="14" y="266" font-size="8" fill="rgba(255,255,255,0.35)" font-family="JetBrains Mono">BACK</text>
+          <text x="14" y="56" font-size="7" fill="rgba(255,255,255,0.25)" font-family="JetBrains Mono">BACK-L</text>
           <circle cx="100" cy="180" r="3" fill="rgba(255,255,255,0.4)"/>
-          <circle id="playerDot" cx="100" cy="195" r="10" fill="#39ff88"
-                  style="filter:drop-shadow(0 0 8px #39ff88);transition:r .3s,opacity .3s,fill .3s" opacity="0.5"/>
-          <circle id="playerPulse" cx="100" cy="195" r="14" fill="none" stroke="#39ff88" stroke-width="2" opacity="0"/>
+          <polyline id="playerTrail" fill="none" stroke="#39ff88" stroke-width="1.5" opacity="0.4" stroke-linecap="round" stroke-linejoin="round" points=""/>
+          <circle id="playerPulse" cx="45" cy="55" r="14" fill="none" stroke="#39ff88" stroke-width="2" opacity="0"/>
+          <circle id="playerDot" cx="45" cy="55" r="10" fill="#39ff88"
+                  style="filter:drop-shadow(0 0 8px #39ff88);transition:cx .4s ease-out,cy .4s ease-out,r .3s,opacity .3s,fill .3s" opacity="0.7"/>
         </svg>
         <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
-          dot color & glow = intensity<br/>pulse = step burst from watch
+          dot moves on each step burst from watch<br/>color & glow = current intensity
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
@@ -532,16 +537,30 @@ const THRESH_EXP  = 2.20;       // explosive push-off threshold (g)
 const THRESH_LUNGE = 2.80;      // hard lunge / sprint start
 const REFRACTORY_MS = 260;      // min gap between counted steps
 
+// Court coordinate space (matches SVG viewBox 0 0 200 280)
+// Back-left corner ≈ (45, 55); front-T ≈ (100, 180); back-right ≈ (155, 55)
+const COURT_BOUNDS = { xMin: 25, xMax: 175, yMin: 30, yMax: 250 };
+const COURT_START  = { x: 45, y: 55 }; // back-left where the watch is now
+const COURT_T      = { x: 100, y: 180 };
+
 const court = {
-  running: false, source: null, // 'watch' | 'phone'
+  running: false, source: null,
   startMs: 0, lastStepMs: 0,
   steps: 0, explosive: 0, lunges: 0, peakG: 0,
-  recent: [],                  // step timestamps for cadence (last 10s)
-  hrBaseline: null, hrPeak: 0, // for HR-spike detection on watch source
-  watchPollTimer: null,        // periodic STEPS query
-  watchBaseSteps: null,        // watch's step count at session start
-  watchLastSteps: null,
-  watchLastTickMs: 0,
+  recent: [],
+  hrBaseline: null, hrPeak: 0,
+  // calibration
+  calibrating: false, calStartMs: 0, calHr: [], calSteps: 0, calBase: null,
+  restHr: null, idleCadFloor: 0,
+  // watch polling
+  watchPollTimer: null,
+  watchBaseSteps: null, watchLastSteps: null, watchLastTickMs: 0,
+  // visualization
+  px: COURT_START.x, py: COURT_START.y,
+  trail: [],          // recent {x,y} for trail polyline
+  // ui
+  cadHist: [], hrHist: [], movements: 0, movingMs: 0, stillMs: 0,
+  lastTickMs: 0, currentCad: 0, currentHr: 0,
   tickTimer: null, motionHandler: null,
 };
 
@@ -556,11 +575,13 @@ function setCourtStatus(s, kind='') {
 function resetCourt() {
   court.steps = 0; court.explosive = 0; court.lunges = 0; court.peakG = 0;
   court.recent = []; court.lastStepMs = 0;
-  court.hrBaseline = null; court.hrPeak = 0;
+  court.hrPeak = 0;
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
   court.cadHist = []; court.hrHist = [];
   court.movements = 0; court.movingMs = 0; court.stillMs = 0;
   court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0;
+  court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
+  updateCourtPosition();
   $('cSteps').textContent = '0';
   $('cExp').textContent   = '0';
   $('cLunge').textContent = '0';
@@ -626,13 +647,38 @@ function intensityColor(cad) {
   if (cad < 180) return '#ffb347';
   return '#ff6b6b';
 }
-function pulseCourtDot() {
+function pulseCourtDot(deltaSteps = 1) {
   const pulse = $('playerPulse'); if (!pulse) return;
+  // sync pulse to current position before animating
+  pulse.setAttribute('cx', court.px); pulse.setAttribute('cy', court.py);
   pulse.setAttribute('r', '14'); pulse.setAttribute('opacity', '0.9');
   pulse.animate(
     [{ r: 14, opacity: 0.9 }, { r: 36, opacity: 0 }],
     { duration: 700, easing: 'ease-out' }
   );
+  // Move the dot a distance proportional to step burst (each step ≈ STRIDE_M, ~1m on
+  // an 9.75×6.4m squash court). Direction is random with mild bias back toward T,
+  // so the player wanders around the court realistically.
+  const meters = deltaSteps * STRIDE_M;
+  // court is 280 SVG units tall ≈ 9.75 m → ~28.7 svg per meter (clamp travel per burst)
+  const svgPerM = 24;
+  const travel = Math.min(meters * svgPerM, 90);
+  const biasX = (COURT_T.x - court.px) * 0.15;
+  const biasY = (COURT_T.y - court.py) * 0.15;
+  const angle = Math.random() * Math.PI * 2;
+  let nx = court.px + Math.cos(angle) * travel + biasX;
+  let ny = court.py + Math.sin(angle) * travel + biasY;
+  nx = Math.max(COURT_BOUNDS.xMin, Math.min(COURT_BOUNDS.xMax, nx));
+  ny = Math.max(COURT_BOUNDS.yMin, Math.min(COURT_BOUNDS.yMax, ny));
+  court.px = nx; court.py = ny;
+  court.trail.push({ x: nx, y: ny });
+  if (court.trail.length > 40) court.trail.shift();
+  updateCourtPosition();
+}
+function updateCourtPosition() {
+  const dot = $('playerDot'); const trail = $('playerTrail');
+  if (dot) { dot.setAttribute('cx', court.px); dot.setAttribute('cy', court.py); }
+  if (trail) trail.setAttribute('points', court.trail.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
 }
 function updateCourtVisual() {
   const cad = court.currentCad;
@@ -641,8 +687,39 @@ function updateCourtVisual() {
   dot.setAttribute('fill', color);
   dot.style.filter = `drop-shadow(0 0 ${6 + Math.min(20, cad/10)}px ${color})`;
   dot.setAttribute('r', String(8 + Math.min(10, cad/20)));
-  dot.setAttribute('opacity', String(0.4 + Math.min(0.6, cad/250)));
+  dot.setAttribute('opacity', String(0.5 + Math.min(0.5, cad/250)));
   $('playerPulse').setAttribute('stroke', color);
+  const trail = $('playerTrail'); if (trail) trail.setAttribute('stroke', color);
+}
+
+// ---- Calibration (10s of resting/idle data) ----
+function startCalibration() {
+  if (!court.running) { log('err', 'Start tracking first, then calibrate.'); return; }
+  court.calibrating = true;
+  court.calStartMs = Date.now();
+  court.calHr = [];
+  court.calBase = court.steps;
+  setCourtStatus('calibrating · stand still', 'on');
+  $('courtCal').disabled = true;
+  log('info', 'Calibration started — stand still on the back-left for 10s.');
+  setTimeout(finishCalibration, 10000);
+}
+function finishCalibration() {
+  if (!court.calibrating) return;
+  court.calibrating = false;
+  const elapsedSec = (Date.now() - court.calStartMs) / 1000;
+  if (court.calHr.length) {
+    court.restHr = Math.round(court.calHr.reduce((s,v) => s+v, 0) / court.calHr.length);
+    court.hrBaseline = court.restHr;
+  }
+  const idleSteps = court.steps - (court.calBase || 0);
+  court.idleCadFloor = Math.round((idleSteps / elapsedSec) * 60);
+  // reset positional baseline back to back-left starting point
+  court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
+  updateCourtPosition();
+  setCourtStatus(`calibrated · rest ${court.restHr||'—'} bpm`, 'on');
+  $('courtCal').disabled = false;
+  log('info', `Calibration done. Rest HR ${court.restHr || '—'} bpm · idle cadence ${court.idleCadFloor} spm.`);
 }
 
 // ---- watch-source feeders ----
@@ -693,13 +770,14 @@ function onWatchSteps(totalSteps) {
     $('cPeak').textContent = gEst.toFixed(2);
   }
 
-  // pulse the court diagram + update intensity color
-  pulseCourtDot();
+  // pulse the court diagram + update intensity color (skip pos drift during cal)
+  if (!court.calibrating) pulseCourtDot(deltaSteps);
   updateCourtVisual();
 }
 function onWatchHr(bpm) {
   court.currentHr = bpm;
   $('hrNow').textContent = bpm + ' bpm';
+  if (court.calibrating) court.calHr.push(bpm);
   if (court.hrBaseline == null) { court.hrBaseline = bpm; return; }
   court.hrBaseline = court.hrBaseline * 0.95 + bpm * 0.05;
   if (bpm > court.hrPeak) court.hrPeak = bpm;
@@ -740,7 +818,7 @@ function tickCourt() {
     $('cCad').textContent = court.currentCad;
     $('cadNow').textContent = court.currentCad + ' spm';
     updateCourtVisual();
-    if (court.recent.length) pulseCourtDot();
+    if (court.recent.length && !court.calibrating) pulseCourtDot(1);
   } else {
     // watch source: decay cadence if no recent step packet
     const stale = (performance.now() - (court.watchLastTickMs || 0)) > 2500;
@@ -791,8 +869,9 @@ async function startCourt() {
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
+    $('courtCal').disabled = false;
     setCourtStatus('watch · tracking', 'on');
-    log('info', 'Court tracking started — source: WATCH (step deltas + HR spikes).');
+    log('info', 'Court tracking started — source: WATCH (step deltas + HR spikes). Watch is on back-left.');
     return;
   }
   // Fallback → phone IMU
@@ -812,21 +891,25 @@ async function startCourt() {
   court.tickTimer = setInterval(tickCourt, 500);
   $('courtStart').disabled = true;
   $('courtStop').disabled = false;
+  $('courtCal').disabled = false;
   setCourtStatus('phone · tracking', 'on');
   log('info', 'Court tracking started — source: PHONE IMU (watch not connected).');
 }
 function stopCourt() {
   court.running = false;
+  court.calibrating = false;
   if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
   if (court.tickTimer)      { clearInterval(court.tickTimer); court.tickTimer = null; }
   if (court.watchPollTimer) { clearInterval(court.watchPollTimer); court.watchPollTimer = null; }
   $('courtStart').disabled = false;
   $('courtStop').disabled = true;
+  $('courtCal').disabled = true;
   setCourtStatus('stopped');
   log('info', `Session [${court.source}]: ${court.steps} steps · ${court.explosive} explosive · ${court.lunges} lunges · peak ${court.peakG.toFixed(2)}g`);
 }
 $('courtStart').onclick = startCourt;
 $('courtStop').onclick  = stopCourt;
+$('courtCal').onclick   = startCalibration;
 $('courtReset').onclick = () => { resetCourt(); };
 
 // ----- env check -----
