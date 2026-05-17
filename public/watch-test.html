@@ -890,6 +890,36 @@ function takeCourtStep(force = 0.5) {
 function moveCourtDotLive(force = 0.5) {
   takeCourtStep(force);
 }
+function forceWatchCourtMove(reason = 'WATCH STREAM FALLBACK', force = 0.42) {
+  const now = performance.now();
+  const gap = now - (court.lastStepMs || 0);
+  if (!court.running || court.source !== 'watch' || gap < 260) return false;
+  court.lastStepMs = now;
+  court.lastMoveMs = now;
+  court.lastWatchMotionMs = now;
+  court.steps++;
+  court.recent.push(now);
+  while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
+  court.currentCad = Math.max(court.currentCad, Math.min(220, Math.round(60000 / Math.max(260, gap || 600))));
+  $('cSteps').textContent = court.steps;
+  $('cDist').textContent = Math.round(court.steps * STRIDE_M);
+  $('cCad').textContent = court.currentCad;
+  $('cadNow').textContent = court.currentCad + ' spm';
+  takeCourtStep(force);
+  updateCourtVisual();
+  updateDebugOverlay('watch', true, reason, { score: Math.round(force * 100), changed: 1, gap, uuid: 'watch-assist' });
+  return true;
+}
+function startWatchMotionAssist() {
+  if (court.watchMotionAssistTimer) clearInterval(court.watchMotionAssistTimer);
+  court.watchMotionAssistTimer = setInterval(() => {
+    if (!court.running || court.source !== 'watch') return;
+    const now = performance.now();
+    const phoneSilent = !court.lastLiveMoveMs || (now - court.lastLiveMoveMs) > 900;
+    const streamFresh = (now - (court.lastWatchPacketMs || 0)) < 2200 || (now - (court.lastHrMs || 0)) < 2200;
+    if (phoneSilent && streamFresh) forceWatchCourtMove('WATCH STREAM FALLBACK', 0.38 + Math.min(0.32, (court.currentHr || 80) / 450));
+  }, 420);
+}
 function updateCourtPosition() {
   const dot = $('playerDot'); const trail = $('playerTrail');
   if (dot) { dot.setAttribute('cx', court.px); dot.setAttribute('cy', court.py); }
