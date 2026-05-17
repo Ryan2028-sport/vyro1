@@ -42,6 +42,7 @@
 </style>
 </head>
 <body>
+<div id="dbgOverlay" style="position:fixed;top:8px;right:8px;z-index:99999;background:rgba(0,0,0,.85);color:#0f0;font:11px/1.35 ui-monospace,Menlo,monospace;padding:8px 10px;border:1px solid #0f0;border-radius:8px;max-width:300px;pointer-events:none;white-space:pre">debug: waiting for motion…</div>
 <div class="wrap">
   <header>
     <div class="logo">VYRO · WATCH TEST</div>
@@ -1016,9 +1017,13 @@ function onMotion(e) {
 
   const peakStep = court.stepArmed && motionScore >= THRESH_STEP;
   const sustainedStep = court.sustainedMotionStartMs && motionScore >= MOTION_MOVE_THRESHOLD && (now - court.lastStepMs) >= 380;
-  if ((peakStep || sustainedStep) && (now - court.lastStepMs) >= REFRACTORY_MS) {
+  const gap = now - court.lastStepMs;
+  const refractoryOk = gap >= REFRACTORY_MS;
+  let reason = '';
+  let moved = false;
+  if ((peakStep || sustainedStep) && refractoryOk) {
     const force = Math.min(1, 0.24 + motionScore * 2.8);
-    const lastGap = court.lastStepMs ? (now - court.lastStepMs) : 500;
+    const lastGap = court.lastStepMs ? gap : 500;
     court.lastStepMs = now;
     court.lastLiveMoveMs = now;
     court.stepArmed = false;
@@ -1034,6 +1039,27 @@ function onMotion(e) {
     $('cadNow').textContent = court.currentCad + ' spm';
     takeCourtStep(force);
     updateCourtVisual();
+    moved = true;
+    reason = peakStep ? 'PEAK STEP' : 'SUSTAINED';
+  } else {
+    if (court.calibrating) reason = 'calibrating';
+    else if (!refractoryOk) reason = `refractory ${Math.round(REFRACTORY_MS - gap)}ms`;
+    else if (motionScore < THRESH_STEP) reason = `score<${THRESH_STEP}`;
+    else if (!court.stepArmed) reason = 'not armed (release below ' + (PHONE_STEP_RELEASE*0.6).toFixed(3) + ')';
+    else reason = 'no trigger';
+  }
+  const dbg = document.getElementById('dbgOverlay');
+  if (dbg) {
+    dbg.style.color = moved ? '#0f0' : '#ff0';
+    dbg.textContent =
+      `${moved ? '✓ MOVED' : '· idle'}  ${reason}\n` +
+      `score   ${motionScore.toFixed(3)}  (step≥${THRESH_STEP})\n` +
+      `dyn ${dyn.toFixed(3)}  jerk ${jerk.toFixed(3)}\n` +
+      `armed:${court.stepArmed}  side:${court.stepSide}\n` +
+      `gap ${Math.round(gap)}ms / ${REFRACTORY_MS}ms\n` +
+      `steps:${court.steps}  moves:${court.movements}  cad:${court.currentCad}\n` +
+      `pos ${court.px.toFixed(0)},${court.py.toFixed(0)}  calib:${court.calibrating?'Y':'N'}\n` +
+      `lastMove ${Math.round(now-(court.lastLiveMoveMs||0))}ms ago`;
   }
 }
 async function attachPhoneMotion() {
@@ -1047,7 +1073,23 @@ async function attachPhoneMotion() {
   if (!('DeviceMotionEvent' in window)) return false;
   if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
   court.motionHandler = onMotion;
-  window.addEventListener('devicemotion', court.motionHandler);
+  court.lastMotionEventMs = performance.now();
+  const wrapped = (e) => { court.lastMotionEventMs = performance.now(); onMotion(e); };
+  court.motionHandler = wrapped;
+  window.addEventListener('devicemotion', wrapped);
+  // Heartbeat: if no devicemotion events arrive, surface that in the overlay.
+  if (court.dbgHeartbeat) clearInterval(court.dbgHeartbeat);
+  court.dbgHeartbeat = setInterval(() => {
+    const dbg = document.getElementById('dbgOverlay'); if (!dbg) return;
+    const since = performance.now() - (court.lastMotionEventMs || 0);
+    if (since > 1500) {
+      dbg.style.color = '#f55';
+      dbg.textContent = `⚠ NO MOTION EVENTS for ${Math.round(since)}ms\n` +
+        `DeviceMotionEvent permission may be denied,\n` +
+        `or the page is not on https / not focused.\n` +
+        `Tap "Start court session" on your phone & allow motion.`;
+    }
+  }, 500);
   return true;
 }
 function tickCourt() {
