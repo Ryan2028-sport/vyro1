@@ -1246,7 +1246,7 @@ function startWatchMotionAssist() {
   if (court.watchMotionAssistTimer) clearInterval(court.watchMotionAssistTimer);
   court.watchMotionAssistTimer = setInterval(() => {
     if (!court.running || court.source !== 'watch') return;
-    updateDebugOverlay('watch', false, 'watch connected · waiting for steps', { score: 0, changed: 0, gap: 0, uuid: 'watch-step-gate' });
+    updateDebugOverlay('watch', false, 'watch connected · waiting for motion/steps', { score: 0, changed: 0, gap: 0, uuid: 'watch-motion-gate' });
   }, 300);
 }
 function updateCourtPosition() {
