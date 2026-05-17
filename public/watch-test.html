@@ -556,6 +556,10 @@ function markWatchStreamAlive(label = 'WATCH STREAM') {
 function inferWatchMotionFromPacket(p, uuid) {
   const now = performance.now();
   const key = uuid || 'watch';
+  if (court.watchBaseSteps != null) {
+    updateDebugOverlay('watch', false, 'watch packet live · waiting for step change', { score: 0, changed: 0, gap: 0, uuid: key });
+    return;
+  }
   const prev = watchPacketState.get(key);
   watchPacketState.set(key, { bytes: Array.from(p), ms: now });
   if (!prev) {
@@ -578,7 +582,13 @@ function inferWatchMotionFromPacket(p, uuid) {
     return;
   }
 
-  updateDebugOverlay('watch', false, 'watch packet changed · waiting for step count', { score, changed, gap, uuid: key });
+  const sessionAge = Date.now() - (court.startMs || Date.now());
+  const threshold = sessionAge < 2500 ? 9999 : 18;
+  if (score >= threshold && gap > 90) {
+    forceWatchCourtMove('STEP packet burst', Math.min(1, 0.34 + score / 140));
+  } else {
+    updateDebugOverlay('watch', false, sessionAge < 2500 ? 'learning watch idle noise' : 'watch packet live · no step burst', { score, changed, gap, uuid: key });
+  }
 }
 
 // ----- parsers -----
