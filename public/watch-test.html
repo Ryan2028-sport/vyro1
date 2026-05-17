@@ -702,6 +702,15 @@ const court = {
   tickTimer: null, motionHandler: null,
 };
 
+async function startHeartRateStream() {
+  if (!writeChar) return;
+  hrSamples = []; hrDisplayed = null; hrLastUpdate = 0;
+  $('hr').textContent = '…';
+  await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
+  if (hrInterval) clearInterval(hrInterval);
+  hrInterval = setInterval(() => sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.CONTINUE)), 1200);
+}
+
 function fmtTime(ms) {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
