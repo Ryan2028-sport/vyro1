@@ -464,6 +464,127 @@ $('btnHrStop').onclick = async () => {
 $('btnSpo2Start').onclick = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.START));
 $('btnSpo2Stop').onclick  = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.STOP));
 
+// ==========================================================================
+// Court movement / explosive step tracker (phone IMU)
+// Peak-picks on the linear accel magnitude. A step = local peak above
+// THRESH_STEP with a refractory period. Explosive step = peak above THRESH_EXP
+// (typical squash split-step / lunge push-off is 2.2–3.5g).
+// ==========================================================================
+const STRIDE_M = 0.72;          // avg squash court step length
+const THRESH_STEP = 1.25;       // g over gravity baseline
+const THRESH_EXP  = 2.20;       // explosive push-off threshold (g)
+const THRESH_LUNGE = 2.80;      // hard lunge / sprint start
+const REFRACTORY_MS = 260;      // min gap between counted steps
+
+const court = {
+  running: false, startMs: 0, lastStepMs: 0,
+  steps: 0, explosive: 0, lunges: 0, peakG: 0,
+  recent: [], // {t, mag} for cadence
+  tickTimer: null, motionHandler: null,
+};
+
+function fmtTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+function setCourtStatus(s, kind='') {
+  $('courtStatusText').textContent = s;
+  $('courtStatus').className = 'status ' + kind;
+}
+function resetCourt() {
+  court.steps = 0; court.explosive = 0; court.lunges = 0; court.peakG = 0;
+  court.recent = []; court.lastStepMs = 0;
+  $('cSteps').textContent = '0';
+  $('cExp').textContent   = '0';
+  $('cLunge').textContent = '0';
+  $('cPeak').textContent  = '0.0';
+  $('cCad').textContent   = '0';
+  $('cTime').textContent  = '0:00';
+  $('cDist').textContent  = '0';
+  $('cInt').textContent   = '—';
+}
+function onMotion(e) {
+  // Prefer accelerationIncludingGravity (works on iOS/Android consistently);
+  // subtract ~1g baseline so a stationary phone reads ~0.
+  const a = e.accelerationIncludingGravity || e.acceleration;
+  if (!a) return;
+  const mag = Math.sqrt((a.x||0)**2 + (a.y||0)**2 + (a.z||0)**2) / 9.81;
+  const dyn = Math.abs(mag - 1.0); // g above baseline
+  const now = performance.now();
+
+  if (dyn > court.peakG) {
+    court.peakG = dyn;
+    $('cPeak').textContent = dyn.toFixed(2);
+  }
+  // Peak-pick with refractory period
+  if (dyn >= THRESH_STEP && (now - court.lastStepMs) >= REFRACTORY_MS) {
+    court.lastStepMs = now;
+    court.steps++;
+    court.recent.push(now);
+    // keep only last 10s of steps for cadence
+    while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
+
+    if (dyn >= THRESH_LUNGE) {
+      court.lunges++;
+      $('cLunge').textContent = court.lunges;
+    }
+    if (dyn >= THRESH_EXP) {
+      court.explosive++;
+      $('cExp').textContent = court.explosive;
+    }
+    $('cSteps').textContent = court.steps;
+    $('cDist').textContent = Math.round(court.steps * STRIDE_M);
+  }
+}
+function tickCourt() {
+  if (!court.running) return;
+  const dt = Date.now() - court.startMs;
+  $('cTime').textContent = fmtTime(dt);
+  // cadence = steps in last 10s × 6
+  const cad = court.recent.length * 6;
+  $('cCad').textContent = cad;
+  const intensity = court.explosive >= 30 ? 'High'
+                  : court.explosive >= 10 ? 'Moderate'
+                  : court.steps     >  0  ? 'Low' : '—';
+  $('cInt').textContent = intensity;
+}
+async function startCourt() {
+  // iOS 13+ requires explicit permission
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      const p = await DeviceMotionEvent.requestPermission();
+      if (p !== 'granted') { setCourtStatus('permission denied', 'err'); return; }
+    }
+  } catch (e) { setCourtStatus('motion unavailable', 'err'); return; }
+
+  if (!('DeviceMotionEvent' in window)) {
+    setCourtStatus('no motion sensor', 'err'); return;
+  }
+  resetCourt();
+  court.running = true;
+  court.startMs = Date.now();
+  court.motionHandler = onMotion;
+  window.addEventListener('devicemotion', court.motionHandler);
+  court.tickTimer = setInterval(tickCourt, 500);
+  $('courtStart').disabled = true;
+  $('courtStop').disabled = false;
+  setCourtStatus('tracking', 'on');
+  log('info', 'Court tracking started (phone IMU).');
+}
+function stopCourt() {
+  court.running = false;
+  if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
+  if (court.tickTimer) { clearInterval(court.tickTimer); court.tickTimer = null; }
+  $('courtStart').disabled = false;
+  $('courtStop').disabled = true;
+  setCourtStatus('stopped');
+  log('info', `Session: ${court.steps} steps · ${court.explosive} explosive · ${court.lunges} lunges · peak ${court.peakG.toFixed(2)}g`);
+}
+$('courtStart').onclick = startCourt;
+$('courtStop').onclick  = stopCourt;
+$('courtReset').onclick = () => { resetCourt(); court.peakG = 0; };
+
 // ----- env check -----
 if (!navigator.bluetooth) {
   $('warn').style.display = 'block';
