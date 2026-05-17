@@ -558,6 +558,9 @@ function resetCourt() {
   court.recent = []; court.lastStepMs = 0;
   court.hrBaseline = null; court.hrPeak = 0;
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
+  court.cadHist = []; court.hrHist = [];
+  court.movements = 0; court.movingMs = 0; court.stillMs = 0;
+  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0;
   $('cSteps').textContent = '0';
   $('cExp').textContent   = '0';
   $('cLunge').textContent = '0';
@@ -566,6 +569,80 @@ function resetCourt() {
   $('cTime').textContent  = '0:00';
   $('cDist').textContent  = '0';
   $('cInt').textContent   = '—';
+  $('movements').textContent = '0';
+  $('movTime').textContent = '0:00';
+  $('stillTime').textContent = '0:00';
+  $('cadNow').textContent = '0 spm';
+  $('hrNow').textContent  = '— bpm';
+  drawSpark('cadChart', [], '#39ff88', 240);
+  drawSpark('hrChart',  [], '#ff6b6b', 200);
+}
+
+// ---- sparkline + court pulse ----
+function drawSpark(id, data, color, maxV) {
+  const c = document.getElementById(id);
+  if (!c) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || c.width, h = c.clientHeight || c.height;
+  if (c.width !== w * dpr) { c.width = w * dpr; c.height = h * dpr; }
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    const y = (h / 4) * i; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+  if (!data.length) return;
+  const N = 60;
+  const start = Math.max(0, data.length - N);
+  const slice = data.slice(start);
+  const step = w / (N - 1);
+  // gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, color + '55'); grad.addColorStop(1, color + '00');
+  ctx.beginPath();
+  slice.forEach((v, i) => {
+    const x = i * step;
+    const y = h - (Math.min(v, maxV) / maxV) * (h - 6) - 3;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.lineTo((slice.length - 1) * step, h); ctx.lineTo(0, h); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  // line
+  ctx.beginPath();
+  slice.forEach((v, i) => {
+    const x = i * step;
+    const y = h - (Math.min(v, maxV) / maxV) * (h - 6) - 3;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+}
+function intensityColor(cad) {
+  // 0 → grey, 60 → cyan, 120 → green, 180+ → red-orange
+  if (cad < 10)  return '#666';
+  if (cad < 60)  return '#5cbdb9';
+  if (cad < 120) return '#39ff88';
+  if (cad < 180) return '#ffb347';
+  return '#ff6b6b';
+}
+function pulseCourtDot() {
+  const pulse = $('playerPulse'); if (!pulse) return;
+  pulse.setAttribute('r', '14'); pulse.setAttribute('opacity', '0.9');
+  pulse.animate(
+    [{ r: 14, opacity: 0.9 }, { r: 36, opacity: 0 }],
+    { duration: 700, easing: 'ease-out' }
+  );
+}
+function updateCourtVisual() {
+  const cad = court.currentCad;
+  const dot = $('playerDot'); if (!dot) return;
+  const color = intensityColor(cad);
+  dot.setAttribute('fill', color);
+  dot.style.filter = `drop-shadow(0 0 ${6 + Math.min(20, cad/10)}px ${color})`;
+  dot.setAttribute('r', String(8 + Math.min(10, cad/20)));
+  dot.setAttribute('opacity', String(0.4 + Math.min(0.6, cad/250)));
+  $('playerPulse').setAttribute('stroke', color);
 }
 
 // ---- watch-source feeders ----
