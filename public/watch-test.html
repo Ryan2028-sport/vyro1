@@ -1285,6 +1285,23 @@ function onWatchSteps(totalSteps) {
     court.watchLastTickMs = now;
     return;
   }
+  // When the phone IMU is the live per-step driver, the watch's bursty step
+  // total is only used to keep session totals honest — don't double-count or
+  // re-pulse the dot from watch deltas.
+  if (court.phoneAssistActive) {
+    lastBySource[detectorSource] = totalSteps;
+    court.watchLastSteps = totalSteps;
+    court.watchLastTickMs = now;
+    court.watchLastChangeMs = now;
+    const watchTotal = (court.watchBaseSteps != null) ? Math.max(0, totalSteps - court.watchBaseSteps) : 0;
+    if (watchTotal > court.steps) {
+      court.steps = watchTotal;
+      $('cSteps').textContent = court.steps;
+      $('cDist').textContent = Math.round(court.steps * STRIDE_M);
+    }
+    updateDebugOverlay('watch', false, `watch sync · total=${totalSteps} (phone IMU drives dot)`, { score: deltaSteps, changed: deltaSteps, gap: 0, uuid: detectorSource + '-sync' });
+    return;
+  }
   // dt from the last actual step change, not from the last poll —
   // watch firmware reports steps in bursts every 1-2s even though we poll faster.
   const lastChange = court.watchLastChangeMs || court.watchLastTickMs || now;
