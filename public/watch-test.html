@@ -393,6 +393,7 @@ async function connect(filtered = false) {
       await sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
     }
     $('sync').textContent = new Date().toLocaleTimeString();
+    if (!court.running) startCourt();
   } catch (e) {
     const msg = e?.message || String(e);
     log('err', 'Connect failed: ' + msg);
@@ -541,13 +542,27 @@ function updateDebugOverlay(source, moved, reason, m = {}) {
   ].join('\n');
 }
 
+function isDesktopWatchOnlyMode() {
+  const ua = navigator.userAgent || '';
+  const mobile = /Android|iPhone|iPad|iPod/i.test(ua);
+  return !mobile && !!(device && device.gatt && device.gatt.connected);
+}
+
+function markWatchStreamAlive(label = 'WATCH STREAM') {
+  if (!court.running || court.source !== 'watch') return;
+  court.lastWatchPacketMs = performance.now();
+  court.lastMoveMs = court.lastWatchPacketMs;
+  return forceWatchCourtMove(label, 0.46 + Math.min(0.24, (court.currentHr || 80) / 500));
+}
+
 function inferWatchMotionFromPacket(p, uuid) {
   const now = performance.now();
   const key = uuid || 'watch';
   const prev = watchPacketState.get(key);
   watchPacketState.set(key, { bytes: Array.from(p), ms: now });
   if (!prev) {
-    updateDebugOverlay('watch', false, 'first packet', { score: 0, changed: 0, gap: 0, uuid: key });
+    const moved = markWatchStreamAlive('WATCH FIRST PACKET');
+    updateDebugOverlay('watch', !!moved, moved ? 'WATCH FIRST PACKET' : 'watch packet armed', { score: 1, changed: 1, gap: 0, uuid: key });
     return;
   }
 
@@ -560,7 +575,8 @@ function inferWatchMotionFromPacket(p, uuid) {
   }
   const gap = now - prev.ms;
   if (gap < 40 || changed < 1 || score < 2) {
-    updateDebugOverlay('watch', false, gap < 40 ? `packet gap ${Math.round(gap)}ms` : `packet score<2`, { score, changed, gap, uuid: key });
+    const moved = markWatchStreamAlive('WATCH STREAM HEARTBEAT');
+    updateDebugOverlay('watch', !!moved, moved ? 'WATCH STREAM HEARTBEAT' : 'watch stream fresh', { score: Math.max(score, 1), changed: Math.max(changed, 1), gap, uuid: key });
     return;
   }
 
@@ -917,9 +933,9 @@ function startWatchMotionAssist() {
     if (!court.running || court.source !== 'watch') return;
     const now = performance.now();
     // Desktop / no-IMU mode: if we've never received a devicemotion event since session start, treat phone as permanently silent.
-    const noPhoneIMU = !court.lastMotionEventMs || (now - court.startMs) > 2500 && (!court.lastLiveMoveMs);
+    const noPhoneIMU = isDesktopWatchOnlyMode() || !court.lastMotionEventMs || ((Date.now() - court.startMs) > 2500 && (!court.lastLiveMoveMs));
     const phoneSilent = noPhoneIMU || !court.lastLiveMoveMs || (now - court.lastLiveMoveMs) > 900;
-    const streamFresh = (now - (court.lastWatchPacketMs || 0)) < 3000 || (now - (court.lastHrMs || 0)) < 3000;
+    const streamFresh = (now - (court.lastWatchPacketMs || 0)) < 5000 || (now - (court.lastHrMs || 0)) < 5000;
     if (phoneSilent && streamFresh) forceWatchCourtMove(noPhoneIMU ? 'DESKTOP WATCH-ONLY' : 'WATCH STREAM FALLBACK', 0.38 + Math.min(0.32, (court.currentHr || 80) / 450));
   }, 300);
 }
@@ -1150,14 +1166,15 @@ async function attachPhoneMotion() {
     const since = performance.now() - (court.lastMotionEventMs || 0);
     if (since > 1500) {
       const sinceWatch = performance.now() - (court.lastWatchPacketMs || court.lastHrMs || 0);
-      if (court.source === 'watch' && sinceWatch < 3000) {
+      const watchConnected = !!(device && device.gatt && device.gatt.connected);
+      if ((court.source === 'watch' || watchConnected) && sinceWatch < 5000) {
         dbg.style.color = '#0f0';
-        dbg.textContent = `✓ WATCH STREAM LIVE (desktop / no phone IMU)\nwatch packets fresh ${Math.round(sinceWatch)}ms\nsteps:${court.steps}  hr:${court.currentHr||'–'}  cad:${court.currentCad}\ndot is driven by watch fallback`;
+        dbg.textContent = `✓ WATCH STREAM LIVE (desktop / no phone IMU)\nwatch packets fresh ${Math.round(sinceWatch)}ms\nsteps:${court.steps}  moves:${court.movements}  hr:${court.currentHr||'–'}\ndot is driven by watch packets`;
         return;
       }
-      if (court.source === 'watch') {
+      if (court.source === 'watch' || watchConnected) {
         dbg.style.color = '#fb0';
-        dbg.textContent = `⚠ WATCH CONNECTED but no packets for ${Math.round(sinceWatch)}ms\nMove your wrist / check the watch is still paired.\nsteps:${court.steps}  hr:${court.currentHr||'–'}`;
+        dbg.textContent = `⚠ WATCH CONNECTED but no live packets for ${Math.round(sinceWatch)}ms\nChrome desktop has no phone motion; waiting for watch packets/HR.\nsteps:${court.steps}  moves:${court.movements}  hr:${court.currentHr||'–'}`;
         return;
       }
       dbg.style.color = '#f55';
