@@ -410,13 +410,18 @@ async function connect(filtered = false) {
 // Parse standard 0x2A37 Heart Rate Measurement characteristic
 function onStdHr(e) {
   const v = e.target.value;
+  const data = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
   const flags = v.getUint8(0);
   const hr16 = flags & 0x01;
   const bpm = hr16 ? v.getUint16(1, true) : v.getUint8(1);
   $('hr').textContent = bpm;
   $('sync').textContent = new Date().toLocaleTimeString();
   log('in', `HR: ${bpm} bpm`);
-  if (court.running && court.source === 'watch') onWatchHr(bpm);
+  if (court.running && court.source === 'watch') {
+    onWatchHr(bpm);
+    court.lastWatchPacketMs = performance.now();
+    inferWatchMotionFromPacket(data, 'standard-hr');
+  }
   // Energy expended + RR-intervals could be parsed here too
 }
 async function disconnect() {
@@ -448,6 +453,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function handleWatchPacket(p, uuid = 'watch') {
   parsePacket(p);
   if (!court.running || court.source !== 'watch') return;
+  court.lastWatchPacketMs = performance.now();
 
   const id = p[0];
   const isKnownPassive =
@@ -458,6 +464,10 @@ function handleWatchPacket(p, uuid = 'watch') {
     const genericSteps = readGenericStepTotal(p, uuid);
     if (genericSteps != null) onWatchSteps(genericSteps);
     if (id !== CMD.STEPS) inferWatchMotionFromPacket(p, uuid);
+  } else if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
+    // Some watches only stream HR/RR packets while active. Use changing live packets
+    // as a fallback motion source when the phone IMU is blocked or silent.
+    inferWatchMotionFromPacket(p, uuid + ':hr');
   }
 }
 
@@ -516,12 +526,30 @@ function readGenericStepTotal(p, uuid = 'watch') {
   return null;
 }
 
+function updateDebugOverlay(source, moved, reason, m = {}) {
+  const dbg = document.getElementById('dbgOverlay');
+  if (!dbg) return;
+  const now = performance.now();
+  dbg.style.color = moved ? '#0f0' : '#ff0';
+  dbg.textContent = [
+    `${moved ? '✓ MOVED' : '· idle'}  ${reason}`,
+    `source:${source}  uuid:${(m.uuid || '—').slice(0, 18)}`,
+    `packetScore:${Math.round(m.score || 0)} changed:${m.changed || 0} gap:${Math.round(m.gap || 0)}ms`,
+    `phoneScore:${(court.lastMotionScore || 0).toFixed(3)}  packetFresh:${Math.round(now - (court.lastWatchPacketMs || 0))}ms`,
+    `steps:${court.steps} moves:${court.movements} cad:${court.currentCad}`,
+    `pos ${court.px.toFixed(0)},${court.py.toFixed(0)}  calib:${court.calibrating?'Y':'N'}`,
+  ].join('\n');
+}
+
 function inferWatchMotionFromPacket(p, uuid) {
   const now = performance.now();
   const key = uuid || 'watch';
   const prev = watchPacketState.get(key);
   watchPacketState.set(key, { bytes: Array.from(p), ms: now });
-  if (!prev) return;
+  if (!prev) {
+    updateDebugOverlay('watch', false, 'first packet', { score: 0, changed: 0, gap: 0, uuid: key });
+    return;
+  }
 
   let changed = 0, score = 0;
   const len = Math.max(p.length, prev.bytes.length);
@@ -531,12 +559,15 @@ function inferWatchMotionFromPacket(p, uuid) {
     score += Math.min(32, d);
   }
   const gap = now - prev.ms;
-  if (gap < 40 || changed < 2 || score < 10) return;
+  if (gap < 40 || changed < 1 || score < 2) {
+    updateDebugOverlay('watch', false, gap < 40 ? `packet gap ${Math.round(gap)}ms` : `packet score<2`, { score, changed, gap, uuid: key });
+    return;
+  }
 
   court.lastMoveMs = now;
   const prevMotion = court.lastWatchMotionMs || 0;
   const motionGap = now - prevMotion;
-  const force = Math.min(1, 0.18 + score / 90);
+  const force = Math.min(1, 0.22 + score / 70);
   if (motionGap > 110) {
     court.lastWatchMotionMs = now;
     court.currentCad = Math.max(court.currentCad, Math.min(220, Math.round(60000 / Math.max(260, motionGap || 600))));
@@ -546,6 +577,9 @@ function inferWatchMotionFromPacket(p, uuid) {
     while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
     moveCourtDotLive(force);
     updateCourtVisual();
+    updateDebugOverlay('watch', true, 'WATCH LIVE PACKET', { score, changed, gap, uuid: key });
+  } else {
+    updateDebugOverlay('watch', false, `watch refractory ${Math.round(110 - motionGap)}ms`, { score, changed, gap, uuid: key });
   }
 }
 
@@ -695,6 +729,7 @@ const court = {
   px: COURT_START.x, py: COURT_START.y,
   trail: [],          // recent {x,y} for trail polyline
   liveMoveMs: 0, lastHrMs: 0, lastMoveMs: 0, lastHrValue: null, lastWatchMotionMs: 0,
+  lastWatchPacketMs: 0, watchMotionAssistTimer: null,
   // ui
   cadHist: [], hrHist: [], movements: 0, movingMs: 0, stillMs: 0,
   lastTickMs: 0, currentCad: 0, currentHr: 0,
@@ -727,7 +762,7 @@ function resetCourt() {
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
   court.cadHist = []; court.hrHist = [];
   court.movements = 0; court.movingMs = 0; court.stillMs = 0;
-  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0; court.lastMoveMs = 0; court.lastHrValue = null; court.lastWatchMotionMs = 0;
+  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0; court.lastMoveMs = 0; court.lastHrValue = null; court.lastWatchMotionMs = 0; court.lastWatchPacketMs = 0;
   court.lastLiveMoveMs = 0; court.lastMotionVector = null; court.lastMotionScore = 0;
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
@@ -856,6 +891,36 @@ function takeCourtStep(force = 0.5) {
 function moveCourtDotLive(force = 0.5) {
   takeCourtStep(force);
 }
+function forceWatchCourtMove(reason = 'WATCH STREAM FALLBACK', force = 0.42) {
+  const now = performance.now();
+  const gap = now - (court.lastStepMs || 0);
+  if (!court.running || court.source !== 'watch' || gap < 260) return false;
+  court.lastStepMs = now;
+  court.lastMoveMs = now;
+  court.lastWatchMotionMs = now;
+  court.steps++;
+  court.recent.push(now);
+  while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
+  court.currentCad = Math.max(court.currentCad, Math.min(220, Math.round(60000 / Math.max(260, gap || 600))));
+  $('cSteps').textContent = court.steps;
+  $('cDist').textContent = Math.round(court.steps * STRIDE_M);
+  $('cCad').textContent = court.currentCad;
+  $('cadNow').textContent = court.currentCad + ' spm';
+  takeCourtStep(force);
+  updateCourtVisual();
+  updateDebugOverlay('watch', true, reason, { score: Math.round(force * 100), changed: 1, gap, uuid: 'watch-assist' });
+  return true;
+}
+function startWatchMotionAssist() {
+  if (court.watchMotionAssistTimer) clearInterval(court.watchMotionAssistTimer);
+  court.watchMotionAssistTimer = setInterval(() => {
+    if (!court.running || court.source !== 'watch') return;
+    const now = performance.now();
+    const phoneSilent = !court.lastLiveMoveMs || (now - court.lastLiveMoveMs) > 900;
+    const streamFresh = (now - (court.lastWatchPacketMs || 0)) < 2200 || (now - (court.lastHrMs || 0)) < 2200;
+    if (phoneSilent && streamFresh) forceWatchCourtMove('WATCH STREAM FALLBACK', 0.38 + Math.min(0.32, (court.currentHr || 80) / 450));
+  }, 420);
+}
 function updateCourtPosition() {
   const dot = $('playerDot'); const trail = $('playerTrail');
   if (dot) { dot.setAttribute('cx', court.px); dot.setAttribute('cy', court.py); }
@@ -983,6 +1048,7 @@ function onWatchHr(bpm) {
     const rising = bpm >= prevHr + 1;
     const phoneMotionFresh = (now - (court.lastLiveMoveMs || court.lastMoveMs || 0)) < 1200;
     if (rising && phoneMotionFresh) court.lastMoveMs = now;
+    if (rising && !phoneMotionFresh) forceWatchCourtMove('RISING HR FALLBACK', 0.5);
   }
 }
 
@@ -1081,6 +1147,12 @@ async function attachPhoneMotion() {
     const dbg = document.getElementById('dbgOverlay'); if (!dbg) return;
     const since = performance.now() - (court.lastMotionEventMs || 0);
     if (since > 1500) {
+      const sinceWatch = performance.now() - (court.lastWatchPacketMs || court.lastHrMs || 0);
+      if (court.source === 'watch' && sinceWatch < 2500) {
+        dbg.style.color = '#0f0';
+        dbg.textContent = `✓ WATCH STREAM LIVE\nphone IMU silent ${Math.round(since)}ms\nwatch packets fresh ${Math.round(sinceWatch)}ms\ndot uses watch fallback movement`;
+        return;
+      }
       dbg.style.color = '#f55';
       dbg.textContent = `⚠ NO MOTION EVENTS for ${Math.round(since)}ms\n` +
         `DeviceMotionEvent permission may be denied,\n` +
@@ -1179,6 +1251,7 @@ async function startCourt() {
     }
     // Also attach the PHONE accelerometer — it drives live dot movement as you move.
     const imuOk = await attachPhoneMotion();
+    startWatchMotionAssist();
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
@@ -1206,6 +1279,7 @@ function stopCourt() {
   if (court.motionHandler) window.removeEventListener('devicemotion', court.motionHandler);
   if (court.tickTimer)      { clearInterval(court.tickTimer); court.tickTimer = null; }
   if (court.watchPollTimer) { clearInterval(court.watchPollTimer); court.watchPollTimer = null; }
+  if (court.watchMotionAssistTimer) { clearInterval(court.watchMotionAssistTimer); court.watchMotionAssistTimer = null; }
   $('courtStart').disabled = false;
   $('courtStop').disabled = true;
   $('courtCal').disabled = true;
