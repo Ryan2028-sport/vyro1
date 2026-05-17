@@ -1343,6 +1343,8 @@ function stopCourt() {
   if (court.tickTimer)      { clearInterval(court.tickTimer); court.tickTimer = null; }
   if (court.watchPollTimer) { clearInterval(court.watchPollTimer); court.watchPollTimer = null; }
   if (court.watchMotionAssistTimer) { clearInterval(court.watchMotionAssistTimer); court.watchMotionAssistTimer = null; }
+  if (court.armTimer) { clearInterval(court.armTimer); court.armTimer = null; }
+  court.armUntilMs = 0;
   $('courtStart').disabled = false;
   $('courtStop').disabled = true;
   $('courtCal').disabled = true;
