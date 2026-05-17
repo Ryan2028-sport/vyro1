@@ -606,6 +606,43 @@ function detectAndReadStepCounter(p, source = 'pkt') {
   court._watchDetectedDelta = 0;
   court._watchDetectedSource = source;
 
+  // Documented Colmi/QCBand layouts. These are exact fields, not guessed bytes.
+  if (source === 'STEPS' && p[0] === CMD.STEPS) {
+    const total = p[1] | (p[2] << 8) | (p[3] << 16);
+    if (total >= 0 && total < 300000) {
+      const prev = court.lastDetectedWatchSteps;
+      const delta = prev == null ? 0 : total - prev;
+      if (delta >= 0 && delta <= 30) {
+        court._watchDetectedPrevSteps = prev;
+        court._watchDetectedDelta = delta;
+        court.lastDetectedWatchSteps = total;
+        return total;
+      }
+    }
+    return null;
+  }
+  if (source === 'SPORTS' && p[0] === CMD.SPORTS_DATA) {
+    const intervalSteps = p[9] | (p[10] << 8);
+    const key = 'SPORTS:9:2';
+    const st = watchStepFieldState.get(key) || { total: 0, bySlot: new Map() };
+    const slot = `${p[1]}-${p[2]}-${p[3]}-${p[4]}`;
+    const prior = st.bySlot.get(slot);
+    if (prior !== intervalSteps) {
+      st.bySlot.set(slot, intervalSteps);
+      st.total = [...st.bySlot.values()].reduce((sum, v) => sum + v, 0);
+    }
+    watchStepFieldState.set(key, st);
+    const prev = court.lastDetectedWatchSteps;
+    const delta = prev == null ? 0 : st.total - prev;
+    if (delta >= 0 && delta <= 30) {
+      court._watchDetectedPrevSteps = prev;
+      court._watchDetectedDelta = delta;
+      court.lastDetectedWatchSteps = st.total;
+      return st.total;
+    }
+    return null;
+  }
+
   const read = (off, size) => size === 3
     ? (p[off] | (p[off + 1] << 8) | (p[off + 2] << 16))
     : (p[off] | (p[off + 1] << 8));
