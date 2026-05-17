@@ -204,6 +204,25 @@
   </div>
 
   <div class="panel" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <div class="section-title" style="margin:0">Sensor probe · find hidden live-streaming opcodes</div>
+      <div class="row" style="gap:6px">
+        <button class="ghost" id="probeStart" disabled>Start probe (0x00–0xFF)</button>
+        <button class="ghost" id="probeMonitor" disabled>Live monitor</button>
+        <button class="ghost" id="probeStop" disabled>Stop</button>
+        <button class="ghost" id="probeClear">Clear</button>
+      </div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:8px">
+      Sends every untested 1-byte opcode (and a couple of REAL_TIME-style sub-payloads) to the watch, then ranks any
+      characteristic that responds by <b>packet rate</b> and <b>byte entropy</b>. A real live-sensor stream looks like
+      ≥5 Hz packets whose bytes change every frame. If nothing shows up after a full sweep, this firmware doesn't expose raw motion.
+    </div>
+    <div id="probeStatus" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);margin-bottom:8px">idle</div>
+    <div id="probeResults" style="font-family:'JetBrains Mono',monospace;font-size:11px;max-height:240px;overflow:auto;background:#000;border:1px solid var(--border);border-radius:10px;padding:8px"></div>
+  </div>
+
+  <div class="panel" style="margin-top:16px">
     <div class="row" style="justify-content:space-between;margin-bottom:12px">
       <div class="section-title" style="margin:0">Commands</div>
       <div class="row">
