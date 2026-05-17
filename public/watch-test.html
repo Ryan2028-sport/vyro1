@@ -525,6 +525,21 @@ function readGenericStepTotal(p, uuid = 'watch') {
   return null;
 }
 
+function updateDebugOverlay(source, moved, reason, m = {}) {
+  const dbg = document.getElementById('dbgOverlay');
+  if (!dbg) return;
+  const now = performance.now();
+  dbg.style.color = moved ? '#0f0' : '#ff0';
+  dbg.textContent = [
+    `${moved ? '✓ MOVED' : '· idle'}  ${reason}`,
+    `source:${source}  uuid:${(m.uuid || '—').slice(0, 18)}`,
+    `packetScore:${Math.round(m.score || 0)} changed:${m.changed || 0} gap:${Math.round(m.gap || 0)}ms`,
+    `phoneScore:${(court.lastMotionScore || 0).toFixed(3)}  packetFresh:${Math.round(now - (court.lastWatchPacketMs || 0))}ms`,
+    `steps:${court.steps} moves:${court.movements} cad:${court.currentCad}`,
+    `pos ${court.px.toFixed(0)},${court.py.toFixed(0)}  calib:${court.calibrating?'Y':'N'}`,
+  ].join('\n');
+}
+
 function inferWatchMotionFromPacket(p, uuid) {
   const now = performance.now();
   const key = uuid || 'watch';
