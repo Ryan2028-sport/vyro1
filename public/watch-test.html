@@ -151,6 +151,8 @@ let device = null, server = null, writeChar = null, notifyChar = null;
 let hrInterval = null;
 let protocol = null; // 'qcband' | 'standard-hr'
 let hrSamples = []; // rolling buffer for median/avg smoothing
+let hrDisplayed = null; // EMA-smoothed displayed bpm
+let hrLastUpdate = 0;   // ms timestamp of last accepted sample
 
 // ----- UI helpers -----
 const $ = id => document.getElementById(id);
