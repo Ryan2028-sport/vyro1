@@ -367,18 +367,34 @@ function parsePacket(p) {
           else                                 bpm = raw;           // raw bpm
           if (bpm < 30 || bpm > 220) break;
 
-        // Rolling median filter to reject single-sample spikes/dropouts.
+        const now = Date.now();
+        // Drop samples that arrive too fast (<400ms apart → likely duplicate frame)
+        if (now - hrLastUpdate < 400) break;
+        hrLastUpdate = now;
+
+        // Rolling buffer (up to 12 samples ≈ 24s of data)
         hrSamples.push(bpm);
-        if (hrSamples.length > 7) hrSamples.shift();
-        // Need a few samples before trusting the reading (warm-up ~6-10 s).
-        if (hrSamples.length < 3) break;
+        if (hrSamples.length > 12) hrSamples.shift();
+        // Warm-up: need at least 4 samples before trusting reading
+        if (hrSamples.length < 4) break;
+
+        // Median of buffer
         const sorted = [...hrSamples].sort((a, b) => a - b);
         const median = sorted[Math.floor(sorted.length / 2)];
 
-        // Reject outliers >25 bpm from median, then average the rest.
-        const kept = hrSamples.filter(v => Math.abs(v - median) <= 25);
+        // Tight outlier rejection (±12 bpm from median)
+        const kept = hrSamples.filter(v => Math.abs(v - median) <= 12);
         const avg = kept.reduce((s, v) => s + v, 0) / kept.length;
-        $('hr').textContent = Math.round(avg);
+
+        // Exponential moving average to smooth jumps (alpha=0.25)
+        if (hrDisplayed == null) hrDisplayed = avg;
+        else hrDisplayed = hrDisplayed * 0.75 + avg * 0.25;
+
+        // Slew-rate limit: max ±3 bpm change per update for stability
+        const target = Math.round(hrDisplayed);
+        const current = parseInt($('hr').textContent) || target;
+        const delta = Math.max(-3, Math.min(3, target - current));
+        $('hr').textContent = current + delta;
         $('sync').textContent = new Date().toLocaleTimeString();
       } else if (type === RT_TYPE.SPO2) {
         const v = Math.round(raw / 10);
