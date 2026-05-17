@@ -1015,6 +1015,7 @@ function resetCourt() {
   court._watchDetectedPrevSteps = null; court._watchDetectedDelta = 0; court._watchDetectedSource = null; court.lastDetectedWatchSteps = null;
   court._stepTotalToday = null; court._liveNotifySteps = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
   court._autoStepFieldKey = null;
+  court.phoneAssistActive = false;
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
@@ -1283,6 +1284,23 @@ function onWatchSteps(totalSteps) {
   if (deltaSteps <= 0) {
     updateDebugOverlay('watch', false, 'watch poll · no new steps (total=' + totalSteps + ')', { score: 0, changed: 0, gap: now - (court.watchLastChangeMs || now), uuid: detectorSource + '-idle' });
     court.watchLastTickMs = now;
+    return;
+  }
+  // When the phone IMU is the live per-step driver, the watch's bursty step
+  // total is only used to keep session totals honest — don't double-count or
+  // re-pulse the dot from watch deltas.
+  if (court.phoneAssistActive) {
+    lastBySource[detectorSource] = totalSteps;
+    court.watchLastSteps = totalSteps;
+    court.watchLastTickMs = now;
+    court.watchLastChangeMs = now;
+    const watchTotal = (court.watchBaseSteps != null) ? Math.max(0, totalSteps - court.watchBaseSteps) : 0;
+    if (watchTotal > court.steps) {
+      court.steps = watchTotal;
+      $('cSteps').textContent = court.steps;
+      $('cDist').textContent = Math.round(court.steps * STRIDE_M);
+    }
+    updateDebugOverlay('watch', false, `watch sync · total=${totalSteps} (phone IMU drives dot)`, { score: deltaSteps, changed: deltaSteps, gap: 0, uuid: detectorSource + '-sync' });
     return;
   }
   // dt from the last actual step change, not from the last poll —
@@ -1575,14 +1593,33 @@ async function startCourt() {
       court.watchPollTimer = setInterval(() => sendCmd(buildPacket(CMD.STEPS)), 350);
       court.sportsPollTimer = setInterval(() => sendCmd(buildSportsDataRequest(0)), 5000);
     }
-    // Watch mode must be step-counter gated. Do not attach the computer/phone IMU
-    // here, because desk vibration or holding the phone still can create false steps.
-    startWatchMotionAssist();
+    // Cheap BLE watches (QCBand/Colmi/H59) only push step totals in 5–30s
+    // bursts — that is too laggy for per-footstep dot motion. When the user is
+    // on a phone, also attach the phone IMU so every footfall moves the dot
+    // instantly; the watch step counter then acts as periodic ground-truth
+    // (its totals overwrite session totals when it reports an increase).
+    const ua = navigator.userAgent || '';
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(ua) && ('ontouchstart' in window);
+    if (isMobile) {
+      const phoneOk = await attachPhoneMotion();
+      if (phoneOk) {
+        court.phoneAssistActive = true;
+        setCourtStatus('watch + phone motion · live', 'on');
+        log('info', `Court tracking live — phone IMU drives per-step dot, watch step counter syncs totals (${protocol}).`);
+      } else {
+        startWatchMotionAssist();
+        log('info', `Court tracking — watch only (phone motion permission denied). Dot updates when watch reports new steps.`);
+      }
+    } else {
+      // Desktop / no IMU: watch step counter is the only source. It will be
+      // bursty — that is a hardware limit of the watch, not a bug.
+      startWatchMotionAssist();
+      log('info', `Court tracking — watch only (desktop). Dot updates when watch reports new steps (typically every 5–30s).`);
+    }
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    log('info', `Court tracking live — dot moves only when the watch step counter increases (${protocol}).`);
     return;
   }
   // Fallback → phone IMU only
