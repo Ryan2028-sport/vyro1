@@ -967,29 +967,40 @@ function onWatchHr(bpm) {
 function onMotion(e) {
   const a = e.accelerationIncludingGravity || e.acceleration;
   if (!a) return;
-  const mag = Math.sqrt((a.x||0)**2 + (a.y||0)**2 + (a.z||0)**2) / 9.81;
+  const ax = a.x || 0, ay = a.y || 0, az = a.z || 0;
+  const mag = Math.sqrt(ax**2 + ay**2 + az**2) / 9.81;
   const dyn = Math.abs(mag - 1.0);
   const now = performance.now();
-  if (dyn > court.peakG) {
-    court.peakG = dyn;
-    $('cPeak').textContent = dyn.toFixed(2);
+  const prev = court.lastMotionVector;
+  const jerk = prev ? Math.sqrt((ax - prev.x)**2 + (ay - prev.y)**2 + (az - prev.z)**2) / 9.81 : 0;
+  court.lastMotionVector = { x: ax, y: ay, z: az };
+  const motionScore = Math.max(dyn, jerk * 1.6);
+  court.lastMotionScore = court.lastMotionScore * 0.55 + motionScore * 0.45;
+  if (motionScore > court.peakG) {
+    court.peakG = motionScore;
+    $('cPeak').textContent = motionScore.toFixed(2);
   }
-  // Continuous live drift driven by raw accel magnitude (any motion moves the dot)
-  if (!court.calibrating && dyn > 0.05) {
+  // Continuous sensitive movement: any real phone motion moves the green dot.
+  // Uses both gravity magnitude change and jerk, so walking with the phone in hand/pocket is detected.
+  if (!court.calibrating && court.lastMotionScore > MOTION_MOVE_THRESHOLD) {
     court.lastMoveMs = now;
-    if ((now - (court.lastLiveMoveMs || 0)) > 120) {
+    if ((now - (court.lastLiveMoveMs || 0)) > 70) {
       court.lastLiveMoveMs = now;
-      moveCourtDotLive(Math.min(1, 0.15 + dyn * 0.6));
+      const force = Math.min(1, 0.22 + court.lastMotionScore * 2.4);
+      court.currentCad = Math.max(court.currentCad, Math.min(180, Math.round(35 + force * 135)));
+      $('cCad').textContent = court.currentCad;
+      $('cadNow').textContent = court.currentCad + ' spm';
+      moveCourtDotLive(force);
       updateCourtVisual();
     }
   }
-  if (dyn >= THRESH_STEP && (now - court.lastStepMs) >= REFRACTORY_MS) {
+  if (motionScore >= 0.16 && (now - court.lastStepMs) >= REFRACTORY_MS) {
     court.lastStepMs = now;
     court.steps++;
     court.recent.push(now);
     while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
-    if (dyn >= THRESH_LUNGE) { court.lunges++; $('cLunge').textContent = court.lunges; }
-    if (dyn >= THRESH_EXP)   { court.explosive++; $('cExp').textContent = court.explosive; }
+    if (motionScore >= THRESH_LUNGE) { court.lunges++; $('cLunge').textContent = court.lunges; }
+    if (motionScore >= THRESH_EXP)   { court.explosive++; $('cExp').textContent = court.explosive; }
     $('cSteps').textContent = court.steps;
     $('cDist').textContent = Math.round(court.steps * STRIDE_M);
     if (!court.calibrating) { pulseCourtDot(1); updateCourtVisual(); }
