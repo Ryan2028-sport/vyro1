@@ -1015,6 +1015,7 @@ function resetCourt() {
   court._watchDetectedPrevSteps = null; court._watchDetectedDelta = 0; court._watchDetectedSource = null; court.lastDetectedWatchSteps = null;
   court._stepTotalToday = null; court._liveNotifySteps = null; court._sportsLastCompleteTotal = null; court._sportsBatch = { bySlot: new Map() };
   court._autoStepFieldKey = null;
+  court.phoneAssistActive = false;
   court.stepArmed = true; court.stepSide = 1; court.sustainedMotionStartMs = 0;
   watchPacketState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
