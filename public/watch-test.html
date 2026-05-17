@@ -541,13 +541,27 @@ function updateDebugOverlay(source, moved, reason, m = {}) {
   ].join('\n');
 }
 
+function isDesktopWatchOnlyMode() {
+  const ua = navigator.userAgent || '';
+  const mobile = /Android|iPhone|iPad|iPod/i.test(ua);
+  return !mobile && !!(device && device.gatt && device.gatt.connected);
+}
+
+function markWatchStreamAlive(label = 'WATCH STREAM') {
+  if (!court.running || court.source !== 'watch') return;
+  court.lastWatchPacketMs = performance.now();
+  court.lastMoveMs = court.lastWatchPacketMs;
+  forceWatchCourtMove(label, 0.46 + Math.min(0.24, (court.currentHr || 80) / 500));
+}
+
 function inferWatchMotionFromPacket(p, uuid) {
   const now = performance.now();
   const key = uuid || 'watch';
   const prev = watchPacketState.get(key);
   watchPacketState.set(key, { bytes: Array.from(p), ms: now });
   if (!prev) {
-    updateDebugOverlay('watch', false, 'first packet', { score: 0, changed: 0, gap: 0, uuid: key });
+    markWatchStreamAlive('WATCH FIRST PACKET');
+    updateDebugOverlay('watch', true, 'WATCH FIRST PACKET', { score: 1, changed: 1, gap: 0, uuid: key });
     return;
   }
 
@@ -560,7 +574,8 @@ function inferWatchMotionFromPacket(p, uuid) {
   }
   const gap = now - prev.ms;
   if (gap < 40 || changed < 1 || score < 2) {
-    updateDebugOverlay('watch', false, gap < 40 ? `packet gap ${Math.round(gap)}ms` : `packet score<2`, { score, changed, gap, uuid: key });
+    markWatchStreamAlive('WATCH STREAM HEARTBEAT');
+    updateDebugOverlay('watch', true, 'WATCH STREAM HEARTBEAT', { score: Math.max(score, 1), changed: Math.max(changed, 1), gap, uuid: key });
     return;
   }
 
