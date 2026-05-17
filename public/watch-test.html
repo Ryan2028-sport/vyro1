@@ -1014,6 +1014,11 @@ function onWatchSteps(totalSteps) {
   court.watchLastSteps = totalSteps;
   court.watchLastTickMs = now;
   if (deltaSteps <= 0 || dt <= 0) return;
+  // Arm-up: ignore steps while the user walks to the T.
+  if (court.armUntilMs && now < court.armUntilMs) {
+    updateDebugOverlay('watch', false, 'arming · walk to the T', { score: deltaSteps, changed: deltaSteps, gap: dt * 1000, uuid: 'watch-arm' });
+    return;
+  }
   if (deltaSteps > 12 || (dt < 0.45 && deltaSteps > 1) || (dt < 2 && deltaSteps > 4)) {
     updateDebugOverlay('watch', false, 'ignored unrealistic step jump', { score: deltaSteps, changed: deltaSteps, gap: dt * 1000, uuid: 'watch-steps' });
     return;
