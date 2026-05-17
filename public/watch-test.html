@@ -424,8 +424,10 @@ function parsePacket(p) {
         const target = Math.round(hrDisplayed);
         const current = parseInt($('hr').textContent) || target;
         const delta = Math.max(-3, Math.min(3, target - current));
-        $('hr').textContent = current + delta;
+        const shown = current + delta;
+        $('hr').textContent = shown;
         $('sync').textContent = new Date().toLocaleTimeString();
+        if (court.running && court.source === 'watch') onWatchHr(shown);
       } else if (type === RT_TYPE.SPO2) {
         const v = Math.round(raw / 10);
         if (v >= 70 && v <= 100) $('spo2').textContent = v;
