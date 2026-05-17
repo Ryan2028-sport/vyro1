@@ -954,9 +954,19 @@ if (!document.getElementById('btnTestStep')) {
   tb.textContent = '👣 Test step (debug)';
   tb.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:99999;padding:10px 14px;background:#0a0;color:#fff;border:0;border-radius:8px;font:600 13px system-ui;box-shadow:0 4px 12px rgba(0,0,0,.3)';
   tb.onclick = () => {
-    if (!court.running) { log('err', 'Start court session first.'); return; }
-    forceWatchCourtMove('MANUAL TEST', 0.7);
-    log('info', 'Manual test step fired — if the dot moved, the pipeline is healthy.');
+    if (!court.running) {
+      resetCourt();
+      court.source = 'debug';
+      court.running = true;
+      court.startMs = Date.now();
+      if (!court.tickTimer) court.tickTimer = setInterval(tickCourt, 500);
+      $('courtStart').disabled = true;
+      $('courtStop').disabled = false;
+      $('courtCal').disabled = false;
+      setCourtStatus('debug step · live', 'on');
+    }
+    const moved = forceWatchCourtMove('MANUAL TEST', 0.7);
+    log(moved ? 'info' : 'err', moved ? 'Manual test step moved the court dot.' : 'Manual test step was throttled — tap again.');
   };
   document.body.appendChild(tb);
 }
