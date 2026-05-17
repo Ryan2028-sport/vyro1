@@ -170,7 +170,7 @@
     <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px" id="calibPanel">
       <div style="background:#000;border:1px solid var(--border);border-radius:18px;padding:14px">
         <div class="section-title" style="margin:0 0 10px">Sensor log · live X/Y/Z</div>
-        <div id="sensorWarn" style="display:none;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ff6b6b;background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.3);border-radius:8px;padding:6px 10px;margin-bottom:10px">⚠ no IMU stream — values frozen at 0</div>
+        <div id="sensorWarn" style="display:none;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ffb020;background:rgba(255,176,32,0.08);border:1px solid rgba(255,176,32,0.3);border-radius:8px;padding:6px 10px;margin-bottom:10px">⚠ no IMU stream yet — most fitness bands don't expose raw accel over BLE. Open this page on your phone and grant motion access to use the phone's sensor.</div>
         <div id="sensorRows" style="display:flex;flex-direction:column;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px">
           <div class="sRow" data-axis="x"></div>
           <div class="sRow" data-axis="y"></div>
@@ -1454,6 +1454,7 @@ function processImuSample(st, s, uuid) {
 let lastImuSample = null;
 let imuSampleCount = 0;
 let imuRateHz = 0;
+const phoneImuState = { gravity: null };
 const courtCal = {
   baseline: null,      // {x,y,z} — captured average raw accel at rest
   baselineNoise: 0,    // std-dev of |linear accel| during center capture
@@ -1600,13 +1601,22 @@ let imuTickTimer = null;
 function startImuTick() {
   if (imuTickTimer) return;
   imuTickTimer = setInterval(() => {
-    if (!court.running || court.source !== 'watch') return;
+    if (!court.running) return;
     let totalVx = 0, totalVy = 0, active = 0;
     for (const st of imuState.values()) {
       if (!st.locked) continue;
       totalVx += st.vx; totalVy += st.vy;
       st.vx *= IMU_CFG.velocityDamp;
       st.vy *= IMU_CFG.velocityDamp;
+      active++;
+    }
+    // Phone-IMU velocity (set by onMotion when calibration peaks exist).
+    if (phoneImuState.vx || phoneImuState.vy) {
+      totalVx += phoneImuState.vx || 0; totalVy += phoneImuState.vy || 0;
+      phoneImuState.vx = (phoneImuState.vx || 0) * IMU_CFG.velocityDamp;
+      phoneImuState.vy = (phoneImuState.vy || 0) * IMU_CFG.velocityDamp;
+      if (Math.abs(phoneImuState.vx) < 0.05) phoneImuState.vx = 0;
+      if (Math.abs(phoneImuState.vy) < 0.05) phoneImuState.vy = 0;
       active++;
     }
     let nx = court.px, ny = court.py;
@@ -1850,6 +1860,40 @@ function onMotion(e) {
   const a = e.accelerationIncludingGravity || e.acceleration;
   if (!a) return;
   const ax = a.x || 0, ay = a.y || 0, az = a.z || 0;
+  // Feed phone accelerometer into the IMU diagnostics + calibration pipeline.
+  // Most fitness-band BLE firmwares (Colmi/QCBand) do NOT expose raw IMU over
+  // BLE — only framed HR/step packets. The phone's own sensor is the reliable
+  // source of X/Y/Z while the watch handles HR + step counts.
+  const gx = ax / 9.81, gy = ay / 9.81, gz = az / 9.81;
+  const gravLpf = 0.02;
+  if (!phoneImuState.gravity) phoneImuState.gravity = { x: 0, y: 0, z: 1 };
+  phoneImuState.gravity.x = phoneImuState.gravity.x * (1 - gravLpf) + gx * gravLpf;
+  phoneImuState.gravity.y = phoneImuState.gravity.y * (1 - gravLpf) + gy * gravLpf;
+  phoneImuState.gravity.z = phoneImuState.gravity.z * (1 - gravLpf) + gz * gravLpf;
+  const lx = gx - phoneImuState.gravity.x;
+  const ly = gy - phoneImuState.gravity.y;
+  const lz = gz - phoneImuState.gravity.z;
+  const linMag = Math.hypot(lx, ly, lz);
+  lastImuSample = { ax: gx, ay: gy, az: gz, lx, ly, lz, mag: linMag, mode: 'phone', ms: performance.now(), uuid: 'phone' };
+  imuSampleCount++;
+  if (courtCal.capturing) captureCalibrationSample({ ax: gx, ay: gy, az: gz }, lx, ly, lz, linMag);
+
+  // Apply calibrated peak thresholds to push phone-IMU velocity directionally.
+  if (courtCal.baseline && (courtCal.peaks.front || courtCal.peaks.back || courtCal.peaks.side)) {
+    const bl = courtCal.baseline;
+    const blx = gx - bl.x, bly = gy - bl.y;
+    const noise = Math.max(0.04, courtCal.baselineNoise || 0.04);
+    const frontN = courtCal.peaks.front ? Math.max(0, -bly - noise) / courtCal.peaks.front : 0;
+    const backN  = courtCal.peaks.back  ? Math.max(0,  bly - noise) / courtCal.peaks.back  : 0;
+    const sideN  = courtCal.peaks.side  ? (Math.abs(blx) > noise ? (blx > 0 ? 1 : -1) * (Math.abs(blx) - noise) / courtCal.peaks.side : 0) : 0;
+    const A = 0.35;
+    phoneImuState.vx = phoneImuState.vx || 0;
+    phoneImuState.vy = phoneImuState.vy || 0;
+    if (frontN > A) { phoneImuState.vy -= Math.min(1.2, frontN) * 6; court.lastWatchMotionMs = performance.now(); }
+    if (backN  > A) { phoneImuState.vy += Math.min(1.2, backN)  * 6; court.lastWatchMotionMs = performance.now(); }
+    if (Math.abs(sideN) > A) { phoneImuState.vx += Math.max(-1.2, Math.min(1.2, sideN)) * 6; court.lastWatchMotionMs = performance.now(); }
+  }
+
   const mag = Math.sqrt(ax**2 + ay**2 + az**2) / 9.81;
   const dyn = Math.abs(mag - 1.0);
   const now = performance.now();
