@@ -1044,6 +1044,149 @@ $('btnSpo2Start').onclick = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.STA
 $('btnSpo2Stop').onclick  = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.STOP));
 
 // ==========================================================================
+// SENSOR PROBE — brute-force every untested opcode and rank notification
+// characteristics by packet rate × byte entropy. A real raw-IMU stream looks
+// like ≥5 Hz packets whose bytes change every frame (high entropy). If no
+// candidate emerges after a full sweep, the firmware doesn't expose raw motion.
+// ==========================================================================
+const KNOWN_OPCODES = new Set(Object.values(CMD));
+// We bucket incoming notifications by (uuid, firstByte) and also keep a
+// global "current opcode under test" so the bucket gets attributed to the
+// command we just sent (if any).
+const probeBuckets = new Map(); // key = `${uuid}:${opcode||'*'}` → stats
+let probeCurrentOpcode = null;  // 0x00–0xFF or null for passive monitor
+let probeAbort = false;
+let probeRunning = false;
+
+function probeKey(uuid, opcode) {
+  return `${uuid}|${opcode == null ? 'passive' : '0x' + opcode.toString(16).padStart(2, '0')}`;
+}
+function probeRecord(uuid, bytes) {
+  // Attribute to the opcode currently being probed (so a sweep produces a
+  // clean per-opcode breakdown). When idle, just record under 'passive'.
+  const op = probeCurrentOpcode;
+  const key = probeKey(uuid, op);
+  let b = probeBuckets.get(key);
+  const now = performance.now();
+  if (!b) {
+    b = { uuid, opcode: op, count: 0, firstMs: now, lastMs: now, prev: null,
+          totalChanged: 0, totalCompared: 0, sampleHex: hex(bytes), len: bytes.length };
+    probeBuckets.set(key, b);
+  }
+  b.count++;
+  b.lastMs = now;
+  b.len = bytes.length;
+  if (b.prev) {
+    const n = Math.min(b.prev.length, bytes.length);
+    let ch = 0;
+    for (let i = 0; i < n; i++) if (b.prev[i] !== bytes[i]) ch++;
+    b.totalChanged += ch;
+    b.totalCompared += n;
+  }
+  b.prev = bytes.slice();
+  if (b.count <= 3) b.sampleHex = hex(bytes);
+}
+function probeStats() {
+  // Return ranked list. Score = rate(Hz) * entropy(0..1) * sqrt(count).
+  const now = performance.now();
+  const rows = [];
+  for (const b of probeBuckets.values()) {
+    const dur = Math.max(0.001, (b.lastMs - b.firstMs) / 1000);
+    const rate = b.count / dur;
+    const entropy = b.totalCompared ? b.totalChanged / b.totalCompared : 0;
+    const score = rate * Math.max(0.05, entropy) * Math.sqrt(b.count);
+    rows.push({ ...b, rate, entropy, score, ageMs: now - b.lastMs });
+  }
+  rows.sort((a, b) => b.score - a.score);
+  return rows;
+}
+function renderProbeResults() {
+  const rows = probeStats();
+  if (!rows.length) { $('probeResults').innerHTML = '<div style="color:var(--muted)">no notifications recorded yet</div>'; return; }
+  const head = `<div style="display:grid;grid-template-columns:90px 110px 50px 60px 70px 70px 1fr;gap:8px;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:4px">
+    <div>opcode</div><div>char</div><div>n</div><div>len</div><div>rate</div><div>entropy</div><div>sample</div></div>`;
+  const body = rows.slice(0, 40).map(r => {
+    const live = r.rate >= 5 && r.entropy >= 0.4;
+    const color = live ? '#39ff88' : (r.rate >= 2 ? '#ffb020' : 'var(--muted)');
+    return `<div style="display:grid;grid-template-columns:90px 110px 50px 60px 70px 70px 1fr;gap:8px;color:${color};padding:2px 0">
+      <div>${r.opcode == null ? 'passive' : '0x' + r.opcode.toString(16).padStart(2,'0')}${live ? ' ⭐' : ''}</div>
+      <div>${r.uuid.slice(4,8)}</div>
+      <div>${r.count}</div>
+      <div>${r.len}B</div>
+      <div>${r.rate.toFixed(1)}Hz</div>
+      <div>${(r.entropy*100).toFixed(0)}%</div>
+      <div style="font-size:10px;opacity:0.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.sampleHex}</div>
+    </div>`;
+  }).join('');
+  $('probeResults').innerHTML = head + body;
+}
+async function probeSweep() {
+  if (!writeChar) { log('err', 'No write characteristic — connect the watch first.'); return; }
+  probeRunning = true; probeAbort = false;
+  $('probeStart').disabled = true; $('probeMonitor').disabled = true; $('probeStop').disabled = false;
+  // For each candidate opcode, send a few payload shapes and listen 600ms.
+  // Payload shapes cover the most common Colmi command formats:
+  //   [op]                 — bare command
+  //   [op, 1, 1]           — REAL_TIME style (type=1, action=START)
+  //   [op, 1]              — single arg
+  //   [op, 0, 1, 1]        — sub-channel style
+  const shapes = [ [], [1, 1], [1], [0, 1, 1] ];
+  const opcodes = [];
+  for (let op = 0; op < 256; op++) if (!KNOWN_OPCODES.has(op)) opcodes.push(op);
+  let done = 0;
+  for (const op of opcodes) {
+    if (probeAbort) break;
+    probeCurrentOpcode = op;
+    for (const shape of shapes) {
+      if (probeAbort) break;
+      try { await sendCmd(buildPacket(op, shape)); } catch {}
+      await sleep(180);
+    }
+    // Listen one more window after the last shape so streaming responses get
+    // attributed to the right opcode bucket.
+    await sleep(400);
+    done++;
+    $('probeStatus').textContent = `probing… ${done}/${opcodes.length} opcodes · ${probeBuckets.size} buckets`;
+    if ((done & 3) === 0) renderProbeResults();
+    // Stop early if we found a clear live stream.
+    const top = probeStats()[0];
+    if (top && top.opcode != null && top.rate >= 5 && top.entropy >= 0.4 && top.count >= 20) {
+      $('probeStatus').textContent = `★ LIVE STREAM FOUND on opcode 0x${top.opcode.toString(16)} char ${top.uuid.slice(4,8)} — stopping early.`;
+      break;
+    }
+  }
+  probeCurrentOpcode = null;
+  probeRunning = false; probeAbort = false;
+  $('probeStart').disabled = false; $('probeMonitor').disabled = false; $('probeStop').disabled = true;
+  renderProbeResults();
+  if ($('probeStatus').textContent.startsWith('probing')) {
+    const top = probeStats()[0];
+    if (top && top.rate >= 5 && top.entropy >= 0.4) {
+      $('probeStatus').textContent = `★ candidate: opcode ${top.opcode == null ? 'passive' : '0x'+top.opcode.toString(16)} on ${top.uuid.slice(4,8)} @ ${top.rate.toFixed(1)}Hz`;
+    } else {
+      $('probeStatus').textContent = `sweep complete — no live-stream opcode found. Firmware likely does not expose raw motion.`;
+    }
+  }
+}
+$('probeStart').onclick = probeSweep;
+$('probeMonitor').onclick = () => {
+  probeCurrentOpcode = null;
+  $('probeStatus').textContent = 'passive monitor — every incoming packet is tallied (no commands sent).';
+  $('probeStop').disabled = false;
+};
+$('probeStop').onclick = () => {
+  probeAbort = true;
+  $('probeStop').disabled = true;
+  $('probeStatus').textContent = 'stopped.';
+};
+$('probeClear').onclick = () => {
+  probeBuckets.clear();
+  renderProbeResults();
+  $('probeStatus').textContent = 'cleared.';
+};
+setInterval(() => { if (probeBuckets.size) renderProbeResults(); }, 600);
+
+// ==========================================================================
 // Court movement / explosive step tracker (phone IMU)
 // Peak-picks on the linear accel magnitude. A step = local peak above
 // THRESH_STEP with a refractory period. Explosive step = peak above THRESH_EXP
