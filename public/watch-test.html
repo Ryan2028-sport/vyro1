@@ -206,7 +206,9 @@ const CMD = {
   SET_TIME:        0x01,
   BATTERY:         0x03,
   REBOOT:          0x08,
-  STEPS:           0x15,           // (today)
+  HEART_RATE_LOG:  0x15,           // historical HR log — not movement
+  SPORTS_DATA:     0x43,           // daily sport intervals, exact steps at bytes 9..10
+  STEPS:           0x48,           // today's sport total, exact 24-bit steps at bytes 1..3
   REAL_TIME_START: 0x69,
   REAL_TIME_STOP:  0x6A,
   FIRMWARE:        0xa1,
@@ -229,6 +231,7 @@ function buildSetTime(d = new Date()) {
   return buildPacket(CMD.SET_TIME, [y, d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), 1, 0]);
 }
 function hex(buf) { return [...buf].map(b => b.toString(16).padStart(2, '0')).join(' '); }
+function buildSportsDataRequest(dayOffset = 0) { return buildPacket(CMD.SPORTS_DATA, [dayOffset, 0x0f, 0x00, 0x5f, 0x01]); }
 
 // Standard BLE GATT (used by HRM Dual, Polar H10, Wahoo, generic HRMs)
 const STD_HR_SERVICE   = 0x180D;
