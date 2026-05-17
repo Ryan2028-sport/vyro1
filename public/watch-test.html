@@ -1229,6 +1229,7 @@ function onWatchSteps(totalSteps) {
   if (detectorDelta > 0 && detectorDelta <= 30) deltaSteps = detectorDelta;
   // Arm-up: keep tracking baseline but ignore movement.
   if (court.armUntilMs && now < court.armUntilMs) {
+    lastBySource[detectorSource] = totalSteps;
     court.watchLastSteps = totalSteps;
     court.watchLastTickMs = now;
     if (deltaSteps > 0) court.watchLastChangeMs = now;
