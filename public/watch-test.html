@@ -1537,15 +1537,19 @@ async function startCourt() {
     }, 250);
     if (writeChar && protocol === 'qcband') {
       await startHeartRateStream();
+      await sendCmd(buildPacket(CMD.STEPS));
+      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
       court.watchPollTimer = setInterval(
         () => { sendCmd(buildPacket(CMD.STEPS)); setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120); },
-        1000
+        700
       );
     } else if (writeChar) {
+      await sendCmd(buildPacket(CMD.STEPS));
+      setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
       court.watchPollTimer = setInterval(() => {
         sendCmd(buildPacket(CMD.STEPS));
         setTimeout(() => sendCmd(buildSportsDataRequest(0)), 120);
-      }, 1000);
+      }, 700);
     }
     // Watch mode must be step-counter gated. Do not attach the computer/phone IMU
     // here, because desk vibration or holding the phone still can create false steps.
