@@ -150,6 +150,7 @@ const STD_MFR_NAME     = 0x2A29;
 let device = null, server = null, writeChar = null, notifyChar = null;
 let hrInterval = null;
 let protocol = null; // 'qcband' | 'standard-hr'
+let hrSamples = []; // rolling buffer for median/avg smoothing
 
 // ----- UI helpers -----
 const $ = id => document.getElementById(id);
