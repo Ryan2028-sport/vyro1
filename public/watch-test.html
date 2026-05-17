@@ -871,6 +871,35 @@ function pulseCourtDot(deltaSteps = 1) {
   updateCourtPosition();
 }
 
+// Cardinal directions: forward (toward front wall), back, left, right.
+const COURT_DIRS = [
+  { dx:  0, dy: -1, name: 'forward' },
+  { dx:  0, dy:  1, name: 'back'    },
+  { dx: -1, dy:  0, name: 'left'    },
+  { dx:  1, dy:  0, name: 'right'   },
+];
+function pickCourtDir() {
+  // Weighted pick that biases away from the wall the dot is closest to,
+  // so the player wanders within the court instead of getting pinned.
+  const w = COURT_DIRS.map(d => {
+    const nx = court.px + d.dx * 18;
+    const ny = court.py + d.dy * 18;
+    let weight = 1;
+    if (nx < COURT_BOUNDS.xMin + 8 || nx > COURT_BOUNDS.xMax - 8) weight *= 0.15;
+    if (ny < COURT_BOUNDS.yMin + 8 || ny > COURT_BOUNDS.yMax - 8) weight *= 0.15;
+    // Slight inertia: prefer continuing in the last chosen direction.
+    if (court.lastDirIdx != null && COURT_DIRS[court.lastDirIdx] === d) weight *= 1.6;
+    return weight;
+  });
+  const total = w.reduce((s, v) => s + v, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < w.length; i++) {
+    r -= w[i];
+    if (r <= 0) { court.lastDirIdx = i; return COURT_DIRS[i]; }
+  }
+  court.lastDirIdx = 0; return COURT_DIRS[0];
+}
+
 function takeCourtStep(force = 0.5) {
   const pulse = $('playerPulse');
   if (pulse) {
@@ -878,17 +907,14 @@ function takeCourtStep(force = 0.5) {
     pulse.setAttribute('r', '11'); pulse.setAttribute('opacity', '0.65');
     pulse.animate([{ r: 11, opacity: 0.65 }, { r: 27, opacity: 0 }], { duration: 520, easing: 'ease-out' });
   }
-  const toT = Math.atan2(COURT_T.y - court.py, COURT_T.x - court.px);
-  const lateral = court.stepSide * (0.45 + Math.min(0.35, force * 0.35));
-  court.stepSide *= -1;
-  const angle = toT + lateral + (Math.random() - 0.5) * 0.25;
-  const travel = 10 + Math.min(13, force * 16);
-  let nx = court.px + Math.cos(angle) * travel;
-  let ny = court.py + Math.sin(angle) * travel;
-  if (ny < COURT_BOUNDS.yMin + 4) ny += travel * 0.8;
+  const dir = pickCourtDir();
+  const travel = 12 + Math.min(10, force * 12); // ~one stride per real step
+  let nx = court.px + dir.dx * travel;
+  let ny = court.py + dir.dy * travel;
   nx = Math.max(COURT_BOUNDS.xMin, Math.min(COURT_BOUNDS.xMax, nx));
   ny = Math.max(COURT_BOUNDS.yMin, Math.min(COURT_BOUNDS.yMax, ny));
   court.px = nx; court.py = ny;
+  court.lastStepDir = dir.name;
   court.trail.push({ x: nx, y: ny });
   if (court.trail.length > 60) court.trail.shift();
   court.movements++;
