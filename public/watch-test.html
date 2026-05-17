@@ -647,13 +647,38 @@ function intensityColor(cad) {
   if (cad < 180) return '#ffb347';
   return '#ff6b6b';
 }
-function pulseCourtDot() {
+function pulseCourtDot(deltaSteps = 1) {
   const pulse = $('playerPulse'); if (!pulse) return;
+  // sync pulse to current position before animating
+  pulse.setAttribute('cx', court.px); pulse.setAttribute('cy', court.py);
   pulse.setAttribute('r', '14'); pulse.setAttribute('opacity', '0.9');
   pulse.animate(
     [{ r: 14, opacity: 0.9 }, { r: 36, opacity: 0 }],
     { duration: 700, easing: 'ease-out' }
   );
+  // Move the dot a distance proportional to step burst (each step ≈ STRIDE_M, ~1m on
+  // an 9.75×6.4m squash court). Direction is random with mild bias back toward T,
+  // so the player wanders around the court realistically.
+  const meters = deltaSteps * STRIDE_M;
+  // court is 280 SVG units tall ≈ 9.75 m → ~28.7 svg per meter (clamp travel per burst)
+  const svgPerM = 24;
+  const travel = Math.min(meters * svgPerM, 90);
+  const biasX = (COURT_T.x - court.px) * 0.15;
+  const biasY = (COURT_T.y - court.py) * 0.15;
+  const angle = Math.random() * Math.PI * 2;
+  let nx = court.px + Math.cos(angle) * travel + biasX;
+  let ny = court.py + Math.sin(angle) * travel + biasY;
+  nx = Math.max(COURT_BOUNDS.xMin, Math.min(COURT_BOUNDS.xMax, nx));
+  ny = Math.max(COURT_BOUNDS.yMin, Math.min(COURT_BOUNDS.yMax, ny));
+  court.px = nx; court.py = ny;
+  court.trail.push({ x: nx, y: ny });
+  if (court.trail.length > 40) court.trail.shift();
+  updateCourtPosition();
+}
+function updateCourtPosition() {
+  const dot = $('playerDot'); const trail = $('playerTrail');
+  if (dot) { dot.setAttribute('cx', court.px); dot.setAttribute('cy', court.py); }
+  if (trail) trail.setAttribute('points', court.trail.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
 }
 function updateCourtVisual() {
   const cad = court.currentCad;
@@ -662,8 +687,39 @@ function updateCourtVisual() {
   dot.setAttribute('fill', color);
   dot.style.filter = `drop-shadow(0 0 ${6 + Math.min(20, cad/10)}px ${color})`;
   dot.setAttribute('r', String(8 + Math.min(10, cad/20)));
-  dot.setAttribute('opacity', String(0.4 + Math.min(0.6, cad/250)));
+  dot.setAttribute('opacity', String(0.5 + Math.min(0.5, cad/250)));
   $('playerPulse').setAttribute('stroke', color);
+  const trail = $('playerTrail'); if (trail) trail.setAttribute('stroke', color);
+}
+
+// ---- Calibration (10s of resting/idle data) ----
+function startCalibration() {
+  if (!court.running) { log('err', 'Start tracking first, then calibrate.'); return; }
+  court.calibrating = true;
+  court.calStartMs = Date.now();
+  court.calHr = [];
+  court.calBase = court.steps;
+  setCourtStatus('calibrating · stand still', 'on');
+  $('courtCal').disabled = true;
+  log('info', 'Calibration started — stand still on the back-left for 10s.');
+  setTimeout(finishCalibration, 10000);
+}
+function finishCalibration() {
+  if (!court.calibrating) return;
+  court.calibrating = false;
+  const elapsedSec = (Date.now() - court.calStartMs) / 1000;
+  if (court.calHr.length) {
+    court.restHr = Math.round(court.calHr.reduce((s,v) => s+v, 0) / court.calHr.length);
+    court.hrBaseline = court.restHr;
+  }
+  const idleSteps = court.steps - (court.calBase || 0);
+  court.idleCadFloor = Math.round((idleSteps / elapsedSec) * 60);
+  // reset positional baseline back to back-left starting point
+  court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
+  updateCourtPosition();
+  setCourtStatus(`calibrated · rest ${court.restHr||'—'} bpm`, 'on');
+  $('courtCal').disabled = false;
+  log('info', `Calibration done. Rest HR ${court.restHr || '—'} bpm · idle cadence ${court.idleCadFloor} spm.`);
 }
 
 // ---- watch-source feeders ----
