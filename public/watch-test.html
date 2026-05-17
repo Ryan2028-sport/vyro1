@@ -551,8 +551,8 @@ function isDesktopWatchOnlyMode() {
 function markWatchStreamAlive(label = 'WATCH STREAM') {
   if (!court.running || court.source !== 'watch') return;
   court.lastWatchPacketMs = performance.now();
-  court.lastMoveMs = court.lastWatchPacketMs;
-  return forceWatchCourtMove(label, 0.46 + Math.min(0.24, (court.currentHr || 80) / 500));
+  updateDebugOverlay('watch', false, label + ' · waiting for step change', { score: 1, changed: 0, gap: 0, uuid: 'watch-stream' });
+  return false;
 }
 
 function inferWatchMotionFromPacket(p, uuid) {
@@ -580,23 +580,7 @@ function inferWatchMotionFromPacket(p, uuid) {
     return;
   }
 
-  court.lastMoveMs = now;
-  const prevMotion = court.lastWatchMotionMs || 0;
-  const motionGap = now - prevMotion;
-  const force = Math.min(1, 0.22 + score / 70);
-  if (motionGap > 110) {
-    court.lastWatchMotionMs = now;
-    court.currentCad = Math.max(court.currentCad, Math.min(220, Math.round(60000 / Math.max(260, motionGap || 600))));
-    $('cCad').textContent = court.currentCad;
-    $('cadNow').textContent = court.currentCad + ' spm';
-    court.recent.push(now);
-    while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
-    moveCourtDotLive(force);
-    updateCourtVisual();
-    updateDebugOverlay('watch', true, 'WATCH LIVE PACKET', { score, changed, gap, uuid: key });
-  } else {
-    updateDebugOverlay('watch', false, `watch refractory ${Math.round(110 - motionGap)}ms`, { score, changed, gap, uuid: key });
-  }
+  updateDebugOverlay('watch', false, 'watch packet changed · waiting for step count', { score, changed, gap, uuid: key });
 }
 
 // ----- parsers -----
