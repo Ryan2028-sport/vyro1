@@ -552,7 +552,7 @@ function markWatchStreamAlive(label = 'WATCH STREAM') {
   if (!court.running || court.source !== 'watch') return;
   court.lastWatchPacketMs = performance.now();
   court.lastMoveMs = court.lastWatchPacketMs;
-  forceWatchCourtMove(label, 0.46 + Math.min(0.24, (court.currentHr || 80) / 500));
+  return forceWatchCourtMove(label, 0.46 + Math.min(0.24, (court.currentHr || 80) / 500));
 }
 
 function inferWatchMotionFromPacket(p, uuid) {
@@ -561,8 +561,8 @@ function inferWatchMotionFromPacket(p, uuid) {
   const prev = watchPacketState.get(key);
   watchPacketState.set(key, { bytes: Array.from(p), ms: now });
   if (!prev) {
-    markWatchStreamAlive('WATCH FIRST PACKET');
-    updateDebugOverlay('watch', true, 'WATCH FIRST PACKET', { score: 1, changed: 1, gap: 0, uuid: key });
+    const moved = markWatchStreamAlive('WATCH FIRST PACKET');
+    updateDebugOverlay('watch', !!moved, moved ? 'WATCH FIRST PACKET' : 'watch packet armed', { score: 1, changed: 1, gap: 0, uuid: key });
     return;
   }
 
@@ -575,8 +575,8 @@ function inferWatchMotionFromPacket(p, uuid) {
   }
   const gap = now - prev.ms;
   if (gap < 40 || changed < 1 || score < 2) {
-    markWatchStreamAlive('WATCH STREAM HEARTBEAT');
-    updateDebugOverlay('watch', true, 'WATCH STREAM HEARTBEAT', { score: Math.max(score, 1), changed: Math.max(changed, 1), gap, uuid: key });
+    const moved = markWatchStreamAlive('WATCH STREAM HEARTBEAT');
+    updateDebugOverlay('watch', !!moved, moved ? 'WATCH STREAM HEARTBEAT' : 'watch stream fresh', { score: Math.max(score, 1), changed: Math.max(changed, 1), gap, uuid: key });
     return;
   }
 
