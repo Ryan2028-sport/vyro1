@@ -770,13 +770,14 @@ function onWatchSteps(totalSteps) {
     $('cPeak').textContent = gEst.toFixed(2);
   }
 
-  // pulse the court diagram + update intensity color
-  pulseCourtDot();
+  // pulse the court diagram + update intensity color (skip pos drift during cal)
+  if (!court.calibrating) pulseCourtDot(deltaSteps);
   updateCourtVisual();
 }
 function onWatchHr(bpm) {
   court.currentHr = bpm;
   $('hrNow').textContent = bpm + ' bpm';
+  if (court.calibrating) court.calHr.push(bpm);
   if (court.hrBaseline == null) { court.hrBaseline = bpm; return; }
   court.hrBaseline = court.hrBaseline * 0.95 + bpm * 0.05;
   if (bpm > court.hrPeak) court.hrPeak = bpm;
