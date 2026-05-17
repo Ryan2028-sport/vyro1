@@ -390,7 +390,15 @@ async function connect(filtered = false) {
     }
     $('sync').textContent = new Date().toLocaleTimeString();
   } catch (e) {
-    log('err', 'Connect failed: ' + e.message);
+    const msg = e?.message || String(e);
+    log('err', 'Connect failed: ' + msg);
+    if (/User cancelled|chooser cancelled/i.test(msg)) {
+      log('info', 'Tip: if your watch isn\'t in the list, close its companion app (QCBand/H Band/Da Fit) on your phone, wake the watch screen, then retry.');
+    } else if (/Bluetooth adapter not available|globally disabled/i.test(msg)) {
+      log('info', 'Tip: turn on Bluetooth on this device, then retry.');
+    } else if (/Web Bluetooth API is not available|secure context/i.test(msg)) {
+      log('info', 'Tip: Web Bluetooth needs HTTPS and a supported browser (Chrome/Edge/Opera on desktop or Android — iOS Safari is not supported).');
+    }
     setStatus('error', 'err');
   }
 }
