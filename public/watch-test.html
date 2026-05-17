@@ -246,6 +246,7 @@ let protocol = null; // 'qcband' | 'standard-hr'
 let hrSamples = []; // rolling buffer for median/avg smoothing
 let hrDisplayed = null; // EMA-smoothed displayed bpm
 let hrLastUpdate = 0;   // ms timestamp of last accepted sample
+const watchPacketState = new Map(); // per-characteristic packet deltas for live watch motion
 
 // ----- UI helpers -----
 const $ = id => document.getElementById(id);
@@ -322,8 +323,8 @@ async function connect(filtered = false) {
               if (isStdHr) {
                 try { onStdHr({ target: { value: e.target.value } }); } catch {}
               } else {
-                // QCBand / vendor framed packets
-                parsePacket(data);
+                // QCBand / vendor framed packets + generic watch motion packets
+                handleWatchPacket(data, c.uuid);
               }
             });
           } catch (err) { log('err', `notify ${c.uuid.slice(4,8)}: ${err.message}`); }
@@ -436,9 +437,78 @@ async function sendCmd(packet) {
 function onNotify(e) {
   const data = new Uint8Array(e.target.value.buffer);
   log('in', '← ' + hex(data));
-  parsePacket(data);
+  handleWatchPacket(data, 'manual');
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function handleWatchPacket(p, uuid = 'watch') {
+  parsePacket(p);
+  if (!court.running || court.source !== 'watch' || court.calibrating) return;
+
+  const id = p[0];
+  const isKnownPassive =
+    id === CMD.BATTERY || id === CMD.FIRMWARE ||
+    (id === CMD.REAL_TIME_START && (p[1] === RT_TYPE.HEART_RATE || p[1] === RT_TYPE.SPO2));
+
+  // Some watches send steps in vendor packets that are not CMD.STEPS. Try all
+  // common little-endian layouts and use any monotonic, plausible step increase.
+  if (id !== CMD.STEPS && !isKnownPassive) {
+    const genericSteps = readGenericStepTotal(p);
+    if (genericSteps != null) onWatchSteps(genericSteps);
+    inferWatchMotionFromPacket(p, uuid);
+  }
+}
+
+function readGenericStepTotal(p) {
+  const vals = [];
+  for (let o = 1; o < p.length - 1; o++) vals.push(p[o] | (p[o + 1] << 8));
+  for (let o = 1; o < p.length - 2; o++) vals.push(p[o] | (p[o + 1] << 8) | (p[o + 2] << 16));
+  for (let o = 1; o < p.length - 3; o++) vals.push((p[o] | (p[o + 1] << 8) | (p[o + 2] << 16) | (p[o + 3] << 24)) >>> 0);
+  const candidates = vals.filter(v => Number.isFinite(v) && v > 0 && v < 1000000);
+  if (!candidates.length) return null;
+
+  const prev = court.watchLastSteps;
+  if (prev == null) return candidates.sort((a, b) => a - b)[0];
+
+  const plausible = candidates
+    .map(v => ({ v, d: v - prev }))
+    .filter(x => x.d > 0 && x.d <= 40)
+    .sort((a, b) => a.d - b.d);
+  return plausible[0]?.v ?? null;
+}
+
+function inferWatchMotionFromPacket(p, uuid) {
+  const now = performance.now();
+  const key = uuid || 'watch';
+  const prev = watchPacketState.get(key);
+  watchPacketState.set(key, { bytes: Array.from(p), ms: now });
+  if (!prev) return;
+
+  let changed = 0, score = 0;
+  const len = Math.max(p.length, prev.bytes.length);
+  for (let i = 0; i < len; i++) {
+    const d = Math.abs((p[i] || 0) - (prev.bytes[i] || 0));
+    if (d) changed++;
+    score += Math.min(32, d);
+  }
+  const gap = now - prev.ms;
+  if (gap < 40 || changed < 2 || score < 10) return;
+
+  court.lastMoveMs = now;
+  const prevMotion = court.lastWatchMotionMs || 0;
+  const motionGap = now - prevMotion;
+  const force = Math.min(1, 0.18 + score / 90);
+  if (motionGap > 110) {
+    court.lastWatchMotionMs = now;
+    court.currentCad = Math.max(court.currentCad, Math.min(220, Math.round(60000 / Math.max(260, motionGap || 600))));
+    $('cCad').textContent = court.currentCad;
+    $('cadNow').textContent = court.currentCad + ' spm';
+    court.recent.push(now);
+    while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
+    moveCourtDotLive(force);
+    updateCourtVisual();
+  }
+}
 
 // ----- parsers -----
 function parsePacket(p) {
@@ -586,7 +656,7 @@ const court = {
   // visualization
   px: COURT_START.x, py: COURT_START.y,
   trail: [],          // recent {x,y} for trail polyline
-  liveMoveMs: 0, lastHrMs: 0, lastMoveMs: 0, lastHrValue: null,
+  liveMoveMs: 0, lastHrMs: 0, lastMoveMs: 0, lastHrValue: null, lastWatchMotionMs: 0,
   // ui
   cadHist: [], hrHist: [], movements: 0, movingMs: 0, stillMs: 0,
   lastTickMs: 0, currentCad: 0, currentHr: 0,
@@ -608,7 +678,8 @@ function resetCourt() {
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
   court.cadHist = []; court.hrHist = [];
   court.movements = 0; court.movingMs = 0; court.stillMs = 0;
-  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0; court.lastMoveMs = 0; court.lastHrValue = null;
+  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0; court.lastMoveMs = 0; court.lastHrValue = null; court.lastWatchMotionMs = 0;
+  watchPacketState.clear();
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
   updateCourtPosition();
   $('cSteps').textContent = '0';
@@ -968,8 +1039,13 @@ async function startCourt() {
       await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
       court.watchPollTimer = setInterval(
         () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
-        500
+        300
       );
+    } else if (writeChar) {
+      court.watchPollTimer = setInterval(() => {
+        sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+        setTimeout(() => sendCmd(buildPacket(CMD.STEPS)), 120);
+      }, 450);
     }
     // Also attach the PHONE accelerometer — it drives live dot movement as you move.
     const imuOk = await attachPhoneMotion();
@@ -977,8 +1053,8 @@ async function startCourt() {
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    setCourtStatus(imuOk ? 'watch + phone IMU · tracking' : 'watch · tracking (no phone IMU)', 'on');
-    log('info', `Court tracking — watch (${protocol}) + phone IMU=${imuOk}. Move your phone (in hand/pocket) to see the dot move live.`);
+    setCourtStatus(imuOk ? 'watch motion + phone IMU · live' : 'watch motion · live', 'on');
+    log('info', `Court tracking — using live watch packets/steps (${protocol})${imuOk ? ' + phone IMU assist' : ''}. Take steps with the watch to move the green dot.`);
     return;
   }
   // Fallback → phone IMU only
