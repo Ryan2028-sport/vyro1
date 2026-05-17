@@ -461,16 +461,12 @@ function handleWatchPacket(p, uuid = 'watch') {
   court.lastWatchPacketMs = performance.now();
 
   const id = p[0];
-  const isKnownPassive =
-    id === CMD.BATTERY || id === CMD.FIRMWARE ||
-    (id === CMD.REAL_TIME_START && (p[1] === RT_TYPE.HEART_RATE || p[1] === RT_TYPE.SPO2));
-
-  if (!isKnownPassive) {
-    // CMD.STEPS is already parsed once in parsePacket(). Do not run the generic
-    // field scanner on it, because checksums/timestamps can look like fake steps.
-    if (id !== CMD.STEPS) inferWatchMotionFromPacket(p, uuid);
-  } else if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
+  if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
     markWatchStreamAlive('HR packet live');
+  } else if (id !== CMD.STEPS) {
+    // Unknown/HR/Battery packets are proof the watch is connected, not proof of
+    // movement. Do not convert changing bytes/checksums into fake court steps.
+    markWatchStreamAlive('watch packet live');
   }
 }
 
@@ -720,16 +716,10 @@ function parsePacket(p) {
       // H59 Pro layout: p[1]=type (1=HR, 3=SpO2), p[2]=err/sub,
       // p[6..7] = sensor value, little-endian uint16 (bpm * 10).
       const type = p[1];
-      // Many firmwares also embed a live step counter in the HR-stream packet.
-      // Scan for it and feed it to the court tracker — works even if 0x15 STEPS is silent.
       if (type === RT_TYPE.HEART_RATE) {
         if (!court._hrLogThrottle || performance.now() - court._hrLogThrottle > 2000) {
           court._hrLogThrottle = performance.now();
           log('info', `HR raw: ${hex(p)}`);
-        }
-        const hrSteps = detectAndReadStepCounter(p, 'HR');
-        if (hrSteps != null && court.running && court.source === 'watch') {
-          onWatchSteps(hrSteps);
         }
       }
         const raw = p[6] | (p[7] << 8);
