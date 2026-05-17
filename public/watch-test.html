@@ -472,6 +472,14 @@ function handleWatchPacket(p, uuid = 'watch') {
   court.lastWatchPacketMs = performance.now();
 
   const id = p[0];
+  if (id !== CMD.STEPS && id !== CMD.SPORTS_DATA && id !== CMD.DEVICE_NOTIFY && id !== CMD.REAL_TIME_START && id !== CMD.BATTERY && id !== CMD.FIRMWARE) {
+    const autoSteps = detectAutoStepCounter(p, uuid);
+    if (autoSteps != null) {
+      $('steps').textContent = autoSteps.toLocaleString();
+      onWatchSteps(autoSteps);
+      return;
+    }
+  }
   if (id === CMD.REAL_TIME_START && p[1] === RT_TYPE.HEART_RATE) {
     markWatchStreamAlive('HR packet live');
   } else if (id !== CMD.STEPS) {
