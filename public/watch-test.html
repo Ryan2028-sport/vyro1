@@ -1126,7 +1126,7 @@ async function startCourt() {
     court.running = true;
     court.startMs = Date.now();
     if (writeChar && protocol === 'qcband') {
-      await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
+      await startHeartRateStream();
       court.watchPollTimer = setInterval(
         () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
         300
@@ -1144,7 +1144,7 @@ async function startCourt() {
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
     setCourtStatus(imuOk ? 'watch motion + phone IMU · live' : 'watch motion · live', 'on');
-    log('info', `Court tracking — using live watch packets/steps (${protocol})${imuOk ? ' + phone IMU assist' : ''}. Take steps with the watch to move the green dot.`);
+    log('info', `Court tracking — HR + movement linked (${protocol})${imuOk ? ' + phone IMU assist' : ''}. The dot moves from real steps/motion while HR streams.`);
     return;
   }
   // Fallback → phone IMU only
