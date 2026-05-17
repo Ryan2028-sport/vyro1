@@ -55,10 +55,20 @@
     ⚠️ Web Bluetooth not available. Use Chrome, Edge, or Opera on desktop or Android. iOS Safari is not supported.
   </div>
 
+  <div class="warning" style="background:rgba(80,160,255,.08);border-color:rgba(80,160,255,.3);color:#bcd9ff">
+    <b>Watch not showing in the chooser?</b><br>
+    1. <b>Close the watch's own app</b> (QCBand / Colmi / H Band / Da Fit) on your phone — while it's connected there, the watch stops advertising to anything else.<br>
+    2. <b>Forget the watch</b> in your phone's system Bluetooth settings, then retry.<br>
+    3. Make sure the <b>watch screen is on</b> (tap it) so it's actively advertising.<br>
+    4. On Android Chrome, enable <code>chrome://flags/#enable-web-bluetooth-new-permissions-backend</code> if devices still don't appear.<br>
+    5. Try <b>"Scan watches only"</b> below — it filters by common watch name prefixes which sometimes surfaces devices that "Scan all" misses.
+  </div>
+
   <div class="panel">
     <div class="row" style="justify-content:space-between">
       <div class="row">
-        <button id="connectBtn" class="cta">Connect Watch</button>
+        <button id="connectBtn" class="cta">Scan all nearby</button>
+        <button id="connectFilteredBtn" class="cta" style="background:#1e4d7a">Scan watches only</button>
         <button id="disconnectBtn" class="ghost" disabled>Disconnect</button>
       </div>
       <div id="status" class="status"><span class="dot"></span><span id="statusText">disconnected</span></div>
