@@ -1585,6 +1585,7 @@ async function startCourt() {
     if (isMobile) {
       const phoneOk = await attachPhoneMotion();
       if (phoneOk) {
+        court.phoneAssistActive = true;
         setCourtStatus('watch + phone motion · live', 'on');
         log('info', `Court tracking live — phone IMU drives per-step dot, watch step counter syncs totals (${protocol}).`);
       } else {
