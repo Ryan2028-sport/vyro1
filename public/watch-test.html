@@ -735,6 +735,7 @@ function resetCourt() {
   $('hrNow').textContent  = '— bpm';
   drawSpark('cadChart', [], '#39ff88', 240);
   drawSpark('hrChart',  [], '#ff6b6b', 200);
+  watchStepFieldState.clear();
 }
 
 // ---- sparkline + court pulse ----
@@ -899,6 +900,9 @@ function onWatchSteps(totalSteps) {
   court.watchLastTickMs = now;
   if (deltaSteps <= 0 || dt <= 0) return;
   court.lastMoveMs = now;
+  court.lastWatchMotionMs = now;
+  court.recent.push(now);
+  while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
 
   // session step count = total - base
   court.steps = totalSteps - court.watchBaseSteps;
@@ -912,9 +916,18 @@ function onWatchSteps(totalSteps) {
   $('cCad').textContent = cadSpm;
   $('cadNow').textContent = cadSpm + ' spm';
 
-  // count discrete "movements" (each polling burst that contains steps)
-  court.movements++;
-  $('movements').textContent = court.movements;
+  // Move the green dot immediately for every watch step burst, not only from HR.
+  if (!court.calibrating) {
+    const pulses = Math.min(6, Math.max(1, deltaSteps));
+    for (let i = 0; i < pulses; i++) {
+      setTimeout(() => {
+        if (!court.running || court.source !== 'watch') return;
+        moveCourtDotLive(Math.min(1, 0.35 + rate * 0.18));
+        updateCourtVisual();
+      }, i * 90);
+    }
+    pulseCourtDot(deltaSteps);
+  }
 
   // explosive: rate ≥ 3 steps/sec → sprint cadence (~180 spm)
   // lunge burst: ≥ 5 steps/sec or single-burst with ≥ 4 steps in <1s window
@@ -933,8 +946,6 @@ function onWatchSteps(totalSteps) {
     $('cPeak').textContent = gEst.toFixed(2);
   }
 
-  // pulse the court diagram + update intensity color (skip pos drift during cal)
-  if (!court.calibrating) pulseCourtDot(deltaSteps);
   updateCourtVisual();
 }
 function onWatchHr(bpm) {
