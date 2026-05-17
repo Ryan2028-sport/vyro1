@@ -136,9 +136,20 @@ function buildSetTime(d = new Date()) {
 }
 function hex(buf) { return [...buf].map(b => b.toString(16).padStart(2, '0')).join(' '); }
 
+// Standard BLE GATT (used by HRM Dual, Polar H10, Wahoo, generic HRMs)
+const STD_HR_SERVICE   = 0x180D;
+const STD_HR_MEASURE   = 0x2A37;
+const STD_BODY_SENSOR  = 0x2A38;
+const STD_BATTERY_SVC  = 0x180F;
+const STD_BATTERY_LVL  = 0x2A19;
+const STD_DEVICE_INFO  = 0x180A;
+const STD_FW_REV       = 0x2A26;
+const STD_MFR_NAME     = 0x2A29;
+
 // ----- state -----
 let device = null, server = null, writeChar = null, notifyChar = null;
 let hrInterval = null;
+let protocol = null; // 'qcband' | 'standard-hr'
 
 // ----- UI helpers -----
 const $ = id => document.getElementById(id);
@@ -163,42 +174,103 @@ async function connect() {
   try {
     log('info', 'Requesting device…');
     device = await navigator.bluetooth.requestDevice({
-      filters: [
-        { services: [SERVICE_UUID] },
-        { namePrefix: 'R0' }, { namePrefix: 'QCBand' }, { namePrefix: 'Colmi' },
-        { namePrefix: 'RY0' }, { namePrefix: 'VK' },
+      // Accept ANY nearby BLE device so we can also pair standard HRMs
+      // (HRM Dual, Polar, Wahoo) AND proprietary QCBand/Colmi watches.
+      acceptAllDevices: true,
+      optionalServices: [
+        SERVICE_UUID, 'battery_service', 'device_information', 'heart_rate',
+        STD_HR_SERVICE, STD_BATTERY_SVC, STD_DEVICE_INFO,
       ],
-      optionalServices: [SERVICE_UUID, 'battery_service', 'device_information'],
     });
     log('info', `Selected: ${device.name || '(unnamed)'} [${device.id}]`);
     device.addEventListener('gattserverdisconnected', onDisconnected);
     setStatus('connecting…');
     server = await device.gatt.connect();
-    log('info', 'GATT connected, getting service…');
-    const svc = await server.getPrimaryService(SERVICE_UUID);
-    writeChar  = await svc.getCharacteristic(WRITE_UUID);
-    notifyChar = await svc.getCharacteristic(NOTIFY_UUID);
-    await notifyChar.startNotifications();
-    notifyChar.addEventListener('characteristicvaluechanged', onNotify);
-    log('info', 'Notifications started.');
+    log('info', 'GATT connected, discovering services…');
+
+    const services = await server.getPrimaryServices();
+    const uuids = services.map(s => s.uuid);
+    log('info', 'Services: ' + uuids.join(', '));
+
+    // Prefer QCBand proprietary protocol if present
+    const qc = services.find(s => s.uuid === SERVICE_UUID);
+    const hr = services.find(s => s.uuid === '0000180d-0000-1000-8000-00805f9b34fb');
+
+    if (qc) {
+      protocol = 'qcband';
+      writeChar  = await qc.getCharacteristic(WRITE_UUID);
+      notifyChar = await qc.getCharacteristic(NOTIFY_UUID);
+      await notifyChar.startNotifications();
+      notifyChar.addEventListener('characteristicvaluechanged', onNotify);
+      log('info', 'QCBand protocol ready.');
+    } else if (hr) {
+      protocol = 'standard-hr';
+      log('info', 'Standard Heart Rate Service detected (0x180D).');
+      const hrm = await hr.getCharacteristic(STD_HR_MEASURE);
+      await hrm.startNotifications();
+      hrm.addEventListener('characteristicvaluechanged', onStdHr);
+      log('info', 'HR notifications started — wear the strap to see bpm.');
+    } else {
+      throw new Error('No supported service. Found: ' + uuids.join(', '));
+    }
+
     setStatus('connected', 'on');
     setConnected(true);
     $('deviceInfo').style.display = 'block';
-    $('deviceInfo').textContent = `${device.name || 'Watch'} · ${device.id}`;
+    $('deviceInfo').textContent = `${device.name || 'Watch'} · ${protocol} · ${device.id}`;
 
-    // Auto-fetch initial data
-    await sendCmd(buildSetTime());
-    await sleep(200);
-    await sendCmd(buildPacket(CMD.BATTERY));
-    await sleep(200);
-    await sendCmd(buildPacket(CMD.FIRMWARE));
-    await sleep(200);
-    await sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+    // Battery (standard service, supported by both)
+    try {
+      const bsvc = services.find(s => s.uuid === '0000180f-0000-1000-8000-00805f9b34fb');
+      if (bsvc) {
+        const b = await bsvc.getCharacteristic(STD_BATTERY_LVL);
+        const v = await b.readValue();
+        $('battery').textContent = v.getUint8(0);
+        log('in', `Battery: ${v.getUint8(0)}%`);
+      }
+    } catch (e) { log('err', 'Battery read: ' + e.message); }
+
+    // Device info (firmware/manufacturer)
+    try {
+      const di = services.find(s => s.uuid === '0000180a-0000-1000-8000-00805f9b34fb');
+      if (di) {
+        try {
+          const fw = await di.getCharacteristic(STD_FW_REV);
+          const v = await fw.readValue();
+          const s = new TextDecoder().decode(v.buffer);
+          $('fw').textContent = s; log('in', 'Firmware: ' + s);
+        } catch {}
+        try {
+          const mn = await di.getCharacteristic(STD_MFR_NAME);
+          const v = await mn.readValue();
+          log('in', 'Manufacturer: ' + new TextDecoder().decode(v.buffer));
+        } catch {}
+      }
+    } catch (e) { log('err', 'Device info: ' + e.message); }
+
+    if (protocol === 'qcband') {
+      await sendCmd(buildSetTime()); await sleep(200);
+      await sendCmd(buildPacket(CMD.BATTERY)); await sleep(200);
+      await sendCmd(buildPacket(CMD.FIRMWARE)); await sleep(200);
+      await sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff]));
+    }
     $('sync').textContent = new Date().toLocaleTimeString();
   } catch (e) {
     log('err', 'Connect failed: ' + e.message);
     setStatus('error', 'err');
   }
+}
+
+// Parse standard 0x2A37 Heart Rate Measurement characteristic
+function onStdHr(e) {
+  const v = e.target.value;
+  const flags = v.getUint8(0);
+  const hr16 = flags & 0x01;
+  const bpm = hr16 ? v.getUint16(1, true) : v.getUint8(1);
+  $('hr').textContent = bpm;
+  $('sync').textContent = new Date().toLocaleTimeString();
+  log('in', `HR: ${bpm} bpm`);
+  // Energy expended + RR-intervals could be parsed here too
 }
 async function disconnect() {
   try {
