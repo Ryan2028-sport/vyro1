@@ -1601,13 +1601,22 @@ let imuTickTimer = null;
 function startImuTick() {
   if (imuTickTimer) return;
   imuTickTimer = setInterval(() => {
-    if (!court.running || court.source !== 'watch') return;
+    if (!court.running) return;
     let totalVx = 0, totalVy = 0, active = 0;
     for (const st of imuState.values()) {
       if (!st.locked) continue;
       totalVx += st.vx; totalVy += st.vy;
       st.vx *= IMU_CFG.velocityDamp;
       st.vy *= IMU_CFG.velocityDamp;
+      active++;
+    }
+    // Phone-IMU velocity (set by onMotion when calibration peaks exist).
+    if (phoneImuState.vx || phoneImuState.vy) {
+      totalVx += phoneImuState.vx || 0; totalVy += phoneImuState.vy || 0;
+      phoneImuState.vx = (phoneImuState.vx || 0) * IMU_CFG.velocityDamp;
+      phoneImuState.vy = (phoneImuState.vy || 0) * IMU_CFG.velocityDamp;
+      if (Math.abs(phoneImuState.vx) < 0.05) phoneImuState.vx = 0;
+      if (Math.abs(phoneImuState.vy) < 0.05) phoneImuState.vy = 0;
       active++;
     }
     let nx = court.px, ny = court.py;
