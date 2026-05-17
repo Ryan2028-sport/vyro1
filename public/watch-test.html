@@ -671,7 +671,7 @@ const STRIDE_M = 0.72;          // avg squash court step length
 const THRESH_STEP = 0.055;      // sensitive phone step threshold from accel/jerk score
 const THRESH_EXP  = 0.42;       // explosive push-off threshold from accel/jerk score
 const THRESH_LUNGE = 0.72;      // hard lunge / sprint start
-const REFRACTORY_MS = 300;      // min gap between counted steps
+const REFRACTORY_MS = 170;      // min gap between counted steps (fast, ~350spm cap)
 
 // Court coordinate space (matches SVG viewBox 0 0 200 280)
 // Front glass is the top of the court drawing; tracking starts there when the phone is placed up front.
@@ -982,26 +982,27 @@ function onMotion(e) {
   const jerk = prev ? Math.sqrt((ax - prev.x)**2 + (ay - prev.y)**2 + (az - prev.z)**2) / 9.81 : 0;
   court.lastMotionVector = { x: ax, y: ay, z: az };
   const motionScore = Math.max(dyn * 0.9, jerk * 1.9);
-  court.lastMotionScore = court.lastMotionScore * 0.62 + motionScore * 0.38;
+  // Light smoothing only for the UI peak readout; step detection uses raw motionScore for zero lag.
+  court.lastMotionScore = court.lastMotionScore * 0.35 + motionScore * 0.65;
   if (motionScore > court.peakG) {
     court.peakG = motionScore;
     $('cPeak').textContent = motionScore.toFixed(2);
   }
-  // Step-accurate movement: each phone accel footfall counts one step and moves the dot once.
-  // If the phone reports a long smooth motion without distinct peaks, add slow fallback steps while moving.
-  if (!court.calibrating && court.lastMotionScore > PHONE_STEP_RELEASE) {
+  // Step-accurate movement: trigger off the raw motionScore peak so the dot reacts the instant
+  // the phone accelerates, matching the responsiveness of HR-driven updates.
+  if (!court.calibrating && motionScore > PHONE_STEP_RELEASE) {
     court.lastMoveMs = now;
     if (!court.sustainedMotionStartMs) court.sustainedMotionStartMs = now;
-  } else {
+  } else if (motionScore < PHONE_STEP_RELEASE * 0.6) {
     court.stepArmed = true;
     court.sustainedMotionStartMs = 0;
   }
 
-  const peakStep = court.stepArmed && court.lastMotionScore >= THRESH_STEP;
-  const sustainedStep = court.sustainedMotionStartMs && court.lastMotionScore >= MOTION_MOVE_THRESHOLD && (now - court.lastStepMs) >= 560 && (now - court.sustainedMotionStartMs) >= 180;
+  const peakStep = court.stepArmed && motionScore >= THRESH_STEP;
+  const sustainedStep = court.sustainedMotionStartMs && motionScore >= MOTION_MOVE_THRESHOLD && (now - court.lastStepMs) >= 380;
   if ((peakStep || sustainedStep) && (now - court.lastStepMs) >= REFRACTORY_MS) {
-    const force = Math.min(1, 0.24 + court.lastMotionScore * 2.8);
-    const lastGap = court.lastStepMs ? (now - court.lastStepMs) : 700;
+    const force = Math.min(1, 0.24 + motionScore * 2.8);
+    const lastGap = court.lastStepMs ? (now - court.lastStepMs) : 500;
     court.lastStepMs = now;
     court.lastLiveMoveMs = now;
     court.stepArmed = false;
@@ -1010,16 +1011,13 @@ function onMotion(e) {
     while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
     if (motionScore >= THRESH_LUNGE) { court.lunges++; $('cLunge').textContent = court.lunges; }
     if (motionScore >= THRESH_EXP)   { court.explosive++; $('cExp').textContent = court.explosive; }
-    court.currentCad = Math.max(court.currentCad, Math.min(190, Math.round(60000 / Math.max(315, lastGap))));
+    court.currentCad = Math.max(court.currentCad, Math.min(220, Math.round(60000 / Math.max(220, lastGap))));
     $('cSteps').textContent = court.steps;
     $('cDist').textContent = Math.round(court.steps * STRIDE_M);
     $('cCad').textContent = court.currentCad;
     $('cadNow').textContent = court.currentCad + ' spm';
     takeCourtStep(force);
     updateCourtVisual();
-  }
-  if (court.lastMotionScore < PHONE_STEP_RELEASE) {
-    court.stepArmed = true;
   }
 }
 async function attachPhoneMotion() {
