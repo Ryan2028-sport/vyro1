@@ -551,8 +551,8 @@ function isDesktopWatchOnlyMode() {
 function markWatchStreamAlive(label = 'WATCH STREAM') {
   if (!court.running || court.source !== 'watch') return;
   court.lastWatchPacketMs = performance.now();
-  court.lastMoveMs = court.lastWatchPacketMs;
-  return forceWatchCourtMove(label, 0.46 + Math.min(0.24, (court.currentHr || 80) / 500));
+  updateDebugOverlay('watch', false, label + ' · waiting for step change', { score: 1, changed: 0, gap: 0, uuid: 'watch-stream' });
+  return false;
 }
 
 function inferWatchMotionFromPacket(p, uuid) {
@@ -580,23 +580,7 @@ function inferWatchMotionFromPacket(p, uuid) {
     return;
   }
 
-  court.lastMoveMs = now;
-  const prevMotion = court.lastWatchMotionMs || 0;
-  const motionGap = now - prevMotion;
-  const force = Math.min(1, 0.22 + score / 70);
-  if (motionGap > 110) {
-    court.lastWatchMotionMs = now;
-    court.currentCad = Math.max(court.currentCad, Math.min(220, Math.round(60000 / Math.max(260, motionGap || 600))));
-    $('cCad').textContent = court.currentCad;
-    $('cadNow').textContent = court.currentCad + ' spm';
-    court.recent.push(now);
-    while (court.recent.length && court.recent[0] < now - 10000) court.recent.shift();
-    moveCourtDotLive(force);
-    updateCourtVisual();
-    updateDebugOverlay('watch', true, 'WATCH LIVE PACKET', { score, changed, gap, uuid: key });
-  } else {
-    updateDebugOverlay('watch', false, `watch refractory ${Math.round(110 - motionGap)}ms`, { score, changed, gap, uuid: key });
-  }
+  updateDebugOverlay('watch', false, 'watch packet changed · waiting for step count', { score, changed, gap, uuid: key });
 }
 
 // ----- parsers -----
@@ -911,6 +895,7 @@ function forceWatchCourtMove(reason = 'WATCH STREAM FALLBACK', force = 0.42) {
   const now = performance.now();
   const gap = now - (court.lastStepMs || 0);
   if (!court.running || court.source !== 'watch' || gap < 180) return false;
+  if (!/STEP/i.test(reason)) return false;
   court.lastStepMs = now;
   court.lastMoveMs = now;
   court.lastWatchMotionMs = now;
@@ -931,12 +916,7 @@ function startWatchMotionAssist() {
   if (court.watchMotionAssistTimer) clearInterval(court.watchMotionAssistTimer);
   court.watchMotionAssistTimer = setInterval(() => {
     if (!court.running || court.source !== 'watch') return;
-    const now = performance.now();
-    // Desktop / no-IMU mode: if we've never received a devicemotion event since session start, treat phone as permanently silent.
-    const noPhoneIMU = isDesktopWatchOnlyMode() || !court.lastMotionEventMs || ((Date.now() - court.startMs) > 2500 && (!court.lastLiveMoveMs));
-    const phoneSilent = noPhoneIMU || !court.lastLiveMoveMs || (now - court.lastLiveMoveMs) > 900;
-    const streamFresh = (now - (court.lastWatchPacketMs || 0)) < 5000 || (now - (court.lastHrMs || 0)) < 5000;
-    if (phoneSilent && streamFresh) forceWatchCourtMove(noPhoneIMU ? 'DESKTOP WATCH-ONLY' : 'WATCH STREAM FALLBACK', 0.38 + Math.min(0.32, (court.currentHr || 80) / 450));
+    updateDebugOverlay('watch', false, 'watch connected · waiting for steps', { score: 0, changed: 0, gap: 0, uuid: 'watch-step-gate' });
   }, 300);
 }
 function updateCourtPosition() {
@@ -1063,10 +1043,7 @@ function onWatchHr(bpm) {
   // Use HR only as an activity gate: actual dot steps still come from live
   // phone/watch motion so court movement happens when the athlete moves.
   if (court.running && court.source === 'watch' && prevHr != null) {
-    const rising = bpm >= prevHr + 1;
-    const phoneMotionFresh = (now - (court.lastLiveMoveMs || court.lastMoveMs || 0)) < 1200;
-    if (rising && phoneMotionFresh) court.lastMoveMs = now;
-    if (rising && !phoneMotionFresh) forceWatchCourtMove('RISING HR FALLBACK', 0.5);
+    updateDebugOverlay('watch', false, 'HR live · waiting for step change', { score: bpm, changed: bpm === prevHr ? 0 : 1, gap: now - (court.lastHrMs || now), uuid: 'watch-hr' });
   }
 }
 
