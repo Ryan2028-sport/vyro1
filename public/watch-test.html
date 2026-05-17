@@ -248,6 +248,7 @@ const STD_MFR_NAME     = 0x2A29;
 let device = null, server = null, writeChar = null, notifyChar = null;
 let hrInterval = null;
 let protocol = null; // 'qcband' | 'standard-hr'
+let writeQueue = Promise.resolve();
 let hrSamples = []; // rolling buffer for median/avg smoothing
 let hrDisplayed = null; // EMA-smoothed displayed bpm
 let hrLastUpdate = 0;   // ms timestamp of last accepted sample
@@ -446,11 +447,16 @@ function onDisconnected() {
   $('deviceInfo').style.display = 'none';
   if (hrInterval) { clearInterval(hrInterval); hrInterval = null; }
 }
-async function sendCmd(packet) {
-  if (!writeChar) return;
-  log('out', '→ ' + hex(packet));
-  try { await writeChar.writeValueWithoutResponse(packet); }
-  catch { await writeChar.writeValue(packet); }
+function sendCmd(packet) {
+  if (!writeChar) return Promise.resolve();
+  const run = async () => {
+    if (!writeChar) return;
+    log('out', '→ ' + hex(packet));
+    try { await writeChar.writeValueWithoutResponse(packet); }
+    catch { await writeChar.writeValue(packet); }
+  };
+  writeQueue = writeQueue.then(run, run);
+  return writeQueue;
 }
 function onNotify(e) {
   const v = e.target.value;
