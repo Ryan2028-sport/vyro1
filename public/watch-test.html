@@ -646,12 +646,9 @@ $('btnSteps').onclick   = () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0
 $('btnTime').onclick    = () => sendCmd(buildSetTime());
 $('btnReboot').onclick  = () => sendCmd(buildPacket(CMD.REBOOT, [1]));
 $('btnHrStart').onclick = async () => {
-  hrSamples = []; hrDisplayed = null; hrLastUpdate = 0;
-  $('hr').textContent = '…';
-  await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
-  // ring expects keep-alive ~every 2s for continuous reading
-  if (hrInterval) clearInterval(hrInterval);
-  hrInterval = setInterval(() => sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.CONTINUE)), 2000);
+  if (!court.running) await startCourt();
+  await startHeartRateStream();
+  log('info', 'Heart-rate tracking is linked to court movement. Keep the phone on you or use a watch that sends steps/motion.');
 };
 $('btnHrStop').onclick = async () => {
   if (hrInterval) { clearInterval(hrInterval); hrInterval = null; }
@@ -704,6 +701,15 @@ const court = {
   stepArmed: true, stepSide: 1, sustainedMotionStartMs: 0,
   tickTimer: null, motionHandler: null,
 };
+
+async function startHeartRateStream() {
+  if (!writeChar) return;
+  hrSamples = []; hrDisplayed = null; hrLastUpdate = 0;
+  $('hr').textContent = '…';
+  await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
+  if (hrInterval) clearInterval(hrInterval);
+  hrInterval = setInterval(() => sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.CONTINUE)), 1200);
+}
 
 function fmtTime(ms) {
   const s = Math.floor(ms / 1000);
@@ -960,8 +966,9 @@ function onWatchSteps(totalSteps) {
 }
 function onWatchHr(bpm) {
   const prevHr = court.lastHrValue;
+  const now = performance.now();
   court.currentHr = bpm;
-  court.lastHrMs = performance.now();
+  court.lastHrMs = now;
   court.lastHrValue = bpm;
   if (prevHr != null && bpm >= prevHr + 1) court.lastMoveMs = court.lastHrMs;
   $('hrNow').textContent = bpm + ' bpm';
@@ -969,6 +976,15 @@ function onWatchHr(bpm) {
   if (court.hrBaseline == null) { court.hrBaseline = bpm; return; }
   court.hrBaseline = court.hrBaseline * 0.95 + bpm * 0.05;
   if (bpm > court.hrPeak) court.hrPeak = bpm;
+
+  // HR packets mean the watch stream is alive, but HR alone is not movement.
+  // Use HR only as an activity gate: actual dot steps still come from live
+  // phone/watch motion so court movement happens when the athlete moves.
+  if (court.running && court.source === 'watch' && prevHr != null) {
+    const rising = bpm >= prevHr + 1;
+    const phoneMotionFresh = (now - (court.lastLiveMoveMs || court.lastMoveMs || 0)) < 1200;
+    if (rising && phoneMotionFresh) court.lastMoveMs = now;
+  }
 }
 
 function onMotion(e) {
@@ -1041,7 +1057,7 @@ function tickCourt() {
   const dtMs = court.lastTickMs ? (now - court.lastTickMs) : 500;
   court.lastTickMs = now;
 
-  if (court.source === 'phone') {
+  if (court.source === 'phone' || court.source === 'watch') {
     const pn = performance.now();
     while (court.recent.length && court.recent[0] < pn - 10000) court.recent.shift();
     const motionFresh = (pn - (court.lastMoveMs || 0)) < 900;
@@ -1049,7 +1065,8 @@ function tickCourt() {
     $('cCad').textContent = court.currentCad;
     $('cadNow').textContent = court.currentCad + ' spm';
     updateCourtVisual();
-  } else {
+  }
+  if (court.source === 'watch') {
     // watch source: decay cadence if no recent step packet
     const stale = (performance.now() - (court.watchLastTickMs || 0)) > 2500;
     if (stale) {
@@ -1064,7 +1081,7 @@ function tickCourt() {
       const rest = Math.min(court.restHr || 78, court.hrBaseline || court.currentHr || 78);
       const hrDelta = Math.max(0, court.currentHr - rest);
       const hrFresh = (performance.now() - (court.lastHrMs || 0)) < 7000;
-      const activeFresh = (performance.now() - (court.lastMoveMs || 0)) < 2500;
+      const activeFresh = (performance.now() - (court.lastLiveMoveMs || court.lastMoveMs || 0)) < 1200;
       const intensity = Math.min(1, Math.max(0, hrDelta / 45));
       const synthCad = activeFresh ? Math.round(30 + Math.max(0.12, intensity) * 170) : 0;
       if (hrFresh && activeFresh && synthCad > court.currentCad) {
@@ -1074,11 +1091,7 @@ function tickCourt() {
       }
       court.liveMoveMs += dtMs;
       const interval = Math.max(180, 700 - intensity * 420);
-      if (hrFresh && activeFresh && intensity >= 0.08 && court.liveMoveMs >= interval) {
-        court.liveMoveMs = 0;
-        moveCourtDotLive(Math.max(0.12, intensity));
-        updateCourtVisual();
-      }
+      // Do not create fake movement from HR alone. The dot moves from steps/motion.
     }
   }
 
@@ -1113,7 +1126,7 @@ async function startCourt() {
     court.running = true;
     court.startMs = Date.now();
     if (writeChar && protocol === 'qcband') {
-      await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
+      await startHeartRateStream();
       court.watchPollTimer = setInterval(
         () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
         300
@@ -1131,7 +1144,7 @@ async function startCourt() {
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
     setCourtStatus(imuOk ? 'watch motion + phone IMU · live' : 'watch motion · live', 'on');
-    log('info', `Court tracking — using live watch packets/steps (${protocol})${imuOk ? ' + phone IMU assist' : ''}. Take steps with the watch to move the green dot.`);
+    log('info', `Court tracking — HR + movement linked (${protocol})${imuOk ? ' + phone IMU assist' : ''}. The dot moves from real steps/motion while HR streams.`);
     return;
   }
   // Fallback → phone IMU only
