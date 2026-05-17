@@ -740,16 +740,33 @@ function parsePacket(p) {
       const rawHex = hex(p);
       if (!court._stepLogThrottle || performance.now() - court._stepLogThrottle > 1500) {
         court._stepLogThrottle = performance.now();
-        log('info', `STEPS raw: ${rawHex}`);
+        log('info', `TODAY STEPS raw: ${rawHex}`);
       }
       const steps = detectAndReadStepCounter(p, 'STEPS');
       if (steps != null) {
         $('steps').textContent = steps.toLocaleString();
         if (court.running && court.source === 'watch') onWatchSteps(steps);
       }
-      const cal = (p[7] | (p[8] << 8)) / 10;
+      const cal = p[7] | (p[8] << 8) | (p[9] << 16);
       if (cal) $('cal').textContent = cal.toFixed(0);
-      const dist = (p[9] | (p[10] << 8));
+      const dist = p[10] | (p[11] << 8) | (p[12] << 16);
+      if (dist) $('dist').textContent = dist.toLocaleString();
+      break;
+    }
+    case CMD.SPORTS_DATA: {
+      const rawHex = hex(p);
+      if (!court._sportsLogThrottle || performance.now() - court._sportsLogThrottle > 1500) {
+        court._sportsLogThrottle = performance.now();
+        log('info', `SPORTS raw: ${rawHex}`);
+      }
+      const steps = detectAndReadStepCounter(p, 'SPORTS');
+      if (steps != null) {
+        $('steps').textContent = steps.toLocaleString();
+        if (court.running && court.source === 'watch') onWatchSteps(steps);
+      }
+      const cal = p[7] | (p[8] << 8);
+      if (cal) $('cal').textContent = cal.toFixed(0);
+      const dist = p[11] | (p[12] << 8);
       if (dist) $('dist').textContent = dist.toLocaleString();
       break;
     }
