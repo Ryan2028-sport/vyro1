@@ -965,42 +965,34 @@ async function startCourt() {
     court.running = true;
     court.startMs = Date.now();
     if (writeChar && protocol === 'qcband') {
-      // Ensure HR stream is running too — adds HR-spike confirmation
       await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
-      // Poll STEPS twice a second
       court.watchPollTimer = setInterval(
         () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
         500
       );
     }
+    // Also attach the PHONE accelerometer — it drives live dot movement as you move.
+    const imuOk = await attachPhoneMotion();
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    setCourtStatus('watch · tracking', 'on');
-    log('info', `Court tracking started — source: WATCH (${protocol}). HR moves the dot live; step packets add jumps. Watch is on back-left.`);
+    setCourtStatus(imuOk ? 'watch + phone IMU · tracking' : 'watch · tracking (no phone IMU)', 'on');
+    log('info', `Court tracking — watch (${protocol}) + phone IMU=${imuOk}. Move your phone (in hand/pocket) to see the dot move live.`);
     return;
   }
-  // Fallback → phone IMU
-  try {
-    if (typeof DeviceMotionEvent !== 'undefined' &&
-        typeof DeviceMotionEvent.requestPermission === 'function') {
-      const p = await DeviceMotionEvent.requestPermission();
-      if (p !== 'granted') { setCourtStatus('permission denied', 'err'); return; }
-    }
-  } catch (e) { setCourtStatus('motion unavailable', 'err'); return; }
-  if (!('DeviceMotionEvent' in window)) { setCourtStatus('no motion sensor', 'err'); return; }
+  // Fallback → phone IMU only
+  const ok = await attachPhoneMotion();
+  if (!ok) { setCourtStatus('motion unavailable', 'err'); return; }
   court.source = 'phone';
   court.running = true;
   court.startMs = Date.now();
-  court.motionHandler = onMotion;
-  window.addEventListener('devicemotion', court.motionHandler);
   court.tickTimer = setInterval(tickCourt, 500);
   $('courtStart').disabled = true;
   $('courtStop').disabled = false;
   $('courtCal').disabled = false;
   setCourtStatus('phone · tracking', 'on');
-  log('info', 'Court tracking started — source: PHONE IMU (watch not connected).');
+  log('info', 'Court tracking — source: PHONE IMU.');
 }
 function stopCourt() {
   court.running = false;
