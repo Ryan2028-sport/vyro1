@@ -130,7 +130,7 @@
                   style="filter:drop-shadow(0 0 8px #39ff88);transition:cx .4s ease-out,cy .4s ease-out,r .3s,opacity .3s,fill .3s" opacity="0.7"/>
         </svg>
         <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
-          dot moves on each step burst from watch<br/>color & glow = current intensity
+          dot moves from live watch HR + step bursts<br/>color & glow = current intensity
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
@@ -166,8 +166,8 @@
     </div>
 
     <div style="margin-top:12px;color:var(--muted);font-size:12px;line-height:1.5">
-      Live data is pulled from the connected watch (steps + HR). Cadence drives the
-      intensity color; the court diagram pulses on each step burst from the watch.
+      Live data is pulled from the connected watch. Heart rate drives continuous movement;
+      step bursts add bigger jumps when the watch sends them.
     </div>
   </div>
 
@@ -412,6 +412,7 @@ function onStdHr(e) {
   $('hr').textContent = bpm;
   $('sync').textContent = new Date().toLocaleTimeString();
   log('in', `HR: ${bpm} bpm`);
+  if (court.running && court.source === 'watch') onWatchHr(bpm);
   // Energy expended + RR-intervals could be parsed here too
 }
 async function disconnect() {
@@ -477,6 +478,7 @@ function parsePacket(p) {
           else if (raw > 300)                  bpm = raw / 10;      // bpm*10
           else                                 bpm = raw;           // raw bpm
           if (bpm < 30 || bpm > 220) break;
+          if (court.running && court.source === 'watch') onWatchHr(Math.round(bpm));
 
         const now = Date.now();
         // Drop samples that arrive too fast (<400ms apart → likely duplicate frame)
@@ -584,6 +586,7 @@ const court = {
   // visualization
   px: COURT_START.x, py: COURT_START.y,
   trail: [],          // recent {x,y} for trail polyline
+  liveMoveMs: 0, lastHrMs: 0,
   // ui
   cadHist: [], hrHist: [], movements: 0, movingMs: 0, stillMs: 0,
   lastTickMs: 0, currentCad: 0, currentHr: 0,
@@ -605,7 +608,7 @@ function resetCourt() {
   court.watchBaseSteps = null; court.watchLastSteps = null; court.watchLastTickMs = 0;
   court.cadHist = []; court.hrHist = [];
   court.movements = 0; court.movingMs = 0; court.stillMs = 0;
-  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0;
+  court.lastTickMs = 0; court.currentCad = 0; court.currentHr = 0; court.liveMoveMs = 0; court.lastHrMs = 0;
   court.px = COURT_START.x; court.py = COURT_START.y; court.trail = [];
   updateCourtPosition();
   $('cSteps').textContent = '0';
@@ -685,7 +688,7 @@ function pulseCourtDot(deltaSteps = 1) {
   // Move the dot a distance proportional to step burst (each step ≈ STRIDE_M, ~1m on
   // an 9.75×6.4m squash court). Direction is random with mild bias back toward T,
   // so the player wanders around the court realistically.
-  const meters = deltaSteps * STRIDE_M;
+  const meters = Math.max(0.18, deltaSteps * STRIDE_M);
   // court is 280 SVG units tall ≈ 9.75 m → ~28.7 svg per meter (clamp travel per burst)
   const svgPerM = 24;
   const travel = Math.min(meters * svgPerM, 90);
@@ -699,6 +702,30 @@ function pulseCourtDot(deltaSteps = 1) {
   court.px = nx; court.py = ny;
   court.trail.push({ x: nx, y: ny });
   if (court.trail.length > 40) court.trail.shift();
+  updateCourtPosition();
+}
+
+function moveCourtDotLive(force = 0.5) {
+  const pulse = $('playerPulse');
+  if (pulse) {
+    pulse.setAttribute('cx', court.px); pulse.setAttribute('cy', court.py);
+    pulse.setAttribute('r', '10'); pulse.setAttribute('opacity', '0.45');
+    pulse.animate([{ r: 10, opacity: 0.45 }, { r: 24, opacity: 0 }], { duration: 450, easing: 'ease-out' });
+  }
+  const toT = Math.random() < 0.62;
+  const baseAngle = toT ? Math.atan2(COURT_T.y - court.py, COURT_T.x - court.px) : Math.random() * Math.PI * 2;
+  const angle = baseAngle + (Math.random() - 0.5) * 1.8;
+  const travel = 4 + Math.min(18, force * 18);
+  let nx = court.px + Math.cos(angle) * travel;
+  let ny = court.py + Math.sin(angle) * travel;
+  if (nx <= COURT_BOUNDS.xMin || nx >= COURT_BOUNDS.xMax) nx = court.px - Math.cos(angle) * travel;
+  if (ny <= COURT_BOUNDS.yMin || ny >= COURT_BOUNDS.yMax) ny = court.py - Math.sin(angle) * travel;
+  court.px = Math.max(COURT_BOUNDS.xMin, Math.min(COURT_BOUNDS.xMax, nx));
+  court.py = Math.max(COURT_BOUNDS.yMin, Math.min(COURT_BOUNDS.yMax, ny));
+  court.trail.push({ x: court.px, y: court.py });
+  if (court.trail.length > 60) court.trail.shift();
+  court.movements++;
+  $('movements').textContent = court.movements;
   updateCourtPosition();
 }
 function updateCourtPosition() {
@@ -802,6 +829,7 @@ function onWatchSteps(totalSteps) {
 }
 function onWatchHr(bpm) {
   court.currentHr = bpm;
+  court.lastHrMs = performance.now();
   $('hrNow').textContent = bpm + ' bpm';
   if (court.calibrating) court.calHr.push(bpm);
   if (court.hrBaseline == null) { court.hrBaseline = bpm; return; }
@@ -854,24 +882,24 @@ function tickCourt() {
       $('cadNow').textContent = court.currentCad + ' spm';
       updateCourtVisual();
     }
-    // HR-driven motion fallback: many ring firmwares only push step totals
-    // every few seconds, so drive continuous drift from HR delta above rest.
-    // Each tick (0.5s) nudge the dot proportional to (HR - restHR).
+    // HR-driven live motion: watches often delay step totals, so move the dot
+    // from the live HR stream immediately, then add bigger jumps on step bursts.
     if (!court.calibrating && court.currentHr) {
-      const rest = court.restHr || court.hrBaseline || 70;
+      const rest = Math.min(court.restHr || 78, court.hrBaseline || court.currentHr || 78);
       const hrDelta = Math.max(0, court.currentHr - rest);
-      if (hrDelta >= 8) {
-        // 8 bpm above rest = light jog drift; 60+ = sprint-level drift
-        const intensity = Math.min(1, hrDelta / 60);
-        // synthetic cadence floor so visualization & sparkline reflect effort
-        const synthCad = Math.round(40 + intensity * 160);
-        if (synthCad > court.currentCad) {
-          court.currentCad = synthCad;
-          $('cCad').textContent = synthCad;
-          $('cadNow').textContent = synthCad + ' spm';
-        }
-        // pulse + drift the dot every tick
-        pulseCourtDot(0.4 + intensity * 2.5);
+      const hrFresh = (performance.now() - (court.lastHrMs || 0)) < 7000;
+      const intensity = Math.min(1, Math.max(0.12, hrDelta / 45));
+      const synthCad = Math.round(30 + intensity * 170);
+      if (hrFresh && synthCad > court.currentCad) {
+        court.currentCad = synthCad;
+        $('cCad').textContent = synthCad;
+        $('cadNow').textContent = synthCad + ' spm';
+      }
+      court.liveMoveMs += dtMs;
+      const interval = Math.max(160, 650 - intensity * 420);
+      if (hrFresh && court.liveMoveMs >= interval) {
+        court.liveMoveMs = 0;
+        moveCourtDotLive(intensity);
         updateCourtVisual();
       }
     }
@@ -901,24 +929,27 @@ function tickCourt() {
 
 async function startCourt() {
   resetCourt();
-  // Prefer the watch if it's connected and we have a writeChar for STEPS polling
-  if (device && device.gatt && device.gatt.connected && writeChar && protocol === 'qcband') {
+  // Use the connected watch first. QCBand gets active HR + step polling; standard
+  // HR / generic watches use the live notification stream we subscribed to.
+  if (device && device.gatt && device.gatt.connected) {
     court.source = 'watch';
     court.running = true;
     court.startMs = Date.now();
-    // Ensure HR stream is running too — adds HR-spike confirmation
-    await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
-    // Poll STEPS once a second
-    court.watchPollTimer = setInterval(
-      () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
-      500
-    );
+    if (writeChar && protocol === 'qcband') {
+      // Ensure HR stream is running too — adds HR-spike confirmation
+      await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
+      // Poll STEPS twice a second
+      court.watchPollTimer = setInterval(
+        () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0, 0xff])),
+        500
+      );
+    }
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
     setCourtStatus('watch · tracking', 'on');
-    log('info', 'Court tracking started — source: WATCH (step deltas + HR spikes). Watch is on back-left.');
+    log('info', `Court tracking started — source: WATCH (${protocol}). HR moves the dot live; step packets add jumps. Watch is on back-left.`);
     return;
   }
   // Fallback → phone IMU
