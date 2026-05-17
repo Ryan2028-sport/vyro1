@@ -1275,6 +1275,27 @@ async function startCourt() {
     court.source = 'watch';
     court.running = true;
     court.startMs = Date.now();
+    // 10-second arm-up: walk to the T. The dot snaps to the T and steps are
+    // ignored until the countdown ends, then every real watch step moves the dot.
+    court.armUntilMs = performance.now() + 10000;
+    court.px = COURT_T.x; court.py = COURT_T.y; court.trail = [];
+    updateCourtPosition();
+    setCourtStatus('arming · walk to the T (10s)…', 'on');
+    if (court.armTimer) clearInterval(court.armTimer);
+    court.armTimer = setInterval(() => {
+      const left = Math.max(0, court.armUntilMs - performance.now());
+      if (left <= 0) {
+        clearInterval(court.armTimer); court.armTimer = null;
+        // Reset step baseline so steps taken during arm-up don't count.
+        court.watchBaseSteps = court.watchLastSteps;
+        court.steps = 0; $('cSteps').textContent = '0'; $('cDist').textContent = '0';
+        court.px = COURT_T.x; court.py = COURT_T.y; court.trail = [];
+        updateCourtPosition();
+        setCourtStatus('watch motion · live (move to track)', 'on');
+      } else {
+        setCourtStatus('arming · walk to the T (' + Math.ceil(left/1000) + 's)…', 'on');
+      }
+    }, 250);
     if (writeChar && protocol === 'qcband') {
       await startHeartRateStream();
       court.watchPollTimer = setInterval(
@@ -1294,8 +1315,7 @@ async function startCourt() {
     $('courtStart').disabled = true;
     $('courtStop').disabled = false;
     $('courtCal').disabled = false;
-    setCourtStatus(imuOk ? 'watch motion + phone IMU · live' : 'watch motion · live', 'on');
-    log('info', `Court tracking — HR + movement linked (${protocol})${imuOk ? ' + phone IMU assist' : ''}. The dot moves from real steps/motion while HR streams.`);
+    log('info', `Court tracking — 10s arm-up, then dot moves one step per real watch step (${protocol})${imuOk ? ' + phone IMU assist' : ''}.`);
     return;
   }
   // Fallback → phone IMU only
