@@ -1206,6 +1206,10 @@ function onWatchSteps(totalSteps) {
   const detectorDelta = court._watchDetectedDelta || 0;
   const detectorPrev = court._watchDetectedPrevSteps;
   const detectorSource = court._watchDetectedSource || 'watch';
+  const lastBySource = court.watchLastBySource || (court.watchLastBySource = {});
+  if (lastBySource[detectorSource] == null) {
+    lastBySource[detectorSource] = detectorPrev != null ? detectorPrev : totalSteps;
+  }
   if (court.watchBaseSteps == null) {
     // If the auto-detector just saw an increase, use the previous value as the
     // baseline so the first real step after arming is not swallowed as setup.
@@ -1221,7 +1225,7 @@ function onWatchSteps(totalSteps) {
       return;
     }
   }
-  let deltaSteps = totalSteps - court.watchLastSteps;
+  let deltaSteps = totalSteps - lastBySource[detectorSource];
   if (detectorDelta > 0 && detectorDelta <= 30) deltaSteps = detectorDelta;
   // Arm-up: keep tracking baseline but ignore movement.
   if (court.armUntilMs && now < court.armUntilMs) {
@@ -1240,6 +1244,7 @@ function onWatchSteps(totalSteps) {
   // watch firmware reports steps in bursts every 1-2s even though we poll faster.
   const lastChange = court.watchLastChangeMs || court.watchLastTickMs || now;
   const dt = Math.max(0.05, (now - lastChange) / 1000);
+  lastBySource[detectorSource] = totalSteps;
   court.watchLastSteps = totalSteps;
   court.watchLastTickMs = now;
   court.watchLastChangeMs = now;
