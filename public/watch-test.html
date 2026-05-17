@@ -150,6 +150,7 @@ const STD_MFR_NAME     = 0x2A29;
 let device = null, server = null, writeChar = null, notifyChar = null;
 let hrInterval = null;
 let protocol = null; // 'qcband' | 'standard-hr'
+let hrSamples = []; // rolling buffer for median/avg smoothing
 
 // ----- UI helpers -----
 const $ = id => document.getElementById(id);
@@ -350,20 +351,28 @@ function parsePacket(p) {
     }
     case CMD.REAL_TIME_START: {
       // H59 Pro layout: p[1]=type (1=HR, 3=SpO2), p[2]=err/sub,
-      // p[6..7] = sensor value, little-endian uint16.
-      // Empirically this is bpm * 10 (e.g. 0x03f7 = 1015 -> 101.5 bpm).
+      // p[6..7] = sensor value, little-endian uint16 (bpm * 10).
       const type = p[1];
       const raw = p[6] | (p[7] << 8);
-      if (raw === 0) break; // no reading yet
+      if (raw === 0) break; // sensor still acquiring
       if (type === RT_TYPE.HEART_RATE) {
-        const bpm = Math.round(raw / 10);
-        if (bpm >= 30 && bpm <= 220) {
-          $('hr').textContent = bpm;
-          $('sync').textContent = new Date().toLocaleTimeString();
-        } else {
-          // fallback: treat as raw if /10 looks bogus
-          $('hr').textContent = raw;
-        }
+        // Sensor reports bpm*10. Sometimes firmware sends raw bpm; auto-detect.
+        let bpm = raw > 300 ? raw / 10 : raw;
+        if (bpm < 30 || bpm > 220) break; // discard impossible values
+
+        // Rolling median filter to reject single-sample spikes/dropouts.
+        hrSamples.push(bpm);
+        if (hrSamples.length > 7) hrSamples.shift();
+        // Need a few samples before trusting the reading (warm-up ~6-10 s).
+        if (hrSamples.length < 3) break;
+        const sorted = [...hrSamples].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+
+        // Reject outliers >25 bpm from median, then average the rest.
+        const kept = hrSamples.filter(v => Math.abs(v - median) <= 25);
+        const avg = kept.reduce((s, v) => s + v, 0) / kept.length;
+        $('hr').textContent = Math.round(avg);
+        $('sync').textContent = new Date().toLocaleTimeString();
       } else if (type === RT_TYPE.SPO2) {
         const v = Math.round(raw / 10);
         if (v >= 70 && v <= 100) $('spo2').textContent = v;
@@ -390,6 +399,8 @@ $('btnSteps').onclick   = () => sendCmd(buildPacket(CMD.STEPS, [0, 0x0f, 0, 0, 0
 $('btnTime').onclick    = () => sendCmd(buildSetTime());
 $('btnReboot').onclick  = () => sendCmd(buildPacket(CMD.REBOOT, [1]));
 $('btnHrStart').onclick = async () => {
+  hrSamples = [];
+  $('hr').textContent = '…';
   await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.START));
   // ring expects keep-alive ~every 2s for continuous reading
   if (hrInterval) clearInterval(hrInterval);
@@ -397,6 +408,7 @@ $('btnHrStart').onclick = async () => {
 };
 $('btnHrStop').onclick = async () => {
   if (hrInterval) { clearInterval(hrInterval); hrInterval = null; }
+  hrSamples = [];
   await sendCmd(buildRealTime(RT_TYPE.HEART_RATE, RT_ACT.STOP));
 };
 $('btnSpo2Start').onclick = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.START));
