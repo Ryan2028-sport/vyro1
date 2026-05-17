@@ -821,28 +821,33 @@ function pulseCourtDot(deltaSteps = 1) {
   updateCourtPosition();
 }
 
-function moveCourtDotLive(force = 0.5) {
+function takeCourtStep(force = 0.5) {
   const pulse = $('playerPulse');
   if (pulse) {
     pulse.setAttribute('cx', court.px); pulse.setAttribute('cy', court.py);
-    pulse.setAttribute('r', '10'); pulse.setAttribute('opacity', '0.45');
-    pulse.animate([{ r: 10, opacity: 0.45 }, { r: 24, opacity: 0 }], { duration: 450, easing: 'ease-out' });
+    pulse.setAttribute('r', '11'); pulse.setAttribute('opacity', '0.65');
+    pulse.animate([{ r: 11, opacity: 0.65 }, { r: 27, opacity: 0 }], { duration: 520, easing: 'ease-out' });
   }
-  const toT = Math.random() < 0.62;
-  const baseAngle = toT ? Math.atan2(COURT_T.y - court.py, COURT_T.x - court.px) : Math.random() * Math.PI * 2;
-  const angle = baseAngle + (Math.random() - 0.5) * 1.8;
-  const travel = 4 + Math.min(18, force * 18);
+  const toT = Math.atan2(COURT_T.y - court.py, COURT_T.x - court.px);
+  const lateral = court.stepSide * (0.45 + Math.min(0.35, force * 0.35));
+  court.stepSide *= -1;
+  const angle = toT + lateral + (Math.random() - 0.5) * 0.25;
+  const travel = 10 + Math.min(13, force * 16);
   let nx = court.px + Math.cos(angle) * travel;
   let ny = court.py + Math.sin(angle) * travel;
-  if (nx <= COURT_BOUNDS.xMin || nx >= COURT_BOUNDS.xMax) nx = court.px - Math.cos(angle) * travel;
-  if (ny <= COURT_BOUNDS.yMin || ny >= COURT_BOUNDS.yMax) ny = court.py - Math.sin(angle) * travel;
-  court.px = Math.max(COURT_BOUNDS.xMin, Math.min(COURT_BOUNDS.xMax, nx));
-  court.py = Math.max(COURT_BOUNDS.yMin, Math.min(COURT_BOUNDS.yMax, ny));
-  court.trail.push({ x: court.px, y: court.py });
+  if (ny < COURT_BOUNDS.yMin + 4) ny += travel * 0.8;
+  nx = Math.max(COURT_BOUNDS.xMin, Math.min(COURT_BOUNDS.xMax, nx));
+  ny = Math.max(COURT_BOUNDS.yMin, Math.min(COURT_BOUNDS.yMax, ny));
+  court.px = nx; court.py = ny;
+  court.trail.push({ x: nx, y: ny });
   if (court.trail.length > 60) court.trail.shift();
   court.movements++;
   $('movements').textContent = court.movements;
   updateCourtPosition();
+}
+
+function moveCourtDotLive(force = 0.5) {
+  takeCourtStep(force);
 }
 function updateCourtPosition() {
   const dot = $('playerDot'); const trail = $('playerTrail');
