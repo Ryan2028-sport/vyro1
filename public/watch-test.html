@@ -128,7 +128,7 @@
           <polyline id="playerTrail" fill="none" stroke="#39ff88" stroke-width="1.5" opacity="0.4" stroke-linecap="round" stroke-linejoin="round" points=""/>
           <circle id="playerPulse" cx="45" cy="55" r="14" fill="none" stroke="#39ff88" stroke-width="2" opacity="0"/>
           <circle id="playerDot" cx="45" cy="55" r="10" fill="#39ff88"
-                  style="filter:drop-shadow(0 0 8px #39ff88);transition:cx .4s ease-out,cy .4s ease-out,r .3s,opacity .3s,fill .3s" opacity="0.7"/>
+                  style="filter:drop-shadow(0 0 8px #39ff88);transition:cx .08s linear,cy .08s linear,r .18s,opacity .18s,fill .18s" opacity="0.7"/>
         </svg>
         <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
           dot moves on step bursts + rising HR<br/>color & glow = current intensity
@@ -447,7 +447,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function handleWatchPacket(p, uuid = 'watch') {
   parsePacket(p);
-  if (!court.running || court.source !== 'watch' || court.calibrating) return;
+  if (!court.running || court.source !== 'watch') return;
 
   const id = p[0];
   const isKnownPassive =
@@ -666,18 +666,18 @@ $('btnSpo2Stop').onclick  = () => sendCmd(buildRealTime(RT_TYPE.SPO2, RT_ACT.STO
 // (typical squash split-step / lunge push-off is 2.2–3.5g).
 // ==========================================================================
 const STRIDE_M = 0.72;          // avg squash court step length
-const THRESH_STEP = 0.055;      // sensitive phone step threshold from accel/jerk score
+const THRESH_STEP = 0.030;      // ultra-sensitive live movement threshold from accel/jerk score
 const THRESH_EXP  = 0.42;       // explosive push-off threshold from accel/jerk score
 const THRESH_LUNGE = 0.72;      // hard lunge / sprint start
-const REFRACTORY_MS = 170;      // min gap between counted steps (fast, ~350spm cap)
+const REFRACTORY_MS = 110;      // min gap between live dot moves; fast enough to follow walking
 
 // Court coordinate space (matches SVG viewBox 0 0 200 280)
 // Front glass is the top of the court drawing; tracking starts there when the phone is placed up front.
 const COURT_BOUNDS = { xMin: 25, xMax: 175, yMin: 30, yMax: 250 };
 const COURT_START  = { x: 100, y: 36 }; // front glass / front wall start position
 const COURT_T      = { x: 100, y: 180 };
-const MOTION_MOVE_THRESHOLD = THRESH_STEP; // step-driven: normal walking/phone sway counts steps
-const PHONE_STEP_RELEASE = 0.026; // re-arm below this so each footfall becomes one dot step
+const MOTION_MOVE_THRESHOLD = 0.018; // continuous movement: normal walking/phone sway moves the dot
+const PHONE_STEP_RELEASE = 0.014; // re-arm below this so each footfall becomes one dot step
 
 const court = {
   running: false, source: null,
@@ -935,15 +935,13 @@ function onWatchSteps(totalSteps) {
   $('cadNow').textContent = cadSpm + ' spm';
 
   // Move the green dot once for every watch step, so dot steps mirror real steps.
-  if (!court.calibrating) {
-    const pulses = Math.min(6, Math.max(1, deltaSteps));
-    for (let i = 0; i < pulses; i++) {
-      setTimeout(() => {
-        if (!court.running || court.source !== 'watch') return;
-        takeCourtStep(Math.min(1, 0.32 + rate * 0.16));
-        updateCourtVisual();
-      }, i * 170);
-    }
+  const pulses = Math.min(6, Math.max(1, deltaSteps));
+  for (let i = 0; i < pulses; i++) {
+    setTimeout(() => {
+      if (!court.running || court.source !== 'watch') return;
+      takeCourtStep(Math.min(1, 0.32 + rate * 0.16));
+      updateCourtVisual();
+    }, i * 110);
   }
 
   // explosive: rate ≥ 3 steps/sec → sprint cadence (~180 spm)
@@ -1007,7 +1005,7 @@ function onMotion(e) {
   }
   // Step-accurate movement: trigger off the raw motionScore peak so the dot reacts the instant
   // the phone accelerates, matching the responsiveness of HR-driven updates.
-  if (!court.calibrating && motionScore > PHONE_STEP_RELEASE) {
+  if (motionScore > PHONE_STEP_RELEASE) {
     court.lastMoveMs = now;
     if (!court.sustainedMotionStartMs) court.sustainedMotionStartMs = now;
   } else if (motionScore < PHONE_STEP_RELEASE * 0.6) {
@@ -1016,13 +1014,14 @@ function onMotion(e) {
   }
 
   const peakStep = court.stepArmed && motionScore >= THRESH_STEP;
-  const sustainedStep = court.sustainedMotionStartMs && motionScore >= MOTION_MOVE_THRESHOLD && (now - court.lastStepMs) >= 380;
+  const liveMove = motionScore >= MOTION_MOVE_THRESHOLD;
+  const sustainedStep = court.sustainedMotionStartMs && liveMove && (now - court.lastStepMs) >= 160;
   const gap = now - court.lastStepMs;
   const refractoryOk = gap >= REFRACTORY_MS;
   let reason = '';
   let moved = false;
-  if ((peakStep || sustainedStep) && refractoryOk) {
-    const force = Math.min(1, 0.24 + motionScore * 2.8);
+  if ((peakStep || sustainedStep || liveMove) && refractoryOk) {
+    const force = Math.min(1, 0.30 + motionScore * 3.8);
     const lastGap = court.lastStepMs ? gap : 500;
     court.lastStepMs = now;
     court.lastLiveMoveMs = now;
@@ -1040,11 +1039,10 @@ function onMotion(e) {
     takeCourtStep(force);
     updateCourtVisual();
     moved = true;
-    reason = peakStep ? 'PEAK STEP' : 'SUSTAINED';
+    reason = peakStep ? 'PEAK STEP' : (sustainedStep ? 'SUSTAINED' : 'LIVE MOTION');
   } else {
-    if (court.calibrating) reason = 'calibrating';
-    else if (!refractoryOk) reason = `refractory ${Math.round(REFRACTORY_MS - gap)}ms`;
-    else if (motionScore < THRESH_STEP) reason = `score<${THRESH_STEP}`;
+    if (!refractoryOk) reason = `refractory ${Math.round(REFRACTORY_MS - gap)}ms`;
+    else if (motionScore < MOTION_MOVE_THRESHOLD) reason = `score<live ${MOTION_MOVE_THRESHOLD}`;
     else if (!court.stepArmed) reason = 'not armed (release below ' + (PHONE_STEP_RELEASE*0.6).toFixed(3) + ')';
     else reason = 'no trigger';
   }
@@ -1053,7 +1051,7 @@ function onMotion(e) {
     dbg.style.color = moved ? '#0f0' : '#ff0';
     dbg.textContent =
       `${moved ? '✓ MOVED' : '· idle'}  ${reason}\n` +
-      `score   ${motionScore.toFixed(3)}  (step≥${THRESH_STEP})\n` +
+      `score   ${motionScore.toFixed(3)}  (live≥${MOTION_MOVE_THRESHOLD} step≥${THRESH_STEP})\n` +
       `dyn ${dyn.toFixed(3)}  jerk ${jerk.toFixed(3)}\n` +
       `armed:${court.stepArmed}  side:${court.stepSide}\n` +
       `gap ${Math.round(gap)}ms / ${REFRACTORY_MS}ms\n` +
