@@ -58,11 +58,10 @@
 
   <div class="warning" style="background:rgba(80,160,255,.08);border-color:rgba(80,160,255,.3);color:#bcd9ff">
     <b>Watch not showing in the chooser?</b><br>
-    1. <b>Close the watch's own app</b> (QCBand / Colmi / H Band / Da Fit) on your phone — while it's connected there, the watch stops advertising to anything else.<br>
-    2. <b>Forget the watch</b> in your phone's system Bluetooth settings, then retry.<br>
-    3. Make sure the <b>watch screen is on</b> (tap it) so it's actively advertising.<br>
-    4. On Android Chrome, enable <code>chrome://flags/#enable-web-bluetooth-new-permissions-backend</code> if devices still don't appear.<br>
-    5. Try <b>"Scan watches only"</b> below — it filters by common watch name prefixes which sometimes surfaces devices that "Scan all" misses.
+    1. iOS does not let apps list every device from the Settings Bluetooth screen; the app must scan once and save the watch ID.<br>
+    2. If you already connected this watch in VYRO before, tap <b>Reconnect last watch</b> — it uses the saved native ID instead of waiting for the Settings list.<br>
+    3. If it has never connected in VYRO, keep the watch screen awake, close QCBand / Colmi / H Band / Da Fit, then scan.<br>
+    4. If iOS blocked permission, tap <b>Open iOS settings</b> and enable Bluetooth for VYRO.
   </div>
 
   <div class="panel">
@@ -70,6 +69,8 @@
       <div class="row">
         <button id="connectBtn" class="cta">Scan all nearby</button>
         <button id="connectFilteredBtn" class="cta" style="background:#1e4d7a">Scan watches only</button>
+        <button id="reconnectNativeBtn" class="ghost">Reconnect last watch</button>
+        <button id="openNativeSettingsBtn" class="ghost">Open iOS settings</button>
         <button id="disconnectBtn" class="ghost" disabled>Disconnect</button>
       </div>
       <div id="status" class="status"><span class="dot"></span><span id="statusText">disconnected</span></div>
@@ -447,6 +448,15 @@ let nativeWriteChar = null;
 
 const nativeBle = () => window.VyroNative?.ble || null;
 const isNativeBle = () => !!(window.VyroNative?.isDespia && nativeBle());
+const LAST_NATIVE_WATCH_KEY = 'vyro:lastNativeWatch';
+function getLastNativeWatch() {
+  try { return JSON.parse(localStorage.getItem(LAST_NATIVE_WATCH_KEY) || 'null'); }
+  catch { return null; }
+}
+function saveLastNativeWatch(d) {
+  if (!d?.id) return;
+  try { localStorage.setItem(LAST_NATIVE_WATCH_KEY, JSON.stringify({ id: d.id, name: d.name || 'Watch', savedAt: Date.now() })); } catch {}
+}
 const normUuid = u => {
   const s = String(u || '').toLowerCase();
   return s.length === 4 ? `0000${s}-0000-1000-8000-00805f9b34fb` : s;
@@ -537,12 +547,57 @@ function setStatus(s, kind = '') {
 function setConnected(on) {
   $('connectBtn').disabled = on;
   $('connectFilteredBtn').disabled = on;
+  $('reconnectNativeBtn').disabled = on || !isNativeBle() || !getLastNativeWatch();
+  $('openNativeSettingsBtn').disabled = on || !window.VyroNative?.isDespia;
   $('disconnectBtn').disabled = !on;
   ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot','probeStart','probeMonitor','decTrigger0c','motionLock']
     .forEach(id => $(id).disabled = !on);
 }
 
 // ----- BLE flow -----
+function waitForNativeConnectAndDiscover(ble, id, displayName, timeoutMs = 18000) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => fail(new Error('Native BLE reconnect timed out. If iOS forgot the peripheral, scan once again while the watch is awake.')), timeoutMs);
+    const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); resolve(v); };
+    const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); reject(e); };
+
+    device = { id, name: displayName || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(id) }, addEventListener() {} };
+    window.onBleState = s => {
+      if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
+      if (s.state === 'off') log('info', 'Bluetooth is off — turn it on in Control Center or Settings.');
+      if (s.state === 'unsupported') fail(new Error('This TestFlight build does not include Despia Bluetooth support.'));
+    };
+    window.onBleConnect = e => {
+      if (e.id && e.id !== id) return;
+      if (e.state === 'connected') {
+        device.gatt.connected = true;
+        log('info', 'Native GATT connected, discovering services…');
+        ble.discover(e.id || id);
+      } else if (e.state === 'failed') fail(new Error(e.error || 'Native BLE connect failed'));
+      else if (e.state === 'disconnected') onDisconnected();
+    };
+    window.onBleDiscovered = tree => {
+      try {
+        nativeServices = (tree.services || []).map(makeNativeService);
+        saveLastNativeWatch(device);
+        finish(nativeServices);
+      } catch (e) { fail(e); }
+    };
+    ble.state();
+    ble.connect(id, { timeout: 10000, autoConnect: true });
+  });
+}
+
+async function reconnectLastNative() {
+  const ble = nativeBle();
+  const saved = getLastNativeWatch();
+  if (!ble || !saved?.id) throw new Error('No saved native watch yet. Scan once first, then reconnect works after that.');
+  log('info', `Reconnecting saved iOS watch: ${saved.name || 'Watch'} [${saved.id}]…`);
+  setStatus('reconnecting…');
+  return waitForNativeConnectAndDiscover(ble, saved.id, saved.name);
+}
+
 async function connectNative(filtered = false) {
   return new Promise((resolve, reject) => {
     const ble = nativeBle();
@@ -565,6 +620,7 @@ async function connectNative(filtered = false) {
       if (filtered && !watchy) return;
       picked = true;
       device = { id: d.id, name: d.name || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(d.id) }, addEventListener() {} };
+      saveLastNativeWatch(device);
       setStatus('connecting…');
       ble.stopScan();
       ble.connect(d.id, { timeout: 10000, autoConnect: true });
@@ -612,7 +668,9 @@ async function connectNative(filtered = false) {
 async function connect(filtered = false) {
   try {
     let services;
-    if (isNativeBle()) {
+    if (filtered === 'last-native') {
+      services = await reconnectLastNative();
+    } else if (isNativeBle()) {
       services = await connectNative(filtered);
     } else {
       const optionalServices = [
@@ -702,6 +760,7 @@ async function connect(filtered = false) {
 
     setStatus('connected', 'on');
     setConnected(true);
+    saveLastNativeWatch(device);
     $('deviceInfo').style.display = 'block';
     $('deviceInfo').textContent = `${device.name || 'Watch'} · ${protocol} · ${device.id}`;
 
@@ -2759,6 +2818,13 @@ if (!navigator.bluetooth && !isNativeBle()) {
   $('connectFilteredBtn').disabled = true;
 }
 log('info', isNativeBle() ? 'Ready. Native iOS BLE bridge detected — click scan to begin.' : 'Ready. Click "Connect Watch" to begin.');
+setConnected(false);
+
+$('reconnectNativeBtn').onclick = () => connect('last-native');
+$('openNativeSettingsBtn').onclick = () => {
+  if (window.VyroNative?.fire?.('settingsapp://')) log('info', 'Opening iOS app settings…');
+  else log('err', 'Native settings are only available inside the TestFlight app.');
+};
 
 // ================= Court Calibration · T-Return Tracking =================
 let ccCourtType = 'squash';
