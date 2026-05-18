@@ -2815,6 +2815,96 @@ requestAnimationFrame(ccDebug);
 
 ccDrawCourt();
 
+// ============ Direction Calibration ============
+const DIRS = ['F','B','L','R'];
+const DIR_OFFSET = { F:[0,-1], B:[0,1], L:[-1,0], R:[1,0] };
+let dirSig = { F:null, B:null, L:null, R:null };
+let dirSampleCount = { F:0, B:0, L:0, R:0 };
+let dirRecord = null;
+let dirLive = null, dirConf = 0;
+let dirHold = null; // {dir, samples:[]}
+let dirLastClassMs = 0;
+
+function dirFeed(bytes, prev) {
+  if (!bytes || !prev || bytes.length !== prev.length) return;
+  const v = new Array(bytes.length - 2);
+  let mag2 = 0;
+  for (let i = 1; i < bytes.length - 1; i++) {
+    let d = bytes[i] - prev[i];
+    if (d > 127) d -= 256; else if (d < -128) d += 256;
+    v[i-1] = d; mag2 += d*d;
+  }
+  const mag = Math.sqrt(mag2);
+  if (dirHold) {
+    dirHold.samples.push(v);
+    dirSampleCount[dirHold.dir] = dirHold.samples.length;
+    const el = $('dirCount'+dirHold.dir);
+    if (el) el.textContent = dirHold.samples.length + ' samples';
+  }
+  // classify only on real motion
+  if (mag < 6) { dirLive = null; updateDirLiveUI(); return; }
+  let best = null, bestS = 0;
+  for (const k of DIRS) {
+    const s = dirSig[k]; if (!s) continue;
+    let dot = 0, na = 0, nb = 0;
+    const L = Math.min(v.length, s.length);
+    for (let i = 0; i < L; i++) { dot += v[i]*s[i]; na += v[i]*v[i]; nb += s[i]*s[i]; }
+    const sim = (na && nb) ? dot / Math.sqrt(na*nb) : 0;
+    if (sim > bestS) { bestS = sim; best = k; }
+  }
+  if (bestS > 0.35) { dirLive = best; dirConf = bestS; }
+  else { dirLive = null; dirConf = bestS; }
+  updateDirLiveUI();
+}
+function updateDirLiveUI() {
+  const el = $('dirLive'); if (!el) return;
+  el.textContent = dirLive ? `${dirLive}  (${(dirConf*100|0)}%)` : '—';
+  el.style.color = dirLive ? '#39ff88' : '#5ec2ff';
+}
+function avgVec(samples) {
+  if (!samples.length) return null;
+  const L = samples[0].length;
+  const a = new Array(L).fill(0);
+  for (const s of samples) for (let i = 0; i < L; i++) a[i] += s[i];
+  for (let i = 0; i < L; i++) a[i] /= samples.length;
+  return a;
+}
+DIRS.forEach(k => {
+  const b = $('dirBtn'+k); if (!b) return;
+  const start = (e) => {
+    e && e.preventDefault();
+    // merge with existing samples so user can build up over multiple presses
+    const existing = dirSig[k] ? [dirSig[k]] : [];
+    dirHold = { dir: k, samples: existing.slice() };
+    b.style.background = 'rgba(57,255,136,.25)';
+    b.style.borderColor = '#39ff88';
+  };
+  const end = (e) => {
+    if (!dirHold || dirHold.dir !== k) return;
+    e && e.preventDefault();
+    if (dirHold.samples.length > 0) {
+      dirSig[k] = avgVec(dirHold.samples);
+      dirSampleCount[k] = dirHold.samples.length;
+      $('dirCount'+k).textContent = dirSampleCount[k] + ' samples ✓';
+    }
+    b.style.background = '';
+    b.style.borderColor = '';
+    dirHold = null;
+  };
+  b.addEventListener('mousedown', start);
+  b.addEventListener('mouseup', end);
+  b.addEventListener('mouseleave', end);
+  b.addEventListener('touchstart', start, { passive: false });
+  b.addEventListener('touchend', end, { passive: false });
+  b.addEventListener('touchcancel', end);
+});
+$('dirReset').onclick = () => {
+  dirSig = { F:null, B:null, L:null, R:null };
+  dirSampleCount = { F:0, B:0, L:0, R:0 };
+  DIRS.forEach(k => $('dirCount'+k).textContent = 'not learned');
+  dirLive = null; updateDirLiveUI();
+};
+
 </script>
 </body>
 </html>
