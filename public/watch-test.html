@@ -39,6 +39,9 @@
   .pulse{display:inline-block;width:10px;height:10px;background:var(--warn);border-radius:50%;margin-right:6px;animation:pulse 1s infinite}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
   .warning{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.3);color:#ffb4b4;padding:14px 16px;border-radius:14px;font-size:13px;line-height:1.6;margin-bottom:16px}
+  .checklist{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:12px}
+  .check{background:#000;border:1px solid var(--border);border-radius:14px;padding:12px;font-size:12px;line-height:1.45;color:var(--muted)}
+  .check b{display:block;color:#fff;margin-bottom:4px}.check.ok{border-color:rgba(57,255,136,.45);color:#b7ffd4}.check.fail{border-color:rgba(255,107,107,.45);color:#ffb4b4}.check.wait{border-color:rgba(253,230,138,.35);color:#fde68a}
 </style>
 </head>
 <body>
@@ -62,6 +65,24 @@
     2. If you already connected this watch in VYRO before, tap <b>Reconnect last watch</b> — it uses the saved native ID instead of waiting for the Settings list.<br>
     3. If it has never connected in VYRO, keep the watch screen awake, close QCBand / Colmi / H Band / Da Fit, then scan.<br>
     4. If iOS blocked permission, tap <b>Open iOS settings</b> and enable Bluetooth for VYRO.
+  </div>
+
+  <div class="panel" id="testFlightGatePanel" style="border-color:rgba(253,230,138,.28)">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <div>
+        <div class="section-title" style="margin:0 0 4px;color:#fde68a">TestFlight connection gate</div>
+        <div id="testFlightSummary" style="font-size:13px;color:var(--muted);line-height:1.5">Run this inside TestFlight before scanning. It checks whether this build can actually talk to BLE.</div>
+      </div>
+      <div class="row">
+        <button id="bleReadinessBtn" class="ghost">Run BLE check</button>
+        <button id="healthFallbackBtn" class="ghost">Read Apple Health fallback</button>
+      </div>
+    </div>
+    <div class="checklist">
+      <div id="nativeBleCheck" class="check wait"><b>Native BLE bridge</b><span>not checked</span></div>
+      <div id="webBleCheck" class="check wait"><b>Web Bluetooth</b><span>not checked</span></div>
+      <div id="healthCheck" class="check wait"><b>Apple Health fallback</b><span>not checked</span></div>
+    </div>
   </div>
 
   <div class="panel">
