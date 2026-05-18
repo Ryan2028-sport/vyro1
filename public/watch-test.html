@@ -546,9 +546,11 @@ function setStatus(s, kind = '') {
   $('status').className = 'status ' + kind;
 }
 function setConnected(on) {
-  $('connectBtn').disabled = on;
-  $('connectFilteredBtn').disabled = on;
-  $('webBluetoothBtn').disabled = on;
+  const canNative = isNativeBle();
+  const canWebBluetooth = !!navigator.bluetooth?.requestDevice;
+  $('connectBtn').disabled = on || (!canNative && !canWebBluetooth);
+  $('connectFilteredBtn').disabled = on || (!canNative && !canWebBluetooth);
+  $('webBluetoothBtn').disabled = on || !canWebBluetooth;
   $('reconnectNativeBtn').disabled = on || !isNativeBle() || !getLastNativeWatch();
   $('openNativeSettingsBtn').disabled = on || !window.VyroNative?.isDespia;
   $('disconnectBtn').disabled = !on;
