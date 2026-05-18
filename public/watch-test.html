@@ -668,7 +668,9 @@ async function connectNative(filtered = false) {
 async function connect(filtered = false) {
   try {
     let services;
-    if (isNativeBle()) {
+    if (filtered === 'last-native') {
+      services = await reconnectLastNative();
+    } else if (isNativeBle()) {
       services = await connectNative(filtered);
     } else {
       const optionalServices = [
@@ -758,6 +760,7 @@ async function connect(filtered = false) {
 
     setStatus('connected', 'on');
     setConnected(true);
+    saveLastNativeWatch(device);
     $('deviceInfo').style.display = 'block';
     $('deviceInfo').textContent = `${device.name || 'Watch'} · ${protocol} · ${device.id}`;
 
