@@ -2818,6 +2818,13 @@ if (!navigator.bluetooth && !isNativeBle()) {
   $('connectFilteredBtn').disabled = true;
 }
 log('info', isNativeBle() ? 'Ready. Native iOS BLE bridge detected — click scan to begin.' : 'Ready. Click "Connect Watch" to begin.');
+setConnected(false);
+
+$('reconnectNativeBtn').onclick = () => connect('last-native');
+$('openNativeSettingsBtn').onclick = () => {
+  if (window.VyroNative?.fire?.('settingsapp://')) log('info', 'Opening iOS app settings…');
+  else log('err', 'Native settings are only available inside the TestFlight app.');
+};
 
 // ================= Court Calibration · T-Return Tracking =================
 let ccCourtType = 'squash';
