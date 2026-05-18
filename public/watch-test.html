@@ -2633,24 +2633,29 @@ function ccDrawCourt() {
     `<circle cx="${px}" cy="${py}" r="${r.toFixed(1)}" fill="${color}" style="filter:drop-shadow(0 0 10px ${color})"/>`;
 }
 
+let ccPeakSeen = 0; // peak motion during current away excursion
 function ccFeed(d) {
   ccLastMotion = d;
   if (ccCalibrating) ccCalSamples.push(d);
   if (ccTracking && ccThreshold) {
     const now = performance.now();
+    if (d > ccPeakSeen) ccPeakSeen = d;
     if (d > ccThreshold) {
       if (ccAboveSince === 0) ccAboveSince = now;
       ccBelowSince = 0;
-      if (ccZoneAtT && (now - ccAboveSince) > 300) {
-        ccZoneAtT = false; ccLeftAt = now; ccUpdateZone();
+      // 1 packet ≈ 400ms; trigger on first spike (no debounce wait)
+      if (ccZoneAtT) {
+        ccZoneAtT = false; ccLeftAt = now; ccPeakSeen = d; ccUpdateZone();
       }
-    } else if (d < ccBaseline * 1.8) {
+    } else if (d <= ccBaseline * 2.0) {
       if (ccBelowSince === 0) ccBelowSince = now;
       ccAboveSince = 0;
-      if (!ccZoneAtT && (now - ccBelowSince) > 800) {
+      // require 500ms below + that we actually saw a real spike (peak > 1.5x threshold)
+      if (!ccZoneAtT && (now - ccBelowSince) > 500 && ccPeakSeen > ccThreshold * 1.2) {
         ccZoneAtT = true;
         ccTotalAwayMs += (now - ccLeftAt);
         ccReturns++;
+        ccPeakSeen = 0;
         ccUpdateZone();
       }
     } else { ccAboveSince = 0; ccBelowSince = 0; }
