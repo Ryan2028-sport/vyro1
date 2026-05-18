@@ -677,10 +677,11 @@ async function connect(filtered = false) {
   try {
     let services;
     const forceWebBluetooth = filtered === 'web';
+    const useServiceFilter = filtered === true;
     if (filtered === 'last-native') {
       services = await reconnectLastNative();
     } else if (!forceWebBluetooth && isNativeBle()) {
-      services = await connectNative(filtered);
+      services = await connectNative(useServiceFilter);
     } else {
       if (!navigator.bluetooth?.requestDevice) {
         showWebBluetoothRestricted();
@@ -692,7 +693,7 @@ async function connect(filtered = false) {
         0xFEE7, 0xFEE0, 0xFEA0, 0xFFF0, 0xFFE0, 0xFFB0,
         'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20',
       ];
-      const reqOpts = filtered
+      const reqOpts = useServiceFilter
         ? {
             filters: [
               { namePrefix: 'R' }, { namePrefix: 'QC' }, { namePrefix: 'Colmi' },
@@ -704,7 +705,7 @@ async function connect(filtered = false) {
             optionalServices,
           }
         : { acceptAllDevices: true, optionalServices };
-      log('info', `Requesting device (${filtered ? 'filtered' : 'all nearby'})…`);
+      log('info', `Requesting device (${useServiceFilter ? 'watch service filters' : 'all devices'})…`);
       device = await navigator.bluetooth.requestDevice(reqOpts);
       log('info', `Selected: ${device.name || '(unnamed)'} [${device.id}]`);
       device.addEventListener('gattserverdisconnected', onDisconnected);
