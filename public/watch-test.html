@@ -77,6 +77,22 @@
     <div id="deviceInfo" style="margin-top:14px;color:var(--muted);font-size:13px;display:none"></div>
   </div>
 
+  <!-- ============ GATT PROFILE INSPECTOR ============ -->
+  <div id="gattPanel" class="panel" style="display:none;border-color:rgba(57,255,136,0.35)">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <div>
+        <div class="section-title" style="margin:0 0 4px;color:var(--accent)">📋 GATT profile · full device spec</div>
+        <div style="font-size:12px;color:var(--muted)">Every service, characteristic, properties, and raw values — exactly what the vendor would put in a GATT profile document.</div>
+      </div>
+      <div class="row">
+        <button id="gattCopyBtn" class="ghost">Copy JSON spec</button>
+        <button id="gattCopyMdBtn" class="ghost">Copy markdown</button>
+      </div>
+    </div>
+    <div id="gattCopyOk" style="display:none;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;margin-bottom:10px">✓ copied — paste into Lovable chat</div>
+    <div id="gattTree" style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.65"></div>
+  </div>
+
   <div class="section-title">Live data</div>
   <div class="grid">
     <div class="stat"><div class="k">Battery</div><div><span class="v" id="battery">—</span><span class="u">%</span></div></div>
@@ -537,6 +553,9 @@ async function connect(filtered = false) {
     setConnected(true);
     $('deviceInfo').style.display = 'block';
     $('deviceInfo').textContent = `${device.name || 'Watch'} · ${protocol} · ${device.id}`;
+
+    // Kick off the GATT profile inspector — runs in parallel, doesn't block anything.
+    buildGattSpec(services).catch(err => log('err', 'GATT inspector: ' + err.message));
 
     // Battery (standard service, supported by both)
     try {
@@ -2903,6 +2922,148 @@ $('dirReset').onclick = () => {
   dirSampleCount = { F:0, B:0, L:0, R:0 };
   DIRS.forEach(k => $('dirCount'+k).textContent = 'not learned');
   dirLive = null; updateDirLiveUI();
+};
+
+/* ============ GATT PROFILE INSPECTOR ============ */
+const SVC_NAMES = {
+  '00001800':'Generic Access','00001801':'Generic Attribute','00001802':'Immediate Alert',
+  '00001803':'Link Loss','00001804':'Tx Power','00001805':'Current Time',
+  '00001808':'Glucose','00001809':'Health Thermometer','0000180a':'Device Information',
+  '0000180d':'Heart Rate','0000180f':'Battery','00001810':'Blood Pressure',
+  '00001812':'HID','00001814':'Running Speed & Cadence','00001816':'Cycling Speed & Cadence',
+  '00001818':'Cycling Power','0000181a':'Environmental Sensing','0000181c':'User Data',
+  '0000181d':'Weight Scale','00001822':'Pulse Oximeter','00001826':'Fitness Machine',
+  '0000fee0':'Xiaomi Mi Band','0000fee1':'Xiaomi auth','0000fee7':'Colmi / QCBand',
+  '0000fff0':'Vendor FFF0','0000ffe0':'HM-10 serial','6e400001':'Nordic UART',
+};
+const CHAR_NAMES = {
+  '00002a00':'Device Name','00002a01':'Appearance','00002a04':'Conn Params',
+  '00002a05':'Service Changed','00002a19':'Battery Level','00002a23':'System ID',
+  '00002a24':'Model Number','00002a25':'Serial Number','00002a26':'Firmware Revision',
+  '00002a27':'Hardware Revision','00002a28':'Software Revision','00002a29':'Manufacturer Name',
+  '00002a37':'Heart Rate Measurement','00002a38':'Body Sensor Location','00002a39':'HR Control Point',
+  '00002a2b':'Current Time','00002a63':'Cycling Power Measurement','00002a65':'Cycling Power Feature',
+  '00002a5b':'CSC Measurement','00002a5c':'CSC Feature','00002a53':'RSC Measurement',
+  '00002a54':'RSC Feature','00002ad2':'Indoor Bike Data','00002ad9':'FTMS Control Point',
+};
+const _sigShort = u => { const m = u.match(/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i); return m ? '0x'+m[1].toUpperCase() : null; };
+const _svcName = u => SVC_NAMES[u.toLowerCase().slice(0,8)] || null;
+const _charName = u => CHAR_NAMES[u.toLowerCase().slice(0,8)] || null;
+const _hexBytes = bs => Array.from(bs).map(b=>b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+const _asciiBytes = bs => Array.from(bs).map(b=>(b>=32&&b<=126)?String.fromCharCode(b):'·').join('');
+
+function _decodeAll(dv) {
+  const bs = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+  const view = new DataView(bs.buffer, bs.byteOffset, bs.byteLength);
+  const u16le=[], u16be=[], i16le=[], u32le=[], f32le=[];
+  for (let i=0;i+1<bs.length;i+=2){u16le.push(bs[i]|(bs[i+1]<<8));u16be.push((bs[i]<<8)|bs[i+1]);i16le.push(view.getInt16(i,true));}
+  for (let i=0;i+3<bs.length;i+=4){u32le.push(view.getUint32(i,true));f32le.push(+view.getFloat32(i,true).toFixed(4));}
+  return { len:bs.length, hex:_hexBytes(bs), ascii:_asciiBytes(bs),
+    uint8:Array.from(bs), uint16LE:u16le, uint16BE:u16be, int16LE:i16le, uint32LE:u32le, float32LE:f32le };
+}
+
+let _gattSpec = null;
+
+async function buildGattSpec(services) {
+  $('gattPanel').style.display = 'block';
+  const tree = $('gattTree'); tree.innerHTML = 'Scanning GATT tree…';
+  _gattSpec = {
+    timestamp: new Date().toISOString(),
+    device: { name: device?.name || null, id: device?.id || null, protocol },
+    services: [],
+  };
+  let html = '';
+  for (const svc of services) {
+    const sigS = _sigShort(svc.uuid);
+    const sName = _svcName(svc.uuid);
+    const specSvc = { uuid: svc.uuid, shortUuid: sigS, name: sName, characteristics: [] };
+    html += `<div style="margin-bottom:12px;border-left:2px solid var(--accent);padding-left:10px">
+      <div style="color:#fff;font-weight:700;font-size:12px">▸ Service ${sigS || svc.uuid}${sName ? ` <span style="color:var(--accent)">· ${sName}</span>` : ''}</div>
+      <div style="color:var(--muted);font-size:10px;margin-bottom:6px">${svc.uuid}</div>`;
+    let chars = [];
+    try { chars = await svc.getCharacteristics(); } catch {}
+    for (const c of chars) {
+      const p = c.properties;
+      const props = ['broadcast','read','writeWithoutResponse','write','notify','indicate','authenticatedSignedWrites','reliableWrite','writableAuxiliaries'].filter(k=>p[k]);
+      const sigC = _sigShort(c.uuid);
+      const cName = _charName(c.uuid);
+      const specChar = { uuid: c.uuid, shortUuid: sigC, name: cName, properties: props, value: null, notifications: [] };
+      let valBlock = '';
+      if (p.read) {
+        try {
+          const dv = await c.readValue();
+          const d = _decodeAll(dv);
+          specChar.value = d;
+          valBlock = `<div style="margin:4px 0 6px;padding:6px 10px;background:#000;border:1px solid var(--border);border-radius:8px;color:rgba(255,255,255,.75)">
+            <div style="color:var(--muted)">read · ${d.len}B</div>
+            <div>hex: <span style="color:var(--accent)">${d.hex}</span></div>
+            <div>ascii: <span style="color:#fde68a">${d.ascii}</span></div>
+            <div>uint8: <span style="color:#7dd3fc">[${d.uint8.join(', ')}]</span></div>
+            ${d.uint16LE.length?`<div>uint16 LE: <span style="color:#7dd3fc">[${d.uint16LE.join(', ')}]</span></div>`:''}
+            ${d.int16LE.length?`<div>int16 LE: <span style="color:#7dd3fc">[${d.int16LE.join(', ')}]</span></div>`:''}
+            ${d.float32LE.length?`<div>float32 LE: <span style="color:#7dd3fc">[${d.float32LE.join(', ')}]</span></div>`:''}
+          </div>`;
+        } catch (e) { valBlock = `<div style="color:#fca5a5;font-size:10px">read failed: ${e.message}</div>`; }
+      }
+      if (p.notify || p.indicate) {
+        const handler = ev => {
+          if (specChar.notifications.length >= 5) return;
+          specChar.notifications.push(_decodeAll(ev.target.value));
+        };
+        try { c.addEventListener('characteristicvaluechanged', handler); } catch {}
+      }
+      html += `<div style="margin:6px 0 4px;padding-left:12px;border-left:1px dashed rgba(255,255,255,.12)">
+        <div style="color:#fff">○ Char ${sigC || c.uuid}${cName ? ` <span style="color:#7dd3fc">· ${cName}</span>` : ''}</div>
+        <div style="color:var(--muted);font-size:10px">${c.uuid}</div>
+        <div style="margin:3px 0">${props.map(pp=>`<span style="display:inline-block;padding:1px 6px;margin-right:3px;border-radius:6px;font-size:9px;background:rgba(57,255,136,.15);color:var(--accent)">${pp}</span>`).join('')}</div>
+        ${valBlock}
+      </div>`;
+      specSvc.characteristics.push(specChar);
+    }
+    html += '</div>';
+    _gattSpec.services.push(specSvc);
+  }
+  tree.innerHTML = html;
+  log('info', `GATT spec built: ${_gattSpec.services.length} services, ${_gattSpec.services.reduce((n,s)=>n+s.characteristics.length,0)} characteristics`);
+}
+
+function _gattAsMarkdown() {
+  if (!_gattSpec) return '';
+  let md = `# GATT profile · ${_gattSpec.device.name || 'unnamed'} (${_gattSpec.device.protocol})\n`;
+  md += `device id: \`${_gattSpec.device.id}\`\ncaptured: ${_gattSpec.timestamp}\n\n`;
+  for (const s of _gattSpec.services) {
+    md += `## Service ${s.shortUuid || s.uuid}${s.name ? ` — ${s.name}` : ''}\n\`${s.uuid}\`\n\n`;
+    for (const c of s.characteristics) {
+      md += `### Char ${c.shortUuid || c.uuid}${c.name ? ` — ${c.name}` : ''}\n`;
+      md += `- uuid: \`${c.uuid}\`\n- properties: ${c.properties.join(', ') || 'none'}\n`;
+      if (c.value) {
+        md += `- read value (${c.value.len}B):\n  - hex: \`${c.value.hex}\`\n  - ascii: \`${c.value.ascii}\`\n  - uint8: \`[${c.value.uint8.join(', ')}]\`\n`;
+        if (c.value.uint16LE.length) md += `  - uint16 LE: \`[${c.value.uint16LE.join(', ')}]\`\n`;
+        if (c.value.int16LE.length) md += `  - int16 LE: \`[${c.value.int16LE.join(', ')}]\`\n`;
+      }
+      if (c.notifications.length) {
+        md += `- notify samples (first ${c.notifications.length}):\n`;
+        c.notifications.forEach((n,i)=>{ md += `  ${i+1}. hex \`${n.hex}\` · uint8 \`[${n.uint8.join(', ')}]\`\n`; });
+      }
+      md += '\n';
+    }
+  }
+  return md;
+}
+
+function _gattCopied() {
+  const ok = $('gattCopyOk'); ok.style.display='block';
+  setTimeout(()=>ok.style.display='none', 3500);
+}
+$('gattCopyBtn').onclick = async () => {
+  if (!_gattSpec) return;
+  await navigator.clipboard.writeText(JSON.stringify(_gattSpec, null, 2));
+  _gattCopied();
+};
+$('gattCopyMdBtn').onclick = async () => {
+  if (!_gattSpec) return;
+  await navigator.clipboard.writeText(_gattAsMarkdown());
+  _gattCopied();
 };
 
 </script>
