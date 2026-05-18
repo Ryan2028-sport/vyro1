@@ -448,6 +448,15 @@ let nativeWriteChar = null;
 
 const nativeBle = () => window.VyroNative?.ble || null;
 const isNativeBle = () => !!(window.VyroNative?.isDespia && nativeBle());
+const LAST_NATIVE_WATCH_KEY = 'vyro:lastNativeWatch';
+function getLastNativeWatch() {
+  try { return JSON.parse(localStorage.getItem(LAST_NATIVE_WATCH_KEY) || 'null'); }
+  catch { return null; }
+}
+function saveLastNativeWatch(d) {
+  if (!d?.id) return;
+  try { localStorage.setItem(LAST_NATIVE_WATCH_KEY, JSON.stringify({ id: d.id, name: d.name || 'Watch', savedAt: Date.now() })); } catch {}
+}
 const normUuid = u => {
   const s = String(u || '').toLowerCase();
   return s.length === 4 ? `0000${s}-0000-1000-8000-00805f9b34fb` : s;
@@ -538,6 +547,8 @@ function setStatus(s, kind = '') {
 function setConnected(on) {
   $('connectBtn').disabled = on;
   $('connectFilteredBtn').disabled = on;
+  $('reconnectNativeBtn').disabled = on || !isNativeBle() || !getLastNativeWatch();
+  $('openNativeSettingsBtn').disabled = on || !window.VyroNative?.isDespia;
   $('disconnectBtn').disabled = !on;
   ['btnBattery','btnSteps','btnHrStart','btnHrStop','btnSpo2Start','btnSpo2Stop','btnTime','btnReboot','probeStart','probeMonitor','decTrigger0c','motionLock']
     .forEach(id => $(id).disabled = !on);
