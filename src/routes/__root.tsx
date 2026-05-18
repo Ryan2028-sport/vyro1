@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 
 function NotFoundComponent() {
   return (
@@ -114,6 +115,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  usePushNotifications();
 
   return (
     <QueryClientProvider client={queryClient}>
