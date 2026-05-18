@@ -542,8 +542,77 @@ function setConnected(on) {
 }
 
 // ----- BLE flow -----
+async function connectNative(filtered = false) {
+  return new Promise((resolve, reject) => {
+    const ble = nativeBle();
+    let picked = false;
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (!settled) reject(new Error('Native BLE scan timed out. Make sure the Despia Bluetooth addon is enabled, then install a fresh TestFlight build.'));
+    }, 18000);
+    const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); resolve(v); };
+    const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); reject(e); };
+
+    window.onBleState = s => {
+      if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
+      if (s.state === 'off') log('info', 'Bluetooth is off — turn it on. Scan will continue when iOS powers it on.');
+      if (s.state === 'unsupported') fail(new Error('This TestFlight build does not include Despia Bluetooth support.'));
+    };
+    window.onBleDevice = d => {
+      log('info', `Native found: ${d.name || '(unnamed)'} [${d.id}] RSSI ${d.rssi || '—'}`);
+      if (picked) return;
+      const name = d.name || '';
+      const watchy = /r|qc|colmi|h\s?band|band|watch|fit|smart|m/i.test(name) || (d.services || []).length;
+      if (filtered && !watchy) return;
+      picked = true;
+      device = { id: d.id, name: d.name || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(d.id) }, addEventListener() {} };
+      setStatus('connecting…');
+      ble.stopScan();
+      ble.connect(d.id, { timeout: 10000, autoConnect: true });
+    };
+    window.onBleConnect = e => {
+      if (e.state === 'connected') {
+        device.gatt.connected = true;
+        log('info', 'Native GATT connected, discovering services…');
+        ble.discover(e.id);
+      } else if (e.state === 'failed') fail(new Error(e.error || 'Native BLE connect failed'));
+      else if (e.state === 'disconnected') onDisconnected();
+    };
+    window.onBleDiscovered = tree => {
+      try {
+        nativeServices = (tree.services || []).map(makeNativeService);
+        finish(nativeServices);
+      } catch (e) { fail(e); }
+    };
+    window.onBleData = p => {
+      const data = payloadToBytes(p);
+      if (!data.length) return;
+      log('in', `← ${(p.characteristic || '').slice(4,8)} [${data.byteLength}B]: ${hex(data)}`);
+      probeRecord(p.characteristic || 'native', data);
+      decoderRecord(data);
+      motionRecord(data);
+      if (normUuid(p.characteristic) === '00002a37-0000-1000-8000-00805f9b34fb') {
+        try { onStdHr({ target: { value: new DataView(data.buffer, data.byteOffset, data.byteLength) } }); } catch {}
+      } else {
+        const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        const imuConsumed = tryParseImuPacket(dv, p.characteristic || 'native');
+        handleWatchPacket(data, p.characteristic || 'native');
+        if (imuConsumed) court.lastWatchPacketMs = performance.now();
+      }
+    };
+    window.onBleScanEnd = () => {
+      if (!picked) fail(new Error('No watch found. Wake the watch screen, close its companion app, and forget it in iPhone Bluetooth settings, then scan again.'));
+    };
+
+    log('info', `Starting native iOS BLE scan (${filtered ? 'watches only' : 'all nearby'})…`);
+    ble.state();
+    ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000);
+  });
+}
+
 async function connect(filtered = false) {
   try {
+    if (isNativeBle()) return await connectViaNative(filtered);
     const optionalServices = [
       SERVICE_UUID, 'battery_service', 'device_information', 'heart_rate',
       STD_HR_SERVICE, STD_BATTERY_SVC, STD_DEVICE_INFO,
