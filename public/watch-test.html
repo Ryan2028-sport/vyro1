@@ -554,6 +554,9 @@ async function connect(filtered = false) {
     $('deviceInfo').style.display = 'block';
     $('deviceInfo').textContent = `${device.name || 'Watch'} · ${protocol} · ${device.id}`;
 
+    // Kick off the GATT profile inspector — runs in parallel, doesn't block anything.
+    buildGattSpec(services).catch(err => log('err', 'GATT inspector: ' + err.message));
+
     // Battery (standard service, supported by both)
     try {
       const bsvc = services.find(s => s.uuid === '0000180f-0000-1000-8000-00805f9b34fb');
