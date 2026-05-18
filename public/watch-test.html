@@ -307,6 +307,22 @@
           <span id="ccMot" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">motion: 0</span>
         </div>
         <div id="ccDbg" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,.45);margin-top:6px;line-height:1.6">debug: connect & lock T to see live values</div>
+
+        <div style="margin-top:14px;padding:12px;border:1px solid rgba(94,194,255,.25);border-radius:10px;background:rgba(94,194,255,.04)">
+          <div style="font-size:12px;color:#5ec2ff;font-weight:700;margin-bottom:4px">Step 4 · Teach directions</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Press &amp; HOLD each button while you actually move that way on court. Release when done. Repeat until samples ≥ 10.</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <button id="dirBtnF" class="ghost" style="padding:14px 6px;font-size:13px;user-select:none">↑ Forward<div id="dirCountF" style="font-size:9px;opacity:.6;margin-top:3px">not learned</div></button>
+            <button id="dirBtnB" class="ghost" style="padding:14px 6px;font-size:13px;user-select:none">↓ Back<div id="dirCountB" style="font-size:9px;opacity:.6;margin-top:3px">not learned</div></button>
+            <button id="dirBtnL" class="ghost" style="padding:14px 6px;font-size:13px;user-select:none">← Left<div id="dirCountL" style="font-size:9px;opacity:.6;margin-top:3px">not learned</div></button>
+            <button id="dirBtnR" class="ghost" style="padding:14px 6px;font-size:13px;user-select:none">→ Right<div id="dirCountR" style="font-size:9px;opacity:.6;margin-top:3px">not learned</div></button>
+          </div>
+          <div class="row" style="justify-content:space-between;margin-top:10px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">live direction:</span>
+            <span id="dirLive" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#5ec2ff;font-weight:700">—</span>
+            <button id="dirReset" class="ghost" style="padding:4px 10px;font-size:10px">Reset</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1389,6 +1405,7 @@ function motionRecord(bytes) {
     motionHist.push(d); motionHist.shift();
     if (d > motionMax) motionMax = d;
     if (typeof ccFeed === 'function') ccFeed(d);
+    if (typeof dirFeed === 'function') dirFeed(bytes, motionPrev);
   }
   motionPrev = bytes.slice();
 }
@@ -2629,10 +2646,15 @@ const CC_COURTS = {
 function ccDrawCourt() {
   const c = CC_COURTS[ccCourtType];
   const t = c.t;
-  const drift = ccZoneAtT ? 0 : Math.min(70, ccSmooth * 0.5);
-  const ang = (performance.now() / 600) % (Math.PI * 2);
-  const px = t.x + (ccZoneAtT ? 0 : Math.cos(ang) * drift);
-  const py = t.y + (ccZoneAtT ? 0 : Math.sin(ang) * drift);
+  const drift = ccZoneAtT ? 0 : Math.min(90, ccSmooth * 0.6);
+  let ox = 0, oy = 0;
+  if (!ccZoneAtT) {
+    const o = (typeof dirLive !== 'undefined' && dirLive) ? DIR_OFFSET[dirLive] : null;
+    if (o) { ox = o[0]; oy = o[1]; }
+    else { const a = (performance.now() / 600) % (Math.PI * 2); ox = Math.cos(a); oy = Math.sin(a); }
+  }
+  const px = t.x + ox * drift;
+  const py = t.y + oy * drift;
   const r = 9 * (1 + Math.min(1.2, ccSmooth / 200));
   const color = ccZoneAtT ? '#39ff88' : '#ff3a3a';
   $('ccCourt').innerHTML = c.draw() +
@@ -2792,6 +2814,96 @@ function ccDebug() {
 requestAnimationFrame(ccDebug);
 
 ccDrawCourt();
+
+// ============ Direction Calibration ============
+const DIRS = ['F','B','L','R'];
+const DIR_OFFSET = { F:[0,-1], B:[0,1], L:[-1,0], R:[1,0] };
+let dirSig = { F:null, B:null, L:null, R:null };
+let dirSampleCount = { F:0, B:0, L:0, R:0 };
+let dirRecord = null;
+let dirLive = null, dirConf = 0;
+let dirHold = null; // {dir, samples:[]}
+let dirLastClassMs = 0;
+
+function dirFeed(bytes, prev) {
+  if (!bytes || !prev || bytes.length !== prev.length) return;
+  const v = new Array(bytes.length - 2);
+  let mag2 = 0;
+  for (let i = 1; i < bytes.length - 1; i++) {
+    let d = bytes[i] - prev[i];
+    if (d > 127) d -= 256; else if (d < -128) d += 256;
+    v[i-1] = d; mag2 += d*d;
+  }
+  const mag = Math.sqrt(mag2);
+  if (dirHold) {
+    dirHold.samples.push(v);
+    dirSampleCount[dirHold.dir] = dirHold.samples.length;
+    const el = $('dirCount'+dirHold.dir);
+    if (el) el.textContent = dirHold.samples.length + ' samples';
+  }
+  // classify only on real motion
+  if (mag < 6) { dirLive = null; updateDirLiveUI(); return; }
+  let best = null, bestS = 0;
+  for (const k of DIRS) {
+    const s = dirSig[k]; if (!s) continue;
+    let dot = 0, na = 0, nb = 0;
+    const L = Math.min(v.length, s.length);
+    for (let i = 0; i < L; i++) { dot += v[i]*s[i]; na += v[i]*v[i]; nb += s[i]*s[i]; }
+    const sim = (na && nb) ? dot / Math.sqrt(na*nb) : 0;
+    if (sim > bestS) { bestS = sim; best = k; }
+  }
+  if (bestS > 0.35) { dirLive = best; dirConf = bestS; }
+  else { dirLive = null; dirConf = bestS; }
+  updateDirLiveUI();
+}
+function updateDirLiveUI() {
+  const el = $('dirLive'); if (!el) return;
+  el.textContent = dirLive ? `${dirLive}  (${(dirConf*100|0)}%)` : '—';
+  el.style.color = dirLive ? '#39ff88' : '#5ec2ff';
+}
+function avgVec(samples) {
+  if (!samples.length) return null;
+  const L = samples[0].length;
+  const a = new Array(L).fill(0);
+  for (const s of samples) for (let i = 0; i < L; i++) a[i] += s[i];
+  for (let i = 0; i < L; i++) a[i] /= samples.length;
+  return a;
+}
+DIRS.forEach(k => {
+  const b = $('dirBtn'+k); if (!b) return;
+  const start = (e) => {
+    e && e.preventDefault();
+    // merge with existing samples so user can build up over multiple presses
+    const existing = dirSig[k] ? [dirSig[k]] : [];
+    dirHold = { dir: k, samples: existing.slice() };
+    b.style.background = 'rgba(57,255,136,.25)';
+    b.style.borderColor = '#39ff88';
+  };
+  const end = (e) => {
+    if (!dirHold || dirHold.dir !== k) return;
+    e && e.preventDefault();
+    if (dirHold.samples.length > 0) {
+      dirSig[k] = avgVec(dirHold.samples);
+      dirSampleCount[k] = dirHold.samples.length;
+      $('dirCount'+k).textContent = dirSampleCount[k] + ' samples ✓';
+    }
+    b.style.background = '';
+    b.style.borderColor = '';
+    dirHold = null;
+  };
+  b.addEventListener('mousedown', start);
+  b.addEventListener('mouseup', end);
+  b.addEventListener('mouseleave', end);
+  b.addEventListener('touchstart', start, { passive: false });
+  b.addEventListener('touchend', end, { passive: false });
+  b.addEventListener('touchcancel', end);
+});
+$('dirReset').onclick = () => {
+  dirSig = { F:null, B:null, L:null, R:null };
+  dirSampleCount = { F:0, B:0, L:0, R:0 };
+  DIRS.forEach(k => $('dirCount'+k).textContent = 'not learned');
+  dirLive = null; updateDirLiveUI();
+};
 
 </script>
 </body>
