@@ -2753,12 +2753,12 @@ $('courtCal').onclick   = startCalibration;
 $('courtReset').onclick = () => { resetCourt(); };
 
 // ----- env check -----
-if (!navigator.bluetooth) {
+if (!navigator.bluetooth && !isNativeBle()) {
   $('warn').style.display = 'block';
   $('connectBtn').disabled = true;
   $('connectFilteredBtn').disabled = true;
 }
-log('info', 'Ready. Click "Connect Watch" to begin.');
+log('info', isNativeBle() ? 'Ready. Native iOS BLE bridge detected — click scan to begin.' : 'Ready. Click "Connect Watch" to begin.');
 
 // ================= Court Calibration · T-Return Tracking =================
 let ccCourtType = 'squash';
