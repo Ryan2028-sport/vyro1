@@ -1530,6 +1530,8 @@ $('connectBtn').onclick = async () => { await requestMotionUpfront(); connect(fa
 $('connectFilteredBtn').onclick = async () => { await requestMotionUpfront(); connect(true); };
 $('webBluetoothBtn').onclick = async () => { await requestMotionUpfront(); connect('web'); };
 $('disconnectBtn').onclick = disconnect;
+$('bleReadinessBtn').onclick = runBleReadinessCheck;
+$('healthFallbackBtn').onclick = readAppleHealthFallback;
 // Manual test step — verifies the dot/step pipeline regardless of sensors.
 // Tap this to confirm the court rendering works; if the dot moves here but
 // not from real steps, the problem is sensor input, not the visualisation.
@@ -2994,6 +2996,9 @@ if (!navigator.bluetooth && !isNativeBle()) {
   $('connectBtn').disabled = true;
   $('connectFilteredBtn').disabled = true;
   $('webBluetoothBtn').disabled = true;
+  setGateSummary('No BLE API is visible yet. Run the BLE check inside the installed TestFlight build for the final answer.', 'wait');
+  setCheck('nativeBleCheck', window.VyroNative?.isDespia ? 'wait' : 'fail', window.VyroNative?.isDespia ? 'native wrapper detected; BLE state not checked' : 'native wrapper not detected in this browser');
+  setCheck('webBleCheck', 'fail', 'navigator.bluetooth is not available');
 }
 log('info', isNativeBle() ? 'Ready. Native iOS BLE bridge detected — click scan to begin.' : 'Ready. Click Web Bluetooth direct to test requestDevice support.');
 setConnected(false);
