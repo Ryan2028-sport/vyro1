@@ -1381,7 +1381,7 @@ function motionRecord(bytes) {
     // ignore byte 0 (tag) and last byte (CRC/counter)
     for (let i = 1; i < bytes.length - 1; i++) d += Math.abs(bytes[i] - motionPrev[i]);
     motionHist.push(d); motionHist.shift();
-    if (d > motionMax) motionMax = d;
+    if (typeof ccFeed === 'function') ccFeed(d);
   }
   motionPrev = bytes.slice();
 }
