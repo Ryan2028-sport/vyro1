@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VYRO · Calibration</title>
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@500,700,900,400&f[]=jetbrains-mono@500,700&display=swap" />
+<style>
+  :root{--bg:#000;--fg:#fff;--panel:rgba(255,255,255,.055);--border:rgba(255,255,255,.10);--muted:rgba(255,255,255,.55);--accent:#39ff88;--amber:#ffb020;--red:#ff2b2b}
+  *{box-sizing:border-box}html,body{margin:0;background:radial-gradient(circle at top left,rgba(255,255,255,.1),transparent 30%),linear-gradient(180deg,#080808,#000);color:var(--fg);font-family:"Satoshi",system-ui,sans-serif;min-height:100vh}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px}
+  .logo{font-family:"JetBrains Mono",monospace;font-weight:700;letter-spacing:.3em;font-size:14px}
+  .back{font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:8px 14px;border-radius:999px}
+  .back:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+  h1{font-size:32px;font-weight:900;margin:0 0 6px}
+  .sub{color:var(--muted);font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:24px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:22px;margin-bottom:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  button.cta{font-family:inherit;font-weight:700;font-size:14px;background:#fff;color:#000;border:none;border-radius:999px;padding:12px 22px;cursor:pointer}
+  button.cta:disabled{opacity:.4;cursor:not-allowed}
+  button.ghost{font-family:inherit;font-weight:600;font-size:13px;background:transparent;color:#fff;border:1px solid var(--border);border-radius:999px;padding:10px 16px;cursor:pointer}
+  .status{display:inline-flex;align-items:center;gap:8px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;padding:6px 12px;border-radius:999px;border:1px solid var(--border)}
+  .stat-dot{width:8px;height:8px;border-radius:50%;background:#666;box-shadow:0 0 8px #666}
+  .status.on .stat-dot{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+  .status.err .stat-dot{background:var(--red);box-shadow:0 0 10px var(--red)}
+  .section-title{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+
+  /* Calibration dot */
+  .cal-stage{position:relative;display:grid;place-items:center;height:340px;border-radius:24px;background:radial-gradient(circle at center,rgba(57,255,136,.06),transparent 60%);border:1px dashed rgba(255,255,255,.08)}
+  .cal-dot{position:relative;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff,#39ff88 55%,#0a4a26 100%);box-shadow:0 0 60px rgba(57,255,136,.5),0 0 0 0 rgba(57,255,136,.6);transform:scale(1);transition:transform .08s ease-out,box-shadow .12s ease-out}
+  .cal-dot::after{content:"";position:absolute;inset:-14px;border-radius:50%;border:1px solid rgba(57,255,136,.3);animation:ring 2.4s infinite ease-out}
+  @keyframes ring{0%{transform:scale(.8);opacity:.8}100%{transform:scale(1.6);opacity:0}}
+  .cal-hint{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:var(--muted);font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase}
+
+  /* Hero ring */
+  .hero-ring{position:relative;display:grid;place-items:center;width:200px;height:200px;border-radius:50%;background:conic-gradient(var(--accent) 0deg,rgba(255,255,255,.09) 0deg);transition:background .15s linear}
+  .hero-ring .inner{width:170px;height:170px;border-radius:50%;background:#0b0b0c;display:grid;place-items:center;text-align:center}
+  .hero-ring .v{font-size:54px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+  .hero-ring .l{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+
+  /* Movement stat */
+  .move-card{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:22px;display:flex;flex-direction:column;gap:14px;height:100%}
+  .move-k{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+  .move-v{font-size:64px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+  .move-v .u{font-size:18px;color:var(--muted);margin-left:6px;font-weight:600}
+  .bar{height:8px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--amber),var(--red));width:0%;transition:width .12s ease-out;border-radius:999px}
+  .mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:4px}
+  .mini-stats div{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:14px;padding:10px}
+  .mini-stats b{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;display:block}
+  .mini-stats span{font-family:"JetBrains Mono",monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+
+  .grid-two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:780px){.grid-two{grid-template-columns:1fr}}
+  .warning{background:rgba(80,160,255,.08);border:1px solid rgba(80,160,255,.3);color:#bcd9ff;padding:14px 16px;border-radius:14px;font-size:13px;line-height:1.6;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">VYRO · CALIBRATION</div>
+    <div class="row" style="gap:8px">
+      <a class="back" href="/watch-test.html">Watch test</a>
+      <a class="back" href="/vyro-app.html">← App</a>
+    </div>
+  </header>
+
+  <h1>Wrist motion calibration</h1>
+  <div class="sub">Live 0x69 stream · move your wrist to calibrate</div>
+
+  <div class="warning">
+    Tap <b>Connect watch</b>, allow Bluetooth, then move your arm naturally. The dot pulses with every motion packet, the ring fills with intensity, and the movement stat tracks live g-equivalent and peak. After ~10 seconds of varied movement, calibration is complete.
+  </div>
+
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <button id="connectBtn" class="cta">Connect watch</button>
+        <button id="disconnectBtn" class="ghost" disabled>Disconnect</button>
+        <button id="resetBtn" class="ghost">Reset peak</button>
+      </div>
+      <div id="status" class="status"><span class="stat-dot"></span><span id="statusText">disconnected</span></div>
+    </div>
+    <div id="deviceInfo" style="margin-top:12px;color:var(--muted);font-size:13px;display:none"></div>
+  </div>
+
+  <div class="section-title">Calibration target · dot pulses with wrist motion</div>
+  <div class="panel" style="padding:28px">
+    <div class="cal-stage">
+      <div id="calDot" class="cal-dot"></div>
+      <div class="cal-hint"><span id="calHint">waiting for watch…</span></div>
+    </div>
+  </div>
+
+  <div class="grid-two">
+    <div>
+      <div class="section-title">Home hero ring · live motion intensity</div>
+      <div class="panel" style="display:grid;place-items:center;padding:32px">
+        <div id="heroRing" class="hero-ring">
+          <div class="inner">
+            <div>
+              <div class="v" id="heroVal">0</div>
+              <div class="l">motion</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Session view · movement stat</div>
+      <div class="move-card">
+        <div class="move-k">Movement</div>
+        <div class="move-v"><span id="moveVal">0.0</span><span class="u">g</span></div>
+        <div class="bar"><i id="moveBar"></i></div>
+        <canvas id="moveSpark" width="520" height="80" style="width:100%;height:80px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--border)"></canvas>
+        <div class="mini-stats">
+          <div><b id="peakVal">0</b><span>Peak</span></div>
+          <div><b id="rateVal">0.0</b><span>Hz</span></div>
+          <div><b id="pktVal">0</b><span>Packets</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SERVICE_UUID='6e40fff0-b5a3-f393-e0a9-e50e24dcca9e';
+const $=id=>document.getElementById(id);
+let device=null,server=null;
+const MOTION_TAG=0x69;
+let prev=null,peak=1,packets=0,firstPkt=0,lastPkt=0;
+const hist=new Array(120).fill(0);let val=0,smooth=0;
+
+function setStatus(text,cls=''){const s=$('status');s.className='status '+cls;$('statusText').textContent=text}
+function setConnected(on){
+  $('connectBtn').disabled=on;$('disconnectBtn').disabled=!on;
+  if(!on){$('calHint').textContent='waiting for watch…';$('deviceInfo').style.display='none'}
+}
+function motionRecord(bytes){
+  if(!bytes||bytes.length<4||bytes[0]!==MOTION_TAG)return;
+  packets++;const now=performance.now();if(!firstPkt)firstPkt=now;lastPkt=now;
+  if(prev){let d=0;for(let i=1;i<bytes.length-2;i++)d+=Math.abs(bytes[i]-prev[i]);
+    val=d;if(d>peak)peak=d;
+    hist.push(d);hist.shift();
+  }
+  prev=Array.from(bytes);
+}
+function render(){
+  // smoothing
+  smooth+=(val-smooth)*0.35;val*=0.86;
+  const pct=peak>0?Math.min(100,(smooth/peak)*100):0;
+  // calibration dot
+  const scale=1+(pct/100)*0.6;
+  const dot=$('calDot');dot.style.transform=`scale(${scale.toFixed(3)})`;
+  dot.style.boxShadow=`0 0 ${60+pct}px rgba(57,255,136,${.4+pct/200}),0 0 0 ${pct/4}px rgba(57,255,136,${.15+pct/400})`;
+  // hero ring
+  const deg=(pct/100)*360;
+  $('heroRing').style.background=`conic-gradient(var(--accent) ${deg}deg,rgba(255,255,255,.09) 0deg)`;
+  $('heroVal').textContent=Math.round(smooth);
+  // movement stat - map smooth -> g equivalent (0..16g)
+  const g=(smooth/Math.max(1,peak))*16;
+  $('moveVal').textContent=g.toFixed(1);
+  $('moveBar').style.width=pct+'%';
+  $('peakVal').textContent=peak;
+  const dur=(lastPkt-firstPkt)/1000;
+  $('rateVal').textContent=dur>0?(packets/dur).toFixed(1):'0.0';
+  $('pktVal').textContent=packets;
+  // sparkline
+  const c=$('moveSpark');const ctx=c.getContext('2d');const w=c.width,h=c.height;
+  ctx.clearRect(0,0,w,h);
+  const grad=ctx.createLinearGradient(0,0,w,0);grad.addColorStop(0,'#39ff88');grad.addColorStop(.6,'#ffb020');grad.addColorStop(1,'#ff2b2b');
+  ctx.strokeStyle=grad;ctx.lineWidth=2;ctx.beginPath();
+  for(let i=0;i<hist.length;i++){const x=(i/(hist.length-1))*w;const y=h-(Math.min(hist[i],peak)/peak)*(h-6)-3;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}
+  ctx.stroke();
+  // hint
+  if(packets>0){
+    const age=((performance.now()-lastPkt)/1000).toFixed(1);
+    if(packets>30 && peak>20) $('calHint').textContent=`calibrated · peak ${peak} · ${packets} packets`;
+    else $('calHint').textContent=`learning · ${packets} packets · last ${age}s ago`;
+  }
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+
+async function connect(){
+  if(!navigator.bluetooth){alert('Web Bluetooth not available. Use Chrome/Edge on desktop or Android.');return}
+  try{
+    setStatus('requesting…');
+    device=await navigator.bluetooth.requestDevice({
+      acceptAllDevices:true,
+      optionalServices:[SERVICE_UUID,'battery_service','heart_rate',0xFEE7,0xFEE0,0xFFF0,0xFFE0]
+    });
+    device.addEventListener('gattserverdisconnected',()=>{setStatus('disconnected','err');setConnected(false)});
+    setStatus('connecting…');
+    server=await device.gatt.connect();
+    const services=await server.getPrimaryServices();
+    for(const svc of services){
+      let chars=[];try{chars=await svc.getCharacteristics()}catch{continue}
+      for(const c of chars){
+        if(c.properties.notify||c.properties.indicate){
+          try{
+            await c.startNotifications();
+            c.addEventListener('characteristicvaluechanged',e=>{
+              const v=e.target.value;
+              const data=new Uint8Array(v.buffer,v.byteOffset,v.byteLength);
+              motionRecord(data);
+            });
+          }catch{}
+        }
+      }
+    }
+    setStatus('connected','on');setConnected(true);
+    $('deviceInfo').style.display='block';
+    $('deviceInfo').textContent=`${device.name||'Watch'} · ${device.id}`;
+    $('calHint').textContent='move your wrist to calibrate';
+  }catch(err){setStatus('error','err');alert('Connect failed: '+err.message)}
+}
+function disconnect(){if(device?.gatt?.connected)device.gatt.disconnect();setConnected(false);setStatus('disconnected')}
+function resetPeak(){peak=1;packets=0;firstPkt=0;hist.fill(0);prev=null}
+
+$('connectBtn').onclick=connect;
+$('disconnectBtn').onclick=disconnect;
+$('resetBtn').onclick=resetPeak;
+</script>
+</body>
+</html>
