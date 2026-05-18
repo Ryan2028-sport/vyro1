@@ -2646,10 +2646,15 @@ const CC_COURTS = {
 function ccDrawCourt() {
   const c = CC_COURTS[ccCourtType];
   const t = c.t;
-  const drift = ccZoneAtT ? 0 : Math.min(70, ccSmooth * 0.5);
-  const ang = (performance.now() / 600) % (Math.PI * 2);
-  const px = t.x + (ccZoneAtT ? 0 : Math.cos(ang) * drift);
-  const py = t.y + (ccZoneAtT ? 0 : Math.sin(ang) * drift);
+  const drift = ccZoneAtT ? 0 : Math.min(90, ccSmooth * 0.6);
+  let ox = 0, oy = 0;
+  if (!ccZoneAtT) {
+    const o = (typeof dirLive !== 'undefined' && dirLive) ? DIR_OFFSET[dirLive] : null;
+    if (o) { ox = o[0]; oy = o[1]; }
+    else { const a = (performance.now() / 600) % (Math.PI * 2); ox = Math.cos(a); oy = Math.sin(a); }
+  }
+  const px = t.x + ox * drift;
+  const py = t.y + oy * drift;
   const r = 9 * (1 + Math.min(1.2, ccSmooth / 200));
   const color = ccZoneAtT ? '#39ff88' : '#ff3a3a';
   $('ccCourt').innerHTML = c.draw() +
