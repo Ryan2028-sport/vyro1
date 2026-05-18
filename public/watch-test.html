@@ -548,6 +548,7 @@ function setStatus(s, kind = '') {
 function setConnected(on) {
   $('connectBtn').disabled = on;
   $('connectFilteredBtn').disabled = on;
+  $('webBluetoothBtn').disabled = on;
   $('reconnectNativeBtn').disabled = on || !isNativeBle() || !getLastNativeWatch();
   $('openNativeSettingsBtn').disabled = on || !window.VyroNative?.isDespia;
   $('disconnectBtn').disabled = !on;
@@ -666,14 +667,25 @@ async function connectNative(filtered = false) {
   });
 }
 
+function showWebBluetoothRestricted() {
+  $('warn').style.display = 'block';
+  $('warn').innerHTML = '⚠️ Web Bluetooth is not exposed by this iOS TestFlight web view. Open iPhone Settings → VYRO and enable <b>Bluetooth</b> if the toggle exists; also allow <b>Local Network</b> if iOS shows it. If there is no Bluetooth toggle, the app needs a fresh native BLE-enabled build to connect to the watch.';
+  log('err', 'navigator.bluetooth is unavailable in this container. iOS pairing in Settings does not give WebView pages access to BLE devices.');
+}
+
 async function connect(filtered = false) {
   try {
     let services;
+    const forceWebBluetooth = filtered === 'web';
     if (filtered === 'last-native') {
       services = await reconnectLastNative();
-    } else if (isNativeBle()) {
+    } else if (!forceWebBluetooth && isNativeBle()) {
       services = await connectNative(filtered);
     } else {
+      if (!navigator.bluetooth?.requestDevice) {
+        showWebBluetoothRestricted();
+        throw new Error('Web Bluetooth is restricted in this iOS app container.');
+      }
       const optionalServices = [
         SERVICE_UUID, 'battery_service', 'device_information', 'heart_rate',
         STD_HR_SERVICE, STD_BATTERY_SVC, STD_DEVICE_INFO,
@@ -686,7 +698,8 @@ async function connect(filtered = false) {
               { namePrefix: 'R' }, { namePrefix: 'QC' }, { namePrefix: 'Colmi' },
               { namePrefix: 'H' }, { namePrefix: 'M' }, { namePrefix: 'Band' },
               { namePrefix: 'Watch' }, { namePrefix: 'Fit' }, { namePrefix: 'Smart' },
-              { services: ['heart_rate'] }, { services: [SERVICE_UUID] }, { services: [0xFEE7] },
+              { services: ['heart_rate'] }, { services: ['battery_service'] },
+              { services: [SERVICE_UUID] }, { services: [0xFEE7] }, { services: [0xFEE0] },
             ],
             optionalServices,
           }
