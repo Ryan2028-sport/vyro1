@@ -78,11 +78,11 @@
   </div>
 
   <!-- ============ GATT PROFILE INSPECTOR ============ -->
-  <div id="gattPanel" class="panel" style="display:none;border-color:rgba(57,255,136,0.35)">
+  <div id="gattPanel" class="panel" style="border-color:rgba(57,255,136,0.35)">
     <div class="row" style="justify-content:space-between;margin-bottom:10px">
       <div>
-        <div class="section-title" style="margin:0 0 4px;color:var(--accent)">📋 GATT profile · full device spec</div>
-        <div style="font-size:12px;color:var(--muted)">Every service, characteristic, properties, and raw values — exactly what the vendor would put in a GATT profile document.</div>
+        <div class="section-title" style="margin:0 0 4px;color:var(--accent)">📋 Watch spec · GATT profile document</div>
+        <div style="font-size:12px;color:var(--muted)">After you connect the watch, this fills with the actual service UUIDs, characteristic UUIDs, properties, raw byte values, and decoded meanings we can infer.</div>
       </div>
       <div class="row">
         <button id="gattCopyBtn" class="ghost">Copy JSON spec</button>
@@ -90,7 +90,7 @@
       </div>
     </div>
     <div id="gattCopyOk" style="display:none;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;margin-bottom:10px">✓ copied — paste into Lovable chat</div>
-    <div id="gattTree" style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.65"></div>
+    <div id="gattTree" style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.65;color:var(--muted)">Connect the watch first — the full spec will appear here, inside Watch Test.</div>
   </div>
 
   <div class="section-title">Live data</div>
@@ -2988,6 +2988,7 @@ async function buildGattSpec(services) {
       const sigC = _sigShort(c.uuid);
       const cName = _charName(c.uuid);
       const specChar = { uuid: c.uuid, shortUuid: sigC, name: cName, properties: props, value: null, notifications: [] };
+      const inferredMeaning = cName || (p.notify || p.indicate ? 'Live stream / notifications — move the watch to capture sample packets' : p.write || p.writeWithoutResponse ? 'Command input characteristic' : p.read ? 'Readable device value' : 'Unknown vendor-specific value');
       let valBlock = '';
       if (p.read) {
         try {
@@ -3015,6 +3016,7 @@ async function buildGattSpec(services) {
       html += `<div style="margin:6px 0 4px;padding-left:12px;border-left:1px dashed rgba(255,255,255,.12)">
         <div style="color:#fff">○ Char ${sigC || c.uuid}${cName ? ` <span style="color:#7dd3fc">· ${cName}</span>` : ''}</div>
         <div style="color:var(--muted);font-size:10px">${c.uuid}</div>
+        <div style="color:#fde68a;font-size:10px;margin-top:2px">meaning: ${inferredMeaning}</div>
         <div style="margin:3px 0">${props.map(pp=>`<span style="display:inline-block;padding:1px 6px;margin-right:3px;border-radius:6px;font-size:9px;background:rgba(57,255,136,.15);color:var(--accent)">${pp}</span>`).join('')}</div>
         ${valBlock}
       </div>`;
