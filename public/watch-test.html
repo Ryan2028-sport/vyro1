@@ -53,7 +53,7 @@
   <div class="sub">QCBand / Colmi compatible · Native iOS BLE + Web Bluetooth</div>
 
   <div id="warn" class="warning" style="display:none">
-    ⚠️ Bluetooth is not available here. Use the TestFlight build with Despia Bluetooth enabled, or Chrome/Edge/Opera on desktop or Android.
+    ⚠️ Web Bluetooth is blocked in this app container. Open iPhone Settings → VYRO and enable Bluetooth if the toggle exists. If there is no Bluetooth toggle, this TestFlight build cannot read BLE without a native BLE module.
   </div>
 
   <div class="warning" style="background:rgba(80,160,255,.08);border-color:rgba(80,160,255,.3);color:#bcd9ff">
@@ -67,8 +67,9 @@
   <div class="panel">
     <div class="row" style="justify-content:space-between">
       <div class="row">
-        <button id="connectBtn" class="cta">Scan all nearby</button>
-        <button id="connectFilteredBtn" class="cta" style="background:#1e4d7a">Scan watches only</button>
+        <button id="connectBtn" class="cta">Connect all devices</button>
+        <button id="connectFilteredBtn" class="cta" style="background:#1e4d7a">Connect by watch services</button>
+        <button id="webBluetoothBtn" class="cta" style="background:#0f7a4d">Web Bluetooth direct</button>
         <button id="reconnectNativeBtn" class="ghost">Reconnect last watch</button>
         <button id="openNativeSettingsBtn" class="ghost">Open iOS settings</button>
         <button id="disconnectBtn" class="ghost" disabled>Disconnect</button>
