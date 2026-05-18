@@ -40,6 +40,7 @@ function BluetoothPage() {
     connectionState,
     connectedId,
     error,
+    powerState,
     scan,
     stopScan,
     connect,
