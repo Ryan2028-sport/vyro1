@@ -77,6 +77,22 @@
     <div id="deviceInfo" style="margin-top:14px;color:var(--muted);font-size:13px;display:none"></div>
   </div>
 
+  <!-- ============ GATT PROFILE INSPECTOR ============ -->
+  <div id="gattPanel" class="panel" style="display:none;border-color:rgba(57,255,136,0.35)">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <div>
+        <div class="section-title" style="margin:0 0 4px;color:var(--accent)">📋 GATT profile · full device spec</div>
+        <div style="font-size:12px;color:var(--muted)">Every service, characteristic, properties, and raw values — exactly what the vendor would put in a GATT profile document.</div>
+      </div>
+      <div class="row">
+        <button id="gattCopyBtn" class="ghost">Copy JSON spec</button>
+        <button id="gattCopyMdBtn" class="ghost">Copy markdown</button>
+      </div>
+    </div>
+    <div id="gattCopyOk" style="display:none;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;margin-bottom:10px">✓ copied — paste into Lovable chat</div>
+    <div id="gattTree" style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.65"></div>
+  </div>
+
   <div class="section-title">Live data</div>
   <div class="grid">
     <div class="stat"><div class="k">Battery</div><div><span class="v" id="battery">—</span><span class="u">%</span></div></div>
