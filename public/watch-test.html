@@ -1405,6 +1405,7 @@ function motionRecord(bytes) {
     motionHist.push(d); motionHist.shift();
     if (d > motionMax) motionMax = d;
     if (typeof ccFeed === 'function') ccFeed(d);
+    if (typeof dirFeed === 'function') dirFeed(bytes, motionPrev);
   }
   motionPrev = bytes.slice();
 }
