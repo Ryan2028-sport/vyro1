@@ -505,6 +505,7 @@ function makeNativeCharacteristic(serviceUuid, c) {
     },
     async writeValue(packet) { nativeBle().write(device.id, serviceUuid, c.uuid, bytesToBase64(packet), true); },
     async writeValueWithoutResponse(packet) { nativeBle().write(device.id, serviceUuid, c.uuid, bytesToBase64(packet), false); },
+    async startNotifications() { nativeBle().subscribe(device.id, serviceUuid, c.uuid); },
   };
 }
 function makeNativeService(s) {
@@ -547,9 +548,7 @@ async function connectNative(filtered = false) {
     const ble = nativeBle();
     let picked = false;
     let settled = false;
-    const timeout = setTimeout(() => {
-      if (!settled) reject(new Error('Native BLE scan timed out. Make sure the Despia Bluetooth addon is enabled, then install a fresh TestFlight build.'));
-    }, 18000);
+    const timeout = setTimeout(() => fail(new Error('Native BLE scan timed out. Make sure the Despia Bluetooth addon is enabled, then install a fresh TestFlight build.')), 18000);
     const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); resolve(v); };
     const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); reject(e); };
 
