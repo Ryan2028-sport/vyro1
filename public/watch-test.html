@@ -60,11 +60,9 @@
   </div>
 
   <div class="warning" style="background:rgba(80,160,255,.08);border-color:rgba(80,160,255,.3);color:#bcd9ff">
-    <b>Watch not showing in the chooser?</b><br>
-    1. iOS does not let apps list every device from the Settings Bluetooth screen; the app must scan once and save the watch ID.<br>
-    2. If you already connected this watch in VYRO before, tap <b>Reconnect last watch</b> — it uses the saved native ID instead of waiting for the Settings list.<br>
-    3. If it has never connected in VYRO, keep the watch screen awake, close QCBand / Colmi / H Band / Da Fit, then scan.<br>
-    4. If iOS blocked permission, tap <b>Open iOS settings</b> and enable Bluetooth for VYRO.
+    <b>No Bluetooth toggle for VYRO in iOS Settings?</b><br>
+    That row only appears after the native iOS binary declares <code>NSBluetoothAlwaysUsageDescription</code> and calls CoreBluetooth — the current TestFlight wrapper does neither, so iOS never creates the toggle. Web code cannot add it.<br>
+    <b>Working path on iOS:</b> your watch already syncs to <b>Apple Health</b> via its companion app (QCBand / Colmi / H Band / Da Fit). VYRO reads from Health instead of pairing the watch directly. Tap <b>Read Apple Health fallback</b> below — it runs automatically on TestFlight launch.
   </div>
 
   <div class="panel" id="testFlightGatePanel" style="border-color:rgba(253,230,138,.28)">
