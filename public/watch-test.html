@@ -442,6 +442,85 @@ let hrDisplayed = null; // EMA-smoothed displayed bpm
 let hrLastUpdate = 0;   // ms timestamp of last accepted sample
 const watchPacketState = new Map(); // per-characteristic packet deltas for live watch motion
 const watchStepFieldState = new Map(); // learns which bytes in watch packets are step totals
+let nativeServices = [];
+let nativeWriteChar = null;
+
+const nativeBle = () => window.VyroNative?.ble || null;
+const isNativeBle = () => !!(window.VyroNative?.isDespia && nativeBle());
+const normUuid = u => {
+  const s = String(u || '').toLowerCase();
+  return s.length === 4 ? `0000${s}-0000-1000-8000-00805f9b34fb` : s;
+};
+function bytesToBase64(bytes) {
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+function payloadToBytes(p) {
+  if (!p) return new Uint8Array();
+  if (p.value) {
+    try {
+      const bin = atob(p.value);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    } catch {}
+  }
+  const raw = p.valueHex || p.hex || '';
+  const clean = String(raw).replace(/[^0-9a-f]/gi, '');
+  const out = new Uint8Array(Math.floor(clean.length / 2));
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+function makeNativeCharacteristic(serviceUuid, c) {
+  const props = c.properties || [];
+  return {
+    uuid: normUuid(c.uuid),
+    properties: {
+      read: props.includes('read'),
+      write: props.includes('write'),
+      writeWithoutResponse: props.includes('writeWithoutResponse') || props.includes('write-without-response') || props.includes('writeNoResponse'),
+      notify: props.includes('notify'),
+      indicate: props.includes('indicate'),
+      broadcast: props.includes('broadcast'),
+      authenticatedSignedWrites: props.includes('authenticatedSignedWrites'),
+      reliableWrite: props.includes('reliableWrite'),
+      writableAuxiliaries: props.includes('writableAuxiliaries'),
+    },
+    addEventListener() {},
+    async readValue() {
+      await nativeBle().read(device.id, serviceUuid, c.uuid);
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { cleanup(); reject(new Error('native read timeout')); }, 5000);
+        const prev = window.onBleData;
+        function cleanup() { clearTimeout(timer); window.onBleData = prev; }
+        window.onBleData = p => {
+          try { if (prev) prev(p); } catch {}
+          if (p.id !== device.id || normUuid(p.service) !== normUuid(serviceUuid) || normUuid(p.characteristic) !== normUuid(c.uuid)) return;
+          cleanup();
+          const bytes = payloadToBytes(p);
+          resolve(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+        };
+      });
+    },
+    async writeValue(packet) { nativeBle().write(device.id, serviceUuid, c.uuid, bytesToBase64(packet), true); },
+    async writeValueWithoutResponse(packet) { nativeBle().write(device.id, serviceUuid, c.uuid, bytesToBase64(packet), false); },
+  };
+}
+function makeNativeService(s) {
+  const serviceUuid = normUuid(s.uuid);
+  const chars = (s.characteristics || []).map(c => makeNativeCharacteristic(serviceUuid, c));
+  return {
+    uuid: serviceUuid,
+    async getCharacteristics() { return chars; },
+    async getCharacteristic(uuid) {
+      const want = normUuid(uuid);
+      const found = chars.find(c => normUuid(c.uuid) === want || c.uuid.slice(4, 8) === String(uuid).toLowerCase());
+      if (!found) throw new Error('Characteristic not found: ' + uuid);
+      return found;
+    },
+  };
+}
 
 // ----- UI helpers -----
 const $ = id => document.getElementById(id);
