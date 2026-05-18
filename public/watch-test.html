@@ -612,33 +612,36 @@ async function connectNative(filtered = false) {
 
 async function connect(filtered = false) {
   try {
-    if (isNativeBle()) return await connectViaNative(filtered);
-    const optionalServices = [
-      SERVICE_UUID, 'battery_service', 'device_information', 'heart_rate',
-      STD_HR_SERVICE, STD_BATTERY_SVC, STD_DEVICE_INFO,
-      0xFEE7, 0xFEE0, 0xFEA0, 0xFFF0, 0xFFE0, 0xFFB0,
-      'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20',
-    ];
-    const reqOpts = filtered
-      ? {
-          filters: [
-            { namePrefix: 'R' }, { namePrefix: 'QC' }, { namePrefix: 'Colmi' },
-            { namePrefix: 'H' }, { namePrefix: 'M' }, { namePrefix: 'Band' },
-            { namePrefix: 'Watch' }, { namePrefix: 'Fit' }, { namePrefix: 'Smart' },
-            { services: ['heart_rate'] }, { services: [SERVICE_UUID] }, { services: [0xFEE7] },
-          ],
-          optionalServices,
-        }
-      : { acceptAllDevices: true, optionalServices };
-    log('info', `Requesting device (${filtered ? 'filtered' : 'all nearby'})…`);
-    device = await navigator.bluetooth.requestDevice(reqOpts);
-    log('info', `Selected: ${device.name || '(unnamed)'} [${device.id}]`);
-    device.addEventListener('gattserverdisconnected', onDisconnected);
-    setStatus('connecting…');
-    server = await device.gatt.connect();
-    log('info', 'GATT connected, discovering services…');
-
-    const services = await server.getPrimaryServices();
+    let services;
+    if (isNativeBle()) {
+      services = await connectNative(filtered);
+    } else {
+      const optionalServices = [
+        SERVICE_UUID, 'battery_service', 'device_information', 'heart_rate',
+        STD_HR_SERVICE, STD_BATTERY_SVC, STD_DEVICE_INFO,
+        0xFEE7, 0xFEE0, 0xFEA0, 0xFFF0, 0xFFE0, 0xFFB0,
+        'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20',
+      ];
+      const reqOpts = filtered
+        ? {
+            filters: [
+              { namePrefix: 'R' }, { namePrefix: 'QC' }, { namePrefix: 'Colmi' },
+              { namePrefix: 'H' }, { namePrefix: 'M' }, { namePrefix: 'Band' },
+              { namePrefix: 'Watch' }, { namePrefix: 'Fit' }, { namePrefix: 'Smart' },
+              { services: ['heart_rate'] }, { services: [SERVICE_UUID] }, { services: [0xFEE7] },
+            ],
+            optionalServices,
+          }
+        : { acceptAllDevices: true, optionalServices };
+      log('info', `Requesting device (${filtered ? 'filtered' : 'all nearby'})…`);
+      device = await navigator.bluetooth.requestDevice(reqOpts);
+      log('info', `Selected: ${device.name || '(unnamed)'} [${device.id}]`);
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+      setStatus('connecting…');
+      server = await device.gatt.connect();
+      log('info', 'GATT connected, discovering services…');
+      services = await server.getPrimaryServices();
+    }
     const uuids = services.map(s => s.uuid);
     log('info', 'Services: ' + uuids.join(', '));
 
