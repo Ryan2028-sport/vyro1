@@ -555,6 +555,49 @@ function setConnected(on) {
 }
 
 // ----- BLE flow -----
+function waitForNativeConnectAndDiscover(ble, id, displayName, timeoutMs = 18000) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => fail(new Error('Native BLE reconnect timed out. If iOS forgot the peripheral, scan once again while the watch is awake.')), timeoutMs);
+    const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); resolve(v); };
+    const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); reject(e); };
+
+    device = { id, name: displayName || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(id) }, addEventListener() {} };
+    window.onBleState = s => {
+      if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
+      if (s.state === 'off') log('info', 'Bluetooth is off — turn it on in Control Center or Settings.');
+      if (s.state === 'unsupported') fail(new Error('This TestFlight build does not include Despia Bluetooth support.'));
+    };
+    window.onBleConnect = e => {
+      if (e.id && e.id !== id) return;
+      if (e.state === 'connected') {
+        device.gatt.connected = true;
+        log('info', 'Native GATT connected, discovering services…');
+        ble.discover(e.id || id);
+      } else if (e.state === 'failed') fail(new Error(e.error || 'Native BLE connect failed'));
+      else if (e.state === 'disconnected') onDisconnected();
+    };
+    window.onBleDiscovered = tree => {
+      try {
+        nativeServices = (tree.services || []).map(makeNativeService);
+        saveLastNativeWatch(device);
+        finish(nativeServices);
+      } catch (e) { fail(e); }
+    };
+    ble.state();
+    ble.connect(id, { timeout: 10000, autoConnect: true });
+  });
+}
+
+async function reconnectLastNative() {
+  const ble = nativeBle();
+  const saved = getLastNativeWatch();
+  if (!ble || !saved?.id) throw new Error('No saved native watch yet. Scan once first, then reconnect works after that.');
+  log('info', `Reconnecting saved iOS watch: ${saved.name || 'Watch'} [${saved.id}]…`);
+  setStatus('reconnecting…');
+  return waitForNativeConnectAndDiscover(ble, saved.id, saved.name);
+}
+
 async function connectNative(filtered = false) {
   return new Promise((resolve, reject) => {
     const ble = nativeBle();
@@ -577,6 +620,7 @@ async function connectNative(filtered = false) {
       if (filtered && !watchy) return;
       picked = true;
       device = { id: d.id, name: d.name || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(d.id) }, addEventListener() {} };
+      saveLastNativeWatch(device);
       setStatus('connecting…');
       ble.stopScan();
       ble.connect(d.id, { timeout: 10000, autoConnect: true });
