@@ -307,6 +307,22 @@
           <span id="ccMot" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">motion: 0</span>
         </div>
         <div id="ccDbg" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,.45);margin-top:6px;line-height:1.6">debug: connect & lock T to see live values</div>
+
+        <div style="margin-top:14px;padding:12px;border:1px solid rgba(94,194,255,.25);border-radius:10px;background:rgba(94,194,255,.04)">
+          <div style="font-size:12px;color:#5ec2ff;font-weight:700;margin-bottom:4px">Step 4 · Teach directions</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Press &amp; HOLD each button while you actually move that way on court. Release when done. Repeat until samples ≥ 10.</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <button id="dirBtnF" class="ghost" style="padding:14px 6px;font-size:13px;user-select:none">↑ Forward<div id="dirCountF" style="font-size:9px;opacity:.6;margin-top:3px">not learned</div></button>
+            <button id="dirBtnB" class="ghost" style="padding:14px 6px;font-size:13px;user-select:none">↓ Back<div id="dirCountB" style="font-size:9px;opacity:.6;margin-top:3px">not learned</div></button>
+            <button id="dirBtnL" class="ghost" style="padding:14px 6px;font-size:13px;user-select:none">← Left<div id="dirCountL" style="font-size:9px;opacity:.6;margin-top:3px">not learned</div></button>
+            <button id="dirBtnR" class="ghost" style="padding:14px 6px;font-size:13px;user-select:none">→ Right<div id="dirCountR" style="font-size:9px;opacity:.6;margin-top:3px">not learned</div></button>
+          </div>
+          <div class="row" style="justify-content:space-between;margin-top:10px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">live direction:</span>
+            <span id="dirLive" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#5ec2ff;font-weight:700">—</span>
+            <button id="dirReset" class="ghost" style="padding:4px 10px;font-size:10px">Reset</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
