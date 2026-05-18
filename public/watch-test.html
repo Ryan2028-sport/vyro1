@@ -2723,7 +2723,7 @@ $('ccLockT').onclick = () => {
       ccCalSamples.sort((a,b)=>a-b);
       const median = ccCalSamples[Math.floor(ccCalSamples.length/2)];
       ccBaseline = Math.max(1, median);
-      ccThreshold = Math.max(ccBaseline * 3, ccBaseline + 15);
+      ccThreshold = Math.max(ccBaseline * 2 + 5, 8); // more sensitive
       $('ccBase').textContent = Math.round(ccBaseline);
       $('ccThr').textContent = Math.round(ccThreshold);
       $('ccLockMsg').textContent = '✓ T locked'; $('ccLockMsg').style.color = '#39ff88';
