@@ -5,17 +5,27 @@ import {
   type BleConnectEvent,
   type BleDataEvent,
   type BleDevice,
+  type BleState,
 } from "@/lib/despia";
 
-export type BleConnectionState = "idle" | "connecting" | "connected" | "disconnected" | "failed";
+export type BleConnectionState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "failed";
+
+export type BlePowerState = BleState["state"] | "unknown";
 
 export function useBluetooth() {
   const [devices, setDevices] = useState<Record<string, BleDevice>>({});
   const [scanning, setScanning] = useState(false);
-  const [connectionState, setConnectionState] = useState<BleConnectionState>("idle");
+  const [connectionState, setConnectionState] =
+    useState<BleConnectionState>("idle");
   const [connectedId, setConnectedId] = useState<string | null>(null);
   const [lastData, setLastData] = useState<BleDataEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [powerState, setPowerState] = useState<BlePowerState>("unknown");
 
   useEffect(() => {
     const offDevice = bluetooth.on("device", (d: BleDevice) => {
@@ -33,10 +43,28 @@ export function useBluetooth() {
       if (e.error) setError(e.error);
     });
     const offData = bluetooth.on("data", (d: BleDataEvent) => setLastData(d));
+    const offState = bluetooth.on("state", (s) => {
+      setPowerState(s.state);
+      if (s.state === "unauthorized")
+        setError("Bluetooth permission denied. Enable it in iOS Settings.");
+      else if (s.state === "off")
+        setError("Bluetooth is off. Turn it on in Control Center.");
+      else if (s.state === "unsupported")
+        setError("Bluetooth is not supported on this device.");
+      else setError(null);
+    });
+    const offScanEnd = bluetooth.on("scanEnd", () => setScanning(false));
+
+    // Bootstrap: query current state. This also triggers the iOS permission
+    // prompt on first BLE call and unblocks subsequent scans.
+    if (isNative) void bluetooth.state();
+
     return () => {
       offDevice();
       offConnect();
       offData();
+      offState();
+      offScanEnd();
     };
   }, []);
 
@@ -44,9 +72,13 @@ export function useBluetooth() {
     async (services: string[] = [], durationMs = 10000) => {
       setError(null);
       setDevices({});
+      // Make sure we have an up-to-date power/permission read. The first call
+      // also triggers the iOS permission prompt if it hasn't appeared yet.
+      if (isNative) await bluetooth.state();
       setScanning(true);
       await bluetooth.scan(services, durationMs);
-      window.setTimeout(() => setScanning(false), durationMs);
+      // Fallback if onBleScanEnd never arrives.
+      window.setTimeout(() => setScanning(false), durationMs + 500);
     },
     [],
   );
@@ -68,6 +100,7 @@ export function useBluetooth() {
 
   return {
     isNative,
+    powerState,
     devices: Object.values(devices),
     scanning,
     connectionState,
