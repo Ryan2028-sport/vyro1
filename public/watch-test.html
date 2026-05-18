@@ -562,6 +562,19 @@ function log(kind, msg) {
   el.innerHTML += `<span class="${kind}">[${time}] ${msg}</span>\n`;
   el.scrollTop = el.scrollHeight;
 }
+function setCheck(id, state, text) {
+  const el = $(id);
+  if (!el) return;
+  el.className = `check ${state}`;
+  const span = el.querySelector('span');
+  if (span) span.innerHTML = text;
+}
+function setGateSummary(html, state = 'wait') {
+  const el = $('testFlightSummary');
+  if (!el) return;
+  el.innerHTML = html;
+  el.style.color = state === 'ok' ? '#b7ffd4' : state === 'fail' ? '#ffb4b4' : 'var(--muted)';
+}
 function setStatus(s, kind = '') {
   $('statusText').textContent = s;
   $('status').className = 'status ' + kind;
