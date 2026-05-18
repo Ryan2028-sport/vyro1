@@ -101,5 +101,131 @@ export const purchases = {
     ),
 };
 
+// --- Bluetooth (BLE central) ---
+// Despia delivers BLE events through global window callbacks.
+// We mirror them into a simple emitter so React code can subscribe.
+
+export type BleDevice = {
+  id: string;
+  name?: string;
+  rssi?: number;
+  services?: string[];
+};
+
+export type BleConnectEvent = {
+  id: string;
+  state: "connected" | "disconnected" | "failed";
+  error?: string;
+};
+
+export type BleDataEvent = {
+  id: string;
+  service: string;
+  characteristic: string;
+  value: string; // hex or base64 depending on platform
+};
+
+type BleEventMap = {
+  device: BleDevice;
+  connect: BleConnectEvent;
+  data: BleDataEvent;
+  event: { type: string; [k: string]: unknown };
+};
+
+type Listener<T> = (payload: T) => void;
+const bleListeners: { [K in keyof BleEventMap]: Listener<BleEventMap[K]>[] } = {
+  device: [],
+  connect: [],
+  data: [],
+  event: [],
+};
+
+function emit<K extends keyof BleEventMap>(key: K, payload: BleEventMap[K]) {
+  for (const fn of bleListeners[key]) {
+    try {
+      fn(payload);
+    } catch (err) {
+      console.warn("[despia] ble listener error", err);
+    }
+  }
+}
+
+// Wire up the global callbacks Despia fires from native.
+if (typeof window !== "undefined") {
+  const w = window as unknown as Record<string, unknown>;
+  w.onBleDevice = (d: BleDevice) => emit("device", d);
+  w.onBleConnect = (e: BleConnectEvent) => emit("connect", e);
+  w.onBleData = (e: BleDataEvent) => emit("data", e);
+  w.onBleEvent = (e: { type: string; [k: string]: unknown }) =>
+    emit("event", e);
+}
+
+export const bluetooth = {
+  /** Start scanning. `services` is an optional UUID allow-list. */
+  scan: (services: string[] = [], durationMs = 10000) => {
+    const params = new URLSearchParams();
+    if (services.length) params.set("services", services.join(","));
+    params.set("duration", String(durationMs));
+    return run(`bluetooth://scan?${params.toString()}`);
+  },
+  stopScan: () => run("bluetooth://stopscan"),
+  state: () => run("bluetooth://state"),
+  connect: (
+    id: string,
+    opts: { timeout?: number; autoConnect?: boolean; server?: string } = {},
+  ) => {
+    const params = new URLSearchParams({
+      id,
+      timeout: String(opts.timeout ?? 10000),
+    });
+    if (opts.autoConnect) params.set("auto_connect", "true");
+    if (opts.server) params.set("server", opts.server);
+    return run(`bluetooth://connect?${params.toString()}`);
+  },
+  disconnect: (id: string) =>
+    run(`bluetooth://disconnect?id=${encodeURIComponent(id)}`),
+  discover: (id: string) =>
+    run(`bluetooth://discover?id=${encodeURIComponent(id)}`),
+  read: (id: string, service: string, characteristic: string) =>
+    run(
+      `bluetooth://read?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`,
+    ),
+  write: (
+    id: string,
+    service: string,
+    characteristic: string,
+    text: string,
+    withResponse = true,
+  ) =>
+    run(
+      `bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`,
+    ),
+  subscribe: (
+    id: string,
+    service: string,
+    characteristic: string,
+    server?: string,
+  ) => {
+    let url = `bluetooth://subscribe?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`;
+    if (server) url += `&server=${encodeURIComponent(server)}`;
+    return run(url);
+  },
+  unsubscribe: (id: string, service: string, characteristic: string) =>
+    run(
+      `bluetooth://unsubscribe?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`,
+    ),
+  rssi: (id: string) =>
+    run(`bluetooth://rssi?id=${encodeURIComponent(id)}`),
+  /** Subscribe to BLE events. Returns an unsubscribe fn. */
+  on<K extends keyof BleEventMap>(event: K, listener: Listener<BleEventMap[K]>) {
+    bleListeners[event].push(listener);
+    return () => {
+      const arr = bleListeners[event];
+      const idx = arr.indexOf(listener);
+      if (idx >= 0) arr.splice(idx, 1);
+    };
+  },
+};
+
 export { despia };
 export default despia;
