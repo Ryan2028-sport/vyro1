@@ -514,6 +514,46 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Biometric lock (Despia bioauth://). Shows only inside the Despia native runtime. -->
+    <div id="vyro-bio-lock" style="display:none;position:fixed;inset:0;z-index:2147483647;background:#0a0a0a;color:#fff;font-family:-apple-system,system-ui,sans-serif;align-items:center;justify-content:center;flex-direction:column;gap:18px;padding:24px;text-align:center;">
+      <div style="width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#17c8a4,#0ea58a);display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 11c-1.5 0-3 1-3 3v2"/><path d="M15 16v-2c0-1.7-1.3-3-3-3"/><path d="M7 19c0-3 2-5 5-5s5 2 5 5"/><path d="M5 9a7 7 0 0 1 14 0"/><path d="M3 13a9 9 0 0 1 .5-3"/><path d="M21 13a9 9 0 0 0-.5-3"/></svg>
+      </div>
+      <div style="font-size:18px;font-weight:600;letter-spacing:.2px;">VYRO is locked</div>
+      <div id="vyro-bio-msg" style="font-size:13px;opacity:.65;max-width:280px;">Use Face ID, Touch ID, or your device passcode to continue.</div>
+      <button id="vyro-bio-retry" style="margin-top:8px;padding:12px 22px;border-radius:12px;border:0;background:#17c8a4;color:#0a0a0a;font-weight:600;font-size:14px;cursor:pointer;">Unlock</button>
+    </div>
+    <script>
+      (function () {
+        var isDespia = navigator.userAgent.toLowerCase().indexOf('despia') !== -1;
+        if (!isDespia) return;
+
+        var lock = document.getElementById('vyro-bio-lock');
+        var msg = document.getElementById('vyro-bio-msg');
+        var retry = document.getElementById('vyro-bio-retry');
+        lock.style.display = 'flex';
+
+        function trigger() {
+          msg.textContent = 'Use Face ID, Touch ID, or your device passcode to continue.';
+          try { window.location.href = 'bioauth://'; } catch (e) {}
+        }
+
+        window.onBioAuthSuccess = function () { lock.style.display = 'none'; };
+        window.onBioAuthFailure = function (code, m) {
+          msg.textContent = 'Authentication failed. Tap Unlock to try again.';
+        };
+        window.onBioAuthUnavailable = function () {
+          // No biometrics enrolled — let the user in (or change to keep locked).
+          lock.style.display = 'none';
+        };
+
+        retry.addEventListener('click', trigger);
+        // Auto-prompt on launch
+        setTimeout(trigger, 250);
+      })();
+    </script>
+
     <script>
       // Hide fake iOS status bar (9:41 / LTE) and the Goodix vitals caption.
       // Runs after React mounts; no observer to avoid re-render loops.
