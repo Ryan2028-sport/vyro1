@@ -2732,7 +2732,10 @@ $('ccLockT').onclick = () => {
       ccThreshold = Math.max(ccBaseline * 2 + 5, 8); // more sensitive
       $('ccBase').textContent = Math.round(ccBaseline);
       $('ccThr').textContent = Math.round(ccThreshold);
-      $('ccLockMsg').textContent = '✓ T locked'; $('ccLockMsg').style.color = '#39ff88';
+      const sl = $('ccThrSlider');
+      sl.disabled = false; sl.value = Math.round(ccThreshold);
+      $('ccThrSliderVal').textContent = Math.round(ccThreshold);
+      $('ccLockMsg').textContent = '✓ T locked — adjust slider if needed'; $('ccLockMsg').style.color = '#39ff88';
       $('ccStart').disabled = false;
       $('ccStatusText').textContent = 'step 3 of 3 · ready to track';
     }
