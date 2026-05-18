@@ -245,6 +245,66 @@
     <canvas id="motionSpark" width="800" height="80" style="width:100%;height:80px;background:#000;border:1px solid var(--border);border-radius:6px"></canvas>
   </div>
 
+  <div class="panel" style="margin-top:16px;border-color:rgba(255,176,32,.3)">
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <div class="section-title" style="margin:0;color:#ffb020">🏟️ Court Calibration · T-Return Tracking</div>
+      <span id="ccStatus" class="status" style="padding:4px 10px"><span class="dot"></span><span id="ccStatusText">step 1 of 3</span></span>
+    </div>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:14px">
+      Stand still on the T (idle wrist motion = baseline). When you leave to chase a ball, motion spikes. When you return and stand still, it drops. Each low → high → low cycle = 1 T-return. Counters are real, dot position is illustrative.
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start">
+      <div>
+        <div style="margin-bottom:14px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Step 1 · Pick court</div>
+          <div class="row">
+            <button class="ghost cc-court active" data-court="squash">Squash</button>
+            <button class="ghost cc-court" data-court="tennis">Tennis</button>
+            <button class="ghost cc-court" data-court="custom">Custom (tap 4 corners)</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Step 2 · Lock the T (5s baseline)</div>
+          <div class="row">
+            <button id="ccLockT" class="cta" style="padding:10px 18px;font-size:13px" disabled>Lock T (5s)</button>
+            <span id="ccLockMsg" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">connect watch first</span>
+          </div>
+          <div style="height:6px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin-top:8px">
+            <div id="ccLockBar" style="height:100%;width:0%;background:#39ff88;transition:width 80ms"></div>
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-top:6px">
+            baseline: <b id="ccBase">—</b> · threshold: <b id="ccThr">—</b>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Step 3 · Track T-returns</div>
+          <div class="row">
+            <button id="ccStart" class="cta" style="padding:10px 18px;font-size:13px" disabled>Start tracking</button>
+            <button id="ccStop" class="ghost" disabled>Stop</button>
+            <button id="ccReset" class="ghost">Reset counters</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px">
+            <div class="stat" style="padding:12px"><div class="k">T-Returns</div><div class="v" id="ccReturns" style="font-size:28px">0</div></div>
+            <div class="stat" style="padding:12px"><div class="k">Avg away</div><div class="v" id="ccAway" style="font-size:20px">0.0s</div></div>
+            <div class="stat" style="padding:12px"><div class="k">T-Control</div><div class="v" id="ccCtrl" style="font-size:20px">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <svg id="ccCourt" viewBox="0 0 320 480" style="width:100%;height:auto;background:rgba(255,255,255,.02);border:1px dashed rgba(255,255,255,.1);border-radius:12px;cursor:crosshair"></svg>
+        <div class="row" style="justify-content:space-between;margin-top:8px">
+          <span id="ccZone" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#39ff88">● at T</span>
+          <span id="ccMot" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">motion: 0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="panel" style="margin-top:16px">
     <div class="row" style="justify-content:space-between;margin-bottom:8px">
       <div class="section-title" style="margin:0">Live decoder · first-byte streams (move your wrist!)</div>
@@ -1322,6 +1382,7 @@ function motionRecord(bytes) {
     for (let i = 1; i < bytes.length - 1; i++) d += Math.abs(bytes[i] - motionPrev[i]);
     motionHist.push(d); motionHist.shift();
     if (d > motionMax) motionMax = d;
+    if (typeof ccFeed === 'function') ccFeed(d);
   }
   motionPrev = bytes.slice();
 }
@@ -2505,6 +2566,198 @@ if (!navigator.bluetooth) {
   $('connectFilteredBtn').disabled = true;
 }
 log('info', 'Ready. Click "Connect Watch" to begin.');
+
+// ================= Court Calibration · T-Return Tracking =================
+let ccCourtType = 'squash';
+let ccCustomCorners = [];
+let ccBaseline = null, ccThreshold = null, ccCalibrating = false, ccCalSamples = [];
+let ccTracking = false, ccZoneAtT = true, ccReturns = 0;
+let ccLeftAt = 0, ccTotalAwayMs = 0, ccTrackStartMs = 0;
+let ccAboveSince = 0, ccBelowSince = 0, ccLastMotion = 0, ccSmooth = 0;
+
+const CC_COURTS = {
+  squash: { t: { x: 160, y: 264 }, draw: () => {
+    const x=20,y=20,w=280,h=440,sl=y+h*0.55,hx=x+w/2;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="rgba(57,255,136,.04)" stroke="rgba(255,255,255,.5)" stroke-width="2"/>
+      <line x1="${x}" y1="${sl}" x2="${x+w}" y2="${sl}" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>
+      <line x1="${hx}" y1="${sl}" x2="${hx}" y2="${y+h}" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>
+      <rect x="${x+10}" y="${sl}" width="80" height="60" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>
+      <rect x="${x+w-90}" y="${sl}" width="80" height="60" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>
+      <circle cx="${hx}" cy="${sl}" r="14" fill="none" stroke="#ffb020" stroke-width="2.5"/>
+      <text x="${hx+18}" y="${sl+4}" fill="#ffb020" font-family="JetBrains Mono" font-size="11" font-weight="700">T</text>`;
+  }},
+  tennis: { t: { x: 160, y: 380 }, draw: () => {
+    const x=30,y=40,w=260,h=400,net=y+h/2;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="rgba(57,255,136,.04)" stroke="rgba(255,255,255,.5)" stroke-width="2"/>
+      <line x1="${x}" y1="${net}" x2="${x+w}" y2="${net}" stroke="rgba(255,255,255,.6)" stroke-width="2.5"/>
+      <rect x="${x+w*0.10}" y="${y+h*0.25}" width="${w*0.80}" height="${h*0.25}" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>
+      <rect x="${x+w*0.10}" y="${net}" width="${w*0.80}" height="${h*0.25}" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>
+      <line x1="${x+w/2}" y1="${y+h*0.25}" x2="${x+w/2}" y2="${y+h*0.75}" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>
+      <circle cx="${x+w/2}" cy="${y+h*0.85}" r="14" fill="none" stroke="#ffb020" stroke-width="2.5"/>
+      <text x="${x+w/2+18}" y="${y+h*0.85+4}" fill="#ffb020" font-family="JetBrains Mono" font-size="11" font-weight="700">Base</text>`;
+  }},
+  custom: {
+    get t() {
+      if (ccCustomCorners.length < 4) return { x: 160, y: 240 };
+      const cx = ccCustomCorners.reduce((a,c)=>a+c.x,0)/4;
+      const cy = ccCustomCorners.reduce((a,c)=>a+c.y,0)/4;
+      return { x: cx, y: cy };
+    },
+    draw: () => {
+      if (ccCustomCorners.length < 4) {
+        return `<rect x="20" y="20" width="280" height="440" fill="rgba(255,255,255,.02)" stroke="rgba(255,255,255,.2)" stroke-dasharray="4 4"/>
+          <text x="160" y="240" text-anchor="middle" fill="rgba(255,255,255,.4)" font-family="JetBrains Mono" font-size="12">Tap ${4-ccCustomCorners.length} more corner(s)</text>
+          ${ccCustomCorners.map((c,i)=>`<circle cx="${c.x}" cy="${c.y}" r="7" fill="#5ec2ff" stroke="#fff" stroke-width="2"/><text x="${c.x+12}" y="${c.y+4}" fill="#5ec2ff" font-family="JetBrains Mono" font-size="10">${i+1}</text>`).join('')}`;
+      }
+      const cs = ccCustomCorners;
+      const path = `M${cs[0].x},${cs[0].y} L${cs[1].x},${cs[1].y} L${cs[2].x},${cs[2].y} L${cs[3].x},${cs[3].y} Z`;
+      const t = CC_COURTS.custom.t;
+      return `<path d="${path}" fill="rgba(57,255,136,.04)" stroke="rgba(255,255,255,.5)" stroke-width="2"/>
+        <circle cx="${t.x}" cy="${t.y}" r="14" fill="none" stroke="#ffb020" stroke-width="2.5"/>
+        <text x="${t.x+18}" y="${t.y+4}" fill="#ffb020" font-family="JetBrains Mono" font-size="11" font-weight="700">T</text>
+        ${cs.map(c=>`<circle cx="${c.x}" cy="${c.y}" r="5" fill="#5ec2ff"/>`).join('')}`;
+    }
+  }
+};
+
+function ccDrawCourt() {
+  const c = CC_COURTS[ccCourtType];
+  const t = c.t;
+  const drift = ccZoneAtT ? 0 : Math.min(70, ccSmooth * 0.5);
+  const ang = (performance.now() / 600) % (Math.PI * 2);
+  const px = t.x + (ccZoneAtT ? 0 : Math.cos(ang) * drift);
+  const py = t.y + (ccZoneAtT ? 0 : Math.sin(ang) * drift);
+  const r = 9 * (1 + Math.min(1.2, ccSmooth / 200));
+  const color = ccZoneAtT ? '#39ff88' : '#ff3a3a';
+  $('ccCourt').innerHTML = c.draw() +
+    `<circle cx="${px}" cy="${py}" r="${r.toFixed(1)}" fill="${color}" style="filter:drop-shadow(0 0 10px ${color})"/>`;
+}
+
+function ccFeed(d) {
+  ccLastMotion = d;
+  if (ccCalibrating) ccCalSamples.push(d);
+  if (ccTracking && ccThreshold) {
+    const now = performance.now();
+    if (d > ccThreshold) {
+      if (ccAboveSince === 0) ccAboveSince = now;
+      ccBelowSince = 0;
+      if (ccZoneAtT && (now - ccAboveSince) > 300) {
+        ccZoneAtT = false; ccLeftAt = now; ccUpdateZone();
+      }
+    } else if (d < ccBaseline * 1.8) {
+      if (ccBelowSince === 0) ccBelowSince = now;
+      ccAboveSince = 0;
+      if (!ccZoneAtT && (now - ccBelowSince) > 800) {
+        ccZoneAtT = true;
+        ccTotalAwayMs += (now - ccLeftAt);
+        ccReturns++;
+        ccUpdateZone();
+      }
+    } else { ccAboveSince = 0; ccBelowSince = 0; }
+  }
+}
+
+function ccUpdateZone() {
+  const z = $('ccZone');
+  if (ccZoneAtT) { z.style.color = '#39ff88'; z.textContent = '● at T'; }
+  else { z.style.color = '#ff3a3a'; z.textContent = '● away from T'; }
+}
+
+function ccRender() {
+  ccSmooth += (ccLastMotion - ccSmooth) * 0.3;
+  ccLastMotion *= 0.85;
+  $('ccMot').textContent = 'motion: ' + Math.round(ccSmooth) + (ccThreshold ? ' · thr ' + Math.round(ccThreshold) : '');
+  ccDrawCourt();
+  if (ccTracking) {
+    const elapsed = performance.now() - ccTrackStartMs;
+    $('ccReturns').textContent = ccReturns;
+    $('ccAway').textContent = (ccReturns > 0 ? (ccTotalAwayMs / ccReturns / 1000) : 0).toFixed(1) + 's';
+    const ctrl = elapsed > 0 ? (1 - ccTotalAwayMs / elapsed) * 100 : 0;
+    $('ccCtrl').textContent = Math.round(ctrl) + '%';
+  }
+  requestAnimationFrame(ccRender);
+}
+requestAnimationFrame(ccRender);
+
+// court picker
+document.querySelectorAll('.cc-court').forEach(b => {
+  b.onclick = () => {
+    ccCourtType = b.dataset.court;
+    document.querySelectorAll('.cc-court').forEach(x => x.classList.toggle('active', x === b));
+    if (ccCourtType === 'custom') ccCustomCorners = [];
+    ccDrawCourt();
+  };
+});
+
+// custom corner tap
+$('ccCourt').addEventListener('click', e => {
+  if (ccCourtType !== 'custom') return;
+  if (ccCustomCorners.length >= 4) ccCustomCorners = [];
+  const svg = e.currentTarget;
+  const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  const loc = pt.matrixTransform(svg.getScreenCTM().inverse());
+  ccCustomCorners.push({ x: loc.x, y: loc.y });
+  ccDrawCourt();
+});
+
+// Lock T (5s sample)
+$('ccLockT').onclick = () => {
+  ccCalibrating = true; ccCalSamples = [];
+  $('ccLockMsg').textContent = 'sampling 5s — stand still…';
+  $('ccLockMsg').style.color = '#ffb020';
+  const start = performance.now();
+  const tick = () => {
+    const p = Math.min(100, ((performance.now() - start) / 5000) * 100);
+    $('ccLockBar').style.width = p + '%';
+    if (p < 100) requestAnimationFrame(tick);
+    else {
+      ccCalibrating = false;
+      if (ccCalSamples.length < 5) {
+        $('ccLockMsg').textContent = 'no packets — make sure watch is connected'; $('ccLockMsg').style.color = '#ff6b6b'; return;
+      }
+      ccCalSamples.sort((a,b)=>a-b);
+      const median = ccCalSamples[Math.floor(ccCalSamples.length/2)];
+      ccBaseline = Math.max(1, median);
+      ccThreshold = Math.max(ccBaseline * 3, ccBaseline + 15);
+      $('ccBase').textContent = Math.round(ccBaseline);
+      $('ccThr').textContent = Math.round(ccThreshold);
+      $('ccLockMsg').textContent = '✓ T locked'; $('ccLockMsg').style.color = '#39ff88';
+      $('ccStart').disabled = false;
+      $('ccStatusText').textContent = 'step 3 of 3 · ready to track';
+    }
+  };
+  tick();
+};
+
+$('ccStart').onclick = () => {
+  if (!ccThreshold) return;
+  ccTracking = true; ccReturns = 0; ccTotalAwayMs = 0; ccTrackStartMs = performance.now();
+  ccZoneAtT = true; ccUpdateZone();
+  $('ccStart').disabled = true; $('ccStop').disabled = false;
+  $('ccStatusText').textContent = 'tracking…';
+};
+$('ccStop').onclick = () => {
+  ccTracking = false;
+  $('ccStart').disabled = false; $('ccStop').disabled = true;
+  $('ccStatusText').textContent = 'stopped · resume?';
+};
+$('ccReset').onclick = () => {
+  ccReturns = 0; ccTotalAwayMs = 0; ccTrackStartMs = performance.now();
+  ccZoneAtT = true; ccUpdateZone();
+};
+
+// enable Lock T once watch is connected
+const _origSetConn = setConnected;
+setConnected = function(on) {
+  _origSetConn(on);
+  $('ccLockT').disabled = !on;
+  $('ccLockMsg').textContent = on ? 'ready to lock' : 'connect watch first';
+  $('ccLockMsg').style.color = on ? '#39ff88' : 'rgba(255,255,255,.55)';
+  if (on) $('ccStatusText').textContent = 'step 2 of 3 · stand on T and lock';
+};
+
+ccDrawCourt();
+
 </script>
 </body>
 </html>
