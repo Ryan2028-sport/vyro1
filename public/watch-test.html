@@ -2988,6 +2988,7 @@ async function buildGattSpec(services) {
       const sigC = _sigShort(c.uuid);
       const cName = _charName(c.uuid);
       const specChar = { uuid: c.uuid, shortUuid: sigC, name: cName, properties: props, value: null, notifications: [] };
+      const inferredMeaning = cName || (p.notify || p.indicate ? 'Live stream / notifications — move the watch to capture sample packets' : p.write || p.writeWithoutResponse ? 'Command input characteristic' : p.read ? 'Readable device value' : 'Unknown vendor-specific value');
       let valBlock = '';
       if (p.read) {
         try {
@@ -3015,6 +3016,7 @@ async function buildGattSpec(services) {
       html += `<div style="margin:6px 0 4px;padding-left:12px;border-left:1px dashed rgba(255,255,255,.12)">
         <div style="color:#fff">○ Char ${sigC || c.uuid}${cName ? ` <span style="color:#7dd3fc">· ${cName}</span>` : ''}</div>
         <div style="color:var(--muted);font-size:10px">${c.uuid}</div>
+        <div style="color:#fde68a;font-size:10px;margin-top:2px">meaning: ${inferredMeaning}</div>
         <div style="margin:3px 0">${props.map(pp=>`<span style="display:inline-block;padding:1px 6px;margin-right:3px;border-radius:6px;font-size:9px;background:rgba(57,255,136,.15);color:var(--accent)">${pp}</span>`).join('')}</div>
         ${valBlock}
       </div>`;
