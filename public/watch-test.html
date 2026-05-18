@@ -2770,6 +2770,27 @@ setConnected = function(on) {
   if (on) $('ccStatusText').textContent = 'step 2 of 3 · stand on T and lock';
 };
 
+// manual threshold slider override
+$('ccThrSlider').addEventListener('input', e => {
+  ccThreshold = +e.target.value;
+  $('ccThrSliderVal').textContent = ccThreshold;
+  $('ccThr').textContent = ccThreshold;
+});
+
+// live debug readout (updates every frame)
+function ccDebug() {
+  if (ccBaseline !== null) {
+    const above = ccLastMotion > ccThreshold ? '🔴 ABOVE' : '🟢 below';
+    const zone = ccZoneAtT ? 'AT-T' : 'AWAY';
+    const peak = ccPeakSeen > 0 ? ` · peak-this-cycle: ${ccPeakSeen}` : '';
+    $('ccDbg').innerHTML =
+      `<b style="color:#fff">raw: ${Math.round(ccLastMotion)}</b> · base: ${Math.round(ccBaseline)} · thr: ${Math.round(ccThreshold)} · ${above} · zone: <b>${zone}</b>${peak}<br>` +
+      `<span style="color:rgba(255,255,255,.4)">tip: motion must exceed threshold while moving, then drop to ≤ ${Math.round(ccBaseline*2)} for 0.5s to count a return</span>`;
+  }
+  requestAnimationFrame(ccDebug);
+}
+requestAnimationFrame(ccDebug);
+
 ccDrawCourt();
 
 </script>
