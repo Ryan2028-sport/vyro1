@@ -3007,6 +3007,15 @@ $('openNativeSettingsBtn').onclick = () => {
   else log('err', 'Native settings are only available inside the TestFlight app.');
 };
 
+// On iOS TestFlight, BLE bridge does not exist in this wrapper — go straight to
+// Apple Health, which is the only working data path on this build.
+if (window.VyroNative?.isDespiaIOS) {
+  log('info', 'iOS detected — using Apple Health as the primary data source. Watch data is read from Health, populated by the watch companion app (QCBand / Colmi / H Band / Da Fit).');
+  setTimeout(() => { readAppleHealthFallback().catch(() => {}); }, 600);
+  // Re-poll Health every 60s so live tiles stay fresh while the page is open.
+  setInterval(() => { readAppleHealthFallback().catch(() => {}); }, 60000);
+}
+
 // ================= Court Calibration · T-Return Tracking =================
 let ccCourtType = 'squash';
 let ccCustomCorners = [];
