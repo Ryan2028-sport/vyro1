@@ -39,6 +39,9 @@
   .pulse{display:inline-block;width:10px;height:10px;background:var(--warn);border-radius:50%;margin-right:6px;animation:pulse 1s infinite}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
   .warning{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.3);color:#ffb4b4;padding:14px 16px;border-radius:14px;font-size:13px;line-height:1.6;margin-bottom:16px}
+  .checklist{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:12px}
+  .check{background:#000;border:1px solid var(--border);border-radius:14px;padding:12px;font-size:12px;line-height:1.45;color:var(--muted)}
+  .check b{display:block;color:#fff;margin-bottom:4px}.check.ok{border-color:rgba(57,255,136,.45);color:#b7ffd4}.check.fail{border-color:rgba(255,107,107,.45);color:#ffb4b4}.check.wait{border-color:rgba(253,230,138,.35);color:#fde68a}
 </style>
 </head>
 <body>
@@ -62,6 +65,24 @@
     2. If you already connected this watch in VYRO before, tap <b>Reconnect last watch</b> — it uses the saved native ID instead of waiting for the Settings list.<br>
     3. If it has never connected in VYRO, keep the watch screen awake, close QCBand / Colmi / H Band / Da Fit, then scan.<br>
     4. If iOS blocked permission, tap <b>Open iOS settings</b> and enable Bluetooth for VYRO.
+  </div>
+
+  <div class="panel" id="testFlightGatePanel" style="border-color:rgba(253,230,138,.28)">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <div>
+        <div class="section-title" style="margin:0 0 4px;color:#fde68a">TestFlight connection gate</div>
+        <div id="testFlightSummary" style="font-size:13px;color:var(--muted);line-height:1.5">Run this inside TestFlight before scanning. It checks whether this build can actually talk to BLE.</div>
+      </div>
+      <div class="row">
+        <button id="bleReadinessBtn" class="ghost">Run BLE check</button>
+        <button id="healthFallbackBtn" class="ghost">Read Apple Health fallback</button>
+      </div>
+    </div>
+    <div class="checklist">
+      <div id="nativeBleCheck" class="check wait"><b>Native BLE bridge</b><span>not checked</span></div>
+      <div id="webBleCheck" class="check wait"><b>Web Bluetooth</b><span>not checked</span></div>
+      <div id="healthCheck" class="check wait"><b>Apple Health fallback</b><span>not checked</span></div>
+    </div>
   </div>
 
   <div class="panel">
@@ -541,6 +562,19 @@ function log(kind, msg) {
   el.innerHTML += `<span class="${kind}">[${time}] ${msg}</span>\n`;
   el.scrollTop = el.scrollHeight;
 }
+function setCheck(id, state, text) {
+  const el = $(id);
+  if (!el) return;
+  el.className = `check ${state}`;
+  const span = el.querySelector('span');
+  if (span) span.innerHTML = text;
+}
+function setGateSummary(html, state = 'wait') {
+  const el = $('testFlightSummary');
+  if (!el) return;
+  el.innerHTML = html;
+  el.style.color = state === 'ok' ? '#b7ffd4' : state === 'fail' ? '#ffb4b4' : 'var(--muted)';
+}
 function setStatus(s, kind = '') {
   $('statusText').textContent = s;
   $('status').className = 'status ' + kind;
@@ -673,6 +707,131 @@ function showWebBluetoothRestricted() {
   $('warn').style.display = 'block';
   $('warn').innerHTML = '⚠️ Web Bluetooth is not exposed by this iOS TestFlight web view. Open iPhone Settings → VYRO and enable <b>Bluetooth</b> if the toggle exists; also allow <b>Local Network</b> if iOS shows it. If there is no Bluetooth toggle, the app needs a fresh native BLE-enabled build to connect to the watch.';
   log('err', 'navigator.bluetooth is unavailable in this container. iOS pairing in Settings does not give WebView pages access to BLE devices.');
+}
+
+function waitForNativeBleState(timeoutMs = 4500) {
+  return new Promise(resolve => {
+    if (!window.VyroNative?.isDespia || !window.VyroNative?.ble?.state) return resolve({ state: 'missing' });
+    let done = false;
+    const prev = window.onBleState;
+    const handler = s => {
+      try { if (prev) prev(s); } catch {}
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (window.onBleState === handler) window.onBleState = prev;
+      resolve(s || { state: 'unknown' });
+    };
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      if (window.onBleState === handler) window.onBleState = prev;
+      resolve({ state: 'timeout' });
+    }, timeoutMs);
+    window.onBleState = handler;
+    const fired = window.VyroNative.ble.state();
+    if (!fired) handler({ state: 'not-fired' });
+  });
+}
+
+async function runBleReadinessCheck() {
+  setGateSummary('Checking the actual TestFlight BLE gates…');
+  setCheck('nativeBleCheck', 'wait', 'checking native bridge…');
+  setCheck('webBleCheck', 'wait', 'checking requestDevice…');
+  const nativeState = await waitForNativeBleState();
+  const webOk = !!navigator.bluetooth?.requestDevice;
+
+  if (nativeState.state === 'on') {
+    setCheck('nativeBleCheck', 'ok', 'ready — native BLE answered <b>on</b>');
+  } else if (nativeState.state === 'off') {
+    setCheck('nativeBleCheck', 'wait', 'native BLE exists, but iPhone Bluetooth is off');
+  } else if (nativeState.state === 'unauthorized') {
+    setCheck('nativeBleCheck', 'fail', 'native BLE exists, but VYRO permission is denied — open iOS app settings');
+  } else if (nativeState.state === 'unsupported') {
+    setCheck('nativeBleCheck', 'fail', 'this binary reports BLE unsupported');
+  } else if (nativeState.state === 'missing') {
+    setCheck('nativeBleCheck', 'fail', 'not inside the native iOS app wrapper');
+  } else {
+    setCheck('nativeBleCheck', 'fail', 'no BLE response from the native wrapper — likely no BLE module in this build');
+  }
+
+  if (webOk) {
+    setCheck('webBleCheck', 'ok', 'available — Web Bluetooth direct can open a chooser');
+  } else {
+    setCheck('webBleCheck', 'fail', 'blocked — iOS/TestFlight WebView does not expose navigator.bluetooth');
+  }
+
+  const nativeUsable = ['on', 'off', 'unauthorized'].includes(nativeState.state);
+  if (nativeState.state === 'on') {
+    setGateSummary('✅ This TestFlight build has a usable BLE path. Tap <b>Connect by watch services</b> with the watch awake.', 'ok');
+  } else if (nativeUsable) {
+    setGateSummary('⚠️ BLE support exists, but iOS is blocking it right now. Turn Bluetooth on or grant VYRO Bluetooth permission, then run the check again.', 'wait');
+  } else if (webOk) {
+    setGateSummary('⚠️ Native BLE is not answering, but Web Bluetooth exists. Try <b>Web Bluetooth direct</b>.', 'wait');
+  } else {
+    setGateSummary('❌ This TestFlight build cannot connect to the watch over BLE from Lovable code. Since Despia will not enable the BLE addon, use the Apple Health fallback or a different native wrapper/plugin.', 'fail');
+    showWebBluetoothRestricted();
+  }
+}
+
+function healthValue(records, preferredKeys = ['value', 'sum', 'total', 'count', 'quantity', 'average', 'bpm']) {
+  if (records == null) return null;
+  if (typeof records === 'number') return records;
+  if (typeof records === 'string') {
+    const n = Number(records.replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(n) ? n : null;
+  }
+  const arr = Array.isArray(records) ? records : [records];
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const item = arr[i];
+    if (typeof item === 'number') return item;
+    if (!item || typeof item !== 'object') continue;
+    for (const key of preferredKeys) {
+      const n = healthValue(item[key], preferredKeys);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+async function readAppleHealthFallback() {
+  if (!window.VyroNative?.isDespiaIOS || !window.VyroNative?.awaitKey) {
+    setCheck('healthCheck', 'fail', 'only available inside the iOS TestFlight app');
+    log('err', 'Apple Health fallback is only available inside the iOS app wrapper.');
+    return;
+  }
+  const ids = [
+    'HKQuantityTypeIdentifierStepCount',
+    'HKQuantityTypeIdentifierHeartRate',
+    'HKQuantityTypeIdentifierActiveEnergyBurned',
+    'HKQuantityTypeIdentifierDistanceWalkingRunning',
+  ];
+  setCheck('healthCheck', 'wait', 'requesting Apple Health permission/data…');
+  try {
+    const raw = await window.VyroNative.awaitKey(`readhealthkit://${ids.join(',')}?days=1`, 'healthkitResponse', 20000);
+    let data = raw;
+    if (typeof data === 'string') { try { data = JSON.parse(data); } catch {} }
+    if (data?.healthkitResponse) data = data.healthkitResponse;
+    const steps = healthValue(data?.HKQuantityTypeIdentifierStepCount);
+    const hr = healthValue(data?.HKQuantityTypeIdentifierHeartRate, ['value', 'average', 'bpm', 'quantity']);
+    const cal = healthValue(data?.HKQuantityTypeIdentifierActiveEnergyBurned);
+    const dist = healthValue(data?.HKQuantityTypeIdentifierDistanceWalkingRunning);
+    if (Number.isFinite(steps)) $('steps').textContent = Math.round(steps).toLocaleString();
+    if (Number.isFinite(hr)) $('hr').textContent = Math.round(hr);
+    if (Number.isFinite(cal)) $('cal').textContent = Math.round(cal).toLocaleString();
+    if (Number.isFinite(dist)) $('dist').textContent = Math.round(dist).toLocaleString();
+    $('sync').textContent = new Date().toLocaleTimeString();
+    const got = [steps, hr, cal, dist].filter(Number.isFinite).length;
+    if (got) {
+      setCheck('healthCheck', 'ok', `loaded ${got} metric${got === 1 ? '' : 's'} from Apple Health`);
+      log('info', 'Apple Health fallback loaded data. This uses the watch companion app → Apple Health path, not direct BLE.');
+    } else {
+      setCheck('healthCheck', 'fail', 'no Health data returned — enable Health permissions or sync the watch companion app first');
+    }
+  } catch (e) {
+    setCheck('healthCheck', 'fail', 'Health read failed — Health Data may not be enabled in this build');
+    log('err', 'Apple Health fallback failed: ' + (e?.message || e));
+  }
 }
 
 async function connect(filtered = false) {
@@ -1371,6 +1530,8 @@ $('connectBtn').onclick = async () => { await requestMotionUpfront(); connect(fa
 $('connectFilteredBtn').onclick = async () => { await requestMotionUpfront(); connect(true); };
 $('webBluetoothBtn').onclick = async () => { await requestMotionUpfront(); connect('web'); };
 $('disconnectBtn').onclick = disconnect;
+$('bleReadinessBtn').onclick = runBleReadinessCheck;
+$('healthFallbackBtn').onclick = readAppleHealthFallback;
 // Manual test step — verifies the dot/step pipeline regardless of sensors.
 // Tap this to confirm the court rendering works; if the dot moves here but
 // not from real steps, the problem is sensor input, not the visualisation.
@@ -2835,6 +2996,9 @@ if (!navigator.bluetooth && !isNativeBle()) {
   $('connectBtn').disabled = true;
   $('connectFilteredBtn').disabled = true;
   $('webBluetoothBtn').disabled = true;
+  setGateSummary('No BLE API is visible yet. Run the BLE check inside the installed TestFlight build for the final answer.', 'wait');
+  setCheck('nativeBleCheck', window.VyroNative?.isDespia ? 'wait' : 'fail', window.VyroNative?.isDespia ? 'native wrapper detected; BLE state not checked' : 'native wrapper not detected in this browser');
+  setCheck('webBleCheck', 'fail', 'navigator.bluetooth is not available');
 }
 log('info', isNativeBle() ? 'Ready. Native iOS BLE bridge detected — click scan to begin.' : 'Ready. Click Web Bluetooth direct to test requestDevice support.');
 setConnected(false);
