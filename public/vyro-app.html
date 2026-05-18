@@ -513,7 +513,10 @@
     </style>
   </head>
   <body>
+    <!-- Despia native bridge: exposes window.VyroNative.* on iOS native; no-op in browser. -->
+    <script src="/vyro-native.js"></script>
     <div id="root"></div>
+
 
     <!-- Biometric lock (Despia bioauth://). Shows only inside the Despia native runtime. -->
     <div id="vyro-bio-lock" style="display:none;position:fixed;inset:0;z-index:2147483647;background:#0a0a0a;color:#fff;font-family:-apple-system,system-ui,sans-serif;align-items:center;justify-content:center;flex-direction:column;gap:18px;padding:24px;text-align:center;">
