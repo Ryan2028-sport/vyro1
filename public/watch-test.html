@@ -1367,6 +1367,7 @@ async function requestMotionUpfront() {
 }
 $('connectBtn').onclick = async () => { await requestMotionUpfront(); connect(false); };
 $('connectFilteredBtn').onclick = async () => { await requestMotionUpfront(); connect(true); };
+$('webBluetoothBtn').onclick = async () => { await requestMotionUpfront(); connect('web'); };
 $('disconnectBtn').onclick = disconnect;
 // Manual test step — verifies the dot/step pipeline regardless of sensors.
 // Tap this to confirm the court rendering works; if the dot moves here but
@@ -2831,8 +2832,9 @@ if (!navigator.bluetooth && !isNativeBle()) {
   $('warn').style.display = 'block';
   $('connectBtn').disabled = true;
   $('connectFilteredBtn').disabled = true;
+  $('webBluetoothBtn').disabled = true;
 }
-log('info', isNativeBle() ? 'Ready. Native iOS BLE bridge detected — click scan to begin.' : 'Ready. Click "Connect Watch" to begin.');
+log('info', isNativeBle() ? 'Ready. Native iOS BLE bridge detected — click scan to begin.' : 'Ready. Click Web Bluetooth direct to test requestDevice support.');
 setConnected(false);
 
 $('reconnectNativeBtn').onclick = () => connect('last-native');
