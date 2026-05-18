@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VYRO · Court Calibration</title>
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@500,700,900,400&f[]=jetbrains-mono@500,700&display=swap" />
+<style>
+  :root{--bg:#000;--fg:#fff;--panel:rgba(255,255,255,.055);--border:rgba(255,255,255,.10);--muted:rgba(255,255,255,.55);--accent:#39ff88;--amber:#ffb020;--red:#ff2b2b;--blue:#5ec2ff}
+  *{box-sizing:border-box}html,body{margin:0;background:radial-gradient(circle at top left,rgba(255,255,255,.08),transparent 30%),linear-gradient(180deg,#080808,#000);color:var(--fg);font-family:"Satoshi",system-ui,sans-serif;min-height:100vh}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px}
+  .logo{font-family:"JetBrains Mono",monospace;font-weight:700;letter-spacing:.3em;font-size:14px}
+  .back{font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:8px 14px;border-radius:999px}
+  h1{font-size:32px;font-weight:900;margin:0 0 6px}
+  .sub{color:var(--muted);font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:24px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:20px;margin-bottom:16px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button.cta{font-family:inherit;font-weight:700;font-size:14px;background:#fff;color:#000;border:none;border-radius:999px;padding:12px 22px;cursor:pointer}
+  button.cta:disabled{opacity:.4;cursor:not-allowed}
+  button.ghost{font-family:inherit;font-weight:600;font-size:13px;background:transparent;color:#fff;border:1px solid var(--border);border-radius:999px;padding:10px 16px;cursor:pointer}
+  button.ghost.active{background:var(--accent);color:#000;border-color:var(--accent)}
+  button.ghost:disabled{opacity:.3;cursor:not-allowed}
+  .status{display:inline-flex;align-items:center;gap:8px;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;padding:6px 12px;border-radius:999px;border:1px solid var(--border)}
+  .sdot{width:8px;height:8px;border-radius:50%;background:#666;box-shadow:0 0 8px #666}
+  .status.on .sdot{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+  .status.err .sdot{background:var(--red);box-shadow:0 0 10px var(--red)}
+  .section{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin:18px 0 10px}
+  .grid-two{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+  @media (max-width:820px){.grid-two{grid-template-columns:1fr}}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .stat{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:18px;padding:14px}
+  .stat .k{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-size:36px;font-weight:900;line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
+  .step{display:flex;gap:14px;align-items:flex-start;padding:14px;border:1px solid var(--border);border-radius:16px;margin-bottom:10px;background:rgba(255,255,255,.02)}
+  .step .num{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.08);display:grid;place-items:center;font-weight:900;flex-shrink:0}
+  .step.done .num{background:var(--accent);color:#000}
+  .step.active{border-color:var(--accent);background:rgba(57,255,136,.06)}
+  .step .title{font-weight:700;margin-bottom:4px}
+  .step .desc{color:var(--muted);font-size:13px;line-height:1.5}
+  .bar{height:8px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin-top:8px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--amber),var(--red));width:0%;transition:width .12s;border-radius:999px}
+  .court-wrap{display:grid;place-items:center;padding:20px;background:rgba(255,255,255,.02);border:1px dashed rgba(255,255,255,.08);border-radius:16px}
+  svg.court{width:100%;max-width:380px;height:auto;cursor:crosshair}
+  .court-rect{fill:rgba(57,255,136,.04);stroke:rgba(255,255,255,.5);stroke-width:2}
+  .court-line{stroke:rgba(255,255,255,.4);stroke-width:1.5;fill:none}
+  .court-t{stroke:var(--amber);stroke-width:2.5;fill:none}
+  .player-dot{fill:var(--accent);filter:drop-shadow(0 0 8px var(--accent));transition:transform .15s,fill .15s}
+  .player-dot.away{fill:var(--red);filter:drop-shadow(0 0 10px var(--red))}
+  .corner-handle{fill:var(--blue);stroke:#fff;stroke-width:2;cursor:move}
+  .warning{background:rgba(80,160,255,.08);border:1px solid rgba(80,160,255,.3);color:#bcd9ff;padding:12px 14px;border-radius:14px;font-size:13px;line-height:1.5;margin-bottom:12px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;border:1px solid var(--border)}
+  .pill.green{background:rgba(57,255,136,.12);border-color:rgba(57,255,136,.4);color:var(--accent)}
+  .pill.red{background:rgba(255,43,43,.12);border-color:rgba(255,43,43,.4);color:var(--red)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">VYRO · COURT CALIBRATION</div>
+    <div class="row" style="gap:8px">
+      <a class="back" href="/watch-test.html">Watch test</a>
+      <a class="back" href="/calibration.html">Motion test</a>
+      <a class="back" href="/vyro-app.html">← App</a>
+    </div>
+  </header>
+
+  <h1>T-Control Calibration</h1>
+  <div class="sub">Court geometry · idle baseline · live T-return counter</div>
+
+  <div class="warning">
+    <b>How it works:</b> we use your watch's wrist-motion signal (0x69). When you're standing at the T, motion is low. When you leave to chase a ball, it spikes. When you come back, it drops. Each low → high → low cycle = 1 T-return. Calibration just samples your baseline so the threshold fits your wrist.
+  </div>
+
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <button id="connectBtn" class="cta">Connect watch</button>
+        <button id="disconnectBtn" class="ghost" disabled>Disconnect</button>
+      </div>
+      <div id="status" class="status"><span class="sdot"></span><span id="statusText">disconnected</span></div>
+    </div>
+  </div>
+
+  <div class="grid-two">
+    <div>
+      <div class="section">Step-by-step calibration</div>
+
+      <div class="step" id="step1">
+        <div class="num">1</div>
+        <div style="flex:1">
+          <div class="title">Pick your court</div>
+          <div class="desc">Choose the geometry so the T position is correct.</div>
+          <div class="row" style="margin-top:10px">
+            <button class="ghost active" data-court="squash">Squash</button>
+            <button class="ghost" data-court="tennis">Tennis</button>
+            <button class="ghost" data-court="custom">Custom (tap corners)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" id="step2">
+        <div class="num">2</div>
+        <div style="flex:1">
+          <div class="title">Lock the T</div>
+          <div class="desc">Stand still on the T with your racket arm relaxed at your side. Tap Lock — we'll sample 5 seconds of your baseline wrist motion.</div>
+          <div class="row" style="margin-top:10px">
+            <button id="lockTBtn" class="cta" disabled>Lock T (5s)</button>
+            <span id="lockStatus" class="pill">awaiting watch</span>
+          </div>
+          <div class="bar"><i id="lockBar"></i></div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-top:8px">
+            Baseline: <b id="baselineVal">—</b> · Threshold: <b id="thresholdVal">—</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" id="step3">
+        <div class="num">3</div>
+        <div style="flex:1">
+          <div class="title">Track T-returns</div>
+          <div class="desc">Press Start, play your rallies, come back to the T between each. The counter ticks every time you return.</div>
+          <div class="row" style="margin-top:10px">
+            <button id="startBtn" class="cta" disabled>Start tracking</button>
+            <button id="stopBtn" class="ghost" disabled>Stop</button>
+            <button id="resetBtn" class="ghost">Reset counters</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section">Court · live position</div>
+      <div class="panel" style="margin-bottom:12px">
+        <div class="court-wrap">
+          <svg id="court" class="court" viewBox="0 0 320 480"></svg>
+        </div>
+        <div class="row" style="justify-content:space-between;margin-top:12px">
+          <span id="zoneStatus" class="pill green">● at T</span>
+          <span id="liveMotion" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)">motion: 0</span>
+        </div>
+      </div>
+
+      <div class="section">Session stats</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="k">T-Returns</div><div class="v" id="returnsVal">0</div></div>
+        <div class="stat"><div class="k">Avg time away</div><div class="v" id="awayVal" style="font-size:24px">0.0s</div></div>
+        <div class="stat"><div class="k">T-Control</div><div class="v" id="controlVal" style="font-size:24px">—</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SERVICE_UUID='6e40fff0-b5a3-f393-e0a9-e50e24dcca9e';
+const $=id=>document.getElementById(id);
+const MOTION_TAG=0x69;
+
+// ============= state =============
+let device=null,server=null;
+let prev=null,packets=0,lastMotion=0,smoothMotion=0;
+let baseline=null,threshold=null,baselineSamples=[];
+let calibrating=false,tracking=false;
+let zoneAtT=true,returnCount=0,leftTAt=0,totalAwayMs=0,totalTrackMs=0,trackStartMs=0;
+let courtType='squash';
+let customCorners=null; // [{x,y}]x4 for custom
+
+// ============= motion parsing =============
+function motionRecord(bytes){
+  if(!bytes||bytes.length<4||bytes[0]!==MOTION_TAG)return;
+  packets++;
+  if(prev){let d=0;for(let i=1;i<bytes.length-2;i++)d+=Math.abs(bytes[i]-prev[i]);
+    lastMotion=d;
+    if(calibrating)baselineSamples.push(d);
+    if(tracking)processTracking(d);
+  }
+  prev=Array.from(bytes);
+}
+
+// ============= tracking logic =============
+// hysteresis: leave T when motion > threshold for >300ms, return when motion < baseline*1.5 for >800ms
+let aboveSince=0,belowSince=0;
+function processTracking(d){
+  const now=performance.now();
+  if(d>threshold){
+    if(aboveSince===0)aboveSince=now;
+    belowSince=0;
+    if(zoneAtT && (now-aboveSince)>300){
+      zoneAtT=false;leftTAt=now;
+      updateZone();
+    }
+  }else if(d<baseline*1.8){
+    if(belowSince===0)belowSince=now;
+    aboveSince=0;
+    if(!zoneAtT && (now-belowSince)>800){
+      zoneAtT=true;
+      const awayMs=now-leftTAt;
+      totalAwayMs+=awayMs;
+      returnCount++;
+      updateZone();
+    }
+  }else{aboveSince=0;belowSince=0}
+}
+function updateZone(){
+  const zs=$('zoneStatus');
+  if(zoneAtT){zs.className='pill green';zs.textContent='● at T'}
+  else{zs.className='pill red';zs.textContent='● away from T'}
+}
+
+// ============= render loop =============
+function render(){
+  smoothMotion+=(lastMotion-smoothMotion)*0.3;lastMotion*=0.85;
+  $('liveMotion').textContent='motion: '+Math.round(smoothMotion)+(threshold?' · thr '+Math.round(threshold):'');
+  // player dot on court
+  drawPlayer();
+  // session stats
+  if(tracking){
+    totalTrackMs=performance.now()-trackStartMs;
+    $('returnsVal').textContent=returnCount;
+    const avg=returnCount>0?(totalAwayMs/returnCount/1000):0;
+    $('awayVal').textContent=avg.toFixed(1)+'s';
+    const ctrl=totalTrackMs>0?(1-totalAwayMs/totalTrackMs)*100:0;
+    $('controlVal').textContent=Math.round(ctrl)+'%';
+  }
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+
+// ============= court rendering =============
+const COURTS={
+  squash:{
+    name:'Squash · 32x21',
+    draw(s){
+      // 320 x 480 viewBox; court fills most of it
+      const x=20,y=20,w=280,h=440;
+      const front=y,back=y+h,tLineY=y+h*0.55,shortLineY=y+h*0.55;
+      const halfX=x+w/2,boxW=w*0.45,boxH=h*0.20;
+      return `
+        <rect class="court-rect" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>
+        <line class="court-line" x1="${x}" y1="${shortLineY}" x2="${x+w}" y2="${shortLineY}"/>
+        <line class="court-line" x1="${halfX}" y1="${shortLineY}" x2="${halfX}" y2="${back}"/>
+        <rect class="court-line" x="${x+(w-boxW*2)/2}" y="${shortLineY}" width="${boxW*0.55}" height="${boxH*0.7}"/>
+        <rect class="court-line" x="${halfX+boxW*0.20}" y="${shortLineY}" width="${boxW*0.55}" height="${boxH*0.7}"/>
+        <circle class="court-t" cx="${halfX}" cy="${shortLineY}" r="14"/>
+        <text x="${halfX+18}" y="${shortLineY+4}" fill="rgba(255,176,32,0.9)" font-family="JetBrains Mono" font-size="11" font-weight="700">T</text>
+      `;
+    },
+    t:{x:160,y:262}
+  },
+  tennis:{
+    name:'Tennis singles',
+    draw(s){
+      const x=30,y=40,w=260,h=400;
+      const net=y+h/2;
+      return `
+        <rect class="court-rect" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>
+        <line class="court-line" x1="${x}" y1="${net}" x2="${x+w}" y2="${net}" stroke-width="2.5"/>
+        <rect class="court-line" x="${x+w*0.10}" y="${y+h*0.25}" width="${w*0.80}" height="${h*0.25}"/>
+        <rect class="court-line" x="${x+w*0.10}" y="${net}" width="${w*0.80}" height="${h*0.25}"/>
+        <line class="court-line" x1="${x+w/2}" y1="${y+h*0.25}" x2="${x+w/2}" y2="${y+h*0.75}"/>
+        <circle class="court-t" cx="${x+w/2}" cy="${y+h*0.85}" r="14"/>
+        <text x="${x+w/2+18}" y="${y+h*0.85+4}" fill="rgba(255,176,32,0.9)" font-family="JetBrains Mono" font-size="11" font-weight="700">Base</text>
+      `;
+    },
+    t:{x:160,y:380}
+  },
+  custom:{
+    name:'Custom · tap 4 corners',
+    draw(s){
+      if(!customCorners||customCorners.length<4){
+        return `<text x="160" y="240" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="JetBrains Mono" font-size="12">Tap 4 corners on the area below</text>
+          <rect x="20" y="20" width="280" height="440" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.2)" stroke-dasharray="4 4"/>
+          ${(customCorners||[]).map((c,i)=>`<circle class="corner-handle" cx="${c.x}" cy="${c.y}" r="8"/><text x="${c.x+12}" y="${c.y+4}" fill="#5ec2ff" font-family="JetBrains Mono" font-size="10">${i+1}</text>`).join('')}`;
+      }
+      const cs=customCorners;
+      const path=`M${cs[0].x},${cs[0].y} L${cs[1].x},${cs[1].y} L${cs[2].x},${cs[2].y} L${cs[3].x},${cs[3].y} Z`;
+      const cx=cs.reduce((a,c)=>a+c.x,0)/4,cy=cs.reduce((a,c)=>a+c.y,0)/4;
+      return `<path class="court-rect" d="${path}"/>
+        <circle class="court-t" cx="${cx}" cy="${cy}" r="14"/>
+        <text x="${cx+18}" y="${cy+4}" fill="rgba(255,176,32,0.9)" font-family="JetBrains Mono" font-size="11" font-weight="700">T</text>
+        ${cs.map((c,i)=>`<circle class="corner-handle" cx="${c.x}" cy="${c.y}" r="6"/>`).join('')}`;
+    },
+    get t(){
+      if(!customCorners||customCorners.length<4)return{x:160,y:240};
+      const cx=customCorners.reduce((a,c)=>a+c.x,0)/4;
+      const cy=customCorners.reduce((a,c)=>a+c.y,0)/4;
+      return{x:cx,y:cy};
+    }
+  }
+};
+
+function drawCourt(){
+  const c=COURTS[courtType];
+  const playerSvg=`<circle id="playerDot" class="player-dot ${zoneAtT?'':'away'}" cx="${c.t.x}" cy="${c.t.y}" r="9"/>`;
+  $('court').innerHTML=c.draw()+playerSvg;
+}
+function drawPlayer(){
+  const dot=document.getElementById('playerDot');if(!dot)return;
+  const c=COURTS[courtType];
+  // simulate position drift when away from T proportional to motion
+  const drift=zoneAtT?0:Math.min(60,smoothMotion*0.4);
+  const angle=(performance.now()/600)%(Math.PI*2);
+  const px=c.t.x+(zoneAtT?0:Math.cos(angle)*drift);
+  const py=c.t.y+(zoneAtT?0:Math.sin(angle)*drift);
+  dot.setAttribute('cx',px);dot.setAttribute('cy',py);
+  dot.setAttribute('class','player-dot '+(zoneAtT?'':'away'));
+  const scale=1+Math.min(1.2,smoothMotion/200);
+  dot.setAttribute('r',9*scale);
+}
+
+// ============= UI events =============
+document.querySelectorAll('[data-court]').forEach(b=>{
+  b.onclick=()=>{
+    courtType=b.dataset.court;
+    document.querySelectorAll('[data-court]').forEach(x=>x.classList.toggle('active',x===b));
+    if(courtType==='custom')customCorners=[];
+    drawCourt();
+    markStepDone(1);
+  };
+});
+
+$('court').addEventListener('click',e=>{
+  if(courtType!=='custom')return;
+  if(!customCorners)customCorners=[];
+  if(customCorners.length>=4)customCorners=[];
+  const svg=e.currentTarget;const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
+  const loc=pt.matrixTransform(svg.getScreenCTM().inverse());
+  customCorners.push({x:loc.x,y:loc.y});
+  drawCourt();
+});
+
+$('lockTBtn').onclick=async()=>{
+  if(!device){alert('Connect watch first');return}
+  calibrating=true;baselineSamples=[];
+  $('lockStatus').textContent='sampling 5s…';$('lockStatus').className='pill';
+  const bar=$('lockBar');const start=performance.now();
+  const tick=()=>{
+    const p=Math.min(100,((performance.now()-start)/5000)*100);
+    bar.style.width=p+'%';
+    if(p<100)requestAnimationFrame(tick);
+    else finishCal();
+  };tick();
+  function finishCal(){
+    calibrating=false;
+    if(baselineSamples.length<5){
+      $('lockStatus').textContent='no data — retry';$('lockStatus').className='pill red';return;
+    }
+    baselineSamples.sort((a,b)=>a-b);
+    const median=baselineSamples[Math.floor(baselineSamples.length/2)];
+    baseline=Math.max(1,median);
+    threshold=Math.max(baseline*3,baseline+15);
+    $('baselineVal').textContent=Math.round(baseline);
+    $('thresholdVal').textContent=Math.round(threshold);
+    $('lockStatus').textContent='✓ locked';$('lockStatus').className='pill green';
+    markStepDone(2);
+    $('startBtn').disabled=false;
+  }
+};
+
+$('startBtn').onclick=()=>{
+  if(!threshold){alert('Lock T first');return}
+  tracking=true;returnCount=0;totalAwayMs=0;trackStartMs=performance.now();
+  zoneAtT=true;updateZone();
+  $('startBtn').disabled=true;$('stopBtn').disabled=false;
+  markStepActive(3);
+};
+$('stopBtn').onclick=()=>{tracking=false;$('startBtn').disabled=false;$('stopBtn').disabled=true};
+$('resetBtn').onclick=()=>{returnCount=0;totalAwayMs=0;totalTrackMs=0;trackStartMs=performance.now();zoneAtT=true;updateZone()};
+
+function markStepDone(n){$('step'+n).classList.add('done');$('step'+n).classList.remove('active');if($('step'+(n+1)))$('step'+(n+1)).classList.add('active')}
+function markStepActive(n){$('step'+n).classList.add('active')}
+
+// ============= BLE =============
+function setStatus(t,c=''){const s=$('status');s.className='status '+c;$('statusText').textContent=t}
+function setConnected(on){
+  $('connectBtn').disabled=on;$('disconnectBtn').disabled=!on;
+  $('lockTBtn').disabled=!on;
+  $('lockStatus').textContent=on?'ready to lock':'awaiting watch';
+}
+async function connect(){
+  if(!navigator.bluetooth){alert('Web Bluetooth not available. Use Chrome/Edge on desktop or Android.');return}
+  try{
+    setStatus('requesting…');
+    device=await navigator.bluetooth.requestDevice({
+      acceptAllDevices:true,
+      optionalServices:[SERVICE_UUID,'battery_service','heart_rate',0xFEE7,0xFEE0,0xFFF0,0xFFE0]
+    });
+    device.addEventListener('gattserverdisconnected',()=>{setStatus('disconnected','err');setConnected(false)});
+    setStatus('connecting…');
+    server=await device.gatt.connect();
+    const services=await server.getPrimaryServices();
+    for(const svc of services){
+      let chars=[];try{chars=await svc.getCharacteristics()}catch{continue}
+      for(const c of chars){
+        if(c.properties.notify||c.properties.indicate){
+          try{
+            await c.startNotifications();
+            c.addEventListener('characteristicvaluechanged',e=>{
+              const v=e.target.value;
+              const data=new Uint8Array(v.buffer,v.byteOffset,v.byteLength);
+              motionRecord(data);
+            });
+          }catch{}
+        }
+      }
+    }
+    setStatus('connected','on');setConnected(true);
+    markStepActive(2);
+  }catch(err){setStatus('error','err');alert('Connect failed: '+err.message)}
+}
+$('connectBtn').onclick=connect;
+$('disconnectBtn').onclick=()=>{if(device?.gatt?.connected)device.gatt.disconnect();setConnected(false);setStatus('disconnected')};
+
+// init
+drawCourt();markStepActive(1);
+</script>
+</body>
+</html>
