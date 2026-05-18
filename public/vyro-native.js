@@ -117,6 +117,14 @@
     disconnect:  function (id)                     { return fire('bluetooth://disconnect?id=' + encodeURIComponent(id)); },
     discover:    function (id)                     { return fire('bluetooth://discover?id=' + encodeURIComponent(id)); },
     read:        function (id, svc, chr)           { return fire('bluetooth://read?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr); },
+    write:       function (id, svc, chr, value, withResponse) {
+      return fire('bluetooth://write?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr
+                + '&value=' + encodeURIComponent(value) + '&with_response=' + (withResponse ? 'true' : 'false'));
+    },
+    writeHex:    function (id, svc, chr, hex, withResponse) {
+      return fire('bluetooth://write?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr
+                + '&hex=' + encodeURIComponent(hex) + '&with_response=' + (withResponse ? 'true' : 'false'));
+    },
     writeText:   function (id, svc, chr, text, withResponse) {
       return fire('bluetooth://write?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr
                 + '&text=' + encodeURIComponent(text) + '&with_response=' + (withResponse ? 'true' : 'false'));
