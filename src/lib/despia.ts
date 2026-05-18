@@ -125,10 +125,34 @@ export type BleDataEvent = {
   value: string; // hex or base64 depending on platform
 };
 
+export type BleState = {
+  state: "on" | "off" | "unauthorized" | "unsupported";
+};
+
+export type BleDiscovered = {
+  id: string;
+  services: Array<{
+    uuid: string;
+    characteristics: Array<{ uuid: string; properties: string[] }>;
+  }>;
+};
+
+export type BleWriteComplete = {
+  id: string;
+  service: string;
+  characteristic: string;
+  success: boolean;
+  error?: string;
+};
+
 type BleEventMap = {
   device: BleDevice;
   connect: BleConnectEvent;
   data: BleDataEvent;
+  state: BleState;
+  scanEnd: { count?: number };
+  discovered: BleDiscovered;
+  writeComplete: BleWriteComplete;
   event: { type: string; [k: string]: unknown };
 };
 
@@ -137,6 +161,10 @@ const bleListeners: { [K in keyof BleEventMap]: Listener<BleEventMap[K]>[] } = {
   device: [],
   connect: [],
   data: [],
+  state: [],
+  scanEnd: [],
+  discovered: [],
+  writeComplete: [],
   event: [],
 };
 
@@ -151,11 +179,17 @@ function emit<K extends keyof BleEventMap>(key: K, payload: BleEventMap[K]) {
 }
 
 // Wire up the global callbacks Despia fires from native.
+// These MUST be defined before any despia() BLE command runs — the native
+// side does not buffer foreground events, so late handlers miss events.
 if (typeof window !== "undefined") {
   const w = window as unknown as Record<string, unknown>;
   w.onBleDevice = (d: BleDevice) => emit("device", d);
   w.onBleConnect = (e: BleConnectEvent) => emit("connect", e);
   w.onBleData = (e: BleDataEvent) => emit("data", e);
+  w.onBleState = (s: BleState) => emit("state", s);
+  w.onBleScanEnd = (e: { count?: number } = {}) => emit("scanEnd", e);
+  w.onBleDiscovered = (t: BleDiscovered) => emit("discovered", t);
+  w.onBleWriteComplete = (e: BleWriteComplete) => emit("writeComplete", e);
   w.onBleEvent = (e: { type: string; [k: string]: unknown }) =>
     emit("event", e);
 }

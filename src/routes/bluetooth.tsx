@@ -40,6 +40,7 @@ function BluetoothPage() {
     connectionState,
     connectedId,
     error,
+    powerState,
     scan,
     stopScan,
     connect,
@@ -93,7 +94,29 @@ function BluetoothPage() {
           <div className="font-mono text-xs text-white/45">
             {scanning ? "Scanning…" : `${sorted.length} found`}
           </div>
+          {isNative && powerState !== "unknown" && (
+            <div
+              className={`font-mono text-[10px] uppercase tracking-widest ${
+                powerState === "on" ? "text-emerald-300" : "text-yellow-300"
+              }`}
+            >
+              BT: {powerState}
+            </div>
+          )}
         </div>
+
+        {isNative && powerState === "unauthorized" && (
+          <div className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/[0.08] px-3 py-2 text-xs text-yellow-100">
+            Bluetooth permission is denied. Open iOS Settings → VYRO → Bluetooth
+            to allow.
+          </div>
+        )}
+        {isNative && powerState === "off" && (
+          <div className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/[0.08] px-3 py-2 text-xs text-yellow-100">
+            Bluetooth is off. Turn it on from Control Center, then tap Start
+            scan again.
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/[0.08] px-3 py-2 text-xs text-red-200">
