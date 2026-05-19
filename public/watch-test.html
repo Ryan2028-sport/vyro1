@@ -639,9 +639,41 @@ async function connectNative(filtered = false) {
     const ble = nativeBle();
     let picked = false;
     let settled = false;
+    const candidates = new Map(); // id -> {id,name,rssi,services,watchy,score}
+    let pickTimer = null;
+    const WATCH_RE = /watch|band|colmi|h\s?band|amazfit|miband|mi\s?band|fit|smart|garmin|polar|wear|gts|gtr|qcy|r0?2|r0?3|r0?6|r0?7|r0?8|r0?9/i;
+    const KNOWN_WATCH_SVCS = new Set(['180d','180f','fee7','fee0','fff0','ffe0','feea','fea0','6e40fff0']);
+    const scoreDevice = (d) => {
+      const name = (d.name || '').toLowerCase();
+      const svcs = (d.services || []).map(s => String(s).toLowerCase().replace(/^0000/, '').slice(0,8));
+      let score = 0;
+      if (WATCH_RE.test(name)) score += 100;
+      if (svcs.some(s => KNOWN_WATCH_SVCS.has(s.slice(0,4)) || KNOWN_WATCH_SVCS.has(s))) score += 80;
+      if (name) score += 20; // named beats unnamed
+      if (svcs.length) score += 10;
+      score += Math.max(-60, Math.min(0, (d.rssi || -100) + 40)); // closer = better
+      return score;
+    };
+    const pickBest = () => {
+      if (picked || settled) return;
+      const arr = Array.from(candidates.values());
+      if (!arr.length) return;
+      const watchish = arr.filter(c => c.watchy);
+      const pool = filtered ? watchish : (watchish.length ? watchish : arr);
+      pool.sort((a,b) => b.score - a.score);
+      const best = pool[0];
+      if (!best) return;
+      picked = true;
+      log('info', `Picked ${best.name || '(unnamed)'} [${best.id}] score=${best.score} from ${arr.length} candidate(s)`);
+      device = { id: best.id, name: best.name || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(best.id) }, addEventListener() {} };
+      saveLastNativeWatch(device);
+      setStatus('connecting…');
+      ble.stopScan();
+      ble.connect(best.id, { timeout: 10000, autoConnect: true });
+    };
     const timeout = setTimeout(() => fail(new Error('Native BLE scan timed out. Make sure the Despia Bluetooth addon is enabled, then install a fresh TestFlight build.')), 18000);
-    const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); resolve(v); };
-    const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); reject(e); };
+    const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); resolve(v); };
+    const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); reject(e); };
 
     window.onBleState = s => {
       if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
@@ -652,14 +684,12 @@ async function connectNative(filtered = false) {
       log('info', `Native found: ${d.name || '(unnamed)'} [${d.id}] RSSI ${d.rssi || '—'}`);
       if (picked) return;
       const name = d.name || '';
-      const watchy = /r|qc|colmi|h\s?band|band|watch|fit|smart|m/i.test(name) || (d.services || []).length;
-      if (filtered && !watchy) return;
-      picked = true;
-      device = { id: d.id, name: d.name || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(d.id) }, addEventListener() {} };
-      saveLastNativeWatch(device);
-      setStatus('connecting…');
-      ble.stopScan();
-      ble.connect(d.id, { timeout: 10000, autoConnect: true });
+      const watchy = WATCH_RE.test(name) || (d.services || []).length > 0;
+      candidates.set(d.id, { id: d.id, name, rssi: d.rssi, services: d.services || [], watchy, score: scoreDevice(d) });
+      // Wait briefly to collect more candidates, then pick the best match.
+      // Strong watch match? pick fast. Otherwise wait the full window.
+      const isStrong = WATCH_RE.test(name);
+      if (!pickTimer) pickTimer = setTimeout(pickBest, isStrong ? 1200 : 4500);
     };
     window.onBleConnect = e => {
       if (e.state === 'connected') {
