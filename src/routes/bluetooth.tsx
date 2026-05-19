@@ -299,10 +299,9 @@ function BluetoothPage() {
 
         {!isNative && (
           <div className="mb-5 rounded-2xl border border-yellow-500/30 bg-yellow-500/[0.06] p-4 text-sm text-yellow-100/90">
-            BLE only runs inside the native Despia app (TestFlight build). In a
-            normal browser, scan does nothing — iOS WebKit has no Web
-            Bluetooth, so <code>/watch-test.html</code> can't see the watch
-            either. Use this page from the TestFlight build.
+            Desktop Chrome uses its built-in Bluetooth picker. Tap Start scan,
+            select your watch in the popup, then this page will list and inspect
+            it. iOS browsers still need the TestFlight build.
           </div>
         )}
 
