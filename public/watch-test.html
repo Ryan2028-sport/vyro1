@@ -1555,9 +1555,9 @@ async function requestMotionUpfront() {
     return false;
   }
 }
-$('connectBtn').onclick = async () => { await requestMotionUpfront(); connect(false); };
-$('connectFilteredBtn').onclick = async () => { await requestMotionUpfront(); connect(true); };
-$('webBluetoothBtn').onclick = async () => { await requestMotionUpfront(); connect('web'); };
+$('connectBtn').onclick = () => { connect(false); requestMotionUpfront(); };
+$('connectFilteredBtn').onclick = () => { connect(true); requestMotionUpfront(); };
+$('webBluetoothBtn').onclick = () => { connect('web'); requestMotionUpfront(); };
 $('disconnectBtn').onclick = disconnect;
 $('bleReadinessBtn').onclick = runBleReadinessCheck;
 $('healthFallbackBtn').onclick = readAppleHealthFallback;
