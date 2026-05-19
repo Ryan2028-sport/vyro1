@@ -250,6 +250,8 @@ export const bluetooth = {
     ),
   rssi: (id: string) =>
     run(`bluetooth://rssi?id=${encodeURIComponent(id)}`),
+  emitBrowserConnect: (event: BleConnectEvent) => emit("connect", event),
+  emitBrowserDiscovered: (tree: BleDiscovered) => emit("discovered", tree),
   /** Subscribe to BLE events. Returns an unsubscribe fn. */
   on<K extends keyof BleEventMap>(event: K, listener: Listener<BleEventMap[K]>) {
     bleListeners[event].push(listener);
