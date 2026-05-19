@@ -17,6 +17,31 @@ export type BleConnectionState =
 
 export type BlePowerState = BleState["state"] | "unknown";
 
+type BrowserBluetoothDevice = {
+  id: string;
+  name?: string;
+  gatt?: {
+    connected?: boolean;
+    connect: () => Promise<{
+      getPrimaryServices: () => Promise<
+        Array<{
+          uuid: string;
+          getCharacteristics: () => Promise<
+            Array<{
+              uuid: string;
+              properties: Record<string, boolean>;
+            }>
+          >;
+        }>
+      >;
+    }>;
+    disconnect: () => void;
+  };
+  addEventListener?: (type: string, listener: () => void) => void;
+};
+
+const browserDevices = new Map<string, BrowserBluetoothDevice>();
+
 export function useBluetooth() {
   const [devices, setDevices] = useState<Record<string, BleDevice>>({});
   const [scanning, setScanning] = useState(false);
@@ -80,10 +105,7 @@ export function useBluetooth() {
       if (!isNative) {
         const nav = navigator as Navigator & {
           bluetooth?: {
-            requestDevice: (opts: unknown) => Promise<{
-              id: string;
-              name?: string;
-            }>;
+            requestDevice: (opts: unknown) => Promise<BrowserBluetoothDevice>;
           };
         };
         if (!nav.bluetooth?.requestDevice) {
@@ -108,6 +130,7 @@ export function useBluetooth() {
                   0xffe0,
                 ],
           });
+          browserDevices.set(d.id, d);
           setDevices((prev) => ({
             ...prev,
             [d.id]: { id: d.id, name: d.name || "Unknown device" },
@@ -141,10 +164,50 @@ export function useBluetooth() {
   const connect = useCallback(async (id: string) => {
     setConnectionState("connecting");
     setError(null);
+
+    const browserDevice = browserDevices.get(id);
+    if (browserDevice) {
+      try {
+        if (!browserDevice.gatt) throw new Error("This Bluetooth device has no GATT server.");
+        browserDevice.addEventListener?.("gattserverdisconnected", () => {
+          bluetooth.emitBrowserConnect({ id, state: "disconnected" });
+        });
+        const server = await browserDevice.gatt.connect();
+        bluetooth.emitBrowserConnect({ id, state: "connected" });
+        const services = await server.getPrimaryServices();
+        bluetooth.emitBrowserDiscovered({
+          id,
+          services: await Promise.all(
+            services.map(async (service) => ({
+              uuid: service.uuid,
+              characteristics: (await service.getCharacteristics()).map((c) => ({
+                uuid: c.uuid,
+                properties: Object.entries(c.properties)
+                  .filter(([, enabled]) => enabled)
+                  .map(([key]) => key),
+              })),
+            })),
+          ),
+        });
+      } catch (err) {
+        const msg = (err as Error)?.message || String(err);
+        setConnectionState("failed");
+        setError(msg);
+        bluetooth.emitBrowserConnect({ id, state: "failed", error: msg });
+      }
+      return;
+    }
+
     await bluetooth.connect(id);
   }, []);
 
   const disconnect = useCallback(async (id: string) => {
+    const browserDevice = browserDevices.get(id);
+    if (browserDevice?.gatt?.connected) {
+      browserDevice.gatt.disconnect();
+      bluetooth.emitBrowserConnect({ id, state: "disconnected" });
+      return;
+    }
     await bluetooth.disconnect(id);
   }, []);
 
