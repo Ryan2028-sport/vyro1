@@ -72,9 +72,59 @@ export function useBluetooth() {
     async (services: string[] = [], durationMs = 10000) => {
       setError(null);
       setDevices({});
+
+      // ---- Browser fallback (Web Bluetooth) ----
+      // Native iOS WebKit has no navigator.bluetooth, but desktop Chrome/Edge
+      // do. We use requestDevice() to show the OS chooser, then surface the
+      // picked device in the list so the rest of the UI keeps working.
+      if (!isNative) {
+        const nav = navigator as Navigator & {
+          bluetooth?: {
+            requestDevice: (opts: unknown) => Promise<{
+              id: string;
+              name?: string;
+            }>;
+          };
+        };
+        if (!nav.bluetooth?.requestDevice) {
+          setError(
+            "Web Bluetooth is not available in this browser. Open this page inside the TestFlight build, or use Chrome/Edge on desktop.",
+          );
+          return;
+        }
+        setScanning(true);
+        try {
+          const d = await nav.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: services.length
+              ? services
+              : [
+                  "battery_service",
+                  "device_information",
+                  "heart_rate",
+                  0xfee7,
+                  0xfee0,
+                  0xfff0,
+                  0xffe0,
+                ],
+          });
+          setDevices((prev) => ({
+            ...prev,
+            [d.id]: { id: d.id, name: d.name || "Unknown device" },
+          }));
+        } catch (err) {
+          const msg = (err as Error)?.message || String(err);
+          if (!/cancell?ed|NotFoundError/i.test(msg)) setError(msg);
+        } finally {
+          setScanning(false);
+        }
+        return;
+      }
+
+      // ---- Native (Despia BLE) ----
       // Make sure we have an up-to-date power/permission read. The first call
       // also triggers the iOS permission prompt if it hasn't appeared yet.
-      if (isNative) await bluetooth.state();
+      await bluetooth.state();
       setScanning(true);
       await bluetooth.scan(services, durationMs);
       // Fallback if onBleScanEnd never arrives.
