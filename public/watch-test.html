@@ -722,6 +722,7 @@ async function connectNative(filtered = false) {
       }
     };
     window.onBleScanEnd = () => {
+      if (!picked && candidates.size) { clearTimeout(pickTimer); pickBest(); return; }
       if (!picked) fail(new Error('No watch found. Wake the watch screen, close its companion app, and forget it in iPhone Bluetooth settings, then scan again.'));
     };
 
