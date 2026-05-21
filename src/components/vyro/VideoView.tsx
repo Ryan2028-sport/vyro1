@@ -209,10 +209,15 @@ export function VideoView() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => handleFile(e.target.files?.[0])}
+              accept="video/*,.mp4,.mov,.m4v,.webm,.mkv"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                handleFile(f);
+              }}
             />
+
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <button
                 onClick={() => fileInputRef.current?.click()}
