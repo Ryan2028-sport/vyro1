@@ -56,6 +56,49 @@ export function VideoView() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+export function VideoView() {
+  const [state, setState] = useState<"idle" | "ready">("idle");
+  const [tab, setTab] = useState<Tab>("overview");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoName, setVideoName] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [insight, setInsight] = useState<SquashInsight | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Recording state
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordSec, setRecordSec] = useState(0);
+  const [recordError, setRecordError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const livePreviewRef = useRef<HTMLVideoElement>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<number | null>(null);
+
+  const runAnalyze = useServerFn(analyzeSquashClip);
+
+  const analyzeFile = async (file: File) => {
+    setAnalyzing(true);
+    setAnalysisError(null);
+    setInsight(null);
+    try {
+      const { frames, duration } = await extractFrames(file, 4);
+      if (frames.length === 0) throw new Error("Could not read frames from this clip.");
+      const res = await runAnalyze({
+        data: { videoName: file.name, durationSec: duration, frames },
+      });
+      if (res.error || !res.insight) throw new Error(res.error ?? "Analysis failed.");
+      setInsight(res.insight);
+    } catch (e) {
+      setAnalysisError(e instanceof Error ? e.message : "Analysis failed.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleFile = (file: File | null | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("video/")) {
@@ -71,11 +114,77 @@ export function VideoView() {
     setVideoUrl(URL.createObjectURL(file));
     setVideoName(file.name);
     setState("ready");
+    void analyzeFile(file);
   };
 
+  const stopStream = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+  };
 
+  const openRecorder = async () => {
+    setRecordError(null);
+    setRecordOpen(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: true,
+      });
+      streamRef.current = stream;
+      if (livePreviewRef.current) {
+        livePreviewRef.current.srcObject = stream;
+        await livePreviewRef.current.play().catch(() => undefined);
+      }
+    } catch (e) {
+      setRecordError(e instanceof Error ? e.message : "Camera unavailable. Allow camera access and retry.");
+    }
+  };
 
-  if (state === "idle") {
+  const startRecording = () => {
+    if (!streamRef.current) return;
+    chunksRef.current = [];
+    let mime = "video/webm;codecs=vp9,opus";
+    if (!MediaRecorder.isTypeSupported(mime)) mime = "video/webm;codecs=vp8,opus";
+    if (!MediaRecorder.isTypeSupported(mime)) mime = "video/webm";
+    const rec = new MediaRecorder(streamRef.current, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
+    rec.ondataavailable = (ev) => { if (ev.data.size > 0) chunksRef.current.push(ev.data); };
+    rec.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: mime });
+      const file = new File([blob], `vyro-record-${Date.now()}.webm`, { type: mime });
+      setRecording(false);
+      setRecordSec(0);
+      stopStream();
+      setRecordOpen(false);
+      handleFile(file);
+    };
+    recorderRef.current = rec;
+    rec.start(1000);
+    setRecording(true);
+    setRecordSec(0);
+    timerRef.current = window.setInterval(() => setRecordSec((s) => s + 1), 1000);
+  };
+
+  const stopRecording = () => {
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+  };
+
+  const cancelRecorder = () => {
+    if (recorderRef.current && recording) {
+      recorderRef.current.ondataavailable = null;
+      recorderRef.current.onstop = null;
+      try { recorderRef.current.stop(); } catch { /* ignore */ }
+      recorderRef.current = null;
+    }
+    setRecording(false);
+    setRecordSec(0);
+    stopStream();
+    setRecordOpen(false);
+  };
+
+  useEffect(() => () => stopStream(), []);
+
     return (
       <>
         <PageHeader
