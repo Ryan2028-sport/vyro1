@@ -94,10 +94,14 @@ export function VideoView() {
 
   const handleFile = (file: File | null | undefined) => {
     if (!file) return;
-    if (!file.type.startsWith("video/")) {
-      setUploadError("Please choose a video file (MP4, MOV, or WebM).");
+    const looksLikeVideo =
+      (file.type && file.type.startsWith("video/")) ||
+      /\.(mp4|mov|m4v|webm|mkv|avi|3gp|hevc)$/i.test(file.name);
+    if (!looksLikeVideo) {
+      setUploadError(`That file doesn't look like a video (${file.type || "unknown type"}). Try MP4, MOV, or WebM.`);
       return;
     }
+
     if (file.size > 500 * 1024 * 1024) {
       setUploadError("Clip is larger than 500MB. Trim it and try again.");
       return;
@@ -205,10 +209,15 @@ export function VideoView() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => handleFile(e.target.files?.[0])}
+              accept="video/*,.mp4,.mov,.m4v,.webm,.mkv"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                handleFile(f);
+              }}
             />
+
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <button
                 onClick={() => fileInputRef.current?.click()}
