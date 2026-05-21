@@ -8,7 +8,7 @@ import { analyzeSquashClip, type SquashInsight } from "@/lib/video-analysis.func
 
 type Tab = "overview" | "footwork" | "swing" | "tcourt" | "tactics" | "physio";
 
-async function extractFrames(file: File, count = 4): Promise<{ frames: string[]; duration: number }> {
+async function extractFrames(file: File, count = 18): Promise<{ frames: string[]; frameTimes: number[]; duration: number }> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
@@ -17,12 +17,13 @@ async function extractFrames(file: File, count = 4): Promise<{ frames: string[];
     video.playsInline = true;
     video.src = url;
     const frames: string[] = [];
+    const frameTimes: number[] = [];
     const cleanup = () => URL.revokeObjectURL(url);
 
     video.onloadedmetadata = async () => {
       const duration = isFinite(video.duration) ? video.duration : 0;
       const canvas = document.createElement("canvas");
-      const w = 640;
+      const w = 512;
       const h = Math.round((video.videoHeight / video.videoWidth) * w) || 360;
       canvas.width = w;
       canvas.height = h;
@@ -38,11 +39,12 @@ async function extractFrames(file: File, count = 4): Promise<{ frames: string[];
         });
         try {
           ctx.drawImage(video, 0, 0, w, h);
-          frames.push(canvas.toDataURL("image/jpeg", 0.75));
+          frames.push(canvas.toDataURL("image/jpeg", 0.68));
+          frameTimes.push(Math.min(t, safeDur - 0.05));
         } catch { /* skip frame */ }
       }
       cleanup();
-      resolve({ frames, duration });
+      resolve({ frames, frameTimes, duration });
     };
     video.onerror = () => { cleanup(); reject(new Error("video load failed")); };
   });
