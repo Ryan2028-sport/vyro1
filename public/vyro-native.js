@@ -431,6 +431,7 @@
   };
 
   var ble = (window.Capacitor || isIOS) ? lazyCapBle : despiaBle;
+  if (isIOS && !window.Capacitor) requestCapacitorScript();
 
   // ───────────────────────── Gyroscope ─────────────────────────
   var gyro = {
