@@ -535,7 +535,7 @@
       var Cap = window.Capacitor;
       return !!(Cap && (typeof Cap.isNativePlatform !== 'function' || Cap.isNativePlatform()));
     },
-    hasCapacitorBle: hasCapBle,
+    get hasCapacitorBle() { return hasCapBle(); },
     isIOS: isIOS,
     isDespiaIOS: isDespiaIOS,
     fire: fire,
