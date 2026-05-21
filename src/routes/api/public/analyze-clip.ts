@@ -6,6 +6,29 @@ const InputSchema = z.object({
   durationSec: z.number().min(0).max(60 * 60 * 3),
   frames: z.array(z.string().min(10).max(900_000)).min(1).max(24),
   frameTimes: z.array(z.number().min(0).max(60 * 60 * 3)).max(24).optional(),
+  sampleEverySec: z.number().min(0.25).max(10).optional(),
+  motionTimeline: z.array(z.object({
+    t: z.number().min(0).max(60 * 60 * 3),
+    motion: z.number().min(0).max(100),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+    zone: z.string().min(3).max(32),
+    brightness: z.number().min(0).max(255),
+  })).max(900).optional(),
+  shotCandidates: z.array(z.object({
+    t: z.number().min(0).max(60 * 60 * 3),
+    motion: z.number().min(0).max(100),
+    zone: z.string().min(3).max(32),
+  })).max(240).optional(),
+  derivedStats: z.object({
+    scannedFrames: z.number().min(1).max(1000),
+    activeSeconds: z.number().min(0).max(60 * 60 * 3),
+    rallyCountEstimate: z.number().min(0).max(1000),
+    totalShotsEstimate: z.number().min(0).max(5000),
+    averageMotion: z.number().min(0).max(100),
+    peakMotion: z.number().min(0).max(100),
+    highIntensityWindows: z.number().min(0).max(1000),
+  }).optional(),
 });
 
 const TOOL = {
@@ -63,10 +86,28 @@ const TOOL = {
       shotSelection: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
       loadRecovery: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
       coachNotes: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 6 },
+      developmentPlan: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 6 },
+      videoEvidence: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
+      limitations: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
     },
-    required: ["headline", "summary", "confidence", "metrics", "timeline", "shotBreakdown", "swingPath", "explosiveSteps", "tCourt", "shotSelection", "loadRecovery", "coachNotes"],
+    required: ["headline", "summary", "confidence", "metrics", "timeline", "shotBreakdown", "swingPath", "explosiveSteps", "tCourt", "shotSelection", "loadRecovery", "coachNotes", "developmentPlan", "videoEvidence", "limitations"],
   },
 };
+
+function summarizeMotion(data: z.infer<typeof InputSchema>) {
+  const timeline = data.motionTimeline ?? [];
+  const zoneCounts = timeline.reduce<Record<string, number>>((acc, s) => {
+    if (s.motion >= Math.max(8, (data.derivedStats?.averageMotion ?? 0) + 4)) acc[s.zone] = (acc[s.zone] ?? 0) + 1;
+    return acc;
+  }, {});
+  const zones = Object.entries(zoneCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([zone, count]) => `${zone}:${count}`).join(", ");
+  const shots = (data.shotCandidates ?? []).slice(0, 120).map((s) => `${s.t.toFixed(1)}s/${s.zone}/${s.motion}`).join(" | ");
+  const compressedTimeline = timeline
+    .filter((_, i) => i % Math.max(1, Math.ceil(timeline.length / 180)) === 0)
+    .map((s) => `${s.t.toFixed(1)}:${s.motion}:${s.zone}`)
+    .join(" | ");
+  return { zones, shots, compressedTimeline };
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -115,16 +156,18 @@ export const Route = createFileRoute("/api/public/analyze-clip")({
           content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: raw } });
         });
 
+        const motion = summarizeMotion(data);
         content.push({
           type: "text",
           text:
-            `Analyze this squash clip in depth: ${data.videoName}, duration ${data.durationSec.toFixed(1)} seconds, ` +
-            `${data.frames.length} visual samples across the video.\n\n` +
-            `You are an elite squash video analyst. Estimate squash-specific performance metrics from the sampled frames. ` +
-            `Do not say you cannot count anything; provide best-estimate ranges compressed to single numbers and mark confidence. ` +
-            `Focus on: number of rallies, total shots hit, winners, forced/unforced errors, shot mix (drive/boast/drop/lob/volley), ` +
-            `forehand/backhand split, swing path issues, T-control, recovery, explosive first step, footwork, fatigue, and shot selection. ` +
-            `Call report_squash_analysis. Make every bullet concrete and based on what is visible or inferred from the full clip samples.`,
+            `Analyze this entire squash video, not just still images: ${data.videoName}, duration ${data.durationSec.toFixed(1)} seconds. ` +
+            `The browser scanned ${data.derivedStats?.scannedFrames ?? data.motionTimeline?.length ?? data.frames.length} checkpoints across the whole clip every ${data.sampleEverySec ?? "unknown"} seconds, then selected ${data.frames.length} evidence frames near key moments.\n\n` +
+            `Motion-derived whole-video stats: ${JSON.stringify(data.derivedStats ?? {})}. Active court zones: ${motion.zones || "not enough signal"}.\n` +
+            `Shot/contact candidates as time/zone/motion: ${motion.shots || "none detected"}.\n` +
+            `Compressed full-video motion timeline as time:motion:zone: ${motion.compressedTimeline}.\n\n` +
+            `Use the motion timeline as the primary source for counts and rhythm; use images to verify posture, racket preparation, court position, and swing path. ` +
+            `Return a report that makes the player better: concrete shot count, rally estimate, winners/errors, shot mix, forehand/backhand split, swing path diagnosis, T-control, recovery speed, fatigue pattern, and exactly what to train next. ` +
+            `If camera angle prevents a precise winner/error count, still give a best estimate grounded in motion/contact patterns and list limitations. Call report_squash_analysis.`,
         });
 
         try {
