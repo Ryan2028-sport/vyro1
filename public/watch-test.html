@@ -2942,7 +2942,7 @@ function tickCourt() {
   $('cInt').textContent = intensity;
 }
 
-async function startCourt() {
+async function startCourt(options = {}) {
   resetCourt();
   // Use the connected watch first. QCBand gets active HR + step polling; standard
   // HR / generic watches use the live notification stream we subscribed to.
@@ -2975,7 +2975,7 @@ async function startCourt() {
     // (its totals overwrite session totals when it reports an increase).
     const ua = navigator.userAgent || '';
     const isMobile = /Android|iPhone|iPad|iPod/i.test(ua) && ('ontouchstart' in window);
-    if (isMobile) {
+    if (isMobile && !options.skipPhoneAssist) {
       const phoneOk = await attachPhoneMotion();
       if (phoneOk) {
         court.phoneAssistActive = true;
@@ -2989,7 +2989,7 @@ async function startCourt() {
       // Desktop / no IMU: watch step counter is the only source. It will be
       // bursty — that is a hardware limit of the watch, not a bug.
       startWatchMotionAssist();
-      log('info', `Court tracking — watch only (desktop). Dot updates when watch reports new steps (typically every 5–30s).`);
+      log('info', `Court tracking — watch only. Dot updates when watch reports new steps (typically every 5–30s). Tap Start court tracking to also use phone motion.`);
     }
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
