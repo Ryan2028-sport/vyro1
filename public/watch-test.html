@@ -1029,7 +1029,7 @@ async function connect(filtered = false) {
       log('info', 'Watch connected — switching court tracking from phone mode to watch mode.');
       stopCourt();
     }
-    if (!court.running) await startCourt();
+    if (!court.running) startCourt({ skipPhoneAssist: true });
   } catch (e) {
     const msg = e?.message || String(e);
     log('err', 'Connect failed: ' + msg);
