@@ -60,7 +60,7 @@
   </div>
 
   <div class="warning" style="background:rgba(80,160,255,.08);border-color:rgba(80,160,255,.3);color:#bcd9ff">
-    <b>TestFlight BLE path:</b> this page now calls the Capacitor <code>BluetoothLe</code> plugin directly through <code>window.VyroNative.ble</code>. Wake the watch, keep it close, then tap <b>Connect all devices</b> or <b>Connect by watch services</b>.<br>
+    <b>TestFlight BLE path:</b> this page now scans through the native Capacitor <code>BluetoothLe</code> plugin and falls back to the iOS picker if scanning is blocked. Wake the watch, keep it close, then tap <b>Connect all devices</b> or <b>Connect by watch services</b>.<br>
     <b>Fallback:</b> if the native plugin is not injected yet, VYRO can still read watch metrics from <b>Apple Health</b> after the companion app syncs.
   </div>
 
@@ -398,7 +398,7 @@
   </div>
 </div>
 
-<script src="/vyro-native.js?v=7"></script>
+<script src="/vyro-native.js?v=8"></script>
 <script>
 // ==========================================================================
 // QCBand / Colmi BLE protocol (Nordic UART-style)
@@ -476,7 +476,8 @@ function nativeRequestOptions(filtered = false) {
     SERVICE_UUID, '180d', '180f', '180a', 'fee7', 'fee0', 'feea', 'fea0', 'fff0', 'ffe0', 'ffb0',
     'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20',
   ].map(normUuid);
-  const opts = { optionalServices, displayMode: 'list' };
+  const opts = { optionalServices };
+  if (filtered) opts.services = optionalServices;
   return opts;
 }
 function getLastNativeWatch() {
@@ -486,6 +487,9 @@ function getLastNativeWatch() {
 function saveLastNativeWatch(d) {
   if (!d?.id) return;
   try { localStorage.setItem(LAST_NATIVE_WATCH_KEY, JSON.stringify({ id: d.id, name: d.name || 'Watch', savedAt: Date.now() })); } catch {}
+}
+function nativeKnownServices() {
+  return [SERVICE_UUID, '180d', '180f', '180a', 'fee7', 'fee0', 'feea', 'fea0', 'fff0', 'ffe0', 'ffb0', 'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20'].map(normUuid);
 }
 const normUuid = u => {
   const s = String(u || '').toLowerCase();
@@ -766,9 +770,26 @@ async function connectNative(filtered = false) {
       if (!picked) fail(new Error('No watch found. Wake the watch screen, close its companion app, and forget it in iPhone Bluetooth settings, then scan again.'));
     };
 
-    log('info', `Opening native iOS Bluetooth picker (${filtered ? 'watch services' : 'all nearby'})…`);
+    const serviceList = nativeKnownServices();
+    log('info', `Scanning with native iOS BLE (${filtered ? 'watch services' : 'all nearby'})…`);
     Promise.resolve(ble.state()).catch(e => log('err', 'Native BLE state failed: ' + (e?.message || e)));
-    Promise.resolve(ble.requestDevice ? ble.requestDevice(nativeRequestOptions(filtered)) : ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000))
+    Promise.resolve(ble.getConnectedDevices ? ble.getConnectedDevices(serviceList) : [])
+      .then(list => {
+        if (settled || picked || !list?.length) return false;
+        const best = list.find(d => d?.id) || null;
+        if (!best) return false;
+        picked = true;
+        log('info', `Using already-connected iOS BLE device: ${best.name || '(unnamed)'} [${best.id}]`);
+        device = { id: best.id, name: best.name || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(best.id) }, addEventListener() {} };
+        saveLastNativeWatch(device);
+        setStatus('connecting…');
+        ble.connect(best.id, { timeout: 12000, autoConnect: true });
+        return true;
+      })
+      .then(usedConnected => {
+        if (usedConnected || settled || picked) return;
+        return ble.scan(filtered ? serviceList : [], 15000);
+      })
       .then(d => {
         if (!d?.id) {
           log('info', 'Native BLE scan command sent — waiting for nearby device advertisements…');
@@ -782,7 +803,23 @@ async function connectNative(filtered = false) {
         setStatus('connecting…');
         ble.connect(d.id, { timeout: 12000, autoConnect: true });
       })
-      .catch(e => fail(new Error('Native Bluetooth picker failed: ' + (e?.message || e))));
+      .catch(e => {
+        if (settled || picked) return;
+        log('err', 'Native scan failed: ' + (e?.message || e));
+        if (!ble.requestDevice) return fail(new Error('Native Bluetooth scan failed: ' + (e?.message || e)));
+        log('info', 'Falling back to native iOS Bluetooth picker…');
+        Promise.resolve(ble.requestDevice(nativeRequestOptions(filtered)))
+          .then(d => {
+            if (!d?.id || settled || picked) return;
+            picked = true;
+            log('info', `Selected native device: ${d.name || '(unnamed)'} [${d.id}]`);
+            device = { id: d.id, name: d.name || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(d.id) }, addEventListener() {} };
+            saveLastNativeWatch(device);
+            setStatus('connecting…');
+            ble.connect(d.id, { timeout: 12000, autoConnect: true });
+          })
+          .catch(err => fail(new Error('Native Bluetooth failed: ' + (err?.message || err))));
+      });
   });
 }
 
@@ -928,7 +965,7 @@ async function connect(filtered = false) {
     : forceWebBluetooth
       ? 'opening chooser…'
       : isNativeBle()
-        ? 'opening native Bluetooth picker…'
+        ? 'scanning native Bluetooth…'
         : 'opening chooser…';
   setConnectBusy(true, modeLabel);
   log('info', `Connect tapped — ${modeLabel}`);

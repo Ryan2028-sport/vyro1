@@ -207,6 +207,24 @@
     };
   }
 
+  function normalizeUuid(u) {
+    var s = String(u == null ? '' : u).toLowerCase().trim();
+    if (!s) return '';
+    if (/^0x[0-9a-f]{4}$/i.test(s)) s = s.slice(2);
+    if (/^[0-9a-f]{4}$/i.test(s)) return '0000' + s + '-0000-1000-8000-00805f9b34fb';
+    return s;
+  }
+
+  function normalizeServiceList(list) {
+    var seen = {};
+    var out = [];
+    (list || []).forEach(function (u) {
+      var v = normalizeUuid(u);
+      if (v && !seen[v]) { seen[v] = true; out.push(v); }
+    });
+    return out;
+  }
+
   function handleScanResult(r) {
     var d = normalizeBleDevice(r);
     if (!d) return;
@@ -269,7 +287,9 @@
       return bleInit().then(function () {
         if (typeof BLE.requestDevice !== 'function') throw new Error('Native Bluetooth picker is not available in this build');
         var opts = options || {};
-        if (!opts.displayMode) opts.displayMode = 'list';
+        if (opts.services) opts.services = normalizeServiceList(opts.services);
+        if (opts.optionalServices) opts.optionalServices = normalizeServiceList(opts.optionalServices);
+        delete opts.displayMode;
         return BLE.requestDevice(opts);
       }).then(function (r) {
         var d = normalizeBleDevice(r);
@@ -284,8 +304,9 @@
     scan:        function (services, durationMs) {
       return bleInit().then(function () {
         var opts = { allowDuplicates: false };
-        if (services && services.length) opts.services = services;
-        return BLE.requestLEScan(opts, handleScanResult);
+        var svc = normalizeServiceList(services);
+        if (svc.length) opts.services = svc;
+        return BLE.requestLEScan(opts);
       }).then(function () {
         bleScanFinish(durationMs);
         return true;
@@ -293,6 +314,16 @@
         emit('onBleConnect', { id: '', state: 'failed', error: (err && err.message) || String(err) });
         throw err;
       });
+    },
+    getConnectedDevices: function (services) {
+      return bleInit().then(function () {
+        if (typeof BLE.getConnectedDevices !== 'function') return [];
+        return BLE.getConnectedDevices({ services: normalizeServiceList(services) });
+      }).then(function (r) {
+        var list = (r && (r.devices || r.value || r)) || [];
+        if (!Array.isArray(list)) list = [];
+        return list.map(normalizeBleDevice).filter(Boolean).map(function (d) { emit('onBleDevice', d); return d; });
+      }).catch(function () { return []; });
     },
     stopScan:    function () {
       return bleInit().then(function () { return BLE.stopLEScan(); }).catch(function () {}).then(function () {
@@ -318,7 +349,9 @@
           emit('onBleConnect', { id: id, state: 'disconnected' });
         });
       } catch (e) {}
-      return BLE.connect({ deviceId: id, timeout: timeout }).then(function () {
+      return BLE.stopLEScan().catch(function () {}).then(function () {
+        return BLE.connect({ deviceId: id, timeout: timeout });
+      }).then(function () {
         emit('onBleConnect', { id: id, state: 'connected' });
         // Auto-discover so onBleDiscovered fires without a separate call.
         return capBle.discover(id);
