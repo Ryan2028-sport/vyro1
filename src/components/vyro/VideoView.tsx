@@ -191,11 +191,11 @@ function VideoPanel({ caption, videoUrl }: { caption: string; videoUrl?: string 
   );
 }
 
-function Overview() {
+function Overview({ videoUrl }: { videoUrl?: string | null }) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2">
-        <VideoPanel caption="Game 3 · Rally 14 · Back-left retrieval" />
+        <VideoPanel caption="Game 3 · Rally 14 · Back-left retrieval" videoUrl={videoUrl} />
       </div>
       <Card>
         <h3 className="font-black">Match summary</h3>
