@@ -265,6 +265,22 @@
   function despiaFire(url) { return fire(url); }
 
   var capBle = {
+    requestDevice: function (options) {
+      return bleInit().then(function () {
+        if (typeof BLE.requestDevice !== 'function') throw new Error('Native Bluetooth picker is not available in this build');
+        var opts = options || {};
+        if (!opts.displayMode) opts.displayMode = 'list';
+        return BLE.requestDevice(opts);
+      }).then(function (r) {
+        var d = normalizeBleDevice(r);
+        if (!d) throw new Error('No Bluetooth device was selected');
+        emit('onBleDevice', d);
+        return d;
+      }).catch(function (err) {
+        emit('onBleConnect', { id: '', state: 'failed', error: (err && err.message) || String(err) });
+        throw err;
+      });
+    },
     scan:        function (services, durationMs) {
       return bleInit().then(function () {
         var opts = { allowDuplicates: false };
@@ -308,6 +324,7 @@
         return capBle.discover(id);
       }).catch(function (err) {
         emit('onBleConnect', { id: id, state: 'failed', error: (err && err.message) || String(err) });
+        throw err;
       });
     },
     disconnect:  function (id) {
