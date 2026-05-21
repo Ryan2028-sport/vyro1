@@ -98,45 +98,283 @@
   };
 
   // ───────────────────────── Bluetooth ─────────────────────────
-  // Thin wrapper. Caller wires up window.onBleDevice / onBleConnect / onBleData / onBleEvent.
-  var ble = {
+  // Talks to the Capacitor BluetoothLe plugin. The native plugin is registered
+  // by the Capacitor runtime, but window.Capacitor.Plugins.BluetoothLe is only
+  // auto-populated if the plugin's own JS ran. Since we don't bundle that JS,
+  // we obtain the plugin proxy via Capacitor.registerPlugin('BluetoothLe'),
+  // which works for any registered native plugin.
+  //
+  // Public API is unchanged — watch-test.html still calls window.VyroNative
+  // .ble.scan / connect / write / subscribe / etc. and listens on
+  // window.onBleDevice / onBleConnect / onBleData / onBleDiscovered.
+
+  var Cap = window.Capacitor;
+  var isNativeCap = !!(Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform());
+  var BLE = null;
+  if (isNativeCap) {
+    if (Cap.Plugins && Cap.Plugins.BluetoothLe) {
+      BLE = Cap.Plugins.BluetoothLe;
+    } else if (typeof Cap.registerPlugin === 'function') {
+      try { BLE = Cap.registerPlugin('BluetoothLe'); } catch (e) { BLE = null; }
+    }
+  }
+  var hasCapBle = !!BLE;
+
+  // base64 ↔ hex (Capacitor wires bytes as base64; VyroNative API uses hex).
+  function b64ToBytes(b64) {
+    try {
+      var bin = atob(b64 || '');
+      var out = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    } catch (e) { return new Uint8Array(); }
+  }
+  function bytesToHex(bytes) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) {
+      var h = bytes[i].toString(16);
+      s += (h.length < 2 ? '0' + h : h);
+    }
+    return s;
+  }
+  function b64ToHex(b64) { return bytesToHex(b64ToBytes(b64)); }
+  function hexToB64(hex) {
+    var clean = String(hex || '').replace(/[^0-9a-fA-F]/g, '');
+    var bin = '';
+    for (var i = 0; i < clean.length; i += 2) {
+      bin += String.fromCharCode(parseInt(clean.substr(i, 2), 16));
+    }
+    try { return btoa(bin); } catch (e) { return ''; }
+  }
+  function textToB64(text) {
+    try { return btoa(unescape(encodeURIComponent(String(text == null ? '' : text)))); }
+    catch (e) { return ''; }
+  }
+  function emit(name, payload) {
+    var fn = window[name];
+    if (typeof fn === 'function') {
+      try { fn(payload); } catch (e) { /* user handler errored; don't crash bridge */ }
+    }
+  }
+
+  // One-time wiring: scan events go through 'onScanResult'.
+  // Per-device disconnect + per-characteristic notification listeners are
+  // added inside connect()/subscribe() respectively, because Capacitor
+  // namespaces them by id/uuid.
+  if (hasCapBle) {
+    try {
+      BLE.addListener('onScanResult', function (r) {
+        if (!r || !r.device) return;
+        emit('onBleDevice', {
+          id: r.device.deviceId,
+          name: r.localName || r.device.name || undefined,
+          rssi: typeof r.rssi === 'number' ? r.rssi : undefined,
+          services: r.uuids
+        });
+      });
+    } catch (e) { /* listener registration not yet supported, ignore */ }
+  }
+
+  var bleInitPromise = null;
+  function bleInit() {
+    if (!hasCapBle) return Promise.resolve();
+    if (!bleInitPromise) {
+      bleInitPromise = BLE.initialize({ androidNeverForLocation: true })
+        .then(function () { emit('onBleState', { state: 'on' }); })
+        .catch(function (err) {
+          var msg = (err && err.message) || String(err);
+          if (/unauthorized|denied|permission/i.test(msg)) emit('onBleState', { state: 'unauthorized' });
+          else if (/off|disabled/i.test(msg)) emit('onBleState', { state: 'off' });
+          else emit('onBleState', { state: 'unsupported' });
+          // Re-throw so callers know init failed.
+          throw err;
+        });
+    }
+    return bleInitPromise;
+  }
+
+  function bleScanFinish(durationMs) {
+    setTimeout(function () {
+      BLE.stopLEScan().catch(function () {});
+      emit('onBleScanEnd', {});
+    }, durationMs || 10000);
+  }
+
+  // Legacy Despia path — kept as a no-op fallback for browser preview
+  // (web Bluetooth in watch-test.html is handled by the page itself via
+  // navigator.bluetooth.requestDevice; we just need these to not throw).
+  function despiaFire(url) { return fire(url); }
+
+  var capBle = {
+    scan:        function (services, durationMs) {
+      return bleInit().then(function () {
+        var opts = { allowDuplicates: false };
+        if (services && services.length) opts.services = services;
+        return BLE.requestLEScan(opts);
+      }).then(function () {
+        bleScanFinish(durationMs);
+      }).catch(function (err) {
+        emit('onBleConnect', { id: '', state: 'failed', error: (err && err.message) || String(err) });
+      });
+    },
+    stopScan:    function () {
+      return BLE.stopLEScan().catch(function () {}).then(function () {
+        emit('onBleScanEnd', {});
+      });
+    },
+    state:       function () {
+      return bleInit().then(function () {
+        return BLE.isEnabled ? BLE.isEnabled() : { value: true };
+      }).then(function (r) {
+        var on = r && (r.value === true || r === true);
+        emit('onBleState', { state: on ? 'on' : 'off' });
+        return true;
+      }).catch(function () { /* state already emitted from bleInit */ });
+    },
+    connect:     function (id, opts) {
+      opts = opts || {};
+      var timeout = opts.timeout || 10000;
+      // Disconnect listener is keyed per-device.
+      try {
+        BLE.addListener('disconnected|' + id, function () {
+          emit('onBleConnect', { id: id, state: 'disconnected' });
+        });
+      } catch (e) {}
+      return BLE.connect({ deviceId: id, timeout: timeout }).then(function () {
+        emit('onBleConnect', { id: id, state: 'connected' });
+        // Auto-discover so onBleDiscovered fires without a separate call.
+        return capBle.discover(id);
+      }).catch(function (err) {
+        emit('onBleConnect', { id: id, state: 'failed', error: (err && err.message) || String(err) });
+      });
+    },
+    disconnect:  function (id) {
+      return BLE.disconnect({ deviceId: id }).catch(function () {}).then(function () {
+        emit('onBleConnect', { id: id, state: 'disconnected' });
+      });
+    },
+    discover:    function (id) {
+      return BLE.discoverServices({ deviceId: id }).catch(function () {}).then(function () {
+        return BLE.getServices({ deviceId: id });
+      }).then(function (r) {
+        var services = (r && r.services) || [];
+        emit('onBleDiscovered', {
+          id: id,
+          services: services.map(function (s) {
+            return {
+              uuid: s.uuid,
+              characteristics: (s.characteristics || []).map(function (c) {
+                var props = [];
+                if (c.properties) {
+                  for (var k in c.properties) {
+                    if (Object.prototype.hasOwnProperty.call(c.properties, k) && c.properties[k]) props.push(k);
+                  }
+                }
+                return { uuid: c.uuid, properties: props };
+              })
+            };
+          })
+        });
+      }).catch(function (err) {
+        // Discovery failed; surface via onBleEvent so callers can react.
+        emit('onBleEvent', { type: 'discoverError', id: id, error: (err && err.message) || String(err) });
+      });
+    },
+    read:        function (id, svc, chr) {
+      return BLE.read({ deviceId: id, service: svc, characteristic: chr }).then(function (r) {
+        emit('onBleData', { id: id, service: svc, characteristic: chr, value: b64ToHex(r && r.value) });
+      }).catch(function (err) {
+        emit('onBleEvent', { type: 'readError', id: id, service: svc, characteristic: chr, error: (err && err.message) || String(err) });
+      });
+    },
+    write:       function (id, svc, chr, value, withResponse) {
+      // Old API accepted a free-form `value`. If it parses cleanly as hex,
+      // treat it as raw bytes; otherwise UTF-8 encode it.
+      var s = String(value == null ? '' : value);
+      var stripped = s.replace(/[^0-9a-fA-F]/g, '');
+      var isHex = stripped.length > 0 && stripped.length % 2 === 0 && /^[0-9a-fA-F\s:,-]+$/.test(s);
+      var b64 = isHex ? hexToB64(stripped) : textToB64(s);
+      var method = withResponse === false ? 'writeWithoutResponse' : 'write';
+      return BLE[method]({ deviceId: id, service: svc, characteristic: chr, value: b64 })
+        .then(function () { emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: true }); })
+        .catch(function (err) {
+          emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: false, error: (err && err.message) || String(err) });
+        });
+    },
+    writeHex:    function (id, svc, chr, hex, withResponse) {
+      var b64 = hexToB64(hex);
+      var method = withResponse === false ? 'writeWithoutResponse' : 'write';
+      return BLE[method]({ deviceId: id, service: svc, characteristic: chr, value: b64 })
+        .then(function () { emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: true }); })
+        .catch(function (err) {
+          emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: false, error: (err && err.message) || String(err) });
+        });
+    },
+    writeText:   function (id, svc, chr, text, withResponse) {
+      var b64 = textToB64(text);
+      var method = withResponse === false ? 'writeWithoutResponse' : 'write';
+      return BLE[method]({ deviceId: id, service: svc, characteristic: chr, value: b64 })
+        .then(function () { emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: true }); })
+        .catch(function (err) {
+          emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: false, error: (err && err.message) || String(err) });
+        });
+    },
+    subscribe:   function (id, svc, chr /*, server (unused under Capacitor) */) {
+      var key = 'notification|' + id + '|' + svc + '|' + chr;
+      try {
+        BLE.addListener(key, function (r) {
+          emit('onBleData', { id: id, service: svc, characteristic: chr, value: b64ToHex(r && r.value) });
+        });
+      } catch (e) {}
+      return BLE.startNotifications({ deviceId: id, service: svc, characteristic: chr }).catch(function (err) {
+        emit('onBleEvent', { type: 'subscribeError', id: id, service: svc, characteristic: chr, error: (err && err.message) || String(err) });
+      });
+    },
+    unsubscribe: function (id, svc, chr) {
+      return BLE.stopNotifications({ deviceId: id, service: svc, characteristic: chr }).catch(function () {});
+    },
+    rssi:        function (id) {
+      return BLE.readRssi({ deviceId: id }).then(function (r) {
+        emit('onBleEvent', { type: 'rssi', id: id, rssi: r && r.value });
+      }).catch(function () {});
+    }
+  };
+
+  // Legacy stub — Despia URL-scheme path. Despia never handled bluetooth://
+  // so these are no-ops; kept only so watch-test.html doesn't crash when
+  // it runs in browser preview (its native-BLE branch silently fails and
+  // the page falls back to navigator.bluetooth on its own).
+  var despiaBle = {
     scan:        function (services, durationMs) {
       var q = 'duration=' + (durationMs || 10000);
       if (services && services.length) q = 'services=' + services.join(',') + '&' + q;
-      return fire('bluetooth://scan?' + q);
+      return despiaFire('bluetooth://scan?' + q);
     },
-    stopScan:    function ()                       { return fire('bluetooth://stopscan'); },
-    state:       function ()                       { return fire('bluetooth://state'); },
+    stopScan:    function () { return despiaFire('bluetooth://stopscan'); },
+    state:       function () { return despiaFire('bluetooth://state'); },
     connect:     function (id, opts) {
       opts = opts || {};
       var q = 'id=' + encodeURIComponent(id) + '&timeout=' + (opts.timeout || 10000);
       if (opts.autoConnect) q += '&auto_connect=true';
       if (opts.server)      q += '&server=' + encodeURIComponent(opts.server);
-      return fire('bluetooth://connect?' + q);
+      return despiaFire('bluetooth://connect?' + q);
     },
-    disconnect:  function (id)                     { return fire('bluetooth://disconnect?id=' + encodeURIComponent(id)); },
-    discover:    function (id)                     { return fire('bluetooth://discover?id=' + encodeURIComponent(id)); },
-    read:        function (id, svc, chr)           { return fire('bluetooth://read?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr); },
-    write:       function (id, svc, chr, value, withResponse) {
-      return fire('bluetooth://write?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr
-                + '&value=' + encodeURIComponent(value) + '&with_response=' + (withResponse ? 'true' : 'false'));
-    },
-    writeHex:    function (id, svc, chr, hex, withResponse) {
-      return fire('bluetooth://write?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr
-                + '&hex=' + encodeURIComponent(hex) + '&with_response=' + (withResponse ? 'true' : 'false'));
-    },
-    writeText:   function (id, svc, chr, text, withResponse) {
-      return fire('bluetooth://write?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr
-                + '&text=' + encodeURIComponent(text) + '&with_response=' + (withResponse ? 'true' : 'false'));
-    },
+    disconnect:  function (id)             { return despiaFire('bluetooth://disconnect?id=' + encodeURIComponent(id)); },
+    discover:    function (id)             { return despiaFire('bluetooth://discover?id=' + encodeURIComponent(id)); },
+    read:        function (id, svc, chr)   { return despiaFire('bluetooth://read?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr); },
+    write:       function (id, svc, chr, v, wr) { return despiaFire('bluetooth://write?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr + '&value=' + encodeURIComponent(v) + '&with_response=' + (wr ? 'true' : 'false')); },
+    writeHex:    function (id, svc, chr, h, wr) { return despiaFire('bluetooth://write?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr + '&hex=' + encodeURIComponent(h) + '&with_response=' + (wr ? 'true' : 'false')); },
+    writeText:   function (id, svc, chr, t, wr) { return despiaFire('bluetooth://write?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr + '&text=' + encodeURIComponent(t) + '&with_response=' + (wr ? 'true' : 'false')); },
     subscribe:   function (id, svc, chr, server) {
       var u = 'bluetooth://subscribe?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr;
       if (server) u += '&server=' + encodeURIComponent(server);
-      return fire(u);
+      return despiaFire(u);
     },
-    unsubscribe: function (id, svc, chr)           { return fire('bluetooth://unsubscribe?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr); },
-    rssi:        function (id)                     { return fire('bluetooth://rssi?id=' + encodeURIComponent(id)); }
+    unsubscribe: function (id, svc, chr) { return despiaFire('bluetooth://unsubscribe?id=' + encodeURIComponent(id) + '&service=' + svc + '&char=' + chr); },
+    rssi:        function (id)           { return despiaFire('bluetooth://rssi?id=' + encodeURIComponent(id)); }
   };
+
+  var ble = hasCapBle ? capBle : despiaBle;
 
   // ───────────────────────── Gyroscope ─────────────────────────
   var gyro = {
@@ -240,6 +478,7 @@
   // ───────────────────────── Public API ─────────────────────────
   window.VyroNative = {
     isDespia: isDespia,
+    isCapacitor: hasCapBle,
     isIOS: isIOS,
     isDespiaIOS: isDespiaIOS,
     fire: fire,
