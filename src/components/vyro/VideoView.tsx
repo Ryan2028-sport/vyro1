@@ -323,7 +323,7 @@ export function VideoView() {
 
       <AIInsightPanel analyzing={analyzing} error={analysisError} insight={insight} activeTab={tab} />
 
-      {tab === "overview" && <Overview videoUrl={videoUrl} insight={insight} />}
+      {tab === "overview" && <Overview videoUrl={videoUrl} />}
       {tab === "footwork" && <Footwork videoUrl={videoUrl} />}
       {tab === "swing" && <Swing />}
       {tab === "tcourt" && <TCourt />}
