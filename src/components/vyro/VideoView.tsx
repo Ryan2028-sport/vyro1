@@ -75,12 +75,14 @@ export function VideoView() {
     setAnalyzing(true);
     setAnalysisError(null);
     setInsight(null);
+    const minimumAnalyzeTime = new Promise<void>((resolve) => window.setTimeout(resolve, 12_000));
     try {
       const { frames, duration } = await extractFrames(file, 4);
       if (frames.length === 0) throw new Error("Could not read frames from this clip.");
-      const res = await runAnalyze({
+      const analysisRequest = runAnalyze({
         data: { videoName: file.name, durationSec: duration, frames },
       });
+      const [res] = await Promise.all([analysisRequest, minimumAnalyzeTime]);
       if (res.error || !res.insight) throw new Error(res.error ?? "Analysis failed.");
       setInsight(res.insight);
     } catch (e) {
@@ -419,7 +421,7 @@ function AIInsightPanel({
         <h3 className="font-black">Claude · squash analysis</h3>
         {analyzing && (
           <span className="ml-2 inline-flex items-center gap-2 text-xs text-white/70">
-            <Loader2 className="h-3 w-3 animate-spin" /> Reading frames…
+            <Loader2 className="h-3 w-3 animate-spin" /> Claude is analyzing…
           </span>
         )}
       </div>
