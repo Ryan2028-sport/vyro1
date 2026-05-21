@@ -606,6 +606,17 @@ function setConnected(on) {
     .forEach(id => $(id).disabled = !on);
 }
 
+let connectBusy = false;
+function setConnectBusy(on, label = 'scanning…') {
+  connectBusy = on;
+  $('connectBtn').disabled = on;
+  $('connectFilteredBtn').disabled = on;
+  $('webBluetoothBtn').disabled = on;
+  $('reconnectNativeBtn').disabled = on || !isNativeBle() || !getLastNativeWatch();
+  if (on) setStatus(label, '');
+  else if (!(device && device.gatt && device.gatt.connected)) setConnected(false);
+}
+
 // ----- BLE flow -----
 function waitForNativeConnectAndDiscover(ble, id, displayName, timeoutMs = 18000) {
   return new Promise((resolve, reject) => {
