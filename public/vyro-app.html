@@ -820,6 +820,7 @@ Error generating stack: `+d.message+`
   let lastFile = null;
   let lastVideoUrl = null;
   let lastInsight = null;
+  let analysisPromise = null;
 
   function ensurePanel(){
     let p = document.getElementById('vyro-ai-panel');
@@ -918,30 +919,37 @@ Error generating stack: `+d.message+`
     });
   }
 
-  async function analyze(file){
-    if (!file) return;
+  function analyze(file){
+    if (!file) return Promise.resolve(null);
+    if (analysisPromise && file === lastFile) return analysisPromise;
     lastFile = file;
-    if (lastVideoUrl) URL.revokeObjectURL(lastVideoUrl);
-    lastVideoUrl = URL.createObjectURL(file);
-    paintVideo();
-    setPanel(spinner('Extracting real frames from ' + (file.name || 'your clip') + '…'));
-    try{
-      const {frames,duration}=await extractFrames(file,4);
-      if(!frames.length) throw new Error('Could not read frames from this clip.');
+    analysisPromise = (async () => {
+      if (lastVideoUrl) URL.revokeObjectURL(lastVideoUrl);
+      lastVideoUrl = URL.createObjectURL(file);
       paintVideo();
-      setPanel(spinner('Sending frames to Claude for squash analysis…'));
-      const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoName:file.name||'clip',durationSec:duration,frames})});
-      const data=await r.json().catch(()=>({error:'Bad response from analyzer'}));
-      if(data.error||!data.insight){setPanel('<span style="color:#ff7a7a"><b>Analyzer error:</b> '+esc(data.error||'Analysis failed.')+'</span>'); return;}
-      renderInsight(data.insight);
-    }catch(e){setPanel('<span style="color:#ff7a7a"><b>Analyzer error:</b> '+esc((e&&e.message)||'Analysis failed.')+'</span>');}
+      setPanel(spinner('Extracting real frames from ' + (file.name || 'your clip') + '…'));
+      try{
+        const {frames,duration}=await extractFrames(file,4);
+        if(!frames.length) throw new Error('Could not read frames from this clip.');
+        paintVideo();
+        setPanel(spinner('Claude is analyzing your clip. This can take 20–60 seconds…'));
+        const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoName:file.name||'clip',durationSec:duration,frames})});
+        const data=await r.json().catch(()=>({error:'Bad response from analyzer'}));
+        if(data.error||!data.insight){setPanel('<span style="color:#ff7a7a"><b>Analyzer error:</b> '+esc(data.error||'Analysis failed.')+'</span>'); return null;}
+        renderInsight(data.insight);
+        return data.insight;
+      }catch(e){setPanel('<span style="color:#ff7a7a"><b>Analyzer error:</b> '+esc((e&&e.message)||'Analysis failed.')+'</span>'); return null;}
+      finally { if (lastFile === file) analysisPromise = null; }
+    })();
+    return analysisPromise;
   }
 
   window.__vyroAnalyzeFile = analyze;
   window.__vyroAnalyzeEvent = function(ev){
     const input = ev && (ev.currentTarget || ev.target);
     const file = input && input.files && input.files[0];
-    if (file) analyze(file);
+    if (file) return analyze(file);
+    return Promise.resolve(null);
   };
 
   document.addEventListener('change', function(e){
