@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as BluetoothRouteImport } from './routes/bluetooth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicAnalyzeClipRouteImport } from './routes/api/public/analyze-clip'
 
 const BluetoothRoute = BluetoothRouteImport.update({
   id: '/bluetooth',
@@ -22,31 +23,40 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAnalyzeClipRoute = ApiPublicAnalyzeClipRouteImport.update({
+  id: '/api/public/analyze-clip',
+  path: '/api/public/analyze-clip',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bluetooth': typeof BluetoothRoute
+  '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bluetooth': typeof BluetoothRoute
+  '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bluetooth': typeof BluetoothRoute
+  '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bluetooth'
+  fullPaths: '/' | '/bluetooth' | '/api/public/analyze-clip'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bluetooth'
-  id: '__root__' | '/' | '/bluetooth'
+  to: '/' | '/bluetooth' | '/api/public/analyze-clip'
+  id: '__root__' | '/' | '/bluetooth' | '/api/public/analyze-clip'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BluetoothRoute: typeof BluetoothRoute
+  ApiPublicAnalyzeClipRoute: typeof ApiPublicAnalyzeClipRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/analyze-clip': {
+      id: '/api/public/analyze-clip'
+      path: '/api/public/analyze-clip'
+      fullPath: '/api/public/analyze-clip'
+      preLoaderRoute: typeof ApiPublicAnalyzeClipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BluetoothRoute: BluetoothRoute,
+  ApiPublicAnalyzeClipRoute: ApiPublicAnalyzeClipRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
