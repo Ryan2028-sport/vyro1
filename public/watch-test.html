@@ -56,11 +56,11 @@
   <div class="sub">QCBand / Colmi compatible · Native iOS BLE + Web Bluetooth</div>
 
   <div id="warn" class="warning" style="display:none">
-    ⚠️ Web Bluetooth is blocked in this app container. VYRO will use the native Capacitor Bluetooth bridge inside TestFlight; if iOS asks, allow Bluetooth access.
+    ⚠️ Web Bluetooth is blocked in this app container. VYRO will use the native iOS BLE bridge inside TestFlight; if iOS asks, allow Bluetooth access.
   </div>
 
   <div class="warning" style="background:rgba(80,160,255,.08);border-color:rgba(80,160,255,.3);color:#bcd9ff">
-    <b>TestFlight BLE path:</b> this page now scans through the native Capacitor <code>BluetoothLe</code> plugin and falls back to the iOS picker if scanning is blocked. Wake the watch, keep it close, then tap <b>Connect all devices</b> or <b>Connect by watch services</b>.<br>
+    <b>TestFlight BLE path:</b> this page scans through the native iOS Bluetooth bridge. Wake the watch, keep it close, then tap <b>Connect all devices</b> or <b>Connect by watch services</b>.<br>
     <b>Fallback:</b> if the native plugin is not injected yet, VYRO can still read watch metrics from <b>Apple Health</b> after the companion app syncs.
   </div>
 
@@ -398,7 +398,7 @@
   </div>
 </div>
 
-<script src="/vyro-native.js?v=8"></script>
+<script src="/vyro-native.js?v=9"></script>
 <script>
 // ==========================================================================
 // QCBand / Colmi BLE protocol (Nordic UART-style)
@@ -466,9 +466,8 @@ let nativeServices = [];
 let nativeWriteChar = null;
 
 const nativeBle = () => window.VyroNative?.ble || null;
-// Native bridge is present under either the legacy Despia runtime OR the
-// Capacitor wrapper (Despia never bridged BLE; Capacitor does, via
-// @capacitor-community/bluetooth-le surfaced through window.VyroNative.ble).
+// Native bridge is present under either Despia's bluetooth:// runtime or a
+// Capacitor wrapper if a separate Capacitor shell is ever used.
 const isNativeBle = () => !!(nativeBle() && (window.VyroNative?.isDespia || window.VyroNative?.isCapacitor || /iphone|ipad|ipod/i.test(navigator.userAgent || '')));
 const LAST_NATIVE_WATCH_KEY = 'vyro:lastNativeWatch';
 function nativeRequestOptions(filtered = false) {
