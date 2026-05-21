@@ -48,13 +48,6 @@ async function extractFrames(file: File, count = 4): Promise<{ frames: string[];
   });
 }
 
-export function VideoView() {
-  const [state, setState] = useState<"idle" | "ready">("idle");
-  const [tab, setTab] = useState<Tab>("overview");
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [videoName, setVideoName] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
 export function VideoView() {
   const [state, setState] = useState<"idle" | "ready">("idle");
