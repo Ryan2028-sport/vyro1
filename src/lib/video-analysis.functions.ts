@@ -6,6 +6,29 @@ const InputSchema = z.object({
   durationSec: z.number().min(0).max(60 * 60 * 3),
   frames: z.array(z.string().min(10).max(900_000)).min(1).max(24),
   frameTimes: z.array(z.number().min(0).max(60 * 60 * 3)).max(24).optional(),
+  sampleEverySec: z.number().min(0.25).max(10).optional(),
+  motionTimeline: z.array(z.object({
+    t: z.number().min(0).max(60 * 60 * 3),
+    motion: z.number().min(0).max(100),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+    zone: z.string().min(3).max(32),
+    brightness: z.number().min(0).max(255),
+  })).max(900).optional(),
+  shotCandidates: z.array(z.object({
+    t: z.number().min(0).max(60 * 60 * 3),
+    motion: z.number().min(0).max(100),
+    zone: z.string().min(3).max(32),
+  })).max(240).optional(),
+  derivedStats: z.object({
+    scannedFrames: z.number().min(1).max(1000),
+    activeSeconds: z.number().min(0).max(60 * 60 * 3),
+    rallyCountEstimate: z.number().min(0).max(1000),
+    totalShotsEstimate: z.number().min(0).max(5000),
+    averageMotion: z.number().min(0).max(100),
+    peakMotion: z.number().min(0).max(100),
+    highIntensityWindows: z.number().min(0).max(1000),
+  }).optional(),
 });
 
 export type SquashInsight = {
@@ -45,6 +68,9 @@ export type SquashInsight = {
   shotSelection: string[];
   loadRecovery: string[];
   coachNotes: string[];
+  developmentPlan?: string[];
+  videoEvidence?: string[];
+  limitations?: string[];
 };
 
 const TOOL = {
