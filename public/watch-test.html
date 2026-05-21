@@ -866,14 +866,14 @@ async function runBleReadinessCheck() {
     setCheck('nativeBleCheck', 'wait', 'native BLE exists, but iPhone Bluetooth is off');
   } else if (nativeState.state === 'unauthorized') {
     setCheck('nativeBleCheck', 'fail', 'native BLE exists, but VYRO permission is denied — open iOS app settings');
-  } else if (nativeState.state === 'unsupported') {
-    setCheck('nativeBleCheck', 'fail', 'native Bluetooth reported unsupported — the TestFlight shell needs BluetoothLe enabled');
+    } else if (nativeState.state === 'unsupported') {
+    setCheck('nativeBleCheck', 'fail', 'native Bluetooth reported unsupported — this must be tested on a real iPhone with the BLE feature enabled in the native build');
   } else if (nativeState.state === 'missing') {
     setCheck('nativeBleCheck', 'fail', 'native BLE bridge was not loaded');
   } else if (nativeState.state === 'failed') {
     setCheck('nativeBleCheck', 'fail', `native BLE failed — ${nativeState.error || 'initialization error'}`);
   } else {
-    setCheck('nativeBleCheck', 'fail', 'native BLE did not answer after 14s — this build may be missing the Bluetooth plugin or iOS Bluetooth permission');
+    setCheck('nativeBleCheck', 'fail', 'native BLE did not answer after 14s — reinstall the latest TestFlight build, then open iOS Settings → VYRO and enable Bluetooth');
   }
 
   if (webOk && !/iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
@@ -890,7 +890,7 @@ async function runBleReadinessCheck() {
   } else if (webOk && !/iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
     setGateSummary('⚠️ Native BLE is not answering, but Web Bluetooth exists. Try <b>Web Bluetooth direct</b>.', 'wait');
   } else {
-    setGateSummary('⚠️ Native BLE is the only Bluetooth path on iPhone. Web Bluetooth is blocked by iOS, so the TestFlight shell must include the BluetoothLe plugin and Bluetooth permission.', 'wait');
+    setGateSummary('⚠️ Native BLE is the only Bluetooth path on iPhone. Web Bluetooth is blocked by iOS, so install the latest TestFlight build and grant VYRO Bluetooth permission in iOS Settings.', 'wait');
     showWebBluetoothRestricted();
   }
 }
