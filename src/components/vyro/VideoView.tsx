@@ -524,12 +524,13 @@ function RecorderOverlay({
 }
 
 function AIInsightPanel({
-  analyzing, error, insight, activeTab,
+  analyzing, error, insight, activeTab, status,
 }: {
   analyzing: boolean;
   error: string | null;
   insight: SquashInsight | null;
   activeTab: Tab;
+  status: string;
 }) {
   if (!analyzing && !error && !insight) return null;
   const bullets =
@@ -548,7 +549,7 @@ function AIInsightPanel({
         <h3 className="font-black">Claude · squash analysis</h3>
         {analyzing && (
           <span className="ml-2 inline-flex items-center gap-2 text-xs text-white/70">
-            <Loader2 className="h-3 w-3 animate-spin" /> Claude is analyzing…
+            <Loader2 className="h-3 w-3 animate-spin" /> {status || "Scanning whole video…"}
           </span>
         )}
       </div>
