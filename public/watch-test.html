@@ -929,7 +929,7 @@ async function connect(filtered = false) {
     : forceWebBluetooth
       ? 'opening chooser…'
       : isNativeBle()
-        ? 'starting native BLE scan…'
+        ? 'opening native Bluetooth picker…'
         : 'opening chooser…';
   setConnectBusy(true, modeLabel);
   log('info', `Connect tapped — ${modeLabel}`);
