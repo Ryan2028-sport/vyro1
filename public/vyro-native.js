@@ -109,6 +109,7 @@
   // window.onBleDevice / onBleConnect / onBleData / onBleDiscovered.
 
   var BLE = null;
+  var CAP_BLE_TIMEOUT_MS = 12000;
   var capScriptRequested = false;
   var scanListenerReady = null;
 
@@ -139,7 +140,7 @@
   function hasCapBle() { return !!resolveBle(); }
 
   function waitForCapBle(timeoutMs) {
-    timeoutMs = timeoutMs || 2500;
+    timeoutMs = timeoutMs || CAP_BLE_TIMEOUT_MS;
     var now = resolveBle();
     if (now) return Promise.resolve(now);
     return new Promise(function (resolve) {
@@ -192,6 +193,16 @@
     }
   }
 
+  function handleScanResult(r) {
+    if (!r || !r.device) return;
+    emit('onBleDevice', {
+      id: r.device.deviceId,
+      name: r.localName || r.device.name || undefined,
+      rssi: typeof r.rssi === 'number' ? r.rssi : undefined,
+      services: r.uuids
+    });
+  }
+
   // One-time wiring: scan events go through 'onScanResult'.
   // Per-device disconnect + per-characteristic notification listeners are
   // added inside connect()/subscribe() respectively, because Capacitor
@@ -200,15 +211,7 @@
     if (scanListenerReady) return scanListenerReady;
     scanListenerReady = waitForCapBle().then(function (ble) {
       if (!ble || typeof ble.addListener !== 'function') return;
-      return ble.addListener('onScanResult', function (r) {
-        if (!r || !r.device) return;
-        emit('onBleDevice', {
-          id: r.device.deviceId,
-          name: r.localName || r.device.name || undefined,
-          rssi: typeof r.rssi === 'number' ? r.rssi : undefined,
-          services: r.uuids
-        });
-      }).catch(function () {});
+      return ble.addListener('onScanResult', handleScanResult).catch(function () {});
     });
     return scanListenerReady;
   }
@@ -217,7 +220,7 @@
   function bleInit() {
     var immediate = resolveBle();
     if (!bleInitPromise) {
-      bleInitPromise = (immediate ? Promise.resolve(immediate) : waitForCapBle(3500))
+      bleInitPromise = (immediate ? Promise.resolve(immediate) : waitForCapBle(CAP_BLE_TIMEOUT_MS))
         .then(function (ble) {
           if (!ble) throw new Error('Capacitor BluetoothLe plugin is not available in this build yet');
           BLE = ble;
@@ -254,7 +257,7 @@
       return bleInit().then(function () {
         var opts = { allowDuplicates: false };
         if (services && services.length) opts.services = services;
-        return BLE.requestLEScan(opts);
+        return BLE.requestLEScan(opts, handleScanResult);
       }).then(function () {
         bleScanFinish(durationMs);
       }).catch(function (err) {
@@ -262,7 +265,7 @@
       });
     },
     stopScan:    function () {
-      return BLE.stopLEScan().catch(function () {}).then(function () {
+      return bleInit().then(function () { return BLE.stopLEScan(); }).catch(function () {}).then(function () {
         emit('onBleScanEnd', {});
       });
     },
@@ -278,6 +281,7 @@
     connect:     function (id, opts) {
       opts = opts || {};
       var timeout = opts.timeout || 10000;
+      if (!BLE) return bleInit().then(function () { return capBle.connect(id, opts); });
       // Disconnect listener is keyed per-device.
       try {
         BLE.addListener('disconnected|' + id, function () {
@@ -427,6 +431,7 @@
   };
 
   var ble = (window.Capacitor || isIOS) ? lazyCapBle : despiaBle;
+  if (isIOS && !window.Capacitor) requestCapacitorScript();
 
   // ───────────────────────── Gyroscope ─────────────────────────
   var gyro = {

@@ -398,7 +398,7 @@
   </div>
 </div>
 
-<script src="/vyro-native.js?v=5"></script>
+<script src="/vyro-native.js?v=6"></script>
 <script>
 // ==========================================================================
 // QCBand / Colmi BLE protocol (Nordic UART-style)
@@ -488,9 +488,25 @@ function bytesToBase64(bytes) {
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin);
 }
+function bytesToHexString(bytes) {
+  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+}
 function payloadToBytes(p) {
   if (!p) return new Uint8Array();
+  const raw = p.valueHex || p.hex || '';
+  const clean = String(raw).replace(/[^0-9a-f]/gi, '');
+  if (clean.length >= 2 && clean.length % 2 === 0) {
+    const out = new Uint8Array(clean.length / 2);
+    for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+    return out;
+  }
   if (p.value) {
+    const maybeHex = String(p.value).replace(/[^0-9a-f]/gi, '');
+    if (maybeHex.length >= 2 && maybeHex.length % 2 === 0 && maybeHex.length === String(p.value).replace(/\s+/g, '').length) {
+      const out = new Uint8Array(maybeHex.length / 2);
+      for (let i = 0; i < out.length; i++) out[i] = parseInt(maybeHex.slice(i * 2, i * 2 + 2), 16);
+      return out;
+    }
     try {
       const bin = atob(p.value);
       const out = new Uint8Array(bin.length);
@@ -498,8 +514,6 @@ function payloadToBytes(p) {
       return out;
     } catch {}
   }
-  const raw = p.valueHex || p.hex || '';
-  const clean = String(raw).replace(/[^0-9a-f]/gi, '');
   const out = new Uint8Array(Math.floor(clean.length / 2));
   for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
   return out;
@@ -535,8 +549,8 @@ function makeNativeCharacteristic(serviceUuid, c) {
         };
       });
     },
-    async writeValue(packet) { nativeBle().write(device.id, serviceUuid, c.uuid, bytesToBase64(packet), true); },
-    async writeValueWithoutResponse(packet) { nativeBle().write(device.id, serviceUuid, c.uuid, bytesToBase64(packet), false); },
+    async writeValue(packet) { nativeBle().writeHex(device.id, serviceUuid, c.uuid, bytesToHexString(packet), true); },
+    async writeValueWithoutResponse(packet) { nativeBle().writeHex(device.id, serviceUuid, c.uuid, bytesToHexString(packet), false); },
     async startNotifications() { nativeBle().subscribe(device.id, serviceUuid, c.uuid); },
   };
 }
@@ -740,7 +754,7 @@ function showWebBluetoothRestricted() {
   log('info', 'navigator.bluetooth is unavailable in this container; trying native Capacitor BLE instead.');
 }
 
-function waitForNativeBleState(timeoutMs = 4500) {
+function waitForNativeBleState(timeoutMs = 14000) {
   return new Promise(resolve => {
     if (!window.VyroNative?.ble?.state) return resolve({ state: 'missing' });
     let done = false;
@@ -769,7 +783,7 @@ async function runBleReadinessCheck() {
   setGateSummary('Checking the actual TestFlight BLE gates…');
   setCheck('nativeBleCheck', 'wait', 'checking native bridge…');
   setCheck('webBleCheck', 'wait', 'checking requestDevice…');
-  const nativeState = await waitForNativeBleState();
+  const nativeState = await waitForNativeBleState(14000);
   const webOk = !!navigator.bluetooth?.requestDevice;
 
   if (nativeState.state === 'on') {
@@ -783,7 +797,7 @@ async function runBleReadinessCheck() {
   } else if (nativeState.state === 'missing') {
     setCheck('nativeBleCheck', 'fail', 'native BLE bridge was not loaded');
   } else {
-    setCheck('nativeBleCheck', 'fail', 'native BLE did not answer yet — close/reopen TestFlight, then run this again');
+    setCheck('nativeBleCheck', 'fail', 'native BLE did not answer after 14s — this build may be missing the Bluetooth plugin or iOS Bluetooth permission');
   }
 
   if (webOk) {
@@ -800,7 +814,7 @@ async function runBleReadinessCheck() {
   } else if (webOk) {
     setGateSummary('⚠️ Native BLE is not answering, but Web Bluetooth exists. Try <b>Web Bluetooth direct</b>.', 'wait');
   } else {
-    setGateSummary('⚠️ Native BLE has not answered yet. Because Capacitor is built in, close/reopen the TestFlight app and tap <b>Run BLE check</b> again; Apple Health remains the fallback.', 'wait');
+    setGateSummary('⚠️ Native BLE still did not answer. VYRO waited for the Capacitor plugin; if this persists, the TestFlight native shell needs the BluetoothLe plugin/permission included.', 'wait');
     showWebBluetoothRestricted();
   }
 }
@@ -1015,7 +1029,7 @@ async function connect(filtered = false) {
       log('info', 'Watch connected — switching court tracking from phone mode to watch mode.');
       stopCourt();
     }
-    if (!court.running) await startCourt();
+    if (!court.running) startCourt({ skipPhoneAssist: true });
   } catch (e) {
     const msg = e?.message || String(e);
     log('err', 'Connect failed: ' + msg);
@@ -1534,11 +1548,9 @@ function parsePacket(p) {
 }
 
 // ----- button wiring -----
-// IMPORTANT: DeviceMotionEvent.requestPermission() must be invoked from the
-// SAME synchronous user-gesture tick on iOS/iPadOS — by the time BLE connect
-// resolves and we call attachPhoneMotion() inside startCourt(), the gesture
-// chain is broken and permission is silently denied. So we pre-request motion
-// permission RIGHT HERE on the Connect tap, before doing any BLE work.
+// Motion/orientation permission is only needed for court movement tracking.
+// Do not request it from the watch connect buttons; otherwise iOS shows a
+// confusing Motion prompt when the user is trying to connect Bluetooth.
 async function requestMotionUpfront() {
   try {
     if (typeof DeviceMotionEvent !== 'undefined' &&
@@ -1557,9 +1569,9 @@ async function requestMotionUpfront() {
     return false;
   }
 }
-$('connectBtn').onclick = () => { connect(false); requestMotionUpfront(); };
-$('connectFilteredBtn').onclick = () => { connect(true); requestMotionUpfront(); };
-$('webBluetoothBtn').onclick = () => { connect('web'); requestMotionUpfront(); };
+$('connectBtn').onclick = () => connect(false);
+$('connectFilteredBtn').onclick = () => connect(true);
+$('webBluetoothBtn').onclick = () => connect('web');
 $('disconnectBtn').onclick = disconnect;
 $('bleReadinessBtn').onclick = runBleReadinessCheck;
 $('healthFallbackBtn').onclick = readAppleHealthFallback;
@@ -2930,7 +2942,7 @@ function tickCourt() {
   $('cInt').textContent = intensity;
 }
 
-async function startCourt() {
+async function startCourt(options = {}) {
   resetCourt();
   // Use the connected watch first. QCBand gets active HR + step polling; standard
   // HR / generic watches use the live notification stream we subscribed to.
@@ -2963,7 +2975,7 @@ async function startCourt() {
     // (its totals overwrite session totals when it reports an increase).
     const ua = navigator.userAgent || '';
     const isMobile = /Android|iPhone|iPad|iPod/i.test(ua) && ('ontouchstart' in window);
-    if (isMobile) {
+    if (isMobile && !options.skipPhoneAssist) {
       const phoneOk = await attachPhoneMotion();
       if (phoneOk) {
         court.phoneAssistActive = true;
@@ -2977,7 +2989,7 @@ async function startCourt() {
       // Desktop / no IMU: watch step counter is the only source. It will be
       // bursty — that is a hardware limit of the watch, not a bug.
       startWatchMotionAssist();
-      log('info', `Court tracking — watch only (desktop). Dot updates when watch reports new steps (typically every 5–30s).`);
+      log('info', `Court tracking — watch only. Dot updates when watch reports new steps (typically every 5–30s). Tap Start court tracking to also use phone motion.`);
     }
     court.tickTimer = setInterval(tickCourt, 500);
     $('courtStart').disabled = true;
@@ -3016,7 +3028,7 @@ function stopCourt() {
   setCourtStatus('stopped');
   log('info', `Session [${court.source}]: ${court.steps} steps · ${court.explosive} explosive · ${court.lunges} lunges · peak ${court.peakG.toFixed(2)}g`);
 }
-$('courtStart').onclick = startCourt;
+$('courtStart').onclick = () => { requestMotionUpfront(); startCourt(); };
 $('courtStop').onclick  = stopCourt;
 $('courtCal').onclick   = startCalibration;
 $('courtReset').onclick = () => { resetCourt(); };
