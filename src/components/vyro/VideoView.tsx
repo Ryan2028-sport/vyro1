@@ -178,12 +178,13 @@ export function VideoView() {
 
   useEffect(() => () => stopStream(), []);
 
+  if (state === "idle") {
     return (
       <>
         <PageHeader
-          eyebrow="AI Video Analyzer · Squash"
+          eyebrow="AI Video Analyzer · Squash · powered by Claude"
           title="Frame-level squash intelligence"
-          subtitle="Explosive steps, swing biomechanics, T-court control, shot selection, and opponent tendency — all synced with IMU and HR signatures from your VYRO watch."
+          subtitle="Upload or record a clip. Claude analyzes explosive steps, swing mechanics, T-court control, shot selection, and rally load."
         />
         <Card>
           <div
@@ -197,9 +198,9 @@ export function VideoView() {
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-white/15 bg-white/10">
               <Camera className="h-8 w-8" />
             </div>
-            <h3 className="mt-4 text-xl font-black">Upload match or drill clip</h3>
+            <h3 className="mt-4 text-xl font-black">Upload or record match footage</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-white/55">
-              Drag &amp; drop or pick a file — MP4, MOV, or WebM up to 500MB.
+              Drag &amp; drop, pick a file, or record from your camera — MP4, MOV, or WebM up to 500MB. Claude returns a squash-specific breakdown.
             </p>
             <input
               ref={fileInputRef}
@@ -214,6 +215,12 @@ export function VideoView() {
                 className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-black"
               >
                 <Upload className="mr-2 inline h-4 w-4" /> Upload clip
+              </button>
+              <button
+                onClick={openRecorder}
+                className="rounded-xl bg-[#ff2b2b] px-5 py-3 text-sm font-bold text-white"
+              >
+                <Video className="mr-2 inline h-4 w-4" /> Record clip
               </button>
               <button
                 onClick={() => {
@@ -247,9 +254,21 @@ export function VideoView() {
             </div>
           </div>
         </Card>
+        {recordOpen && (
+          <RecorderOverlay
+            previewRef={livePreviewRef}
+            recording={recording}
+            recordSec={recordSec}
+            recordError={recordError}
+            onStart={startRecording}
+            onStop={stopRecording}
+            onCancel={cancelRecorder}
+          />
+        )}
       </>
     );
   }
+
 
   const tabs: [Tab, string, typeof Eye][] = [
     ["overview", "Overview", Eye],
