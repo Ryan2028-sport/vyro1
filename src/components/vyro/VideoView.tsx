@@ -563,9 +563,12 @@ function AIInsightPanel({
               ["Shots", insight.metrics.totalShotsEstimate],
               ["Rallies", insight.metrics.rallyCountEstimate],
               ["Winners", insight.metrics.winnersEstimate],
-              ["Errors", insight.metrics.unforcedErrorsEstimate],
+              ["Forced", insight.metrics.forcedErrorsEstimate],
+              ["Unforced", insight.metrics.unforcedErrorsEstimate],
               ["T-control", `${insight.metrics.tControlPercent}%`],
               ["Swing", `${insight.metrics.swingPathScore}/100`],
+              ["Footwork", `${insight.metrics.footworkScore}/100`],
+              ["Return T", `${insight.metrics.avgReturnToTSeconds}s`],
             ].map(([label, value]) => (
               <div key={label as string} className="rounded-xl border border-white/10 bg-black/25 p-2">
                 <span className="block text-white/45">{label}</span>
@@ -583,9 +586,29 @@ function AIInsightPanel({
               ))}
             </ul>
           )}
+          <InsightList title="What the video showed" items={insight.videoEvidence} />
+          <InsightList title="4-week development plan" items={insight.developmentPlan} />
+          <InsightList title="Analyzer limits" items={insight.limitations} muted />
         </>
       )}
     </Card>
+  );
+}
+
+function InsightList({ title, items, muted = false }: { title: string; items?: string[]; muted?: boolean }) {
+  if (!items?.length) return null;
+  return (
+    <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+      <h4 className="text-xs font-black uppercase tracking-[0.16em] text-white/55">{title}</h4>
+      <ul className="mt-2 space-y-1.5 text-sm">
+        {items.map((item, i) => (
+          <li key={i} className="flex gap-2">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff2b2b]" />
+            <span className={muted ? "text-white/60" : "text-white/85"}>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
