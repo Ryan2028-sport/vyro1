@@ -108,17 +108,52 @@
   // .ble.scan / connect / write / subscribe / etc. and listens on
   // window.onBleDevice / onBleConnect / onBleData / onBleDiscovered.
 
-  var Cap = window.Capacitor;
-  var isNativeCap = !!(Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform());
   var BLE = null;
-  if (isNativeCap) {
-    if (Cap.Plugins && Cap.Plugins.BluetoothLe) {
-      BLE = Cap.Plugins.BluetoothLe;
-    } else if (typeof Cap.registerPlugin === 'function') {
+  var capScriptRequested = false;
+  var scanListenerReady = null;
+
+  function requestCapacitorScript() {
+    if (capScriptRequested || document.querySelector('script[data-vyro-capacitor]')) return;
+    capScriptRequested = true;
+    try {
+      var s = document.createElement('script');
+      s.src = '/capacitor.js';
+      s.async = true;
+      s.setAttribute('data-vyro-capacitor', 'true');
+      s.onerror = function () {};
+      (document.head || document.documentElement).appendChild(s);
+    } catch (e) {}
+  }
+
+  function resolveBle() {
+    if (BLE) return BLE;
+    var Cap = window.Capacitor;
+    if (!Cap) { requestCapacitorScript(); return null; }
+    if (Cap.Plugins && Cap.Plugins.BluetoothLe) BLE = Cap.Plugins.BluetoothLe;
+    else if (typeof Cap.registerPlugin === 'function') {
       try { BLE = Cap.registerPlugin('BluetoothLe'); } catch (e) { BLE = null; }
     }
+    return BLE;
   }
-  var hasCapBle = !!BLE;
+
+  function hasCapBle() { return !!resolveBle(); }
+
+  function waitForCapBle(timeoutMs) {
+    timeoutMs = timeoutMs || 2500;
+    var now = resolveBle();
+    if (now) return Promise.resolve(now);
+    return new Promise(function (resolve) {
+      requestCapacitorScript();
+      var t0 = Date.now();
+      var iv = setInterval(function () {
+        var ble = resolveBle();
+        if (ble || Date.now() - t0 > timeoutMs) {
+          clearInterval(iv);
+          resolve(ble || null);
+        }
+      }, 50);
+    });
+  }
 
   // base64 ↔ hex (Capacitor wires bytes as base64; VyroNative API uses hex).
   function b64ToBytes(b64) {
@@ -161,9 +196,11 @@
   // Per-device disconnect + per-characteristic notification listeners are
   // added inside connect()/subscribe() respectively, because Capacitor
   // namespaces them by id/uuid.
-  if (hasCapBle) {
-    try {
-      BLE.addListener('onScanResult', function (r) {
+  function ensureScanListener() {
+    if (scanListenerReady) return scanListenerReady;
+    scanListenerReady = waitForCapBle().then(function (ble) {
+      if (!ble || typeof ble.addListener !== 'function') return;
+      return ble.addListener('onScanResult', function (r) {
         if (!r || !r.device) return;
         emit('onBleDevice', {
           id: r.device.deviceId,
@@ -171,17 +208,24 @@
           rssi: typeof r.rssi === 'number' ? r.rssi : undefined,
           services: r.uuids
         });
-      });
-    } catch (e) { /* listener registration not yet supported, ignore */ }
+      }).catch(function () {});
+    });
+    return scanListenerReady;
   }
 
   var bleInitPromise = null;
   function bleInit() {
-    if (!hasCapBle) return Promise.resolve();
+    var immediate = resolveBle();
     if (!bleInitPromise) {
-      bleInitPromise = BLE.initialize({ androidNeverForLocation: true })
-        .then(function () { emit('onBleState', { state: 'on' }); })
+      bleInitPromise = (immediate ? Promise.resolve(immediate) : waitForCapBle(3500))
+        .then(function (ble) {
+          if (!ble) throw new Error('Capacitor BluetoothLe plugin is not available in this build yet');
+          BLE = ble;
+          return ensureScanListener().then(function () { return BLE.initialize({ androidNeverForLocation: true }); });
+        })
+        .then(function () { emit('onBleState', { state: 'on' }); return BLE; })
         .catch(function (err) {
+          bleInitPromise = null;
           var msg = (err && err.message) || String(err);
           if (/unauthorized|denied|permission/i.test(msg)) emit('onBleState', { state: 'unauthorized' });
           else if (/off|disabled/i.test(msg)) emit('onBleState', { state: 'off' });
@@ -340,6 +384,14 @@
     }
   };
 
+  var lazyCapBle = {};
+  Object.keys(capBle).forEach(function (key) {
+    lazyCapBle[key] = function () {
+      var args = arguments;
+      return bleInit().then(function () { return capBle[key].apply(capBle, args); });
+    };
+  });
+
   // Legacy stub — Despia URL-scheme path. Despia never handled bluetooth://
   // so these are no-ops; kept only so watch-test.html doesn't crash when
   // it runs in browser preview (its native-BLE branch silently fails and
@@ -374,7 +426,7 @@
     rssi:        function (id)           { return despiaFire('bluetooth://rssi?id=' + encodeURIComponent(id)); }
   };
 
-  var ble = hasCapBle ? capBle : despiaBle;
+  var ble = (window.Capacitor || isIOS) ? lazyCapBle : despiaBle;
 
   // ───────────────────────── Gyroscope ─────────────────────────
   var gyro = {
@@ -478,7 +530,12 @@
   // ───────────────────────── Public API ─────────────────────────
   window.VyroNative = {
     isDespia: isDespia,
-    isCapacitor: hasCapBle,
+    get isCapacitor() { return !!window.Capacitor; },
+    get isNativeCapacitor() {
+      var Cap = window.Capacitor;
+      return !!(Cap && (typeof Cap.isNativePlatform !== 'function' || Cap.isNativePlatform()));
+    },
+    get hasCapacitorBle() { return hasCapBle(); },
     isIOS: isIOS,
     isDespiaIOS: isDespiaIOS,
     fire: fire,

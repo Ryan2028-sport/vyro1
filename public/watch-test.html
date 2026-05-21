@@ -56,13 +56,12 @@
   <div class="sub">QCBand / Colmi compatible · Native iOS BLE + Web Bluetooth</div>
 
   <div id="warn" class="warning" style="display:none">
-    ⚠️ Web Bluetooth is blocked in this app container. Open iPhone Settings → VYRO and enable Bluetooth if the toggle exists. If there is no Bluetooth toggle, this TestFlight build cannot read BLE without a native BLE module.
+    ⚠️ Web Bluetooth is blocked in this app container. VYRO will use the native Capacitor Bluetooth bridge inside TestFlight; if iOS asks, allow Bluetooth access.
   </div>
 
   <div class="warning" style="background:rgba(80,160,255,.08);border-color:rgba(80,160,255,.3);color:#bcd9ff">
-    <b>No Bluetooth toggle for VYRO in iOS Settings?</b><br>
-    That row only appears after the native iOS binary declares <code>NSBluetoothAlwaysUsageDescription</code> and calls CoreBluetooth — the current TestFlight wrapper does neither, so iOS never creates the toggle. Web code cannot add it.<br>
-    <b>Working path on iOS:</b> your watch already syncs to <b>Apple Health</b> via its companion app (QCBand / Colmi / H Band / Da Fit). VYRO reads from Health instead of pairing the watch directly. Tap <b>Read Apple Health fallback</b> below — it runs automatically on TestFlight launch.
+    <b>TestFlight BLE path:</b> this page now calls the Capacitor <code>BluetoothLe</code> plugin directly through <code>window.VyroNative.ble</code>. Wake the watch, keep it close, then tap <b>Connect all devices</b> or <b>Connect by watch services</b>.<br>
+    <b>Fallback:</b> if the native plugin is not injected yet, VYRO can still read watch metrics from <b>Apple Health</b> after the companion app syncs.
   </div>
 
   <div class="panel" id="testFlightGatePanel" style="border-color:rgba(253,230,138,.28)">
@@ -399,7 +398,7 @@
   </div>
 </div>
 
-<script src="/vyro-native.js?v=4"></script>
+<script src="/vyro-native.js?v=5"></script>
 <script>
 // ==========================================================================
 // QCBand / Colmi BLE protocol (Nordic UART-style)
@@ -470,7 +469,7 @@ const nativeBle = () => window.VyroNative?.ble || null;
 // Native bridge is present under either the legacy Despia runtime OR the
 // Capacitor wrapper (Despia never bridged BLE; Capacitor does, via
 // @capacitor-community/bluetooth-le surfaced through window.VyroNative.ble).
-const isNativeBle = () => !!((window.VyroNative?.isDespia || window.VyroNative?.isCapacitor) && nativeBle());
+const isNativeBle = () => !!(nativeBle() && (window.VyroNative?.isDespia || window.VyroNative?.isCapacitor || /iphone|ipad|ipod/i.test(navigator.userAgent || '')));
 const LAST_NATIVE_WATCH_KEY = 'vyro:lastNativeWatch';
 function getLastNativeWatch() {
   try { return JSON.parse(localStorage.getItem(LAST_NATIVE_WATCH_KEY) || 'null'); }
@@ -605,7 +604,7 @@ function waitForNativeConnectAndDiscover(ble, id, displayName, timeoutMs = 18000
     window.onBleState = s => {
       if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
       if (s.state === 'off') log('info', 'Bluetooth is off — turn it on in Control Center or Settings.');
-      if (s.state === 'unsupported') fail(new Error('This TestFlight build does not include Despia Bluetooth support.'));
+      if (s.state === 'unsupported') fail(new Error('This TestFlight build reported Bluetooth unsupported. Close/reopen TestFlight, then try again.'));
     };
     window.onBleConnect = e => {
       if (e.id && e.id !== id) return;
@@ -674,14 +673,14 @@ async function connectNative(filtered = false) {
       ble.stopScan();
       ble.connect(best.id, { timeout: 10000, autoConnect: true });
     };
-    const timeout = setTimeout(() => fail(new Error('Native BLE scan timed out. Make sure the Despia Bluetooth addon is enabled, then install a fresh TestFlight build.')), 18000);
+    const timeout = setTimeout(() => fail(new Error('Native BLE scan timed out. Wake the watch, keep it close, and make sure VYRO has Bluetooth permission in iOS Settings.')), 18000);
     const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); resolve(v); };
     const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); reject(e); };
 
     window.onBleState = s => {
       if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
       if (s.state === 'off') log('info', 'Bluetooth is off — turn it on. Scan will continue when iOS powers it on.');
-      if (s.state === 'unsupported') fail(new Error('This TestFlight build does not include Despia Bluetooth support.'));
+      if (s.state === 'unsupported') fail(new Error('This TestFlight build reported Bluetooth unsupported. Close/reopen TestFlight, then try again.'));
     };
     window.onBleDevice = d => {
       log('info', `Native found: ${d.name || '(unnamed)'} [${d.id}] RSSI ${d.rssi || '—'}`);
@@ -737,13 +736,13 @@ async function connectNative(filtered = false) {
 
 function showWebBluetoothRestricted() {
   $('warn').style.display = 'block';
-  $('warn').innerHTML = '⚠️ Web Bluetooth is not exposed by this iOS TestFlight web view. Open iPhone Settings → VYRO and enable <b>Bluetooth</b> if the toggle exists; also allow <b>Local Network</b> if iOS shows it. If there is no Bluetooth toggle, the app needs a fresh native BLE-enabled build to connect to the watch.';
-  log('err', 'navigator.bluetooth is unavailable in this container. iOS pairing in Settings does not give WebView pages access to BLE devices.');
+  $('warn').innerHTML = '⚠️ Web Bluetooth is not exposed by this iOS TestFlight web view, so VYRO is using the native Capacitor BLE bridge instead. If iOS asks, allow Bluetooth for VYRO.';
+  log('info', 'navigator.bluetooth is unavailable in this container; trying native Capacitor BLE instead.');
 }
 
 function waitForNativeBleState(timeoutMs = 4500) {
   return new Promise(resolve => {
-    if ((!window.VyroNative?.isDespia && !window.VyroNative?.isCapacitor) || !window.VyroNative?.ble?.state) return resolve({ state: 'missing' });
+    if (!window.VyroNative?.ble?.state) return resolve({ state: 'missing' });
     let done = false;
     const prev = window.onBleState;
     const handler = s => {
@@ -780,11 +779,11 @@ async function runBleReadinessCheck() {
   } else if (nativeState.state === 'unauthorized') {
     setCheck('nativeBleCheck', 'fail', 'native BLE exists, but VYRO permission is denied — open iOS app settings');
   } else if (nativeState.state === 'unsupported') {
-    setCheck('nativeBleCheck', 'fail', 'this binary reports BLE unsupported');
+    setCheck('nativeBleCheck', 'fail', 'native Bluetooth reported unsupported — close/reopen TestFlight, then retry');
   } else if (nativeState.state === 'missing') {
-    setCheck('nativeBleCheck', 'fail', 'not inside the native iOS app wrapper');
+    setCheck('nativeBleCheck', 'fail', 'native BLE bridge was not loaded');
   } else {
-    setCheck('nativeBleCheck', 'fail', 'no BLE response from the native wrapper — likely no BLE module in this build');
+    setCheck('nativeBleCheck', 'fail', 'native BLE did not answer yet — close/reopen TestFlight, then run this again');
   }
 
   if (webOk) {
@@ -801,7 +800,7 @@ async function runBleReadinessCheck() {
   } else if (webOk) {
     setGateSummary('⚠️ Native BLE is not answering, but Web Bluetooth exists. Try <b>Web Bluetooth direct</b>.', 'wait');
   } else {
-    setGateSummary('❌ This TestFlight build cannot connect to the watch over BLE from Lovable code. Since Despia will not enable the BLE addon, use the Apple Health fallback or a different native wrapper/plugin.', 'fail');
+    setGateSummary('⚠️ Native BLE has not answered yet. Because Capacitor is built in, close/reopen the TestFlight app and tap <b>Run BLE check</b> again; Apple Health remains the fallback.', 'wait');
     showWebBluetoothRestricted();
   }
 }
@@ -3042,11 +3041,11 @@ $('openNativeSettingsBtn').onclick = () => {
   else log('err', 'Native settings are only available inside the TestFlight app.');
 };
 
-// On iOS TestFlight, BLE bridge does not exist in this wrapper — go straight to
-// Apple Health, which is the only working data path on this build.
+// On iOS TestFlight, start Apple Health as a passive fallback while direct
+// Capacitor BLE remains the primary watch connection path.
 if (window.VyroNative?.isDespiaIOS) {
-  log('info', 'iOS detected — using Apple Health as the primary data source. Watch data is read from Health, populated by the watch companion app (QCBand / Colmi / H Band / Da Fit).');
-  setTimeout(() => { readAppleHealthFallback().catch(() => {}); }, 600);
+  log('info', 'iOS detected — direct Capacitor BLE is primary; Apple Health will load as a fallback if available.');
+  setTimeout(() => { runBleReadinessCheck().catch(() => {}); readAppleHealthFallback().catch(() => {}); }, 600);
   // Re-poll Health every 60s so live tiles stay fresh while the page is open.
   setInterval(() => { readAppleHealthFallback().catch(() => {}); }, 60000);
 }
