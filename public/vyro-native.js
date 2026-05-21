@@ -193,14 +193,24 @@
     }
   }
 
-  function handleScanResult(r) {
-    if (!r || !r.device) return;
-    emit('onBleDevice', {
-      id: r.device.deviceId,
-      name: r.localName || r.device.name || undefined,
+  function normalizeBleDevice(r) {
+    var raw = r && (r.device || r);
+    if (!raw) return null;
+    var id = raw.deviceId || raw.id;
+    if (!id) return null;
+    return {
+      id: id,
+      deviceId: id,
+      name: r.localName || raw.name || undefined,
       rssi: typeof r.rssi === 'number' ? r.rssi : undefined,
-      services: r.uuids
-    });
+      services: r.uuids || raw.uuids || raw.services || []
+    };
+  }
+
+  function handleScanResult(r) {
+    var d = normalizeBleDevice(r);
+    if (!d) return;
+    emit('onBleDevice', d);
   }
 
   // One-time wiring: scan events go through 'onScanResult'.
@@ -232,7 +242,9 @@
           var msg = (err && err.message) || String(err);
           if (/unauthorized|denied|permission/i.test(msg)) emit('onBleState', { state: 'unauthorized' });
           else if (/off|disabled/i.test(msg)) emit('onBleState', { state: 'off' });
-          else emit('onBleState', { state: 'unsupported' });
+          else if (/not available|not loaded|not implemented|missing|plugin/i.test(msg)) emit('onBleState', { state: 'missing' });
+          else if (/unsupported|unavailable/i.test(msg)) emit('onBleState', { state: 'unsupported' });
+          else emit('onBleState', { state: 'failed', error: msg });
           // Re-throw so callers know init failed.
           throw err;
         });
@@ -253,6 +265,22 @@
   function despiaFire(url) { return fire(url); }
 
   var capBle = {
+    requestDevice: function (options) {
+      return bleInit().then(function () {
+        if (typeof BLE.requestDevice !== 'function') throw new Error('Native Bluetooth picker is not available in this build');
+        var opts = options || {};
+        if (!opts.displayMode) opts.displayMode = 'list';
+        return BLE.requestDevice(opts);
+      }).then(function (r) {
+        var d = normalizeBleDevice(r);
+        if (!d) throw new Error('No Bluetooth device was selected');
+        emit('onBleDevice', d);
+        return d;
+      }).catch(function (err) {
+        emit('onBleConnect', { id: '', state: 'failed', error: (err && err.message) || String(err) });
+        throw err;
+      });
+    },
     scan:        function (services, durationMs) {
       return bleInit().then(function () {
         var opts = { allowDuplicates: false };
@@ -296,6 +324,7 @@
         return capBle.discover(id);
       }).catch(function (err) {
         emit('onBleConnect', { id: id, state: 'failed', error: (err && err.message) || String(err) });
+        throw err;
       });
     },
     disconnect:  function (id) {
@@ -403,6 +432,7 @@
   // it runs in browser preview (its native-BLE branch silently fails and
   // the page falls back to navigator.bluetooth on its own).
   var despiaBle = {
+    requestDevice:function () { return despiaFire('bluetooth://requestdevice'); },
     scan:        function (services, durationMs) {
       var q = 'duration=' + (durationMs || 10000);
       if (services && services.length) q = 'services=' + services.join(',') + '&' + q;

@@ -87,7 +87,7 @@
       <div class="row">
         <button id="connectBtn" class="cta">Connect all devices</button>
         <button id="connectFilteredBtn" class="cta" style="background:#1e4d7a">Connect by watch services</button>
-        <button id="webBluetoothBtn" class="cta" style="background:#0f7a4d">Web Bluetooth direct</button>
+        <button id="webBluetoothBtn" class="cta" style="background:#0f7a4d">Web Bluetooth (desktop)</button>
         <button id="reconnectNativeBtn" class="ghost">Reconnect last watch</button>
         <button id="openNativeSettingsBtn" class="ghost">Open iOS settings</button>
         <button id="disconnectBtn" class="ghost" disabled>Disconnect</button>
@@ -398,7 +398,7 @@
   </div>
 </div>
 
-<script src="/vyro-native.js?v=6"></script>
+<script src="/vyro-native.js?v=7"></script>
 <script>
 // ==========================================================================
 // QCBand / Colmi BLE protocol (Nordic UART-style)
@@ -471,6 +471,14 @@ const nativeBle = () => window.VyroNative?.ble || null;
 // @capacitor-community/bluetooth-le surfaced through window.VyroNative.ble).
 const isNativeBle = () => !!(nativeBle() && (window.VyroNative?.isDespia || window.VyroNative?.isCapacitor || /iphone|ipad|ipod/i.test(navigator.userAgent || '')));
 const LAST_NATIVE_WATCH_KEY = 'vyro:lastNativeWatch';
+function nativeRequestOptions(filtered = false) {
+  const optionalServices = [
+    SERVICE_UUID, '180d', '180f', '180a', 'fee7', 'fee0', 'feea', 'fea0', 'fff0', 'ffe0', 'ffb0',
+    'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20',
+  ].map(normUuid);
+  const opts = { optionalServices, displayMode: 'list' };
+  return opts;
+}
 function getLastNativeWatch() {
   try { return JSON.parse(localStorage.getItem(LAST_NATIVE_WATCH_KEY) || 'null'); }
   catch { return null; }
@@ -595,7 +603,8 @@ function setStatus(s, kind = '') {
 }
 function setConnected(on) {
   const canNative = isNativeBle();
-  const canWebBluetooth = !!navigator.bluetooth?.requestDevice;
+  const isAppleMobile = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+  const canWebBluetooth = !isAppleMobile && !!navigator.bluetooth?.requestDevice;
   $('connectBtn').disabled = on || (!canNative && !canWebBluetooth);
   $('connectFilteredBtn').disabled = on || (!canNative && !canWebBluetooth);
   $('webBluetoothBtn').disabled = on || !canWebBluetooth;
@@ -629,7 +638,9 @@ function waitForNativeConnectAndDiscover(ble, id, displayName, timeoutMs = 18000
     window.onBleState = s => {
       if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
       if (s.state === 'off') log('info', 'Bluetooth is off — turn it on in Control Center or Settings.');
-      if (s.state === 'unsupported') fail(new Error('This TestFlight build reported Bluetooth unsupported. Close/reopen TestFlight, then try again.'));
+      if (s.state === 'unsupported') fail(new Error('Native Bluetooth reports unsupported. If this is a real iPhone, the installed TestFlight build is missing the native Bluetooth plugin or permission.'));
+      if (s.state === 'missing') fail(new Error('Native Bluetooth plugin is missing from this TestFlight build.'));
+      if (s.state === 'failed') fail(new Error(s.error || 'Native Bluetooth failed to initialize.'));
     };
     window.onBleConnect = e => {
       if (e.id && e.id !== id) return;
@@ -698,14 +709,16 @@ async function connectNative(filtered = false) {
       ble.stopScan();
       ble.connect(best.id, { timeout: 10000, autoConnect: true });
     };
-    const timeout = setTimeout(() => fail(new Error('Native BLE scan timed out. Wake the watch, keep it close, and make sure VYRO has Bluetooth permission in iOS Settings.')), 18000);
+    const timeout = setTimeout(() => fail(new Error('Native BLE connection timed out. Wake the watch, keep it close, and make sure VYRO has Bluetooth permission in iOS Settings.')), 22000);
     const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); resolve(v); };
     const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); reject(e); };
 
     window.onBleState = s => {
       if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
       if (s.state === 'off') log('info', 'Bluetooth is off — turn it on. Scan will continue when iOS powers it on.');
-      if (s.state === 'unsupported') fail(new Error('This TestFlight build reported Bluetooth unsupported. Close/reopen TestFlight, then try again.'));
+      if (s.state === 'unsupported') fail(new Error('Native Bluetooth reports unsupported. If this is a real iPhone, this usually means the installed TestFlight build is missing the native Bluetooth plugin or permission.'));
+      if (s.state === 'missing') fail(new Error('Native Bluetooth plugin is missing from this TestFlight build.'));
+      if (s.state === 'failed') fail(new Error(s.error || 'Native Bluetooth failed to initialize.'));
     };
     window.onBleDevice = d => {
       log('info', `Native found: ${d.name || '(unnamed)'} [${d.id}] RSSI ${d.rssi || '—'}`);
@@ -753,11 +766,23 @@ async function connectNative(filtered = false) {
       if (!picked) fail(new Error('No watch found. Wake the watch screen, close its companion app, and forget it in iPhone Bluetooth settings, then scan again.'));
     };
 
-    log('info', `Starting native iOS BLE scan (${filtered ? 'watches only' : 'all nearby'})…`);
+    log('info', `Opening native iOS Bluetooth picker (${filtered ? 'watch services' : 'all nearby'})…`);
     Promise.resolve(ble.state()).catch(e => log('err', 'Native BLE state failed: ' + (e?.message || e)));
-    Promise.resolve(ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000))
-      .then(() => log('info', 'Native BLE scan command sent — waiting for nearby device advertisements…'))
-      .catch(e => fail(new Error('Native BLE scan command failed: ' + (e?.message || e))));
+    Promise.resolve(ble.requestDevice ? ble.requestDevice(nativeRequestOptions(filtered)) : ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000))
+      .then(d => {
+        if (!d?.id) {
+          log('info', 'Native BLE scan command sent — waiting for nearby device advertisements…');
+          return;
+        }
+        if (settled || picked) return;
+        picked = true;
+        log('info', `Selected native device: ${d.name || '(unnamed)'} [${d.id}]`);
+        device = { id: d.id, name: d.name || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(d.id) }, addEventListener() {} };
+        saveLastNativeWatch(device);
+        setStatus('connecting…');
+        ble.connect(d.id, { timeout: 12000, autoConnect: true });
+      })
+      .catch(e => fail(new Error('Native Bluetooth picker failed: ' + (e?.message || e))));
   });
 }
 
@@ -806,17 +831,19 @@ async function runBleReadinessCheck() {
   } else if (nativeState.state === 'unauthorized') {
     setCheck('nativeBleCheck', 'fail', 'native BLE exists, but VYRO permission is denied — open iOS app settings');
   } else if (nativeState.state === 'unsupported') {
-    setCheck('nativeBleCheck', 'fail', 'native Bluetooth reported unsupported — close/reopen TestFlight, then retry');
+    setCheck('nativeBleCheck', 'fail', 'native Bluetooth reported unsupported — the TestFlight shell needs BluetoothLe enabled');
   } else if (nativeState.state === 'missing') {
     setCheck('nativeBleCheck', 'fail', 'native BLE bridge was not loaded');
+  } else if (nativeState.state === 'failed') {
+    setCheck('nativeBleCheck', 'fail', `native BLE failed — ${nativeState.error || 'initialization error'}`);
   } else {
     setCheck('nativeBleCheck', 'fail', 'native BLE did not answer after 14s — this build may be missing the Bluetooth plugin or iOS Bluetooth permission');
   }
 
-  if (webOk) {
+  if (webOk && !/iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
     setCheck('webBleCheck', 'ok', 'available — Web Bluetooth direct can open a chooser');
   } else {
-    setCheck('webBleCheck', 'fail', 'blocked — iOS/TestFlight WebView does not expose navigator.bluetooth');
+    setCheck('webBleCheck', 'wait', 'not used on iPhone — iOS blocks Web Bluetooth, so native BLE is required');
   }
 
   const nativeUsable = ['on', 'off', 'unauthorized'].includes(nativeState.state);
@@ -824,10 +851,10 @@ async function runBleReadinessCheck() {
     setGateSummary('✅ This TestFlight build has a usable BLE path. Tap <b>Connect by watch services</b> with the watch awake.', 'ok');
   } else if (nativeUsable) {
     setGateSummary('⚠️ BLE support exists, but iOS is blocking it right now. Turn Bluetooth on or grant VYRO Bluetooth permission, then run the check again.', 'wait');
-  } else if (webOk) {
+  } else if (webOk && !/iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
     setGateSummary('⚠️ Native BLE is not answering, but Web Bluetooth exists. Try <b>Web Bluetooth direct</b>.', 'wait');
   } else {
-    setGateSummary('⚠️ Native BLE still did not answer. VYRO waited for the Capacitor plugin; if this persists, the TestFlight native shell needs the BluetoothLe plugin/permission included.', 'wait');
+    setGateSummary('⚠️ Native BLE is the only Bluetooth path on iPhone. Web Bluetooth is blocked by iOS, so the TestFlight shell must include the BluetoothLe plugin and Bluetooth permission.', 'wait');
     showWebBluetoothRestricted();
   }
 }
@@ -901,7 +928,7 @@ async function connect(filtered = false) {
     : forceWebBluetooth
       ? 'opening chooser…'
       : isNativeBle()
-        ? 'starting native BLE scan…'
+        ? 'opening native Bluetooth picker…'
         : 'opening chooser…';
   setConnectBusy(true, modeLabel);
   log('info', `Connect tapped — ${modeLabel}`);
