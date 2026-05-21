@@ -56,13 +56,12 @@
   <div class="sub">QCBand / Colmi compatible · Native iOS BLE + Web Bluetooth</div>
 
   <div id="warn" class="warning" style="display:none">
-    ⚠️ Web Bluetooth is blocked in this app container. Open iPhone Settings → VYRO and enable Bluetooth if the toggle exists. If there is no Bluetooth toggle, this TestFlight build cannot read BLE without a native BLE module.
+    ⚠️ Web Bluetooth is blocked in this app container. VYRO will use the native Capacitor Bluetooth bridge inside TestFlight; if iOS asks, allow Bluetooth access.
   </div>
 
   <div class="warning" style="background:rgba(80,160,255,.08);border-color:rgba(80,160,255,.3);color:#bcd9ff">
-    <b>No Bluetooth toggle for VYRO in iOS Settings?</b><br>
-    That row only appears after the native iOS binary declares <code>NSBluetoothAlwaysUsageDescription</code> and calls CoreBluetooth — the current TestFlight wrapper does neither, so iOS never creates the toggle. Web code cannot add it.<br>
-    <b>Working path on iOS:</b> your watch already syncs to <b>Apple Health</b> via its companion app (QCBand / Colmi / H Band / Da Fit). VYRO reads from Health instead of pairing the watch directly. Tap <b>Read Apple Health fallback</b> below — it runs automatically on TestFlight launch.
+    <b>TestFlight BLE path:</b> this page now calls the Capacitor <code>BluetoothLe</code> plugin directly through <code>window.VyroNative.ble</code>. Wake the watch, keep it close, then tap <b>Connect all devices</b> or <b>Connect by watch services</b>.<br>
+    <b>Fallback:</b> if the native plugin is not injected yet, VYRO can still read watch metrics from <b>Apple Health</b> after the companion app syncs.
   </div>
 
   <div class="panel" id="testFlightGatePanel" style="border-color:rgba(253,230,138,.28)">
@@ -399,7 +398,7 @@
   </div>
 </div>
 
-<script src="/vyro-native.js?v=4"></script>
+<script src="/vyro-native.js?v=5"></script>
 <script>
 // ==========================================================================
 // QCBand / Colmi BLE protocol (Nordic UART-style)
