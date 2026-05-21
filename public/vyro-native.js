@@ -530,7 +530,11 @@
   // ───────────────────────── Public API ─────────────────────────
   window.VyroNative = {
     isDespia: isDespia,
-    isCapacitor: !!window.Capacitor,
+    get isCapacitor() { return !!window.Capacitor; },
+    get isNativeCapacitor() {
+      var Cap = window.Capacitor;
+      return !!(Cap && (typeof Cap.isNativePlatform !== 'function' || Cap.isNativePlatform()));
+    },
     hasCapacitorBle: hasCapBle,
     isIOS: isIOS,
     isDespiaIOS: isDespiaIOS,
