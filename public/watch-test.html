@@ -779,7 +779,7 @@ async function runBleReadinessCheck() {
   } else if (nativeState.state === 'unauthorized') {
     setCheck('nativeBleCheck', 'fail', 'native BLE exists, but VYRO permission is denied — open iOS app settings');
   } else if (nativeState.state === 'unsupported') {
-    setCheck('nativeBleCheck', 'fail', 'this binary reports BLE unsupported');
+    setCheck('nativeBleCheck', 'fail', 'native Bluetooth reported unsupported — close/reopen TestFlight, then retry');
   } else if (nativeState.state === 'missing') {
     setCheck('nativeBleCheck', 'fail', 'native BLE bridge was not loaded');
   } else {
