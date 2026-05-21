@@ -1,10 +1,52 @@
-import { useRef, useState } from "react";
-import { Camera, Play, Upload, Zap, Activity, Target, Eye, TrendingUp, Footprints } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { Camera, Play, Upload, Zap, Activity, Target, Eye, TrendingUp, Footprints, Loader2, Sparkles, Video, Square, Circle } from "lucide-react";
 import { sportProfiles } from "@/lib/vyro-data";
 import { Bar, Card, PageHeader, Pill } from "./shared";
 import { SportSwing } from "./SportView";
+import { analyzeSquashClip, type SquashInsight } from "@/lib/video-analysis.functions";
 
 type Tab = "overview" | "footwork" | "swing" | "tcourt" | "tactics" | "physio";
+
+async function extractFrames(file: File, count = 4): Promise<{ frames: string[]; duration: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    const frames: string[] = [];
+    const cleanup = () => URL.revokeObjectURL(url);
+
+    video.onloadedmetadata = async () => {
+      const duration = isFinite(video.duration) ? video.duration : 0;
+      const canvas = document.createElement("canvas");
+      const w = 640;
+      const h = Math.round((video.videoHeight / video.videoWidth) * w) || 360;
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { cleanup(); reject(new Error("canvas 2d unavailable")); return; }
+      const safeDur = duration > 0.5 ? duration : 1;
+      for (let i = 0; i < count; i++) {
+        const t = (safeDur * (i + 1)) / (count + 1);
+        await new Promise<void>((res) => {
+          const onSeeked = () => { video.removeEventListener("seeked", onSeeked); res(); };
+          video.addEventListener("seeked", onSeeked);
+          try { video.currentTime = Math.min(t, safeDur - 0.05); } catch { res(); }
+        });
+        try {
+          ctx.drawImage(video, 0, 0, w, h);
+          frames.push(canvas.toDataURL("image/jpeg", 0.75));
+        } catch { /* skip frame */ }
+      }
+      cleanup();
+      resolve({ frames, duration });
+    };
+    video.onerror = () => { cleanup(); reject(new Error("video load failed")); };
+  });
+}
 
 export function VideoView() {
   const [state, setState] = useState<"idle" | "ready">("idle");
