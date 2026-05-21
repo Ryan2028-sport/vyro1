@@ -814,7 +814,7 @@ async function runBleReadinessCheck() {
   } else if (webOk) {
     setGateSummary('⚠️ Native BLE is not answering, but Web Bluetooth exists. Try <b>Web Bluetooth direct</b>.', 'wait');
   } else {
-    setGateSummary('⚠️ Native BLE has not answered yet. Because Capacitor is built in, close/reopen the TestFlight app and tap <b>Run BLE check</b> again; Apple Health remains the fallback.', 'wait');
+    setGateSummary('⚠️ Native BLE still did not answer. VYRO waited for the Capacitor plugin; if this persists, the TestFlight native shell needs the BluetoothLe plugin/permission included.', 'wait');
     showWebBluetoothRestricted();
   }
 }
