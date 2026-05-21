@@ -157,8 +157,8 @@ export function VideoView() {
         ))}
       </div>
 
-      {tab === "overview" && <Overview />}
-      {tab === "footwork" && <Footwork />}
+      {tab === "overview" && <Overview videoUrl={videoUrl} />}
+      {tab === "footwork" && <Footwork videoUrl={videoUrl} />}
       {tab === "swing" && <Swing />}
       {tab === "tcourt" && <TCourt />}
       {tab === "tactics" && <Tactics />}
@@ -167,22 +167,26 @@ export function VideoView() {
   );
 }
 
-function VideoPanel({ caption }: { caption: string }) {
+function VideoPanel({ caption, videoUrl }: { caption: string; videoUrl?: string | null }) {
   return (
     <Card>
       <div className="relative grid aspect-video place-items-center overflow-hidden rounded-2xl border border-white/10 bg-black">
-        <div className="grid h-16 w-16 place-items-center rounded-full border border-white/20 bg-white/10">
-          <Play className="h-8 w-8" />
-        </div>
-        <div className="absolute left-3 top-3 flex gap-2">
+        {videoUrl ? (
+          <video src={videoUrl} controls className="h-full w-full object-contain" />
+        ) : (
+          <div className="grid h-16 w-16 place-items-center rounded-full border border-white/20 bg-white/10">
+            <Play className="h-8 w-8" />
+          </div>
+        )}
+        <div className="pointer-events-none absolute left-3 top-3 flex gap-2">
           <Pill color="red">LIVE TAG</Pill>
           <Pill>30 fps · 4K</Pill>
         </div>
-        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-white/70">
+        <div className="pointer-events-none absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-white/70">
           <span>{caption}</span>
-          <span>02:14 / 04:42</span>
         </div>
       </div>
+
     </Card>
   );
 }
