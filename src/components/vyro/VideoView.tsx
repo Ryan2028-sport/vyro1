@@ -8,7 +8,7 @@ import { analyzeSquashClip, type SquashInsight } from "@/lib/video-analysis.func
 
 type Tab = "overview" | "footwork" | "swing" | "tcourt" | "tactics" | "physio";
 
-async function extractFrames(file: File, count = 4): Promise<{ frames: string[]; duration: number }> {
+async function extractFrames(file: File, count = 20): Promise<{ frames: string[]; frameTimes: number[]; duration: number }> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
@@ -17,12 +17,13 @@ async function extractFrames(file: File, count = 4): Promise<{ frames: string[];
     video.playsInline = true;
     video.src = url;
     const frames: string[] = [];
+    const frameTimes: number[] = [];
     const cleanup = () => URL.revokeObjectURL(url);
 
     video.onloadedmetadata = async () => {
       const duration = isFinite(video.duration) ? video.duration : 0;
       const canvas = document.createElement("canvas");
-      const w = 640;
+      const w = 512;
       const h = Math.round((video.videoHeight / video.videoWidth) * w) || 360;
       canvas.width = w;
       canvas.height = h;
@@ -38,11 +39,12 @@ async function extractFrames(file: File, count = 4): Promise<{ frames: string[];
         });
         try {
           ctx.drawImage(video, 0, 0, w, h);
-          frames.push(canvas.toDataURL("image/jpeg", 0.75));
+          frames.push(canvas.toDataURL("image/jpeg", 0.68));
+          frameTimes.push(Math.min(t, safeDur - 0.05));
         } catch { /* skip frame */ }
       }
       cleanup();
-      resolve({ frames, duration });
+      resolve({ frames, frameTimes, duration });
     };
     video.onerror = () => { cleanup(); reject(new Error("video load failed")); };
   });
@@ -77,10 +79,10 @@ export function VideoView() {
     setInsight(null);
     const minimumAnalyzeTime = new Promise<void>((resolve) => window.setTimeout(resolve, 12_000));
     try {
-      const { frames, duration } = await extractFrames(file, 4);
+      const { frames, frameTimes, duration } = await extractFrames(file, 20);
       if (frames.length === 0) throw new Error("Could not read frames from this clip.");
       const analysisRequest = runAnalyze({
-        data: { videoName: file.name, durationSec: duration, frames },
+        data: { videoName: file.name, durationSec: duration, frames, frameTimes },
       });
       const [res] = await Promise.all([analysisRequest, minimumAnalyzeTime]);
       if (res.error || !res.insight) throw new Error(res.error ?? "Analysis failed.");
@@ -408,7 +410,7 @@ function AIInsightPanel({
   const bullets =
     !insight ? [] :
     activeTab === "footwork" ? insight.explosiveSteps :
-    activeTab === "swing" ? insight.swingDetection :
+    activeTab === "swing" ? insight.swingPath :
     activeTab === "tcourt" ? insight.tCourt :
     activeTab === "tactics" ? insight.shotSelection :
     activeTab === "physio" ? insight.loadRecovery :
@@ -430,6 +432,21 @@ function AIInsightPanel({
         <>
           <p className="mt-2 text-sm font-bold">{insight.headline}</p>
           <p className="mt-1 text-sm text-white/70">{insight.summary}</p>
+          <div className="mt-4 grid gap-2 text-xs sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              ["Shots", insight.metrics.totalShotsEstimate],
+              ["Rallies", insight.metrics.rallyCountEstimate],
+              ["Winners", insight.metrics.winnersEstimate],
+              ["Errors", insight.metrics.unforcedErrorsEstimate],
+              ["T-control", `${insight.metrics.tControlPercent}%`],
+              ["Swing", `${insight.metrics.swingPathScore}/100`],
+            ].map(([label, value]) => (
+              <div key={label as string} className="rounded-xl border border-white/10 bg-black/25 p-2">
+                <span className="block text-white/45">{label}</span>
+                <b className="text-base tabular-nums">{value}</b>
+              </div>
+            ))}
+          </div>
           {bullets.length > 0 && (
             <ul className="mt-3 space-y-1.5 text-sm">
               {bullets.map((b, i) => (

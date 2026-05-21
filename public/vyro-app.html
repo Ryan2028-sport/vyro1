@@ -880,8 +880,15 @@ Error generating stack: `+d.message+`
 
   function renderInsight(ins){
     lastInsight = ins;
+    const m = ins.metrics || {};
     const sec=(t,items)=>Array.isArray(items)&&items.length?'<div style="margin-top:11px;"><b style="font-size:12px;color:#39ff88;">'+esc(t)+'</b><ul style="margin:5px 0 0;padding-left:17px;color:#d6d6d6;">'+items.map(b=>'<li>'+esc(b)+'</li>').join('')+'</ul></div>':'';
-    setPanel('<div style="font-weight:800;font-size:14px;color:#fff;">'+esc(ins.headline||'Clip analysis complete')+'</div><div style="margin-top:5px;color:#bbb;">'+esc(ins.summary||'Claude analyzed the uploaded frames from this clip.')+'</div>'+sec('Explosive steps',ins.explosiveSteps)+sec('Swing detection',ins.swingDetection)+sec('T-court control',ins.tCourt)+sec('Shot selection',ins.shotSelection)+sec('Load & recovery',ins.loadRecovery)+sec('Coach notes',ins.coachNotes));
+    const metric=(label,value)=>'<div style="border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.28);border-radius:10px;padding:8px;"><span style="display:block;color:#8fa897;font-size:10px;text-transform:uppercase;letter-spacing:.10em;">'+esc(label)+'</span><b style="font-size:18px;color:#fff;">'+esc(value ?? '—')+'</b></div>';
+    const metrics='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:12px;">'+
+      metric('Shots hit',m.totalShotsEstimate)+metric('Rallies',m.rallyCountEstimate)+metric('Winners',m.winnersEstimate)+
+      metric('Errors',m.unforcedErrorsEstimate)+metric('T-control',(m.tControlPercent ?? '—')+'%')+metric('Swing',(m.swingPathScore ?? '—')+'/100')+'</div>';
+    const shotMix='<div style="margin-top:10px;color:#cfe8d8;font-size:12px;">Drive '+esc(m.driveEstimate ?? '—')+' · Volley '+esc(m.volleyEstimate ?? '—')+' · Boast '+esc(m.boastEstimate ?? '—')+' · Drop '+esc(m.dropEstimate ?? '—')+' · Lob '+esc(m.lobEstimate ?? '—')+'</div>';
+    const timeline=Array.isArray(ins.timeline)&&ins.timeline.length?'<div style="margin-top:12px;"><b style="font-size:12px;color:#39ff88;">Video timeline</b>'+ins.timeline.map(x=>'<div style="margin-top:7px;border-left:2px solid rgba(57,255,136,.55);padding-left:9px;"><b>'+esc(x.time)+' · '+esc(x.phase)+'</b><div style="color:#bbb;">'+esc(x.observation)+'</div><div style="color:#9effc4;">'+esc(x.keyShot)+' — '+esc(x.coachingCue)+'</div></div>').join('')+'</div>':'';
+    setPanel('<div style="font-weight:800;font-size:14px;color:#fff;">'+esc(ins.headline||'Clip analysis complete')+'</div><div style="margin-top:5px;color:#bbb;">'+esc(ins.summary||'Claude analyzed the uploaded frames from this clip.')+'</div>'+metrics+shotMix+timeline+sec('Shot count breakdown',ins.shotBreakdown)+sec('Swing path',ins.swingPath||ins.swingDetection)+sec('Explosive steps',ins.explosiveSteps)+sec('T-court control',ins.tCourt)+sec('Shot selection',ins.shotSelection)+sec('Load & recovery',ins.loadRecovery)+sec('Coach notes',ins.coachNotes));
   }
 
   function extractFrames(file, count){
@@ -890,8 +897,9 @@ Error generating stack: `+d.message+`
       const v = document.createElement('video');
       v.preload = 'auto'; v.muted = true; v.playsInline = true; v.crossOrigin = 'anonymous'; v.src = url;
       const frames = [];
+      const frameTimes = [];
       let settled = false;
-      const finish = (err) => { if (settled) return; settled = true; URL.revokeObjectURL(url); err ? reject(err) : resolve({frames, duration: isFinite(v.duration) ? v.duration : 0}); };
+      const finish = (err) => { if (settled) return; settled = true; URL.revokeObjectURL(url); err ? reject(err) : resolve({frames, frameTimes, duration: isFinite(v.duration) ? v.duration : 0}); };
       const timeout = setTimeout(() => finish(new Error('Timed out reading this video. Try a shorter MP4/WebM clip.')), 20000);
       v.onerror = () => { clearTimeout(timeout); finish(new Error('This browser could not decode the video. Try MP4 or WebM.')); };
       v.onloadedmetadata = async () => {
@@ -910,7 +918,7 @@ Error generating stack: `+d.message+`
               try { v.currentTime = t; } catch { on(); }
               setTimeout(on, 1600);
             });
-            try { ctx.drawImage(v,0,0,w,h); frames.push(c.toDataURL('image/jpeg',.68)); } catch {}
+            try { ctx.drawImage(v,0,0,w,h); frames.push(c.toDataURL('image/jpeg',.68)); frameTimes.push(t); } catch {}
           }
           clearTimeout(timeout); finish();
         }catch(e){ clearTimeout(timeout); finish(e); }
@@ -929,11 +937,11 @@ Error generating stack: `+d.message+`
       paintVideo();
       setPanel(spinner('Extracting real frames from ' + (file.name || 'your clip') + '…'));
       try{
-        const {frames,duration}=await extractFrames(file,4);
+        const {frames,frameTimes,duration}=await extractFrames(file,20);
         if(!frames.length) throw new Error('Could not read frames from this clip.');
         paintVideo();
-        setPanel(spinner('Claude is analyzing your clip. This can take 20–60 seconds…'));
-        const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoName:file.name||'clip',durationSec:duration,frames})});
+        setPanel(spinner('Claude is reviewing the full squash clip: shot count, rallies, winners, swing path, T-control…'));
+        const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoName:file.name||'clip',durationSec:duration,frames,frameTimes})});
         const data=await r.json().catch(()=>({error:'Bad response from analyzer'}));
         if(data.error||!data.insight){setPanel('<span style="color:#ff7a7a"><b>Analyzer error:</b> '+esc(data.error||'Analysis failed.')+'</span>'); return null;}
         renderInsight(data.insight);
