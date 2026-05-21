@@ -8,43 +8,164 @@ import { analyzeSquashClip, type SquashInsight } from "@/lib/video-analysis.func
 
 type Tab = "overview" | "footwork" | "swing" | "tcourt" | "tactics" | "physio";
 
-async function extractFrames(file: File, count = 20): Promise<{ frames: string[]; frameTimes: number[]; duration: number }> {
+type FrameSignal = {
+  t: number;
+  motion: number;
+  x: number;
+  y: number;
+  zone: string;
+  brightness: number;
+};
+
+type ClipScan = {
+  frames: string[];
+  frameTimes: number[];
+  duration: number;
+  sampleEverySec: number;
+  motionTimeline: FrameSignal[];
+  shotCandidates: Array<{ t: number; motion: number; zone: string }>;
+  derivedStats: {
+    scannedFrames: number;
+    activeSeconds: number;
+    rallyCountEstimate: number;
+    totalShotsEstimate: number;
+    averageMotion: number;
+    peakMotion: number;
+    highIntensityWindows: number;
+  };
+};
+
+const zoneFromPoint = (x: number, y: number) => {
+  const side = x < 0.38 ? "left" : x > 0.62 ? "right" : "middle";
+  const depth = y < 0.34 ? "front" : y > 0.68 ? "back" : "mid";
+  return `${depth}-${side}`;
+};
+
+async function scanVideoClip(file: File, onProgress?: (message: string) => void): Promise<ClipScan> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
-    video.preload = "metadata";
+    video.preload = "auto";
     video.muted = true;
     video.playsInline = true;
     video.src = url;
-    const frames: string[] = [];
-    const frameTimes: number[] = [];
     const cleanup = () => URL.revokeObjectURL(url);
 
     video.onloadedmetadata = async () => {
-      const duration = isFinite(video.duration) ? video.duration : 0;
-      const canvas = document.createElement("canvas");
-      const w = 512;
-      const h = Math.round((video.videoHeight / video.videoWidth) * w) || 360;
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { cleanup(); reject(new Error("canvas 2d unavailable")); return; }
-      const safeDur = duration > 0.5 ? duration : 1;
-      for (let i = 0; i < count; i++) {
-        const t = (safeDur * (i + 1)) / (count + 1);
-        await new Promise<void>((res) => {
-          const onSeeked = () => { video.removeEventListener("seeked", onSeeked); res(); };
-          video.addEventListener("seeked", onSeeked);
-          try { video.currentTime = Math.min(t, safeDur - 0.05); } catch { res(); }
+      try {
+        const duration = isFinite(video.duration) ? video.duration : 0;
+        const safeDur = duration > 0.5 ? duration : 1;
+        const sampleEverySec = safeDur > 900 ? 3 : safeDur > 360 ? 2 : safeDur > 120 ? 1.25 : 0.75;
+        const scanTimes = Array.from(
+          { length: Math.max(1, Math.min(900, Math.ceil(safeDur / sampleEverySec))) },
+          (_, i) => Math.min(i * sampleEverySec, safeDur - 0.05),
+        );
+        const scanCanvas = document.createElement("canvas");
+        scanCanvas.width = 192;
+        scanCanvas.height = Math.max(108, Math.round(((video.videoHeight || 360) / (video.videoWidth || 640)) * scanCanvas.width));
+        const scanCtx = scanCanvas.getContext("2d", { willReadFrequently: true });
+        const frameCanvas = document.createElement("canvas");
+        frameCanvas.width = 512;
+        frameCanvas.height = Math.max(288, Math.round(((video.videoHeight || 360) / (video.videoWidth || 640)) * frameCanvas.width));
+        const frameCtx = frameCanvas.getContext("2d");
+        if (!scanCtx || !frameCtx) throw new Error("Canvas unavailable for full-video scan.");
+
+        const seekTo = (t: number) => new Promise<void>((res) => {
+          let done = false;
+          const finish = () => { if (done) return; done = true; video.removeEventListener("seeked", finish); res(); };
+          video.addEventListener("seeked", finish);
+          try { video.currentTime = Math.max(0, Math.min(t, safeDur - 0.05)); } catch { finish(); }
+          window.setTimeout(finish, 1800);
         });
-        try {
-          ctx.drawImage(video, 0, 0, w, h);
-          frames.push(canvas.toDataURL("image/jpeg", 0.68));
-          frameTimes.push(Math.min(t, safeDur - 0.05));
-        } catch { /* skip frame */ }
+
+        const motionTimeline: FrameSignal[] = [];
+        let previous: Uint8ClampedArray | null = null;
+        for (let i = 0; i < scanTimes.length; i++) {
+          const t = scanTimes[i];
+          await seekTo(t);
+          scanCtx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
+          const data = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height).data;
+          let diffSum = 0;
+          let weightSum = 0;
+          let xSum = 0;
+          let ySum = 0;
+          let brightness = 0;
+          for (let p = 0; p < data.length; p += 16) {
+            const lum = (data[p] + data[p + 1] + data[p + 2]) / 3;
+            brightness += lum;
+            const diff = previous ? Math.abs(data[p] - previous[p]) + Math.abs(data[p + 1] - previous[p + 1]) + Math.abs(data[p + 2] - previous[p + 2]) : 0;
+            diffSum += diff;
+            if (diff > 26) {
+              const pixel = p / 4;
+              const x = pixel % scanCanvas.width;
+              const y = Math.floor(pixel / scanCanvas.width);
+              weightSum += diff;
+              xSum += x * diff;
+              ySum += y * diff;
+            }
+          }
+          previous = new Uint8ClampedArray(data);
+          const motion = Math.round(Math.min(100, diffSum / (data.length / 16) / 2.1));
+          const x = weightSum ? xSum / weightSum / scanCanvas.width : 0.5;
+          const y = weightSum ? ySum / weightSum / scanCanvas.height : 0.5;
+          motionTimeline.push({ t: Number(t.toFixed(2)), motion, x: Number(x.toFixed(2)), y: Number(y.toFixed(2)), zone: zoneFromPoint(x, y), brightness: Math.round(brightness / (data.length / 16)) });
+          if (i % 8 === 0 || i === scanTimes.length - 1) onProgress?.(`Scanning whole video ${Math.round(((i + 1) / scanTimes.length) * 100)}% · ${motionTimeline.length} checkpoints`);
+        }
+
+        const sortedMotion = motionTimeline.map((s) => s.motion).sort((a, b) => a - b);
+        const median = sortedMotion[Math.floor(sortedMotion.length / 2)] || 0;
+        const peakMotion = sortedMotion[sortedMotion.length - 1] || 0;
+        const threshold = Math.max(12, median + Math.max(8, (peakMotion - median) * 0.32));
+        const shotCandidates = motionTimeline
+          .filter((s, i, arr) => s.motion >= threshold && s.motion >= (arr[i - 1]?.motion ?? 0) && s.motion >= (arr[i + 1]?.motion ?? 0))
+          .reduce<Array<{ t: number; motion: number; zone: string }>>((acc, s) => {
+            if (!acc.length || s.t - acc[acc.length - 1].t > 1.4) acc.push({ t: s.t, motion: s.motion, zone: s.zone });
+            else if (s.motion > acc[acc.length - 1].motion) acc[acc.length - 1] = { t: s.t, motion: s.motion, zone: s.zone };
+            return acc;
+          }, []);
+        const activeSamples = motionTimeline.filter((s) => s.motion >= Math.max(8, median + 4));
+        const activeSeconds = Math.round(activeSamples.length * sampleEverySec);
+        let rallyCountEstimate = 0;
+        let lastActive = -Infinity;
+        activeSamples.forEach((s) => { if (s.t - lastActive > 7) rallyCountEstimate += 1; lastActive = s.t; });
+        const totalShotsEstimate = Math.max(shotCandidates.length, Math.round(activeSeconds / 1.65));
+        const evidenceTimes = Array.from(new Set([
+          ...shotCandidates.sort((a, b) => b.motion - a.motion).slice(0, 18).map((s) => s.t),
+          ...Array.from({ length: 6 }, (_, i) => (safeDur * (i + 1)) / 7),
+        ])).sort((a, b) => a - b).slice(0, 24);
+        const frames: string[] = [];
+        const frameTimes: number[] = [];
+        for (let i = 0; i < evidenceTimes.length; i++) {
+          const t = evidenceTimes[i];
+          onProgress?.(`Capturing evidence frames ${i + 1}/${evidenceTimes.length}`);
+          await seekTo(t);
+          frameCtx.drawImage(video, 0, 0, frameCanvas.width, frameCanvas.height);
+          frames.push(frameCanvas.toDataURL("image/jpeg", 0.58));
+          frameTimes.push(Number(t.toFixed(2)));
+        }
+
+        cleanup();
+        resolve({
+          frames,
+          frameTimes,
+          duration,
+          sampleEverySec,
+          motionTimeline,
+          shotCandidates: shotCandidates.slice(0, 240),
+          derivedStats: {
+            scannedFrames: motionTimeline.length,
+            activeSeconds,
+            rallyCountEstimate: Math.max(1, rallyCountEstimate),
+            totalShotsEstimate,
+            averageMotion: Math.round(motionTimeline.reduce((sum, s) => sum + s.motion, 0) / Math.max(1, motionTimeline.length)),
+            peakMotion,
+            highIntensityWindows: shotCandidates.filter((s) => s.motion > threshold + 10).length,
+          },
+        });
+      } catch (e) {
+        cleanup();
+        reject(e);
       }
-      cleanup();
-      resolve({ frames, frameTimes, duration });
     };
     video.onerror = () => { cleanup(); reject(new Error("video load failed")); };
   });
