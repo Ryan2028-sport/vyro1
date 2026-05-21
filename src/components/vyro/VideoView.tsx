@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Camera, Play, Upload, Zap, Activity, Target, Eye, TrendingUp, Footprints } from "lucide-react";
 import { sportProfiles } from "@/lib/vyro-data";
 import { Bar, Card, PageHeader, Pill } from "./shared";
@@ -9,6 +9,29 @@ type Tab = "overview" | "footwork" | "swing" | "tcourt" | "tactics" | "physio";
 export function VideoView() {
   const [state, setState] = useState<"idle" | "ready">("idle");
   const [tab, setTab] = useState<Tab>("overview");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoName, setVideoName] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File | null | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      setUploadError("Please choose a video file (MP4, MOV, or WebM).");
+      return;
+    }
+    if (file.size > 500 * 1024 * 1024) {
+      setUploadError("Clip is larger than 500MB. Trim it and try again.");
+      return;
+    }
+    setUploadError(null);
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setVideoUrl(URL.createObjectURL(file));
+    setVideoName(file.name);
+    setState("ready");
+  };
+
+
 
   if (state === "idle") {
     return (
