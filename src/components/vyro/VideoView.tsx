@@ -120,17 +120,27 @@ export function VideoView() {
     <>
       <PageHeader
         eyebrow="AI Video Analyzer · Squash"
-        title="Match clip · Ryan Chen vs Player X"
-        subtitle="Game 3 · 11–9 · 4:42 of rally footage analyzed · 38 rallies · 312 swings"
+        title={videoName ? `Clip · ${videoName}` : "Match clip · Ryan Chen vs Player X"}
+        subtitle={
+          videoName
+            ? "Analyzing rallies, swings, footwork, and T-court control."
+            : "Game 3 · 11–9 · 4:42 of rally footage analyzed · 38 rallies · 312 swings"
+        }
         action={
           <button
-            onClick={() => setState("idle")}
+            onClick={() => {
+              if (videoUrl) URL.revokeObjectURL(videoUrl);
+              setVideoUrl(null);
+              setVideoName(null);
+              setState("idle");
+            }}
             className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold"
           >
             New clip
           </button>
         }
       />
+
 
       <div className="mb-5 flex gap-2 overflow-x-auto">
         {tabs.map(([id, label, Icon]) => (
