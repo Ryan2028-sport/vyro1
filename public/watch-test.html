@@ -707,14 +707,16 @@ async function connectNative(filtered = false) {
       ble.stopScan();
       ble.connect(best.id, { timeout: 10000, autoConnect: true });
     };
-    const timeout = setTimeout(() => fail(new Error('Native BLE scan timed out. Wake the watch, keep it close, and make sure VYRO has Bluetooth permission in iOS Settings.')), 18000);
+    const timeout = setTimeout(() => fail(new Error('Native BLE connection timed out. Wake the watch, keep it close, and make sure VYRO has Bluetooth permission in iOS Settings.')), 22000);
     const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); resolve(v); };
     const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); reject(e); };
 
     window.onBleState = s => {
       if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
       if (s.state === 'off') log('info', 'Bluetooth is off — turn it on. Scan will continue when iOS powers it on.');
-      if (s.state === 'unsupported') fail(new Error('This TestFlight build reported Bluetooth unsupported. Close/reopen TestFlight, then try again.'));
+      if (s.state === 'unsupported') fail(new Error('Native Bluetooth reports unsupported. If this is a real iPhone, this usually means the installed TestFlight build is missing the native Bluetooth plugin or permission.'));
+      if (s.state === 'missing') fail(new Error('Native Bluetooth plugin is missing from this TestFlight build.'));
+      if (s.state === 'failed') fail(new Error(s.error || 'Native Bluetooth failed to initialize.'));
     };
     window.onBleDevice = d => {
       log('info', `Native found: ${d.name || '(unnamed)'} [${d.id}] RSSI ${d.rssi || '—'}`);
@@ -762,11 +764,23 @@ async function connectNative(filtered = false) {
       if (!picked) fail(new Error('No watch found. Wake the watch screen, close its companion app, and forget it in iPhone Bluetooth settings, then scan again.'));
     };
 
-    log('info', `Starting native iOS BLE scan (${filtered ? 'watches only' : 'all nearby'})…`);
+    log('info', `Opening native iOS Bluetooth picker (${filtered ? 'watch services' : 'all nearby'})…`);
     Promise.resolve(ble.state()).catch(e => log('err', 'Native BLE state failed: ' + (e?.message || e)));
-    Promise.resolve(ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000))
-      .then(() => log('info', 'Native BLE scan command sent — waiting for nearby device advertisements…'))
-      .catch(e => fail(new Error('Native BLE scan command failed: ' + (e?.message || e))));
+    Promise.resolve(ble.requestDevice ? ble.requestDevice(nativeRequestOptions(filtered)) : ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000))
+      .then(d => {
+        if (!d?.id) {
+          log('info', 'Native BLE scan command sent — waiting for nearby device advertisements…');
+          return;
+        }
+        if (settled || picked) return;
+        picked = true;
+        log('info', `Selected native device: ${d.name || '(unnamed)'} [${d.id}]`);
+        device = { id: d.id, name: d.name || 'Watch', gatt: { connected: false, disconnect: () => ble.disconnect(d.id) }, addEventListener() {} };
+        saveLastNativeWatch(device);
+        setStatus('connecting…');
+        ble.connect(d.id, { timeout: 12000, autoConnect: true });
+      })
+      .catch(e => fail(new Error('Native Bluetooth picker failed: ' + (e?.message || e))));
   });
 }
 
