@@ -477,7 +477,6 @@ function nativeRequestOptions(filtered = false) {
     'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20',
   ].map(normUuid);
   const opts = { optionalServices, displayMode: 'list' };
-  if (filtered) opts.services = [normUuid('180d'), normUuid('180f'), SERVICE_UUID, normUuid('fee7'), normUuid('fee0'), normUuid('fff0'), normUuid('ffe0')];
   return opts;
 }
 function getLastNativeWatch() {
