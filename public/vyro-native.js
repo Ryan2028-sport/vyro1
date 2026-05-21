@@ -384,6 +384,14 @@
     }
   };
 
+  var lazyCapBle = {};
+  Object.keys(capBle).forEach(function (key) {
+    lazyCapBle[key] = function () {
+      var args = arguments;
+      return bleInit().then(function () { return capBle[key].apply(capBle, args); });
+    };
+  });
+
   // Legacy stub — Despia URL-scheme path. Despia never handled bluetooth://
   // so these are no-ops; kept only so watch-test.html doesn't crash when
   // it runs in browser preview (its native-BLE branch silently fails and
@@ -418,7 +426,7 @@
     rssi:        function (id)           { return despiaFire('bluetooth://rssi?id=' + encodeURIComponent(id)); }
   };
 
-  var ble = hasCapBle ? capBle : despiaBle;
+  var ble = (window.Capacitor || isIOS) ? lazyCapBle : despiaBle;
 
   // ───────────────────────── Gyroscope ─────────────────────────
   var gyro = {
@@ -522,7 +530,8 @@
   // ───────────────────────── Public API ─────────────────────────
   window.VyroNative = {
     isDespia: isDespia,
-    isCapacitor: hasCapBle,
+    isCapacitor: !!window.Capacitor,
+    hasCapacitorBle: hasCapBle,
     isIOS: isIOS,
     isDespiaIOS: isDespiaIOS,
     fire: fire,
