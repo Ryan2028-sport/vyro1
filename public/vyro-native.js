@@ -432,6 +432,7 @@
   // it runs in browser preview (its native-BLE branch silently fails and
   // the page falls back to navigator.bluetooth on its own).
   var despiaBle = {
+    requestDevice:function () { return despiaFire('bluetooth://requestdevice'); },
     scan:        function (services, durationMs) {
       var q = 'duration=' + (durationMs || 10000);
       if (services && services.length) q = 'services=' + services.join(',') + '&' + q;
