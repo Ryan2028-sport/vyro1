@@ -94,10 +94,14 @@ export function VideoView() {
 
   const handleFile = (file: File | null | undefined) => {
     if (!file) return;
-    if (!file.type.startsWith("video/")) {
-      setUploadError("Please choose a video file (MP4, MOV, or WebM).");
+    const looksLikeVideo =
+      (file.type && file.type.startsWith("video/")) ||
+      /\.(mp4|mov|m4v|webm|mkv|avi|3gp|hevc)$/i.test(file.name);
+    if (!looksLikeVideo) {
+      setUploadError(`That file doesn't look like a video (${file.type || "unknown type"}). Try MP4, MOV, or WebM.`);
       return;
     }
+
     if (file.size > 500 * 1024 * 1024) {
       setUploadError("Clip is larger than 500MB. Trim it and try again.");
       return;
