@@ -169,9 +169,17 @@ export const analyzeSquashClip = createServerFn({ method: "POST" })
     content.push({
       type: "text",
       text:
-        `Analyze this squash clip in depth: ${data.videoName}, duration ${data.durationSec.toFixed(1)} seconds, ${data.frames.length} visual samples across the video.\n\n` +
-        `You are an elite squash video analyst. Estimate rallies, total shots hit, winners, errors, shot mix, forehand/backhand split, swing path, T-control, recovery, and footwork. ` +
-        `Provide concrete numbers and coaching observations. Call report_squash_analysis.`,
+        (() => {
+          const motion = summarizeMotion(data);
+          return `Analyze this entire squash video, not just still images: ${data.videoName}, duration ${data.durationSec.toFixed(1)} seconds.\n` +
+            `The browser scanned ${data.derivedStats?.scannedFrames ?? data.motionTimeline?.length ?? data.frames.length} checkpoints across the whole clip every ${data.sampleEverySec ?? "unknown"} seconds and then selected ${data.frames.length} evidence frames near key moments.\n\n` +
+            `Motion-derived whole-video stats: ${JSON.stringify(data.derivedStats ?? {})}. Active court zones: ${motion.zones || "not enough signal"}.\n` +
+            `Shot/contact candidates as time/zone/motion: ${motion.shots || "none detected"}.\n` +
+            `Compressed full-video motion timeline as time:motion:zone: ${motion.compressedTimeline}.\n\n` +
+            `You are an elite squash coach. Use the motion timeline as the primary source for counts and rhythm; use the images to verify posture, racket preparation, court position, and swing path. ` +
+            `Return a report that makes the player better: concrete shot count, rally estimate, winners/errors, shot mix, forehand/backhand split, swing path diagnosis, T-control, recovery speed, fatigue pattern, and exactly what to train next. ` +
+            `If camera angle prevents a precise winner/error count, still give a best estimate grounded in motion/contact patterns and list limitations. Call report_squash_analysis.`,
+        })(),
     });
 
     try {
