@@ -58,8 +58,6 @@ export function VideoView() {
   const [insight, setInsight] = useState<SquashInsight | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   // Recording state
   const [recordOpen, setRecordOpen] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -206,25 +204,21 @@ export function VideoView() {
             <p className="mx-auto mt-2 max-w-md text-sm text-white/55">
               Drag &amp; drop, pick a file, or record from your camera — MP4, MOV, or WebM up to 500MB. Claude returns a squash-specific breakdown.
             </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*,.mp4,.mov,.m4v,.webm,.mkv"
-              className="sr-only"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                handleFile(f);
-              }}
-            />
-
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-black"
-              >
-                <Upload className="mr-2 inline h-4 w-4" /> Upload clip
-              </button>
+              <label className="relative inline-flex cursor-pointer items-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-black">
+                <input
+                  type="file"
+                  accept="video/*,.mp4,.mov,.m4v,.webm,.mkv,.avi,.3gp,.hevc"
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    handleFile(f);
+                  }}
+                />
+                <Upload className="mr-2 inline h-4 w-4" />
+                <span>Upload clip</span>
+              </label>
               <button
                 onClick={openRecorder}
                 className="rounded-xl bg-[#ff2b2b] px-5 py-3 text-sm font-bold text-white"
