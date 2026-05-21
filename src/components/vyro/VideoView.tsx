@@ -432,6 +432,21 @@ function AIInsightPanel({
         <>
           <p className="mt-2 text-sm font-bold">{insight.headline}</p>
           <p className="mt-1 text-sm text-white/70">{insight.summary}</p>
+          <div className="mt-4 grid gap-2 text-xs sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              ["Shots", insight.metrics.totalShotsEstimate],
+              ["Rallies", insight.metrics.rallyCountEstimate],
+              ["Winners", insight.metrics.winnersEstimate],
+              ["Errors", insight.metrics.unforcedErrorsEstimate],
+              ["T-control", `${insight.metrics.tControlPercent}%`],
+              ["Swing", `${insight.metrics.swingPathScore}/100`],
+            ].map(([label, value]) => (
+              <div key={label as string} className="rounded-xl border border-white/10 bg-black/25 p-2">
+                <span className="block text-white/45">{label}</span>
+                <b className="text-base tabular-nums">{value}</b>
+              </div>
+            ))}
+          </div>
           {bullets.length > 0 && (
             <ul className="mt-3 space-y-1.5 text-sm">
               {bullets.map((b, i) => (
