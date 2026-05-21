@@ -320,7 +320,10 @@ export function VideoView() {
         ))}
       </div>
 
-      {tab === "overview" && <Overview videoUrl={videoUrl} />}
+
+      <AIInsightPanel analyzing={analyzing} error={analysisError} insight={insight} activeTab={tab} />
+
+      {tab === "overview" && <Overview videoUrl={videoUrl} insight={insight} />}
       {tab === "footwork" && <Footwork videoUrl={videoUrl} />}
       {tab === "swing" && <Swing />}
       {tab === "tcourt" && <TCourt />}
@@ -329,6 +332,115 @@ export function VideoView() {
     </>
   );
 }
+
+function RecorderOverlay({
+  previewRef, recording, recordSec, recordError, onStart, onStop, onCancel,
+}: {
+  previewRef: React.RefObject<HTMLVideoElement | null>;
+  recording: boolean;
+  recordSec: number;
+  recordError: string | null;
+  onStart: () => void;
+  onStop: () => void;
+  onCancel: () => void;
+}) {
+  const mm = String(Math.floor(recordSec / 60)).padStart(2, "0");
+  const ss = String(recordSec % 60).padStart(2, "0");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-3xl rounded-3xl border border-white/15 bg-[#0b0b0b] p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Video className="h-4 w-4" />
+            <h3 className="font-black">Record clip</h3>
+            {recording && (
+              <span className="ml-2 inline-flex items-center gap-2 rounded-full bg-[#ff2b2b]/20 px-2 py-0.5 text-xs font-bold text-[#ff2b2b]">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-[#ff2b2b]" /> REC {mm}:{ss}
+              </span>
+            )}
+          </div>
+          <button onClick={onCancel} className="rounded-full border border-white/15 px-3 py-1 text-xs">Close</button>
+        </div>
+        <div className="mt-3 aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black">
+          <video ref={previewRef} className="h-full w-full object-cover" muted playsInline />
+        </div>
+        {recordError && <p className="mt-3 text-sm text-[#ff2b2b]">{recordError}</p>}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {!recording ? (
+            <button
+              onClick={onStart}
+              disabled={!!recordError}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#ff2b2b] px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              <Circle className="h-4 w-4 fill-current" /> Start recording
+            </button>
+          ) : (
+            <button
+              onClick={onStop}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-black"
+            >
+              <Square className="h-4 w-4 fill-current" /> Stop &amp; analyze
+            </button>
+          )}
+        </div>
+        <p className="mt-3 text-center text-xs text-white/55">
+          Tip: prop the phone behind the back wall at T-height for best court coverage. Claude will analyze footwork, swing, and shot selection automatically.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AIInsightPanel({
+  analyzing, error, insight, activeTab,
+}: {
+  analyzing: boolean;
+  error: string | null;
+  insight: SquashInsight | null;
+  activeTab: Tab;
+}) {
+  if (!analyzing && !error && !insight) return null;
+  const bullets =
+    !insight ? [] :
+    activeTab === "footwork" ? insight.explosiveSteps :
+    activeTab === "swing" ? insight.swingDetection :
+    activeTab === "tcourt" ? insight.tCourt :
+    activeTab === "tactics" ? insight.shotSelection :
+    activeTab === "physio" ? insight.loadRecovery :
+    insight.coachNotes;
+
+  return (
+    <Card className="mb-5 border-[#ff2b2b]/30 bg-gradient-to-br from-[#ff2b2b]/10 to-transparent">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-[#ff2b2b]" />
+        <h3 className="font-black">Claude · squash analysis</h3>
+        {analyzing && (
+          <span className="ml-2 inline-flex items-center gap-2 text-xs text-white/70">
+            <Loader2 className="h-3 w-3 animate-spin" /> Reading frames…
+          </span>
+        )}
+      </div>
+      {error && <p className="mt-2 text-sm text-[#ff2b2b]">{error}</p>}
+      {insight && (
+        <>
+          <p className="mt-2 text-sm font-bold">{insight.headline}</p>
+          <p className="mt-1 text-sm text-white/70">{insight.summary}</p>
+          {bullets.length > 0 && (
+            <ul className="mt-3 space-y-1.5 text-sm">
+              {bullets.map((b, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff2b2b]" />
+                  <span className="text-white/85">{b}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 
 function VideoPanel({ caption, videoUrl }: { caption: string; videoUrl?: string | null }) {
   return (
