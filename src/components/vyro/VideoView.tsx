@@ -250,7 +250,7 @@ function Overview({ videoUrl }: { videoUrl?: string | null }) {
   );
 }
 
-function Footwork() {
+function Footwork({ videoUrl }: { videoUrl?: string | null }) {
   const steps = [
     ["First-step burst", 88, "2.6 ft avg push-off from T"],
     ["Acceleration", 86, "0–4 ft in 0.41s"],
@@ -262,7 +262,7 @@ function Footwork() {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2">
-        <VideoPanel caption="Explosive step → front-right lunge · pose overlay" />
+        <VideoPanel caption="Explosive step → front-right lunge · pose overlay" videoUrl={videoUrl} />
       </div>
       <Card>
         <h3 className="font-black">Explosive step breakdown</h3>
