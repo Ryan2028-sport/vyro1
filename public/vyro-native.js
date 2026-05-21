@@ -260,8 +260,10 @@
         return BLE.requestLEScan(opts, handleScanResult);
       }).then(function () {
         bleScanFinish(durationMs);
+        return true;
       }).catch(function (err) {
         emit('onBleConnect', { id: '', state: 'failed', error: (err && err.message) || String(err) });
+        throw err;
       });
     },
     stopScan:    function () {

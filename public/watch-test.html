@@ -606,6 +606,17 @@ function setConnected(on) {
     .forEach(id => $(id).disabled = !on);
 }
 
+let connectBusy = false;
+function setConnectBusy(on, label = 'scanning…') {
+  connectBusy = on;
+  $('connectBtn').disabled = on;
+  $('connectFilteredBtn').disabled = on;
+  $('webBluetoothBtn').disabled = on;
+  $('reconnectNativeBtn').disabled = on || !isNativeBle() || !getLastNativeWatch();
+  if (on) setStatus(label, '');
+  else if (!(device && device.gatt && device.gatt.connected)) setConnected(false);
+}
+
 // ----- BLE flow -----
 function waitForNativeConnectAndDiscover(ble, id, displayName, timeoutMs = 18000) {
   return new Promise((resolve, reject) => {
@@ -743,8 +754,10 @@ async function connectNative(filtered = false) {
     };
 
     log('info', `Starting native iOS BLE scan (${filtered ? 'watches only' : 'all nearby'})…`);
-    ble.state();
-    ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000);
+    Promise.resolve(ble.state()).catch(e => log('err', 'Native BLE state failed: ' + (e?.message || e)));
+    Promise.resolve(ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000))
+      .then(() => log('info', 'Native BLE scan command sent — waiting for nearby device advertisements…'))
+      .catch(e => fail(new Error('Native BLE scan command failed: ' + (e?.message || e))));
   });
 }
 
@@ -880,10 +893,21 @@ async function readAppleHealthFallback() {
 }
 
 async function connect(filtered = false) {
+  if (connectBusy) return;
+  const forceWebBluetooth = filtered === 'web';
+  const useServiceFilter = filtered === true;
+  const modeLabel = filtered === 'last-native'
+    ? 'reconnecting…'
+    : forceWebBluetooth
+      ? 'opening chooser…'
+      : isNativeBle()
+        ? 'starting native BLE scan…'
+        : 'opening chooser…';
+  setConnectBusy(true, modeLabel);
+  log('info', `Connect tapped — ${modeLabel}`);
+  setGateSummary('Scanning for watches now… keep the watch awake and next to the phone.', 'wait');
   try {
     let services;
-    const forceWebBluetooth = filtered === 'web';
-    const useServiceFilter = filtered === true;
     if (filtered === 'last-native') {
       services = await reconnectLastNative();
     } else if (!forceWebBluetooth && isNativeBle()) {
@@ -1041,6 +1065,8 @@ async function connect(filtered = false) {
       log('info', 'Tip: Web Bluetooth needs HTTPS and a supported browser (Chrome/Edge/Opera on desktop or Android — iOS Safari is not supported).');
     }
     setStatus('error', 'err');
+  } finally {
+    setConnectBusy(false);
   }
 }
 
