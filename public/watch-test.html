@@ -87,7 +87,7 @@
       <div class="row">
         <button id="connectBtn" class="cta">Connect all devices</button>
         <button id="connectFilteredBtn" class="cta" style="background:#1e4d7a">Connect by watch services</button>
-        <button id="webBluetoothBtn" class="cta" style="background:#0f7a4d">Web Bluetooth direct</button>
+        <button id="webBluetoothBtn" class="cta" style="background:#0f7a4d">Web Bluetooth (desktop)</button>
         <button id="reconnectNativeBtn" class="ghost">Reconnect last watch</button>
         <button id="openNativeSettingsBtn" class="ghost">Open iOS settings</button>
         <button id="disconnectBtn" class="ghost" disabled>Disconnect</button>
@@ -604,7 +604,8 @@ function setStatus(s, kind = '') {
 }
 function setConnected(on) {
   const canNative = isNativeBle();
-  const canWebBluetooth = !!navigator.bluetooth?.requestDevice;
+  const isAppleMobile = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+  const canWebBluetooth = !isAppleMobile && !!navigator.bluetooth?.requestDevice;
   $('connectBtn').disabled = on || (!canNative && !canWebBluetooth);
   $('connectFilteredBtn').disabled = on || (!canNative && !canWebBluetooth);
   $('webBluetoothBtn').disabled = on || !canWebBluetooth;
@@ -840,10 +841,10 @@ async function runBleReadinessCheck() {
     setCheck('nativeBleCheck', 'fail', 'native BLE did not answer after 14s — this build may be missing the Bluetooth plugin or iOS Bluetooth permission');
   }
 
-  if (webOk) {
+  if (webOk && !/iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
     setCheck('webBleCheck', 'ok', 'available — Web Bluetooth direct can open a chooser');
   } else {
-    setCheck('webBleCheck', 'fail', 'blocked — iOS/TestFlight WebView does not expose navigator.bluetooth');
+    setCheck('webBleCheck', 'wait', 'not used on iPhone — iOS blocks Web Bluetooth, so native BLE is required');
   }
 
   const nativeUsable = ['on', 'off', 'unauthorized'].includes(nativeState.state);
