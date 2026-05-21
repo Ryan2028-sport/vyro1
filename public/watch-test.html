@@ -824,8 +824,8 @@ async function connectNative(filtered = false) {
 
 function showWebBluetoothRestricted() {
   $('warn').style.display = 'block';
-  $('warn').innerHTML = '⚠️ Web Bluetooth is not exposed by this iOS TestFlight web view, so VYRO is using the native Capacitor BLE bridge instead. If iOS asks, allow Bluetooth for VYRO.';
-  log('info', 'navigator.bluetooth is unavailable in this container; trying native Capacitor BLE instead.');
+  $('warn').innerHTML = '⚠️ Web Bluetooth is not exposed by this iOS TestFlight web view, so VYRO is using the native iOS BLE bridge instead. If iOS asks, allow Bluetooth for VYRO.';
+  log('info', 'navigator.bluetooth is unavailable in this container; trying native iOS BLE instead.');
 }
 
 function waitForNativeBleState(timeoutMs = 14000) {
