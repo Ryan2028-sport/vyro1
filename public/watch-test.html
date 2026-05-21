@@ -891,10 +891,21 @@ async function readAppleHealthFallback() {
 }
 
 async function connect(filtered = false) {
+  if (connectBusy) return;
+  const forceWebBluetooth = filtered === 'web';
+  const useServiceFilter = filtered === true;
+  const modeLabel = filtered === 'last-native'
+    ? 'reconnecting…'
+    : forceWebBluetooth
+      ? 'opening chooser…'
+      : isNativeBle()
+        ? 'starting native BLE scan…'
+        : 'opening chooser…';
+  setConnectBusy(true, modeLabel);
+  log('info', `Connect tapped — ${modeLabel}`);
+  setGateSummary('Scanning for watches now… keep the watch awake and next to the phone.', 'wait');
   try {
     let services;
-    const forceWebBluetooth = filtered === 'web';
-    const useServiceFilter = filtered === true;
     if (filtered === 'last-native') {
       services = await reconnectLastNative();
     } else if (!forceWebBluetooth && isNativeBle()) {
@@ -1052,6 +1063,8 @@ async function connect(filtered = false) {
       log('info', 'Tip: Web Bluetooth needs HTTPS and a supported browser (Chrome/Edge/Opera on desktop or Android — iOS Safari is not supported).');
     }
     setStatus('error', 'err');
+  } finally {
+    setConnectBusy(false);
   }
 }
 
