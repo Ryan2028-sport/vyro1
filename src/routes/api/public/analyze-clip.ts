@@ -156,16 +156,18 @@ export const Route = createFileRoute("/api/public/analyze-clip")({
           content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: raw } });
         });
 
+        const motion = summarizeMotion(data);
         content.push({
           type: "text",
           text:
-            `Analyze this squash clip in depth: ${data.videoName}, duration ${data.durationSec.toFixed(1)} seconds, ` +
-            `${data.frames.length} visual samples across the video.\n\n` +
-            `You are an elite squash video analyst. Estimate squash-specific performance metrics from the sampled frames. ` +
-            `Do not say you cannot count anything; provide best-estimate ranges compressed to single numbers and mark confidence. ` +
-            `Focus on: number of rallies, total shots hit, winners, forced/unforced errors, shot mix (drive/boast/drop/lob/volley), ` +
-            `forehand/backhand split, swing path issues, T-control, recovery, explosive first step, footwork, fatigue, and shot selection. ` +
-            `Call report_squash_analysis. Make every bullet concrete and based on what is visible or inferred from the full clip samples.`,
+            `Analyze this entire squash video, not just still images: ${data.videoName}, duration ${data.durationSec.toFixed(1)} seconds. ` +
+            `The browser scanned ${data.derivedStats?.scannedFrames ?? data.motionTimeline?.length ?? data.frames.length} checkpoints across the whole clip every ${data.sampleEverySec ?? "unknown"} seconds, then selected ${data.frames.length} evidence frames near key moments.\n\n` +
+            `Motion-derived whole-video stats: ${JSON.stringify(data.derivedStats ?? {})}. Active court zones: ${motion.zones || "not enough signal"}.\n` +
+            `Shot/contact candidates as time/zone/motion: ${motion.shots || "none detected"}.\n` +
+            `Compressed full-video motion timeline as time:motion:zone: ${motion.compressedTimeline}.\n\n` +
+            `Use the motion timeline as the primary source for counts and rhythm; use images to verify posture, racket preparation, court position, and swing path. ` +
+            `Return a report that makes the player better: concrete shot count, rally estimate, winners/errors, shot mix, forehand/backhand split, swing path diagnosis, T-control, recovery speed, fatigue pattern, and exactly what to train next. ` +
+            `If camera angle prevents a precise winner/error count, still give a best estimate grounded in motion/contact patterns and list limitations. Call report_squash_analysis.`,
         });
 
         try {
