@@ -42,28 +42,50 @@ export function VideoView() {
           subtitle="Explosive steps, swing biomechanics, T-court control, shot selection, and opponent tendency — all synced with IMU and HR signatures from your VYRO watch."
         />
         <Card>
-          <div className="py-12 text-center">
+          <div
+            className="py-12 text-center"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleFile(e.dataTransfer.files?.[0]);
+            }}
+          >
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-white/15 bg-white/10">
               <Camera className="h-8 w-8" />
             </div>
             <h3 className="mt-4 text-xl font-black">Upload match or drill clip</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-white/55">
-              60-second drill or a full 5-game match. VYRO breaks down every rally, swing, lunge, and recovery to the T.
+              Drag &amp; drop or pick a file — MP4, MOV, or WebM up to 500MB.
             </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => handleFile(e.target.files?.[0])}
+            />
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <button
-                onClick={() => setState("ready")}
+                onClick={() => fileInputRef.current?.click()}
                 className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-black"
               >
                 <Upload className="mr-2 inline h-4 w-4" /> Upload clip
               </button>
               <button
-                onClick={() => setState("ready")}
+                onClick={() => {
+                  if (videoUrl) URL.revokeObjectURL(videoUrl);
+                  setVideoUrl(null);
+                  setVideoName(null);
+                  setUploadError(null);
+                  setState("ready");
+                }}
                 className="rounded-xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-bold"
               >
                 Use sample match
               </button>
             </div>
+            {uploadError && <p className="mt-3 text-sm text-[#ff2b2b]">{uploadError}</p>}
+
             <div className="mx-auto mt-6 grid max-w-2xl grid-cols-2 gap-2 text-left sm:grid-cols-3">
               {[
                 ["Explosive steps", "1st-step burst, lunge depth"],
