@@ -754,7 +754,7 @@ function showWebBluetoothRestricted() {
   log('info', 'navigator.bluetooth is unavailable in this container; trying native Capacitor BLE instead.');
 }
 
-function waitForNativeBleState(timeoutMs = 4500) {
+function waitForNativeBleState(timeoutMs = 14000) {
   return new Promise(resolve => {
     if (!window.VyroNative?.ble?.state) return resolve({ state: 'missing' });
     let done = false;
@@ -783,7 +783,7 @@ async function runBleReadinessCheck() {
   setGateSummary('Checking the actual TestFlight BLE gates…');
   setCheck('nativeBleCheck', 'wait', 'checking native bridge…');
   setCheck('webBleCheck', 'wait', 'checking requestDevice…');
-  const nativeState = await waitForNativeBleState();
+  const nativeState = await waitForNativeBleState(14000);
   const webOk = !!navigator.bluetooth?.requestDevice;
 
   if (nativeState.state === 'on') {
@@ -797,7 +797,7 @@ async function runBleReadinessCheck() {
   } else if (nativeState.state === 'missing') {
     setCheck('nativeBleCheck', 'fail', 'native BLE bridge was not loaded');
   } else {
-    setCheck('nativeBleCheck', 'fail', 'native BLE did not answer yet — close/reopen TestFlight, then run this again');
+    setCheck('nativeBleCheck', 'fail', 'native BLE did not answer after 14s — this build may be missing the Bluetooth plugin or iOS Bluetooth permission');
   }
 
   if (webOk) {
