@@ -640,7 +640,26 @@ function VideoPanel({ caption, videoUrl }: { caption: string; videoUrl?: string 
   );
 }
 
-function Overview({ videoUrl }: { videoUrl?: string | null }) {
+function Overview({ videoUrl, insight }: { videoUrl?: string | null; insight?: SquashInsight | null }) {
+  const summaryRows = insight ? [
+    ["Swings detected", String(insight.metrics.totalShotsEstimate)],
+    ["Rallies", String(insight.metrics.rallyCountEstimate)],
+    ["Winners", String(insight.metrics.winnersEstimate)],
+    ["Forced errors", String(insight.metrics.forcedErrorsEstimate)],
+    ["Unforced errors", String(insight.metrics.unforcedErrorsEstimate)],
+    ["Avg return-to-T", `${insight.metrics.avgReturnToTSeconds}s`],
+    ["T-control", `${insight.metrics.tControlPercent}%`],
+    ["Shot quality", `${insight.metrics.shotQualityScore}/100`],
+  ] : [
+    ["Swings detected", "312"],
+    ["Lunges (≥45°)", "84"],
+    ["Avg return-to-T", "1.31s"],
+    ["Avg first-step burst", "2.6 ft"],
+    ["Court coverage", "71%"],
+    ["Right-shot calls", "78%"],
+    ["Avg HR in rally", "168 bpm"],
+    ["Peak HR", "192 bpm"],
+  ];
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2">
@@ -649,16 +668,7 @@ function Overview({ videoUrl }: { videoUrl?: string | null }) {
       <Card>
         <h3 className="font-black">Match summary</h3>
         <div className="mt-3 space-y-3 text-sm">
-          {[
-            ["Swings detected", "312"],
-            ["Lunges (≥45°)", "84"],
-            ["Avg return-to-T", "1.31s"],
-            ["Avg first-step burst", "2.6 ft"],
-            ["Court coverage", "71%"],
-            ["Right-shot calls", "78%"],
-            ["Avg HR in rally", "168 bpm"],
-            ["Peak HR", "192 bpm"],
-          ].map(([k, v]) => (
+          {summaryRows.map(([k, v]) => (
             <div key={k} className="flex items-center justify-between border-b border-white/5 pb-2">
               <span className="text-white/55">{k}</span>
               <b className="tabular-nums">{v}</b>
