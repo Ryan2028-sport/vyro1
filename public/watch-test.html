@@ -1548,11 +1548,9 @@ function parsePacket(p) {
 }
 
 // ----- button wiring -----
-// IMPORTANT: DeviceMotionEvent.requestPermission() must be invoked from the
-// SAME synchronous user-gesture tick on iOS/iPadOS — by the time BLE connect
-// resolves and we call attachPhoneMotion() inside startCourt(), the gesture
-// chain is broken and permission is silently denied. So we pre-request motion
-// permission RIGHT HERE on the Connect tap, before doing any BLE work.
+// Motion/orientation permission is only needed for court movement tracking.
+// Do not request it from the watch connect buttons; otherwise iOS shows a
+// confusing Motion prompt when the user is trying to connect Bluetooth.
 async function requestMotionUpfront() {
   try {
     if (typeof DeviceMotionEvent !== 'undefined' &&
@@ -1571,9 +1569,9 @@ async function requestMotionUpfront() {
     return false;
   }
 }
-$('connectBtn').onclick = () => { connect(false); requestMotionUpfront(); };
-$('connectFilteredBtn').onclick = () => { connect(true); requestMotionUpfront(); };
-$('webBluetoothBtn').onclick = () => { connect('web'); requestMotionUpfront(); };
+$('connectBtn').onclick = () => connect(false);
+$('connectFilteredBtn').onclick = () => connect(true);
+$('webBluetoothBtn').onclick = () => connect('web');
 $('disconnectBtn').onclick = disconnect;
 $('bleReadinessBtn').onclick = runBleReadinessCheck;
 $('healthFallbackBtn').onclick = readAppleHealthFallback;
