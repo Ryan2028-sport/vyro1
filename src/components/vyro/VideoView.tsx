@@ -1,10 +1,53 @@
-import { useRef, useState } from "react";
-import { Camera, Play, Upload, Zap, Activity, Target, Eye, TrendingUp, Footprints } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { Camera, Play, Upload, Zap, Activity, Target, Eye, TrendingUp, Footprints, Loader2, Sparkles, Video, Square, Circle } from "lucide-react";
 import { sportProfiles } from "@/lib/vyro-data";
 import { Bar, Card, PageHeader, Pill } from "./shared";
 import { SportSwing } from "./SportView";
+import { analyzeSquashClip, type SquashInsight } from "@/lib/video-analysis.functions";
 
 type Tab = "overview" | "footwork" | "swing" | "tcourt" | "tactics" | "physio";
+
+async function extractFrames(file: File, count = 4): Promise<{ frames: string[]; duration: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    const frames: string[] = [];
+    const cleanup = () => URL.revokeObjectURL(url);
+
+    video.onloadedmetadata = async () => {
+      const duration = isFinite(video.duration) ? video.duration : 0;
+      const canvas = document.createElement("canvas");
+      const w = 640;
+      const h = Math.round((video.videoHeight / video.videoWidth) * w) || 360;
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { cleanup(); reject(new Error("canvas 2d unavailable")); return; }
+      const safeDur = duration > 0.5 ? duration : 1;
+      for (let i = 0; i < count; i++) {
+        const t = (safeDur * (i + 1)) / (count + 1);
+        await new Promise<void>((res) => {
+          const onSeeked = () => { video.removeEventListener("seeked", onSeeked); res(); };
+          video.addEventListener("seeked", onSeeked);
+          try { video.currentTime = Math.min(t, safeDur - 0.05); } catch { res(); }
+        });
+        try {
+          ctx.drawImage(video, 0, 0, w, h);
+          frames.push(canvas.toDataURL("image/jpeg", 0.75));
+        } catch { /* skip frame */ }
+      }
+      cleanup();
+      resolve({ frames, duration });
+    };
+    video.onerror = () => { cleanup(); reject(new Error("video load failed")); };
+  });
+}
+
 
 export function VideoView() {
   const [state, setState] = useState<"idle" | "ready">("idle");
@@ -12,7 +55,42 @@ export function VideoView() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoName, setVideoName] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [insight, setInsight] = useState<SquashInsight | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Recording state
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordSec, setRecordSec] = useState(0);
+  const [recordError, setRecordError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const livePreviewRef = useRef<HTMLVideoElement>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<number | null>(null);
+
+  const runAnalyze = useServerFn(analyzeSquashClip);
+
+  const analyzeFile = async (file: File) => {
+    setAnalyzing(true);
+    setAnalysisError(null);
+    setInsight(null);
+    try {
+      const { frames, duration } = await extractFrames(file, 4);
+      if (frames.length === 0) throw new Error("Could not read frames from this clip.");
+      const res = await runAnalyze({
+        data: { videoName: file.name, durationSec: duration, frames },
+      });
+      if (res.error || !res.insight) throw new Error(res.error ?? "Analysis failed.");
+      setInsight(res.insight);
+    } catch (e) {
+      setAnalysisError(e instanceof Error ? e.message : "Analysis failed.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const handleFile = (file: File | null | undefined) => {
     if (!file) return;
@@ -29,17 +107,84 @@ export function VideoView() {
     setVideoUrl(URL.createObjectURL(file));
     setVideoName(file.name);
     setState("ready");
+    void analyzeFile(file);
   };
 
+  const stopStream = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+  };
 
+  const openRecorder = async () => {
+    setRecordError(null);
+    setRecordOpen(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: true,
+      });
+      streamRef.current = stream;
+      if (livePreviewRef.current) {
+        livePreviewRef.current.srcObject = stream;
+        await livePreviewRef.current.play().catch(() => undefined);
+      }
+    } catch (e) {
+      setRecordError(e instanceof Error ? e.message : "Camera unavailable. Allow camera access and retry.");
+    }
+  };
+
+  const startRecording = () => {
+    if (!streamRef.current) return;
+    chunksRef.current = [];
+    let mime = "video/webm;codecs=vp9,opus";
+    if (!MediaRecorder.isTypeSupported(mime)) mime = "video/webm;codecs=vp8,opus";
+    if (!MediaRecorder.isTypeSupported(mime)) mime = "video/webm";
+    const rec = new MediaRecorder(streamRef.current, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
+    rec.ondataavailable = (ev) => { if (ev.data.size > 0) chunksRef.current.push(ev.data); };
+    rec.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: mime });
+      const file = new File([blob], `vyro-record-${Date.now()}.webm`, { type: mime });
+      setRecording(false);
+      setRecordSec(0);
+      stopStream();
+      setRecordOpen(false);
+      handleFile(file);
+    };
+    recorderRef.current = rec;
+    rec.start(1000);
+    setRecording(true);
+    setRecordSec(0);
+    timerRef.current = window.setInterval(() => setRecordSec((s) => s + 1), 1000);
+  };
+
+  const stopRecording = () => {
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+  };
+
+  const cancelRecorder = () => {
+    if (recorderRef.current && recording) {
+      recorderRef.current.ondataavailable = null;
+      recorderRef.current.onstop = null;
+      try { recorderRef.current.stop(); } catch { /* ignore */ }
+      recorderRef.current = null;
+    }
+    setRecording(false);
+    setRecordSec(0);
+    stopStream();
+    setRecordOpen(false);
+  };
+
+  useEffect(() => () => stopStream(), []);
 
   if (state === "idle") {
     return (
       <>
         <PageHeader
-          eyebrow="AI Video Analyzer · Squash"
+          eyebrow="AI Video Analyzer · Squash · powered by Claude"
           title="Frame-level squash intelligence"
-          subtitle="Explosive steps, swing biomechanics, T-court control, shot selection, and opponent tendency — all synced with IMU and HR signatures from your VYRO watch."
+          subtitle="Upload or record a clip. Claude analyzes explosive steps, swing mechanics, T-court control, shot selection, and rally load."
         />
         <Card>
           <div
@@ -53,9 +198,9 @@ export function VideoView() {
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-white/15 bg-white/10">
               <Camera className="h-8 w-8" />
             </div>
-            <h3 className="mt-4 text-xl font-black">Upload match or drill clip</h3>
+            <h3 className="mt-4 text-xl font-black">Upload or record match footage</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-white/55">
-              Drag &amp; drop or pick a file — MP4, MOV, or WebM up to 500MB.
+              Drag &amp; drop, pick a file, or record from your camera — MP4, MOV, or WebM up to 500MB. Claude returns a squash-specific breakdown.
             </p>
             <input
               ref={fileInputRef}
@@ -70,6 +215,12 @@ export function VideoView() {
                 className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-black"
               >
                 <Upload className="mr-2 inline h-4 w-4" /> Upload clip
+              </button>
+              <button
+                onClick={openRecorder}
+                className="rounded-xl bg-[#ff2b2b] px-5 py-3 text-sm font-bold text-white"
+              >
+                <Video className="mr-2 inline h-4 w-4" /> Record clip
               </button>
               <button
                 onClick={() => {
@@ -103,9 +254,21 @@ export function VideoView() {
             </div>
           </div>
         </Card>
+        {recordOpen && (
+          <RecorderOverlay
+            previewRef={livePreviewRef}
+            recording={recording}
+            recordSec={recordSec}
+            recordError={recordError}
+            onStart={startRecording}
+            onStop={stopRecording}
+            onCancel={cancelRecorder}
+          />
+        )}
       </>
     );
   }
+
 
   const tabs: [Tab, string, typeof Eye][] = [
     ["overview", "Overview", Eye],
@@ -157,6 +320,9 @@ export function VideoView() {
         ))}
       </div>
 
+
+      <AIInsightPanel analyzing={analyzing} error={analysisError} insight={insight} activeTab={tab} />
+
       {tab === "overview" && <Overview videoUrl={videoUrl} />}
       {tab === "footwork" && <Footwork videoUrl={videoUrl} />}
       {tab === "swing" && <Swing />}
@@ -166,6 +332,115 @@ export function VideoView() {
     </>
   );
 }
+
+function RecorderOverlay({
+  previewRef, recording, recordSec, recordError, onStart, onStop, onCancel,
+}: {
+  previewRef: React.RefObject<HTMLVideoElement | null>;
+  recording: boolean;
+  recordSec: number;
+  recordError: string | null;
+  onStart: () => void;
+  onStop: () => void;
+  onCancel: () => void;
+}) {
+  const mm = String(Math.floor(recordSec / 60)).padStart(2, "0");
+  const ss = String(recordSec % 60).padStart(2, "0");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-3xl rounded-3xl border border-white/15 bg-[#0b0b0b] p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Video className="h-4 w-4" />
+            <h3 className="font-black">Record clip</h3>
+            {recording && (
+              <span className="ml-2 inline-flex items-center gap-2 rounded-full bg-[#ff2b2b]/20 px-2 py-0.5 text-xs font-bold text-[#ff2b2b]">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-[#ff2b2b]" /> REC {mm}:{ss}
+              </span>
+            )}
+          </div>
+          <button onClick={onCancel} className="rounded-full border border-white/15 px-3 py-1 text-xs">Close</button>
+        </div>
+        <div className="mt-3 aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black">
+          <video ref={previewRef} className="h-full w-full object-cover" muted playsInline />
+        </div>
+        {recordError && <p className="mt-3 text-sm text-[#ff2b2b]">{recordError}</p>}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {!recording ? (
+            <button
+              onClick={onStart}
+              disabled={!!recordError}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#ff2b2b] px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              <Circle className="h-4 w-4 fill-current" /> Start recording
+            </button>
+          ) : (
+            <button
+              onClick={onStop}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-black"
+            >
+              <Square className="h-4 w-4 fill-current" /> Stop &amp; analyze
+            </button>
+          )}
+        </div>
+        <p className="mt-3 text-center text-xs text-white/55">
+          Tip: prop the phone behind the back wall at T-height for best court coverage. Claude will analyze footwork, swing, and shot selection automatically.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AIInsightPanel({
+  analyzing, error, insight, activeTab,
+}: {
+  analyzing: boolean;
+  error: string | null;
+  insight: SquashInsight | null;
+  activeTab: Tab;
+}) {
+  if (!analyzing && !error && !insight) return null;
+  const bullets =
+    !insight ? [] :
+    activeTab === "footwork" ? insight.explosiveSteps :
+    activeTab === "swing" ? insight.swingDetection :
+    activeTab === "tcourt" ? insight.tCourt :
+    activeTab === "tactics" ? insight.shotSelection :
+    activeTab === "physio" ? insight.loadRecovery :
+    insight.coachNotes;
+
+  return (
+    <Card className="mb-5 border-[#ff2b2b]/30 bg-gradient-to-br from-[#ff2b2b]/10 to-transparent">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-[#ff2b2b]" />
+        <h3 className="font-black">Claude · squash analysis</h3>
+        {analyzing && (
+          <span className="ml-2 inline-flex items-center gap-2 text-xs text-white/70">
+            <Loader2 className="h-3 w-3 animate-spin" /> Reading frames…
+          </span>
+        )}
+      </div>
+      {error && <p className="mt-2 text-sm text-[#ff2b2b]">{error}</p>}
+      {insight && (
+        <>
+          <p className="mt-2 text-sm font-bold">{insight.headline}</p>
+          <p className="mt-1 text-sm text-white/70">{insight.summary}</p>
+          {bullets.length > 0 && (
+            <ul className="mt-3 space-y-1.5 text-sm">
+              {bullets.map((b, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff2b2b]" />
+                  <span className="text-white/85">{b}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 
 function VideoPanel({ caption, videoUrl }: { caption: string; videoUrl?: string | null }) {
   return (
