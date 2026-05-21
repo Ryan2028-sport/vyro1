@@ -178,7 +178,7 @@ export const analyzeSquashClip = createServerFn({ method: "POST" })
             `Compressed full-video motion timeline as time:motion:zone: ${motion.compressedTimeline}.\n\n` +
             `You are an elite squash coach. Use the motion timeline as the primary source for counts and rhythm; use the images to verify posture, racket preparation, court position, and swing path. ` +
             `Return a report that makes the player better: concrete shot count, rally estimate, winners/errors, shot mix, forehand/backhand split, swing path diagnosis, T-control, recovery speed, fatigue pattern, and exactly what to train next. ` +
-            `If camera angle prevents a precise winner/error count, still give a best estimate grounded in motion/contact patterns and list limitations. Call report_squash_analysis.`,
+            `If camera angle prevents a precise winner/error count, still give a best estimate grounded in motion/contact patterns and list limitations. Call report_squash_analysis.`;
         })(),
     });
 
