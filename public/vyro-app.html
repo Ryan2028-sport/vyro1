@@ -953,11 +953,11 @@ Error generating stack: `+d.message+`
       paintVideo();
       setPanel(spinner('Extracting real frames from ' + (file.name || 'your clip') + '…'));
       try{
-        const {frames,frameTimes,duration}=await extractFrames(file,20);
+        const {frames,frameTimes,duration,motionTimeline,shotCandidates,derivedStats,sampleEverySec}=await scanVideoClip(file);
         if(!frames.length) throw new Error('Could not read frames from this clip.');
         paintVideo();
-        setPanel(spinner('Claude is reviewing the full squash clip: shot count, rallies, winners, swing path, T-control…'));
-        const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoName:file.name||'clip',durationSec:duration,frames,frameTimes})});
+        setPanel(spinner('Claude is reviewing '+derivedStats.scannedFrames+' whole-video checkpoints, '+shotCandidates.length+' shot candidates, rally rhythm, swing path, and T-control…'));
+        const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoName:file.name||'clip',durationSec:duration,frames,frameTimes,motionTimeline,shotCandidates,derivedStats,sampleEverySec})});
         const data=await r.json().catch(()=>({error:'Bad response from analyzer'}));
         if(data.error||!data.insight){setPanel('<span style="color:#ff7a7a"><b>Analyzer error:</b> '+esc(data.error||'Analysis failed.')+'</span>'); return null;}
         renderInsight(data.insight);
