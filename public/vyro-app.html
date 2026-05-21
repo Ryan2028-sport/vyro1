@@ -891,36 +891,52 @@ Error generating stack: `+d.message+`
     setPanel('<div style="font-weight:800;font-size:14px;color:#fff;">'+esc(ins.headline||'Clip analysis complete')+'</div><div style="margin-top:5px;color:#bbb;">'+esc(ins.summary||'Claude analyzed the uploaded frames from this clip.')+'</div>'+metrics+shotMix+timeline+sec('Shot count breakdown',ins.shotBreakdown)+sec('Swing path',ins.swingPath||ins.swingDetection)+sec('Explosive steps',ins.explosiveSteps)+sec('T-court control',ins.tCourt)+sec('Shot selection',ins.shotSelection)+sec('Load & recovery',ins.loadRecovery)+sec('Coach notes',ins.coachNotes));
   }
 
-  function extractFrames(file, count){
+  function zoneFromPoint(x,y){ const side=x<.38?'left':x>.62?'right':'middle'; const depth=y<.34?'front':y>.68?'back':'mid'; return depth+'-'+side; }
+  function scanVideoClip(file){
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const v = document.createElement('video');
       v.preload = 'auto'; v.muted = true; v.playsInline = true; v.crossOrigin = 'anonymous'; v.src = url;
-      const frames = [];
-      const frameTimes = [];
+      const frames = [], frameTimes = [], motionTimeline = [];
       let settled = false;
-      const finish = (err) => { if (settled) return; settled = true; URL.revokeObjectURL(url); err ? reject(err) : resolve({frames, frameTimes, duration: isFinite(v.duration) ? v.duration : 0}); };
-      const timeout = setTimeout(() => finish(new Error('Timed out reading this video. Try a shorter MP4/WebM clip.')), 20000);
+      const finish = (err, payload) => { if (settled) return; settled = true; URL.revokeObjectURL(url); err ? reject(err) : resolve(payload); };
+      const timeout = setTimeout(() => finish(new Error('Timed out scanning this video. Try MP4/WebM or trim huge raw footage.')), 90000);
       v.onerror = () => { clearTimeout(timeout); finish(new Error('This browser could not decode the video. Try MP4 or WebM.')); };
       v.onloadedmetadata = async () => {
         try{
+          const sw=192, sh=Math.max(108, Math.round(((v.videoHeight || 288) / (v.videoWidth || 512)) * sw));
+          const scan=document.createElement('canvas'); scan.width=sw; scan.height=sh;
+          const sctx=scan.getContext('2d', {willReadFrequently:true});
           const w = 512, h = Math.max(288, Math.round(((v.videoHeight || 288) / (v.videoWidth || 512)) * w));
           const c = document.createElement('canvas'); c.width = w; c.height = h;
           const ctx = c.getContext('2d');
-          if (!ctx) throw new Error('Canvas unavailable for frame extraction.');
+          if (!ctx || !sctx) throw new Error('Canvas unavailable for video scan.');
           const dur = isFinite(v.duration) && v.duration > .5 ? v.duration : 1;
-          for(let i=0;i<count;i++){
-            const t = Math.max(0, Math.min((dur*(i+1))/(count+1), dur-.05));
-            await new Promise(res => {
+          const sampleEverySec = dur > 900 ? 3 : dur > 360 ? 2 : dur > 120 ? 1.25 : .75;
+          const scanCount = Math.max(1, Math.min(900, Math.ceil(dur / sampleEverySec)));
+          let prev=null;
+          const seek = (t) => new Promise(res => {
               let done = false;
               const on = () => { if (done) return; done = true; v.removeEventListener('seeked', on); res(); };
               v.addEventListener('seeked', on);
               try { v.currentTime = t; } catch { on(); }
-              setTimeout(on, 1600);
-            });
-            try { ctx.drawImage(v,0,0,w,h); frames.push(c.toDataURL('image/jpeg',.68)); frameTimes.push(t); } catch {}
+              setTimeout(on, 1800);
+          });
+          for(let i=0;i<scanCount;i++){
+            const t=Math.max(0, Math.min(i*sampleEverySec, dur-.05));
+            await seek(t); sctx.drawImage(v,0,0,sw,sh);
+            const data=sctx.getImageData(0,0,sw,sh).data; let diffSum=0, weight=0, xs=0, ys=0, bright=0;
+            for(let p=0;p<data.length;p+=16){ const lum=(data[p]+data[p+1]+data[p+2])/3; bright+=lum; const diff=prev?Math.abs(data[p]-prev[p])+Math.abs(data[p+1]-prev[p+1])+Math.abs(data[p+2]-prev[p+2]):0; diffSum+=diff; if(diff>26){ const pix=p/4, x=pix%sw, y=Math.floor(pix/sw); weight+=diff; xs+=x*diff; ys+=y*diff; } }
+            prev=new Uint8ClampedArray(data); const motion=Math.round(Math.min(100, diffSum/(data.length/16)/2.1)); const x=weight?xs/weight/sw:.5, y=weight?ys/weight/sh:.5;
+            motionTimeline.push({t:+t.toFixed(2), motion, x:+x.toFixed(2), y:+y.toFixed(2), zone:zoneFromPoint(x,y), brightness:Math.round(bright/(data.length/16))});
+            if(i%8===0 || i===scanCount-1) setPanel(spinner('Scanning whole video '+Math.round(((i+1)/scanCount)*100)+'% · '+motionTimeline.length+' checkpoints'));
           }
-          clearTimeout(timeout); finish();
+          const sorted=motionTimeline.map(s=>s.motion).sort((a,b)=>a-b), median=sorted[Math.floor(sorted.length/2)]||0, peakMotion=sorted[sorted.length-1]||0, threshold=Math.max(12, median+Math.max(8,(peakMotion-median)*.32));
+          const shotCandidates=motionTimeline.filter((s,i,a)=>s.motion>=threshold&&s.motion>=(a[i-1]?.motion||0)&&s.motion>=(a[i+1]?.motion||0)).reduce((acc,s)=>{ if(!acc.length||s.t-acc[acc.length-1].t>1.4) acc.push({t:s.t,motion:s.motion,zone:s.zone}); else if(s.motion>acc[acc.length-1].motion) acc[acc.length-1]={t:s.t,motion:s.motion,zone:s.zone}; return acc; },[]);
+          const active=motionTimeline.filter(s=>s.motion>=Math.max(8,median+4)); let rallies=0,last=-999; active.forEach(s=>{ if(s.t-last>7) rallies++; last=s.t; });
+          const evidence=[...new Set([...shotCandidates.sort((a,b)=>b.motion-a.motion).slice(0,18).map(s=>s.t), ...Array.from({length:6},(_,i)=>(dur*(i+1))/7)])].sort((a,b)=>a-b).slice(0,24);
+          for(let i=0;i<evidence.length;i++){ await seek(evidence[i]); ctx.drawImage(v,0,0,w,h); frames.push(c.toDataURL('image/jpeg',.58)); frameTimes.push(+evidence[i].toFixed(2)); }
+          clearTimeout(timeout); finish(null,{frames,frameTimes,duration:isFinite(v.duration)?v.duration:0,sampleEverySec,motionTimeline,shotCandidates:shotCandidates.slice(0,240),derivedStats:{scannedFrames:motionTimeline.length,activeSeconds:Math.round(active.length*sampleEverySec),rallyCountEstimate:Math.max(1,rallies),totalShotsEstimate:Math.max(shotCandidates.length,Math.round(active.length*sampleEverySec/1.65)),averageMotion:Math.round(motionTimeline.reduce((s,x)=>s+x.motion,0)/Math.max(1,motionTimeline.length)),peakMotion,highIntensityWindows:shotCandidates.filter(s=>s.motion>threshold+10).length}});
         }catch(e){ clearTimeout(timeout); finish(e); }
       };
       v.load();
