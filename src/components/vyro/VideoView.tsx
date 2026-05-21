@@ -79,10 +79,10 @@ export function VideoView() {
     setInsight(null);
     const minimumAnalyzeTime = new Promise<void>((resolve) => window.setTimeout(resolve, 12_000));
     try {
-      const { frames, duration } = await extractFrames(file, 4);
+      const { frames, frameTimes, duration } = await extractFrames(file, 18);
       if (frames.length === 0) throw new Error("Could not read frames from this clip.");
       const analysisRequest = runAnalyze({
-        data: { videoName: file.name, durationSec: duration, frames },
+        data: { videoName: file.name, durationSec: duration, frames, frameTimes },
       });
       const [res] = await Promise.all([analysisRequest, minimumAnalyzeTime]);
       if (res.error || !res.insight) throw new Error(res.error ?? "Analysis failed.");
@@ -410,7 +410,7 @@ function AIInsightPanel({
   const bullets =
     !insight ? [] :
     activeTab === "footwork" ? insight.explosiveSteps :
-    activeTab === "swing" ? insight.swingDetection :
+    activeTab === "swing" ? insight.swingPath :
     activeTab === "tcourt" ? insight.tCourt :
     activeTab === "tactics" ? insight.shotSelection :
     activeTab === "physio" ? insight.loadRecovery :
