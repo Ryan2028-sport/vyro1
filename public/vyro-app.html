@@ -832,11 +832,31 @@ Error generating stack: `+d.message+`
     p.querySelector('#vyro-ai-close').onclick = () => p.remove();
     return p;
   }
-  function setPanel(html){ const b = ensurePanel().querySelector('#vyro-ai-body'); if (b) b.innerHTML = html; }
+  function ensureInlinePanel(){
+    const headings = Array.from(document.querySelectorAll('h1,h2,h3'));
+    const heading = headings.find(h => (h.textContent || '').includes('Frame-level technique intelligence'));
+    const main = heading && heading.closest('main');
+    if (!main) return null;
+    let p = document.getElementById('vyro-ai-inline-panel');
+    if (!p) {
+      p = document.createElement('div');
+      p.id = 'vyro-ai-inline-panel';
+      p.style.cssText = 'margin:16px 0;border:1px solid rgba(57,255,136,.45);border-radius:12px;background:#07110b;color:#fff;padding:14px 16px;box-shadow:0 14px 40px rgba(57,255,136,.10);font:13px/1.45 ui-sans-serif,system-ui,sans-serif;';
+      p.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;"><b style="color:#39ff88;letter-spacing:.04em;">Claude real video analysis</b><span style="font:700 10px ui-monospace,monospace;letter-spacing:.14em;color:#9effc4;">LIVE API</span></div><div id="vyro-ai-inline-body"></div>';
+      const subtitle = Array.from(main.querySelectorAll('p')).find(x => (x.textContent || '').includes('Movement'));
+      (subtitle && subtitle.parentElement ? subtitle.parentElement : main).appendChild(p);
+    }
+    return p;
+  }
+  function setPanel(html){
+    const fixed = ensurePanel().querySelector('#vyro-ai-body'); if (fixed) fixed.innerHTML = html;
+    const inline = ensureInlinePanel()?.querySelector('#vyro-ai-inline-body'); if (inline) inline.innerHTML = html;
+  }
   function esc(t){ return String(t ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
   function spinner(text){ return '<div style="display:flex;align-items:center;gap:9px;color:#d9ffe8;"><span style="display:inline-block;width:12px;height:12px;border:2px solid #39ff88;border-top-color:transparent;border-radius:50%;animation:vyrospin .75s linear infinite;"></span>'+esc(text)+'</div>'; }
 
   function paintVideo(){
+    if (lastFile || lastInsight) ensureInlinePanel();
     if (!lastVideoUrl) return;
     const boxes = Array.from(document.querySelectorAll('.aspect-video'));
     const target = boxes.find(el => el.textContent.includes('00:14') || el.querySelector('svg')) || boxes[0];
@@ -933,7 +953,7 @@ Error generating stack: `+d.message+`
     if(isVideo) analyze(f);
   }, true);
 
-  new MutationObserver(() => { paintVideo(); }).observe(document.documentElement,{childList:true,subtree:true});
+  new MutationObserver(() => { paintVideo(); if (lastInsight) renderInsight(lastInsight); }).observe(document.documentElement,{childList:true,subtree:true});
 })();
 </script>
 </body>
