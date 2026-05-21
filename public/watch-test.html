@@ -476,7 +476,8 @@ function nativeRequestOptions(filtered = false) {
     SERVICE_UUID, '180d', '180f', '180a', 'fee7', 'fee0', 'feea', 'fea0', 'fff0', 'ffe0', 'ffb0',
     'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20',
   ].map(normUuid);
-  const opts = { optionalServices, displayMode: 'list' };
+  const opts = { optionalServices };
+  if (filtered) opts.services = optionalServices;
   return opts;
 }
 function getLastNativeWatch() {
@@ -486,6 +487,9 @@ function getLastNativeWatch() {
 function saveLastNativeWatch(d) {
   if (!d?.id) return;
   try { localStorage.setItem(LAST_NATIVE_WATCH_KEY, JSON.stringify({ id: d.id, name: d.name || 'Watch', savedAt: Date.now() })); } catch {}
+}
+function nativeKnownServices() {
+  return [SERVICE_UUID, '180d', '180f', '180a', 'fee7', 'fee0', 'feea', 'fea0', 'fff0', 'ffe0', 'ffb0', 'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20'].map(normUuid);
 }
 const normUuid = u => {
   const s = String(u || '').toLowerCase();
