@@ -98,7 +98,15 @@
   };
 
   // ───────────────────────── Bluetooth ─────────────────────────
-  // Talks to the Capacitor BluetoothLe plugin. The native plugin is registered
+  // Talks to two possible native BLE bridges:
+  // 1) Despia's built-in bluetooth:// bridge in the TestFlight shell.
+  // 2) Capacitor BluetoothLe only when a Capacitor runtime is actually present.
+  //
+  // Do not force the Capacitor path just because the device is iOS. The VYRO
+  // TestFlight app is a Despia shell, and forcing Capacitor makes BLE wait for
+  // a plugin that is not compiled into that shell, causing the 14s timeout.
+  //
+  // Capacitor notes: The native plugin is registered
   // by the Capacitor runtime, but window.Capacitor.Plugins.BluetoothLe is only
   // auto-populated if the plugin's own JS ran. Since we don't bundle that JS,
   // we obtain the plugin proxy via Capacitor.registerPlugin('BluetoothLe'),
@@ -495,7 +503,7 @@
     rssi:        function (id)           { return despiaFire('bluetooth://rssi?id=' + encodeURIComponent(id)); }
   };
 
-  var ble = (window.Capacitor || isIOS) ? lazyCapBle : despiaBle;
+  var ble = window.Capacitor ? lazyCapBle : despiaBle;
   if (isIOS && !window.Capacitor) requestCapacitorScript();
 
   // ───────────────────────── Gyroscope ─────────────────────────
