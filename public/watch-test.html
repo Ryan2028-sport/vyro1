@@ -398,7 +398,7 @@
   </div>
 </div>
 
-<script src="/vyro-native.js?v=6"></script>
+<script src="/vyro-native.js?v=7"></script>
 <script>
 // ==========================================================================
 // QCBand / Colmi BLE protocol (Nordic UART-style)
@@ -471,6 +471,15 @@ const nativeBle = () => window.VyroNative?.ble || null;
 // @capacitor-community/bluetooth-le surfaced through window.VyroNative.ble).
 const isNativeBle = () => !!(nativeBle() && (window.VyroNative?.isDespia || window.VyroNative?.isCapacitor || /iphone|ipad|ipod/i.test(navigator.userAgent || '')));
 const LAST_NATIVE_WATCH_KEY = 'vyro:lastNativeWatch';
+function nativeRequestOptions(filtered = false) {
+  const optionalServices = [
+    SERVICE_UUID, '180d', '180f', '180a', 'fee7', 'fee0', 'feea', 'fea0', 'fff0', 'ffe0', 'ffb0',
+    'a8b71efc-21a3-4f43-9e54-7d3f1a8e3c20',
+  ].map(normUuid);
+  const opts = { optionalServices, displayMode: 'list' };
+  if (filtered) opts.services = [normUuid('180d'), normUuid('180f'), SERVICE_UUID, normUuid('fee7'), normUuid('fee0'), normUuid('fff0'), normUuid('ffe0')];
+  return opts;
+}
 function getLastNativeWatch() {
   try { return JSON.parse(localStorage.getItem(LAST_NATIVE_WATCH_KEY) || 'null'); }
   catch { return null; }
