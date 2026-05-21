@@ -60,7 +60,7 @@
   </div>
 
   <div class="warning" style="background:rgba(80,160,255,.08);border-color:rgba(80,160,255,.3);color:#bcd9ff">
-    <b>TestFlight BLE path:</b> this page now calls the Capacitor <code>BluetoothLe</code> plugin directly through <code>window.VyroNative.ble</code>. Wake the watch, keep it close, then tap <b>Connect all devices</b> or <b>Connect by watch services</b>.<br>
+    <b>TestFlight BLE path:</b> this page now scans through the native Capacitor <code>BluetoothLe</code> plugin and falls back to the iOS picker if scanning is blocked. Wake the watch, keep it close, then tap <b>Connect all devices</b> or <b>Connect by watch services</b>.<br>
     <b>Fallback:</b> if the native plugin is not injected yet, VYRO can still read watch metrics from <b>Apple Health</b> after the companion app syncs.
   </div>
 
@@ -398,7 +398,7 @@
   </div>
 </div>
 
-<script src="/vyro-native.js?v=7"></script>
+<script src="/vyro-native.js?v=8"></script>
 <script>
 // ==========================================================================
 // QCBand / Colmi BLE protocol (Nordic UART-style)
@@ -965,7 +965,7 @@ async function connect(filtered = false) {
     : forceWebBluetooth
       ? 'opening chooser…'
       : isNativeBle()
-        ? 'opening native Bluetooth picker…'
+        ? 'scanning native Bluetooth…'
         : 'opening chooser…';
   setConnectBusy(true, modeLabel);
   log('info', `Connect tapped — ${modeLabel}`);
