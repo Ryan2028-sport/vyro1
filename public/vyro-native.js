@@ -257,7 +257,7 @@
       return bleInit().then(function () {
         var opts = { allowDuplicates: false };
         if (services && services.length) opts.services = services;
-        return BLE.requestLEScan(opts);
+        return BLE.requestLEScan(opts, handleScanResult);
       }).then(function () {
         bleScanFinish(durationMs);
       }).catch(function (err) {
@@ -265,7 +265,7 @@
       });
     },
     stopScan:    function () {
-      return BLE.stopLEScan().catch(function () {}).then(function () {
+      return bleInit().then(function () { return BLE.stopLEScan(); }).catch(function () {}).then(function () {
         emit('onBleScanEnd', {});
       });
     },
@@ -281,6 +281,7 @@
     connect:     function (id, opts) {
       opts = opts || {};
       var timeout = opts.timeout || 10000;
+      if (!BLE) return bleInit().then(function () { return capBle.connect(id, opts); });
       // Disconnect listener is keyed per-device.
       try {
         BLE.addListener('disconnected|' + id, function () {
