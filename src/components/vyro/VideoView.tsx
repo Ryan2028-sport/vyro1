@@ -679,8 +679,21 @@ function Overview({ videoUrl, insight }: { videoUrl?: string | null; insight?: S
       <Card className="lg:col-span-3">
         <div className="flex items-center justify-between">
           <h3 className="font-black">Rally timeline</h3>
-          <Pill color="amber">red zones = fatigue swing decay</Pill>
+          <Pill color="amber">{insight ? `${insight.confidence} confidence · uploaded video` : "red zones = fatigue swing decay"}</Pill>
         </div>
+        {insight?.timeline?.length ? (
+          <div className="mt-4 grid gap-2 md:grid-cols-2">
+            {insight.timeline.map((event, i) => (
+              <div key={`${event.time}-${i}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm">
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">{event.time} · {event.phase}</div>
+                <b className="mt-1 block">{event.keyShot}</b>
+                <p className="mt-1 text-white/65">{event.observation}</p>
+                <p className="mt-2 text-[#ffb020]">{event.coachingCue}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+        <>
         <div className="mt-4 flex h-10 w-full overflow-hidden rounded-xl border border-white/10">
           {Array.from({ length: 38 }).map((_, i) => {
             const intensity = 0.25 + ((i * 37) % 100) / 130;
@@ -704,6 +717,8 @@ function Overview({ videoUrl, insight }: { videoUrl?: string | null; insight?: S
           <span>R19</span>
           <span>R38</span>
         </div>
+        </>
+        )}
       </Card>
     </div>
   );
