@@ -398,7 +398,7 @@
   </div>
 </div>
 
-<script src="/vyro-native.js?v=5"></script>
+<script src="/vyro-native.js?v=6"></script>
 <script>
 // ==========================================================================
 // QCBand / Colmi BLE protocol (Nordic UART-style)
@@ -490,7 +490,20 @@ function bytesToBase64(bytes) {
 }
 function payloadToBytes(p) {
   if (!p) return new Uint8Array();
+  const raw = p.valueHex || p.hex || '';
+  const clean = String(raw).replace(/[^0-9a-f]/gi, '');
+  if (clean.length >= 2 && clean.length % 2 === 0) {
+    const out = new Uint8Array(clean.length / 2);
+    for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+    return out;
+  }
   if (p.value) {
+    const maybeHex = String(p.value).replace(/[^0-9a-f]/gi, '');
+    if (maybeHex.length >= 2 && maybeHex.length % 2 === 0 && maybeHex.length === String(p.value).replace(/\s+/g, '').length) {
+      const out = new Uint8Array(maybeHex.length / 2);
+      for (let i = 0; i < out.length; i++) out[i] = parseInt(maybeHex.slice(i * 2, i * 2 + 2), 16);
+      return out;
+    }
     try {
       const bin = atob(p.value);
       const out = new Uint8Array(bin.length);
@@ -498,8 +511,6 @@ function payloadToBytes(p) {
       return out;
     } catch {}
   }
-  const raw = p.valueHex || p.hex || '';
-  const clean = String(raw).replace(/[^0-9a-f]/gi, '');
   const out = new Uint8Array(Math.floor(clean.length / 2));
   for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
   return out;
