@@ -128,10 +128,28 @@ const TOOL = {
       shotSelection: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
       loadRecovery: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
       coachNotes: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 6 },
+      developmentPlan: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 6 },
+      videoEvidence: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
+      limitations: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
     },
-    required: ["headline", "summary", "confidence", "metrics", "timeline", "shotBreakdown", "swingPath", "explosiveSteps", "tCourt", "shotSelection", "loadRecovery", "coachNotes"],
+    required: ["headline", "summary", "confidence", "metrics", "timeline", "shotBreakdown", "swingPath", "explosiveSteps", "tCourt", "shotSelection", "loadRecovery", "coachNotes", "developmentPlan", "videoEvidence", "limitations"],
   },
 };
+
+function summarizeMotion(data: z.infer<typeof InputSchema>) {
+  const timeline = data.motionTimeline ?? [];
+  const zoneCounts = timeline.reduce<Record<string, number>>((acc, s) => {
+    if (s.motion >= Math.max(8, (data.derivedStats?.averageMotion ?? 0) + 4)) acc[s.zone] = (acc[s.zone] ?? 0) + 1;
+    return acc;
+  }, {});
+  const zones = Object.entries(zoneCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([zone, count]) => `${zone}:${count}`).join(", ");
+  const shots = (data.shotCandidates ?? []).slice(0, 120).map((s) => `${s.t.toFixed(1)}s/${s.zone}/${s.motion}`).join(" | ");
+  const compressedTimeline = timeline
+    .filter((_, i) => i % Math.max(1, Math.ceil(timeline.length / 180)) === 0)
+    .map((s) => `${s.t.toFixed(1)}:${s.motion}:${s.zone}`)
+    .join(" | ");
+  return { zones, shots, compressedTimeline };
+}
 
 export const analyzeSquashClip = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => InputSchema.parse(d))
