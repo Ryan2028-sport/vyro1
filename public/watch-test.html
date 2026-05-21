@@ -488,6 +488,9 @@ function bytesToBase64(bytes) {
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin);
 }
+function bytesToHexString(bytes) {
+  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+}
 function payloadToBytes(p) {
   if (!p) return new Uint8Array();
   const raw = p.valueHex || p.hex || '';
@@ -546,8 +549,8 @@ function makeNativeCharacteristic(serviceUuid, c) {
         };
       });
     },
-    async writeValue(packet) { nativeBle().write(device.id, serviceUuid, c.uuid, bytesToBase64(packet), true); },
-    async writeValueWithoutResponse(packet) { nativeBle().write(device.id, serviceUuid, c.uuid, bytesToBase64(packet), false); },
+    async writeValue(packet) { nativeBle().writeHex(device.id, serviceUuid, c.uuid, bytesToHexString(packet), true); },
+    async writeValueWithoutResponse(packet) { nativeBle().writeHex(device.id, serviceUuid, c.uuid, bytesToHexString(packet), false); },
     async startNotifications() { nativeBle().subscribe(device.id, serviceUuid, c.uuid); },
   };
 }
