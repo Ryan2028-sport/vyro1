@@ -3150,9 +3150,9 @@ $('openNativeSettingsBtn').onclick = () => {
 };
 
 // On iOS TestFlight, start Apple Health as a passive fallback while direct
-// Capacitor BLE remains the primary watch connection path.
+// native BLE remains the primary watch connection path.
 if (window.VyroNative?.isDespiaIOS) {
-  log('info', 'iOS detected — direct Capacitor BLE is primary; Apple Health will load as a fallback if available.');
+  log('info', 'iOS detected — direct native BLE is primary; Apple Health will load as a fallback if available.');
   setTimeout(() => { runBleReadinessCheck().catch(() => {}); readAppleHealthFallback().catch(() => {}); }, 600);
   // Re-poll Health every 60s so live tiles stay fresh while the page is open.
   setInterval(() => { readAppleHealthFallback().catch(() => {}); }, 60000);
