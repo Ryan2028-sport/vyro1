@@ -604,7 +604,7 @@ function waitForNativeConnectAndDiscover(ble, id, displayName, timeoutMs = 18000
     window.onBleState = s => {
       if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
       if (s.state === 'off') log('info', 'Bluetooth is off — turn it on in Control Center or Settings.');
-      if (s.state === 'unsupported') fail(new Error('This TestFlight build does not include Despia Bluetooth support.'));
+      if (s.state === 'unsupported') fail(new Error('This TestFlight build reported Bluetooth unsupported. Close/reopen TestFlight, then try again.'));
     };
     window.onBleConnect = e => {
       if (e.id && e.id !== id) return;
@@ -673,14 +673,14 @@ async function connectNative(filtered = false) {
       ble.stopScan();
       ble.connect(best.id, { timeout: 10000, autoConnect: true });
     };
-    const timeout = setTimeout(() => fail(new Error('Native BLE scan timed out. Make sure the Despia Bluetooth addon is enabled, then install a fresh TestFlight build.')), 18000);
+    const timeout = setTimeout(() => fail(new Error('Native BLE scan timed out. Wake the watch, keep it close, and make sure VYRO has Bluetooth permission in iOS Settings.')), 18000);
     const finish = v => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); resolve(v); };
     const fail = e => { if (settled) return; settled = true; clearTimeout(timeout); clearTimeout(pickTimer); reject(e); };
 
     window.onBleState = s => {
       if (s.state === 'unauthorized') fail(new Error('Bluetooth permission denied. Open iOS Settings → VYRO and enable Bluetooth.'));
       if (s.state === 'off') log('info', 'Bluetooth is off — turn it on. Scan will continue when iOS powers it on.');
-      if (s.state === 'unsupported') fail(new Error('This TestFlight build does not include Despia Bluetooth support.'));
+      if (s.state === 'unsupported') fail(new Error('This TestFlight build reported Bluetooth unsupported. Close/reopen TestFlight, then try again.'));
     };
     window.onBleDevice = d => {
       log('info', `Native found: ${d.name || '(unnamed)'} [${d.id}] RSSI ${d.rssi || '—'}`);
