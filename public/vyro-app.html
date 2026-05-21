@@ -937,7 +937,7 @@ Error generating stack: `+d.message+`
       paintVideo();
       setPanel(spinner('Extracting real frames from ' + (file.name || 'your clip') + '…'));
       try{
-        const {frames,frameTimes,duration}=await extractFrames(file,18);
+        const {frames,frameTimes,duration}=await extractFrames(file,20);
         if(!frames.length) throw new Error('Could not read frames from this clip.');
         paintVideo();
         setPanel(spinner('Claude is reviewing the full squash clip: shot count, rallies, winners, swing path, T-control…'));
