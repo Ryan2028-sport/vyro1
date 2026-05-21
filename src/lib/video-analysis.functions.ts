@@ -4,14 +4,43 @@ import { z } from "zod";
 const InputSchema = z.object({
   videoName: z.string().min(1).max(255),
   durationSec: z.number().min(0).max(60 * 60 * 3),
-  frames: z.array(z.string().min(10).max(2_500_000)).min(1).max(6),
+  frames: z.array(z.string().min(10).max(900_000)).min(1).max(24),
+  frameTimes: z.array(z.number().min(0).max(60 * 60 * 3)).max(24).optional(),
 });
 
 export type SquashInsight = {
   headline: string;
   summary: string;
+  confidence: "low" | "medium" | "high";
+  metrics: {
+    rallyCountEstimate: number;
+    totalShotsEstimate: number;
+    forehandEstimate: number;
+    backhandEstimate: number;
+    volleyEstimate: number;
+    driveEstimate: number;
+    boastEstimate: number;
+    dropEstimate: number;
+    lobEstimate: number;
+    winnersEstimate: number;
+    forcedErrorsEstimate: number;
+    unforcedErrorsEstimate: number;
+    avgReturnToTSeconds: number;
+    tControlPercent: number;
+    swingPathScore: number;
+    footworkScore: number;
+    shotQualityScore: number;
+  };
+  timeline: Array<{
+    time: string;
+    phase: string;
+    observation: string;
+    keyShot: string;
+    coachingCue: string;
+  }>;
+  shotBreakdown: string[];
+  swingPath: string[];
   explosiveSteps: string[];
-  swingDetection: string[];
   tCourt: string[];
   shotSelection: string[];
   loadRecovery: string[];
@@ -20,23 +49,61 @@ export type SquashInsight = {
 
 const TOOL = {
   name: "report_squash_analysis",
-  description: "Return a structured squash performance breakdown derived from the video frames.",
+  description: "Return a detailed squash performance report from sampled video frames across the full clip.",
   input_schema: {
     type: "object",
     properties: {
       headline: { type: "string" },
       summary: { type: "string" },
-      explosiveSteps: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 },
-      swingDetection: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 },
-      tCourt: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 },
-      shotSelection: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 },
-      loadRecovery: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 },
-      coachNotes: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 5 },
+      confidence: { type: "string", enum: ["low", "medium", "high"] },
+      metrics: {
+        type: "object",
+        properties: {
+          rallyCountEstimate: { type: "number" },
+          totalShotsEstimate: { type: "number" },
+          forehandEstimate: { type: "number" },
+          backhandEstimate: { type: "number" },
+          volleyEstimate: { type: "number" },
+          driveEstimate: { type: "number" },
+          boastEstimate: { type: "number" },
+          dropEstimate: { type: "number" },
+          lobEstimate: { type: "number" },
+          winnersEstimate: { type: "number" },
+          forcedErrorsEstimate: { type: "number" },
+          unforcedErrorsEstimate: { type: "number" },
+          avgReturnToTSeconds: { type: "number" },
+          tControlPercent: { type: "number" },
+          swingPathScore: { type: "number" },
+          footworkScore: { type: "number" },
+          shotQualityScore: { type: "number" },
+        },
+        required: ["rallyCountEstimate", "totalShotsEstimate", "forehandEstimate", "backhandEstimate", "volleyEstimate", "driveEstimate", "boastEstimate", "dropEstimate", "lobEstimate", "winnersEstimate", "forcedErrorsEstimate", "unforcedErrorsEstimate", "avgReturnToTSeconds", "tControlPercent", "swingPathScore", "footworkScore", "shotQualityScore"],
+      },
+      timeline: {
+        type: "array",
+        minItems: 4,
+        maxItems: 8,
+        items: {
+          type: "object",
+          properties: {
+            time: { type: "string" },
+            phase: { type: "string" },
+            observation: { type: "string" },
+            keyShot: { type: "string" },
+            coachingCue: { type: "string" },
+          },
+          required: ["time", "phase", "observation", "keyShot", "coachingCue"],
+        },
+      },
+      shotBreakdown: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
+      swingPath: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
+      explosiveSteps: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
+      tCourt: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
+      shotSelection: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
+      loadRecovery: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
+      coachNotes: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 6 },
     },
-    required: [
-      "headline","summary","explosiveSteps","swingDetection",
-      "tCourt","shotSelection","loadRecovery","coachNotes",
-    ],
+    required: ["headline", "summary", "confidence", "metrics", "timeline", "shotBreakdown", "swingPath", "explosiveSteps", "tCourt", "shotSelection", "loadRecovery", "coachNotes"],
   },
 };
 
@@ -51,20 +118,16 @@ export const analyzeSquashClip = createServerFn({ method: "POST" })
       const match = b64.match(/^data:(image\/[a-zA-Z+]+);base64,(.*)$/);
       const mediaType = match?.[1] ?? "image/jpeg";
       const raw = match?.[2] ?? b64;
-      content.push({
-        type: "image",
-        source: { type: "base64", media_type: mediaType, data: raw },
-      });
-      content.push({ type: "text", text: `Frame ${i + 1} of ${data.frames.length}` });
+      const stamp = data.frameTimes?.[i];
+      content.push({ type: "text", text: `Sample ${i + 1}/${data.frames.length}${typeof stamp === "number" ? ` at ${stamp.toFixed(1)}s` : ""}` });
+      content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: raw } });
     });
     content.push({
       type: "text",
       text:
-        `Clip: ${data.videoName} (${data.durationSec.toFixed(1)}s).\n` +
-        `You are an elite squash performance coach. From these frames, infer rally dynamics ` +
-        `and produce a squash-specific breakdown. Use concrete, observable detail (lunge depth, ` +
-        `swing path, T-recovery, shot choice, fatigue signals). If frames are limited, give ` +
-        `well-reasoned coaching hypotheses and label them as such. Call report_squash_analysis.`,
+        `Analyze this squash clip in depth: ${data.videoName}, duration ${data.durationSec.toFixed(1)} seconds, ${data.frames.length} visual samples across the video.\n\n` +
+        `You are an elite squash video analyst. Estimate rallies, total shots hit, winners, errors, shot mix, forehand/backhand split, swing path, T-control, recovery, and footwork. ` +
+        `Provide concrete numbers and coaching observations. Call report_squash_analysis.`,
     });
 
     try {
@@ -77,7 +140,7 @@ export const analyzeSquashClip = createServerFn({ method: "POST" })
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-5-20250929",
-          max_tokens: 1500,
+          max_tokens: 3000,
           tools: [TOOL],
           tool_choice: { type: "tool", name: TOOL.name },
           messages: [{ role: "user", content }],
