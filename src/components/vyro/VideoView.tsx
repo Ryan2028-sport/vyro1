@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Camera, Play, Upload, Zap, Activity, Target, Eye, TrendingUp, Footprints } from "lucide-react";
 import { sportProfiles } from "@/lib/vyro-data";
 import { Bar, Card, PageHeader, Pill } from "./shared";
@@ -9,6 +9,29 @@ type Tab = "overview" | "footwork" | "swing" | "tcourt" | "tactics" | "physio";
 export function VideoView() {
   const [state, setState] = useState<"idle" | "ready">("idle");
   const [tab, setTab] = useState<Tab>("overview");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoName, setVideoName] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File | null | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      setUploadError("Please choose a video file (MP4, MOV, or WebM).");
+      return;
+    }
+    if (file.size > 500 * 1024 * 1024) {
+      setUploadError("Clip is larger than 500MB. Trim it and try again.");
+      return;
+    }
+    setUploadError(null);
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setVideoUrl(URL.createObjectURL(file));
+    setVideoName(file.name);
+    setState("ready");
+  };
+
+
 
   if (state === "idle") {
     return (
@@ -19,28 +42,50 @@ export function VideoView() {
           subtitle="Explosive steps, swing biomechanics, T-court control, shot selection, and opponent tendency — all synced with IMU and HR signatures from your VYRO watch."
         />
         <Card>
-          <div className="py-12 text-center">
+          <div
+            className="py-12 text-center"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleFile(e.dataTransfer.files?.[0]);
+            }}
+          >
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-white/15 bg-white/10">
               <Camera className="h-8 w-8" />
             </div>
             <h3 className="mt-4 text-xl font-black">Upload match or drill clip</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-white/55">
-              60-second drill or a full 5-game match. VYRO breaks down every rally, swing, lunge, and recovery to the T.
+              Drag &amp; drop or pick a file — MP4, MOV, or WebM up to 500MB.
             </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => handleFile(e.target.files?.[0])}
+            />
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <button
-                onClick={() => setState("ready")}
+                onClick={() => fileInputRef.current?.click()}
                 className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-black"
               >
                 <Upload className="mr-2 inline h-4 w-4" /> Upload clip
               </button>
               <button
-                onClick={() => setState("ready")}
+                onClick={() => {
+                  if (videoUrl) URL.revokeObjectURL(videoUrl);
+                  setVideoUrl(null);
+                  setVideoName(null);
+                  setUploadError(null);
+                  setState("ready");
+                }}
                 className="rounded-xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-bold"
               >
                 Use sample match
               </button>
             </div>
+            {uploadError && <p className="mt-3 text-sm text-[#ff2b2b]">{uploadError}</p>}
+
             <div className="mx-auto mt-6 grid max-w-2xl grid-cols-2 gap-2 text-left sm:grid-cols-3">
               {[
                 ["Explosive steps", "1st-step burst, lunge depth"],
@@ -75,17 +120,27 @@ export function VideoView() {
     <>
       <PageHeader
         eyebrow="AI Video Analyzer · Squash"
-        title="Match clip · Ryan Chen vs Player X"
-        subtitle="Game 3 · 11–9 · 4:42 of rally footage analyzed · 38 rallies · 312 swings"
+        title={videoName ? `Clip · ${videoName}` : "Match clip · Ryan Chen vs Player X"}
+        subtitle={
+          videoName
+            ? "Analyzing rallies, swings, footwork, and T-court control."
+            : "Game 3 · 11–9 · 4:42 of rally footage analyzed · 38 rallies · 312 swings"
+        }
         action={
           <button
-            onClick={() => setState("idle")}
+            onClick={() => {
+              if (videoUrl) URL.revokeObjectURL(videoUrl);
+              setVideoUrl(null);
+              setVideoName(null);
+              setState("idle");
+            }}
             className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold"
           >
             New clip
           </button>
         }
       />
+
 
       <div className="mb-5 flex gap-2 overflow-x-auto">
         {tabs.map(([id, label, Icon]) => (
@@ -102,8 +157,8 @@ export function VideoView() {
         ))}
       </div>
 
-      {tab === "overview" && <Overview />}
-      {tab === "footwork" && <Footwork />}
+      {tab === "overview" && <Overview videoUrl={videoUrl} />}
+      {tab === "footwork" && <Footwork videoUrl={videoUrl} />}
       {tab === "swing" && <Swing />}
       {tab === "tcourt" && <TCourt />}
       {tab === "tactics" && <Tactics />}
@@ -112,31 +167,35 @@ export function VideoView() {
   );
 }
 
-function VideoPanel({ caption }: { caption: string }) {
+function VideoPanel({ caption, videoUrl }: { caption: string; videoUrl?: string | null }) {
   return (
     <Card>
       <div className="relative grid aspect-video place-items-center overflow-hidden rounded-2xl border border-white/10 bg-black">
-        <div className="grid h-16 w-16 place-items-center rounded-full border border-white/20 bg-white/10">
-          <Play className="h-8 w-8" />
-        </div>
-        <div className="absolute left-3 top-3 flex gap-2">
+        {videoUrl ? (
+          <video src={videoUrl} controls className="h-full w-full object-contain" />
+        ) : (
+          <div className="grid h-16 w-16 place-items-center rounded-full border border-white/20 bg-white/10">
+            <Play className="h-8 w-8" />
+          </div>
+        )}
+        <div className="pointer-events-none absolute left-3 top-3 flex gap-2">
           <Pill color="red">LIVE TAG</Pill>
           <Pill>30 fps · 4K</Pill>
         </div>
-        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-white/70">
+        <div className="pointer-events-none absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-white/70">
           <span>{caption}</span>
-          <span>02:14 / 04:42</span>
         </div>
       </div>
+
     </Card>
   );
 }
 
-function Overview() {
+function Overview({ videoUrl }: { videoUrl?: string | null }) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2">
-        <VideoPanel caption="Game 3 · Rally 14 · Back-left retrieval" />
+        <VideoPanel caption="Game 3 · Rally 14 · Back-left retrieval" videoUrl={videoUrl} />
       </div>
       <Card>
         <h3 className="font-black">Match summary</h3>
@@ -191,7 +250,7 @@ function Overview() {
   );
 }
 
-function Footwork() {
+function Footwork({ videoUrl }: { videoUrl?: string | null }) {
   const steps = [
     ["First-step burst", 88, "2.6 ft avg push-off from T"],
     ["Acceleration", 86, "0–4 ft in 0.41s"],
@@ -203,7 +262,7 @@ function Footwork() {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2">
-        <VideoPanel caption="Explosive step → front-right lunge · pose overlay" />
+        <VideoPanel caption="Explosive step → front-right lunge · pose overlay" videoUrl={videoUrl} />
       </div>
       <Card>
         <h3 className="font-black">Explosive step breakdown</h3>
