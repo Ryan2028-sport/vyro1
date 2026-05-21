@@ -427,6 +427,9 @@ export function VideoView() {
               if (videoUrl) URL.revokeObjectURL(videoUrl);
               setVideoUrl(null);
               setVideoName(null);
+              setInsight(null);
+              setAnalysisError(null);
+              setAnalysisStatus("");
               setState("idle");
             }}
             className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold"
@@ -455,7 +458,7 @@ export function VideoView() {
 
       <AIInsightPanel analyzing={analyzing} error={analysisError} insight={insight} activeTab={tab} status={analysisStatus} />
 
-      {tab === "overview" && <Overview videoUrl={videoUrl} />}
+      {tab === "overview" && <Overview videoUrl={videoUrl} insight={insight} />}
       {tab === "footwork" && <Footwork videoUrl={videoUrl} />}
       {tab === "swing" && <Swing />}
       {tab === "tcourt" && <TCourt />}
