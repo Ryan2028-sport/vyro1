@@ -831,6 +831,7 @@ function showWebBluetoothRestricted() {
 function waitForNativeBleState(timeoutMs = 14000) {
   return new Promise(resolve => {
     if (!window.VyroNative?.ble?.state) return resolve({ state: 'missing' });
+    if (window.bluetoothActive === true) return resolve({ state: 'on' });
     let done = false;
     const prev = window.onBleState;
     const handler = s => {
@@ -849,7 +850,13 @@ function waitForNativeBleState(timeoutMs = 14000) {
     }, timeoutMs);
     window.onBleState = handler;
     const fired = window.VyroNative.ble.state();
-    if (!fired) handler({ state: 'not-fired' });
+    if (fired && typeof fired.then === 'function') {
+      fired.catch(e => handler({ state: 'failed', error: e?.message || String(e) }));
+    } else if (!fired) {
+      setTimeout(() => {
+        if (!done && window.bluetoothActive === true) handler({ state: 'on' });
+      }, 600);
+    }
   });
 }
 
