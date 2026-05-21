@@ -193,14 +193,24 @@
     }
   }
 
-  function handleScanResult(r) {
-    if (!r || !r.device) return;
-    emit('onBleDevice', {
-      id: r.device.deviceId,
-      name: r.localName || r.device.name || undefined,
+  function normalizeBleDevice(r) {
+    var raw = r && (r.device || r);
+    if (!raw) return null;
+    var id = raw.deviceId || raw.id;
+    if (!id) return null;
+    return {
+      id: id,
+      deviceId: id,
+      name: r.localName || raw.name || undefined,
       rssi: typeof r.rssi === 'number' ? r.rssi : undefined,
-      services: r.uuids
-    });
+      services: r.uuids || raw.uuids || raw.services || []
+    };
+  }
+
+  function handleScanResult(r) {
+    var d = normalizeBleDevice(r);
+    if (!d) return;
+    emit('onBleDevice', d);
   }
 
   // One-time wiring: scan events go through 'onScanResult'.
@@ -232,7 +242,9 @@
           var msg = (err && err.message) || String(err);
           if (/unauthorized|denied|permission/i.test(msg)) emit('onBleState', { state: 'unauthorized' });
           else if (/off|disabled/i.test(msg)) emit('onBleState', { state: 'off' });
-          else emit('onBleState', { state: 'unsupported' });
+          else if (/not available|not loaded|not implemented|missing|plugin/i.test(msg)) emit('onBleState', { state: 'missing' });
+          else if (/unsupported|unavailable/i.test(msg)) emit('onBleState', { state: 'unsupported' });
+          else emit('onBleState', { state: 'failed', error: msg });
           // Re-throw so callers know init failed.
           throw err;
         });
