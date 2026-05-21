@@ -8,7 +8,7 @@ import { analyzeSquashClip, type SquashInsight } from "@/lib/video-analysis.func
 
 type Tab = "overview" | "footwork" | "swing" | "tcourt" | "tactics" | "physio";
 
-async function extractFrames(file: File, count = 18): Promise<{ frames: string[]; frameTimes: number[]; duration: number }> {
+async function extractFrames(file: File, count = 20): Promise<{ frames: string[]; frameTimes: number[]; duration: number }> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
@@ -79,7 +79,7 @@ export function VideoView() {
     setInsight(null);
     const minimumAnalyzeTime = new Promise<void>((resolve) => window.setTimeout(resolve, 12_000));
     try {
-      const { frames, frameTimes, duration } = await extractFrames(file, 18);
+      const { frames, frameTimes, duration } = await extractFrames(file, 20);
       if (frames.length === 0) throw new Error("Could not read frames from this clip.");
       const analysisRequest = runAnalyze({
         data: { videoName: file.name, durationSec: duration, frames, frameTimes },
