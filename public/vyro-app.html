@@ -812,5 +812,75 @@ Error generating stack: `+d.message+`
       <span style="display:inline-block;width:8px;height:8px;background:#39ff88;border-radius:50%;box-shadow:0 0 8px #39ff88"></span>
       Watch Test
     </a>
-  </body>
+  
+<script>/* vyro-analyzer-hook v2 */
+(function(){
+  if (window.__vyroAnalyzerInstalled) return; window.__vyroAnalyzerInstalled = true;
+  const ENDPOINT = '/api/public/analyze-clip';
+  function ensurePanel(){
+    let p = document.getElementById('vyro-ai-panel');
+    if (p) return p;
+    p = document.createElement('div');
+    p.id = 'vyro-ai-panel';
+    p.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99999;max-width:380px;width:calc(100vw - 32px);background:#0b0b0b;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:18px;padding:14px 16px;font:13px/1.45 ui-sans-serif,system-ui,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:80vh;overflow:auto;';
+    p.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><b>Claude · squash analysis</b><button id="vyro-ai-close" style="background:transparent;border:0;color:#aaa;cursor:pointer;font-size:18px;">×</button></div><div id="vyro-ai-body" style="margin-top:8px;color:#ddd;">Reading frames…</div><style>@keyframes vyrospin{to{transform:rotate(360deg)}}</style>';
+    document.body.appendChild(p);
+    p.querySelector('#vyro-ai-close').onclick = () => p.remove();
+    return p;
+  }
+  function setPanel(html){ ensurePanel().querySelector('#vyro-ai-body').innerHTML = html; }
+  function esc(t){ return String(t).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function spinner(text){ return '<div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:10px;height:10px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:vyrospin 0.8s linear infinite;"></span>'+esc(text)+'</div>'; }
+  function extractFrames(file, count){
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement('video');
+      v.preload='metadata'; v.muted=true; v.playsInline=true; v.src=url;
+      const frames=[];
+      const done=(e)=>{URL.revokeObjectURL(url); e?reject(e):resolve({frames,duration:isFinite(v.duration)?v.duration:0});};
+      v.onerror=()=>done(new Error('video load failed'));
+      v.onloadedmetadata=async()=>{
+        try{
+          const w=640, h=Math.round((v.videoHeight/v.videoWidth)*w)||360;
+          const c=document.createElement('canvas'); c.width=w; c.height=h;
+          const ctx=c.getContext('2d');
+          const dur=v.duration>0.5?v.duration:1;
+          for(let i=0;i<count;i++){
+            const t=(dur*(i+1))/(count+1);
+            await new Promise(res=>{const on=()=>{v.removeEventListener('seeked',on);res();}; v.addEventListener('seeked',on); try{v.currentTime=Math.min(t,dur-0.05);}catch{res();}});
+            try{ctx.drawImage(v,0,0,w,h); frames.push(c.toDataURL('image/jpeg',0.7));}catch{}
+          }
+          done();
+        }catch(e){done(e);}
+      };
+    });
+  }
+  async function analyze(file){
+    ensurePanel();
+    setPanel(spinner('Extracting frames…'));
+    try{
+      const {frames,duration}=await extractFrames(file,4);
+      if(!frames.length) throw new Error('Could not read frames from this clip.');
+      setPanel(spinner('Claude is analyzing your clip…'));
+      const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoName:file.name||'clip',durationSec:duration,frames})});
+      const data=await r.json().catch(()=>({error:'Bad response'}));
+      if(data.error||!data.insight){setPanel('<span style="color:#ff6b6b">'+esc(data.error||'Analysis failed.')+'</span>'); return;}
+      const ins=data.insight;
+      const sec=(t,items)=>items&&items.length?'<div style="margin-top:10px;"><b style="font-size:12px;">'+esc(t)+'</b><ul style="margin:4px 0 0;padding-left:16px;color:#ccc;">'+items.map(b=>'<li style="margin:2px 0;">'+esc(b)+'</li>').join('')+'</ul></div>':'';
+      setPanel('<div style="font-weight:700;">'+esc(ins.headline||'')+'</div><div style="margin-top:4px;color:#bbb;">'+esc(ins.summary||'')+'</div>'+sec('Explosive steps',ins.explosiveSteps)+sec('Swing detection',ins.swingDetection)+sec('T-court control',ins.tCourt)+sec('Shot selection',ins.shotSelection)+sec('Load & recovery',ins.loadRecovery)+sec('Coach notes',ins.coachNotes));
+    }catch(e){setPanel('<span style="color:#ff6b6b">'+esc(e&&e.message||'Analysis failed.')+'</span>');}
+  }
+  document.addEventListener('change', function(e){
+    const t=e.target;
+    if(!t||t.tagName!=='INPUT'||t.type!=='file') return;
+    const accept=(t.accept||'').toLowerCase();
+    const f=t.files&&t.files[0];
+    if(!f) return;
+    const isVideo=accept.includes('video')||/\.(mp4|mov|m4v|webm|mkv|avi|3gp|hevc)$/i.test(f.name)||(f.type||'').startsWith('video/');
+    if(!isVideo) return;
+    analyze(f);
+  }, true);
+})();
+</script>
+</body>
 </html>
