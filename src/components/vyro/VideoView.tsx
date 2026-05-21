@@ -181,6 +181,7 @@ export function VideoView() {
   const [insight, setInsight] = useState<SquashInsight | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<string>("");
   // Recording state
   const [recordOpen, setRecordOpen] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -198,16 +199,19 @@ export function VideoView() {
     setAnalyzing(true);
     setAnalysisError(null);
     setInsight(null);
-    const minimumAnalyzeTime = new Promise<void>((resolve) => window.setTimeout(resolve, 12_000));
+    setAnalysisStatus("Scanning the whole video timeline…");
+    const minimumAnalyzeTime = new Promise<void>((resolve) => window.setTimeout(resolve, 15_000));
     try {
-      const { frames, frameTimes, duration } = await extractFrames(file, 20);
+      const { frames, frameTimes, duration, motionTimeline, shotCandidates, derivedStats, sampleEverySec } = await scanVideoClip(file, setAnalysisStatus);
       if (frames.length === 0) throw new Error("Could not read frames from this clip.");
+      setAnalysisStatus(`Analyzing ${derivedStats.scannedFrames} video checkpoints, ${shotCandidates.length} shot candidates, and ${Math.round(duration)} seconds of play…`);
       const analysisRequest = runAnalyze({
-        data: { videoName: file.name, durationSec: duration, frames, frameTimes },
+        data: { videoName: file.name, durationSec: duration, frames, frameTimes, motionTimeline, shotCandidates, derivedStats, sampleEverySec },
       });
       const [res] = await Promise.all([analysisRequest, minimumAnalyzeTime]);
       if (res.error || !res.insight) throw new Error(res.error ?? "Analysis failed.");
       setInsight(res.insight);
+      setAnalysisStatus("");
     } catch (e) {
       setAnalysisError(e instanceof Error ? e.message : "Analysis failed.");
     } finally {
@@ -449,7 +453,7 @@ export function VideoView() {
       </div>
 
 
-      <AIInsightPanel analyzing={analyzing} error={analysisError} insight={insight} activeTab={tab} />
+      <AIInsightPanel analyzing={analyzing} error={analysisError} insight={insight} activeTab={tab} status={analysisStatus} />
 
       {tab === "overview" && <Overview videoUrl={videoUrl} />}
       {tab === "footwork" && <Footwork videoUrl={videoUrl} />}
