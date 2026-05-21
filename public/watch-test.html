@@ -754,8 +754,10 @@ async function connectNative(filtered = false) {
     };
 
     log('info', `Starting native iOS BLE scan (${filtered ? 'watches only' : 'all nearby'})…`);
-    ble.state();
-    ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000);
+    Promise.resolve(ble.state()).catch(e => log('err', 'Native BLE state failed: ' + (e?.message || e)));
+    Promise.resolve(ble.scan(filtered ? ['180d', SERVICE_UUID, 'fee7', 'fee0', 'fff0', 'ffe0'] : [], 15000))
+      .then(() => log('info', 'Native BLE scan command sent — waiting for nearby device advertisements…'))
+      .catch(e => fail(new Error('Native BLE scan command failed: ' + (e?.message || e))));
   });
 }
 
