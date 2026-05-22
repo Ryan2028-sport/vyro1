@@ -247,7 +247,16 @@
     if (scanListenerReady) return scanListenerReady;
     scanListenerReady = waitForCapBle().then(function (ble) {
       if (!ble || typeof ble.addListener !== 'function') return;
-      return ble.addListener('onScanResult', handleScanResult).catch(function () {});
+      // addListener returns a PluginListenerHandle (not a Promise) in this
+      // Capacitor build, so don't chain .catch/.then on it — that throws
+      // "ble.addListener(...).catch is not a function" and aborts BLE init.
+      try {
+        var handle = ble.addListener('onScanResult', handleScanResult);
+        if (handle && typeof handle.then === 'function') handle.then(undefined, function () {});
+        return handle;
+      } catch (e) {
+        return;
+      }
     });
     return scanListenerReady;
   }
