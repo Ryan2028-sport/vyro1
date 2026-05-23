@@ -194,6 +194,21 @@
     try { return btoa(unescape(encodeURIComponent(String(text == null ? '' : text)))); }
     catch (e) { return ''; }
   }
+  // Capacitor BluetoothLe sends/receives characteristic values as HEX strings
+  // (its native stringToData() hard-fatalErrors on non-hex / odd-length input).
+  function cleanHex(s) {
+    var h = String(s == null ? '' : s).replace(/[^0-9a-fA-F]/g, '').toLowerCase();
+    if (h.length % 2 !== 0) h = h.slice(0, h.length - 1); // even length required by native parser
+    return h;
+  }
+  function textToHex(text) {
+    var str = String(text == null ? '' : text), bytes;
+    try { bytes = new TextEncoder().encode(str); }
+    catch (e) { bytes = []; for (var i = 0; i < str.length; i++) bytes.push(str.charCodeAt(i) & 0xff); }
+    var out = '';
+    for (var j = 0; j < bytes.length; j++) { var x = bytes[j].toString(16); out += x.length < 2 ? '0' + x : x; }
+    return out;
+  }
   function emit(name, payload) {
     var fn = window[name];
     if (typeof fn === 'function') {
@@ -411,38 +426,40 @@
     },
     read:        function (id, svc, chr) {
       return BLE.read({ deviceId: id, service: svc, characteristic: chr }).then(function (r) {
-        emit('onBleData', { id: id, service: svc, characteristic: chr, value: b64ToHex(r && r.value) });
+        // Plugin returns the value as a hex string.
+        emit('onBleData', { id: id, service: svc, characteristic: chr, value: cleanHex(r && r.value) });
       }).catch(function (err) {
         emit('onBleEvent', { type: 'readError', id: id, service: svc, characteristic: chr, error: (err && err.message) || String(err) });
       });
     },
     write:       function (id, svc, chr, value, withResponse) {
-      // Old API accepted a free-form `value`. If it parses cleanly as hex,
-      // treat it as raw bytes; otherwise UTF-8 encode it.
+      // Capacitor BluetoothLe expects the write value as a HEX string. Old API
+      // accepted free-form input: if it parses as hex, send it as raw bytes;
+      // otherwise UTF-8-encode to hex. (Sending base64 here crashes the native
+      // plugin: stringToData() fatalErrors on non-hex input.)
       var s = String(value == null ? '' : value);
-      var stripped = s.replace(/[^0-9a-fA-F]/g, '');
-      var isHex = stripped.length > 0 && stripped.length % 2 === 0 && /^[0-9a-fA-F\s:,-]+$/.test(s);
-      var b64 = isHex ? hexToB64(stripped) : textToB64(s);
+      var looksHex = /^[0-9a-fA-F\s:,-]+$/.test(s) && cleanHex(s).length > 0;
+      var hex = looksHex ? cleanHex(s) : textToHex(s);
       var method = withResponse === false ? 'writeWithoutResponse' : 'write';
-      return BLE[method]({ deviceId: id, service: svc, characteristic: chr, value: b64 })
+      return BLE[method]({ deviceId: id, service: svc, characteristic: chr, value: hex })
         .then(function () { emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: true }); })
         .catch(function (err) {
           emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: false, error: (err && err.message) || String(err) });
         });
     },
     writeHex:    function (id, svc, chr, hex, withResponse) {
-      var b64 = hexToB64(hex);
+      var value = cleanHex(hex);
       var method = withResponse === false ? 'writeWithoutResponse' : 'write';
-      return BLE[method]({ deviceId: id, service: svc, characteristic: chr, value: b64 })
+      return BLE[method]({ deviceId: id, service: svc, characteristic: chr, value: value })
         .then(function () { emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: true }); })
         .catch(function (err) {
           emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: false, error: (err && err.message) || String(err) });
         });
     },
     writeText:   function (id, svc, chr, text, withResponse) {
-      var b64 = textToB64(text);
+      var value = textToHex(text);
       var method = withResponse === false ? 'writeWithoutResponse' : 'write';
-      return BLE[method]({ deviceId: id, service: svc, characteristic: chr, value: b64 })
+      return BLE[method]({ deviceId: id, service: svc, characteristic: chr, value: value })
         .then(function () { emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: true }); })
         .catch(function (err) {
           emit('onBleWriteComplete', { id: id, service: svc, characteristic: chr, success: false, error: (err && err.message) || String(err) });
@@ -452,7 +469,8 @@
       var key = 'notification|' + id + '|' + svc + '|' + chr;
       try {
         BLE.addListener(key, function (r) {
-          emit('onBleData', { id: id, service: svc, characteristic: chr, value: b64ToHex(r && r.value) });
+          // Notify values arrive as hex strings from the plugin.
+          emit('onBleData', { id: id, service: svc, characteristic: chr, value: cleanHex(r && r.value) });
         });
       } catch (e) {}
       return BLE.startNotifications({ deviceId: id, service: svc, characteristic: chr }).catch(function (err) {
