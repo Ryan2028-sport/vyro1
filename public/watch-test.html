@@ -3149,6 +3149,22 @@ $('openNativeSettingsBtn').onclick = () => {
   else log('err', 'Native settings are only available inside the TestFlight app.');
 };
 
+// Auto-reconnect on load. The web view reloads whenever you navigate between
+// pages, which tears down this page's JS Bluetooth session and drops the watch.
+// If a watch was connected before, silently re-attach to it (the native
+// peripheral is often still connected) instead of making the user scan again.
+(function autoReconnectLastWatch() {
+  try {
+    if (!isNativeBle()) return;
+    if (!getLastNativeWatch()?.id) return;
+    setTimeout(() => {
+      if (connectBusy) return;
+      log('info', 'Auto-reconnecting to last watch…');
+      Promise.resolve(connect('last-native')).catch(() => {});
+    }, 900);
+  } catch (e) {}
+})();
+
 // On iOS TestFlight, start Apple Health as a passive fallback while direct
 // native BLE remains the primary watch connection path.
 if (window.VyroNative?.isDespiaIOS) {
