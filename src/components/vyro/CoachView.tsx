@@ -20,13 +20,11 @@ const squashRoster: Athlete[] = [
   { name: "Kathryn Chung", initials: "KC", status: "Ready", load: 61, hrv: 74, resting: 51, sleep: 84, agility: 81, matches: 22, wins: 15 },
   { name: "Chelsea Chan", initials: "CC", status: "Caution", load: 78, hrv: 58, resting: 56, sleep: 71, agility: 77, matches: 26, wins: 17 },
   { name: "Savannah Moxham", initials: "SM", status: "Ready", load: 64, hrv: 71, resting: 49, sleep: 82, agility: 83, matches: 21, wins: 14 },
-];
-
-const strengthRoster: Athlete[] = [
   { name: "Yow", initials: "YO", status: "Peak", load: 52, hrv: 79, resting: 47, sleep: 88, agility: 84, matches: 19, wins: 13 },
   { name: "Marina", initials: "MA", status: "Ready", load: 66, hrv: 70, resting: 52, sleep: 80, agility: 79, matches: 23, wins: 14 },
   { name: "Sam Todd", initials: "ST", status: "Recover", load: 81, hrv: 54, resting: 58, sleep: 68, agility: 74, matches: 18, wins: 10 },
 ];
+
 
 // Opponent tendency database: per-athlete observations of opponent "Player X"
 // (the consolidated database combines what each athlete has seen).
@@ -107,7 +105,7 @@ export function CoachView() {
       />
       <div className="mb-4 flex gap-2 overflow-x-auto">
         {sports.map((s) => {
-          const count = s === "Squash" ? squashRoster.length : s === "Tennis" ? strengthRoster.length : Math.floor(Math.random() * 3) + 2;
+          const count = s === "Squash" ? squashRoster.length : Math.floor(((s.charCodeAt(0) * 7) % 4) + 2);
           const active = s === selectedSport;
           return (
             <button
@@ -127,10 +125,10 @@ export function CoachView() {
         <Card>
           <div className="flex items-center justify-between">
             <h3 className="font-black">{selectedSport} roster</h3>
-            <Pill>{selectedSport === "Squash" ? squashRoster.length : strengthRoster.length} athletes</Pill>
+            <Pill>{squashRoster.length} athletes</Pill>
           </div>
           <div className="mt-4 space-y-2">
-            {(selectedSport === "Squash" ? squashRoster : strengthRoster).map((a) => (
+            {squashRoster.map((a) => (
               <div key={a.name} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
                 <div className="flex items-center gap-3">
                   <div className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[11px] font-black">
@@ -155,6 +153,7 @@ export function CoachView() {
             ))}
           </div>
         </Card>
+
 
         <Card className="lg:col-span-2">
           <div className="flex items-start justify-between">
