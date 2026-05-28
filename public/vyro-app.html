@@ -1376,7 +1376,8 @@
             ['4 CONSENTED','5 CONSENTED'],
             ['Mostafa Hesham tendency profile','Princeton #3 tendency profile'],
             ['Mostafa Hesham\'s combined profile','Princeton #3 combined profile'],
-            ['Across Squash teammates','Across Columbia teammates']
+            ['Across Squash teammates','Across Columbia teammates'],
+            ['Baseball, Football, Golf, Squash, and Tennis now have active VYRO sport intelligence layers.','Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, and Tennis all have active VYRO sport intelligence layers.']
           ];
           var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
           var n, edits = [];
@@ -1387,7 +1388,7 @@
           }
           edits.forEach(function(e){ e[0].textContent = e[1]; });
         }
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceHeatmap(); enhanceSocialThumbnails(); vyroSwapNames(); vyroDemoPolish(); }, 800);
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); }, 800);
         setTimeout(vyroSwapNames, 200);
         setTimeout(vyroSwapNames, 800);
         setTimeout(vyroDemoPolish, 250);
