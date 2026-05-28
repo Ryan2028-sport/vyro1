@@ -783,15 +783,15 @@
           grid.appendChild(card);
         }
 
-        // ===== Coach roster (Sam Yu, Kathryn Chung, Chelsea Chan, Savannah Moxham, Yow, Marina, Sam Todd) =====
+        // ===== Coach roster (collegiate men's squash squad — realistic season metrics) =====
         var COACH_ROSTER = [
-          { name: 'Sam Yu',          status: 'Peak',    statusColor: '#10b981', load: 48, hrv: 82, matches: 24, wins: 18 },
-          { name: 'Kathryn Chung',   status: 'Ready',   statusColor: '#10b981', load: 61, hrv: 74, matches: 22, wins: 15 },
-          { name: 'Chelsea Chan',    status: 'Caution', statusColor: '#f59e0b', load: 78, hrv: 58, matches: 26, wins: 17 },
-          { name: 'Savannah Moxham', status: 'Ready',   statusColor: '#10b981', load: 64, hrv: 71, matches: 21, wins: 14 },
-          { name: 'Yow',             status: 'Peak',    statusColor: '#10b981', load: 52, hrv: 79, matches: 19, wins: 13 },
-          { name: 'Marina',          status: 'Ready',   statusColor: '#10b981', load: 66, hrv: 70, matches: 23, wins: 14 },
-          { name: 'Sam Todd',        status: 'Recover', statusColor: '#ef4444', load: 81, hrv: 54, matches: 18, wins: 10 }
+          { name: 'Marwan Tarek',    status: 'Peak',    statusColor: '#10b981', load: 54, hrv: 87, matches: 23, wins: 19 },
+          { name: 'Omar Allaudin',   status: 'Ready',   statusColor: '#10b981', load: 63, hrv: 78, matches: 21, wins: 15 },
+          { name: 'Aly Hussein',     status: 'Caution', statusColor: '#f59e0b', load: 79, hrv: 61, matches: 24, wins: 16 },
+          { name: 'David Mensah',    status: 'Ready',   statusColor: '#10b981', load: 67, hrv: 73, matches: 20, wins: 13 },
+          { name: 'Karim Sadek',     status: 'Peak',    statusColor: '#10b981', load: 51, hrv: 84, matches: 22, wins: 17 },
+          { name: 'Jonah Bryan',     status: 'Ready',   statusColor: '#10b981', load: 69, hrv: 71, matches: 19, wins: 12 },
+          { name: 'Andrew Douglas',  status: 'Recover', statusColor: '#ef4444', load: 84, hrv: 56, matches: 18, wins: 10 }
         ];
         function initials(n){ return n.split(/\s+/).map(function(p){return p[0];}).join('').slice(0,2).toUpperCase(); }
         function enhanceCoachRoster(){
@@ -839,14 +839,14 @@
           card.appendChild(wrap);
         }
 
-        // ===== Combined opponent model =====
+        // ===== Combined opponent model (Ivy League men's squash opponents — sample-weighted tendencies) =====
         var OPP_DATA = {
-          'Savannah Moxham':  [['Back-left','Straight drive on pressure',74,38],['Back-right','Cross-court reset',52,31],['Front-left','Counter-drop',61,22],['Mid-court volley','Volley kill on loose rail',58,19]],
-          'Sam Yu':           [['Back-left','Straight drive on pressure',70,41],['Back-right','Cross-court reset',47,28],['Front-left','Counter-drop',55,24],['Mid-court volley','Volley kill on loose rail',64,26]],
-          'Kathryn Chung':    [['Back-left','Straight drive on pressure',71,34],['Back-right','Cross-court reset',49,30],['Front-left','Counter-drop',59,21],['Mid-court volley','Volley kill on loose rail',60,23]],
-          'Chelsea Chan':     [['Back-left','Straight drive on pressure',69,44],['Back-right','Cross-court reset',54,36],['Front-left','Counter-drop',57,27],['Mid-court volley','Volley kill on loose rail',62,29]]
+          'Mostafa Hesham':   [['Back-left','Straight drive on pressure',73,62],['Back-right','Cross-court reset',51,44],['Front-left','Counter-drop',58,29],['Mid-court volley','Volley kill on loose rail',61,33]],
+          'Velavan Senthil':  [['Back-left','Straight drive on pressure',68,57],['Back-right','Cross-court reset',46,38],['Front-left','Counter-drop',54,31],['Mid-court volley','Volley kill on loose rail',66,36]],
+          'James Flynn':      [['Back-left','Straight drive on pressure',71,49],['Back-right','Cross-court reset',49,41],['Front-left','Counter-drop',57,27],['Mid-court volley','Volley kill on loose rail',59,31]],
+          'Saadeldin Abouaish':[['Back-left','Straight drive on pressure',69,53],['Back-right','Cross-court reset',55,42],['Front-left','Counter-drop',56,30],['Mid-court volley','Volley kill on loose rail',63,34]]
         };
-        var OPP_SELECTED = { 'Savannah Moxham': true, 'Sam Yu': true, 'Kathryn Chung': true, 'Chelsea Chan': false };
+        var OPP_SELECTED = { 'Mostafa Hesham': true, 'Velavan Senthil': true, 'James Flynn': true, 'Saadeldin Abouaish': false };
         function computeCombined(){
           var buckets = {};
           Object.keys(OPP_SELECTED).forEach(function(name){
@@ -1013,14 +1013,15 @@
         setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); }, 100);
         setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); }, 500);
         setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); }, 1500);
-        // Swap the bundle's hardcoded roster names to the user's requested names.
+        // Swap the bundle's hardcoded roster names to realistic male collegiate squash athletes.
         var VYRO_NAME_SWAPS = [
-          ['Shiv Patel', 'Kathryn Chung'],
-          ['Alex K.',    'Chelsea Chan'],
-          ['Marcus W.',  'Savannah Moxham'],
-          ['Diego R.',   'Sam Yu'],
-          ['Nico B.',    'Player X'],
-          ['Kira J.',    'Yusuf Sheikh']
+          ['Shiv Patel',  'Omar Allaudin'],
+          ['Alex K.',     'Aly Hussein'],
+          ['Marcus W.',   'David Mensah'],
+          ['Diego R.',    'Marwan Tarek'],
+          ['Nico B.',     'Mostafa Hesham'],
+          ['Kira J.',     'Karim Sadek'],
+          ['Player X',    'Mostafa Hesham']
         ];
         function vyroSwapNames(){
           var skip = { SCRIPT:1, STYLE:1, NOSCRIPT:1, INPUT:1, TEXTAREA:1 };
