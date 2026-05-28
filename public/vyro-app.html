@@ -782,10 +782,264 @@
             rowsHtml;
           grid.appendChild(card);
         }
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); }, 1500);
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); }, 800);
+
+        // ===== Coach roster (Sam Yu, Kathryn Chung, Chelsea Chan, Savannah Moxham, Yow, Marina, Sam Todd) =====
+        var COACH_ROSTER = [
+          { name: 'Sam Yu',          status: 'Peak',    statusColor: '#10b981', load: 48, hrv: 82, matches: 24, wins: 18 },
+          { name: 'Kathryn Chung',   status: 'Ready',   statusColor: '#10b981', load: 61, hrv: 74, matches: 22, wins: 15 },
+          { name: 'Chelsea Chan',    status: 'Caution', statusColor: '#f59e0b', load: 78, hrv: 58, matches: 26, wins: 17 },
+          { name: 'Savannah Moxham', status: 'Ready',   statusColor: '#10b981', load: 64, hrv: 71, matches: 21, wins: 14 },
+          { name: 'Yow',             status: 'Peak',    statusColor: '#10b981', load: 52, hrv: 79, matches: 19, wins: 13 },
+          { name: 'Marina',          status: 'Ready',   statusColor: '#10b981', load: 66, hrv: 70, matches: 23, wins: 14 },
+          { name: 'Sam Todd',        status: 'Recover', statusColor: '#ef4444', load: 81, hrv: 54, matches: 18, wins: 10 }
+        ];
+        function initials(n){ return n.split(/\s+/).map(function(p){return p[0];}).join('').slice(0,2).toUpperCase(); }
+        function enhanceCoachRoster(){
+          // Find the "Squash roster" card
+          var heading = null;
+          var hs = document.querySelectorAll('h1,h2,h3,h4');
+          for (var i = 0; i < hs.length; i++) {
+            if (/^\s*Squash roster\s*$/i.test(hs[i].textContent || '')) { heading = hs[i]; break; }
+          }
+          if (!heading) return;
+          var card = heading.closest('section') || heading.parentElement;
+          for (var k = 0; k < 6 && card && card.tagName !== 'SECTION'; k++) card = card.parentElement;
+          if (!card) return;
+          if (card.querySelector('[data-vyro-roster]')) return;
+
+          // Hide every direct child of the card except the heading row
+          var headRow = heading.parentElement;
+          while (headRow && headRow.parentElement !== card) headRow = headRow.parentElement;
+          Array.prototype.forEach.call(card.children, function(ch){
+            if (ch !== headRow) ch.style.display = 'none';
+          });
+
+          var wrap = document.createElement('div');
+          wrap.setAttribute('data-vyro-roster','1');
+          wrap.style.cssText = 'margin-top:14px;display:flex;flex-direction:column;gap:8px';
+          wrap.innerHTML = COACH_ROSTER.map(function(a){
+            var loadColor = a.load > 75 ? '#f59e0b' : '#ffffff';
+            return ''+
+              '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:16px;padding:10px 12px">'+
+                '<div style="display:flex;align-items:center;gap:10px">'+
+                  '<div style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.10);display:grid;place-items:center;font:700 11px/1 system-ui;color:#fff">'+initials(a.name)+'</div>'+
+                  '<div style="flex:1;min-width:0">'+
+                    '<div style="font-weight:700;font-size:13px;color:#fff">'+a.name+'</div>'+
+                    '<div style="font-size:10px;color:rgba(255,255,255,0.55)">'+a.matches+' matches · '+a.wins+'W-'+(a.matches-a.wins)+'L · HRV '+a.hrv+'ms</div>'+
+                  '</div>'+
+                  '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid '+a.statusColor+'66;background:'+a.statusColor+'1a;color:'+a.statusColor+'">'+a.status+'</span>'+
+                '</div>'+
+                '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'+
+                  '<span style="font:600 9px/1 monospace;color:rgba(255,255,255,0.5)">LOAD</span>'+
+                  '<div style="flex:1;height:6px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden"><div style="width:'+a.load+'%;height:100%;background:'+loadColor+'"></div></div>'+
+                  '<span style="font:700 11px/1 monospace;color:rgba(255,255,255,0.7);min-width:22px;text-align:right">'+a.load+'</span>'+
+                '</div>'+
+              '</div>';
+          }).join('');
+          card.appendChild(wrap);
+        }
+
+        // ===== Combined opponent model =====
+        var OPP_DATA = {
+          'Savannah Moxham':  [['Back-left','Straight drive on pressure',74,38],['Back-right','Cross-court reset',52,31],['Front-left','Counter-drop',61,22],['Mid-court volley','Volley kill on loose rail',58,19]],
+          'Sam Yu':           [['Back-left','Straight drive on pressure',70,41],['Back-right','Cross-court reset',47,28],['Front-left','Counter-drop',55,24],['Mid-court volley','Volley kill on loose rail',64,26]],
+          'Kathryn Chung':    [['Back-left','Straight drive on pressure',71,34],['Back-right','Cross-court reset',49,30],['Front-left','Counter-drop',59,21],['Mid-court volley','Volley kill on loose rail',60,23]],
+          'Chelsea Chan':     [['Back-left','Straight drive on pressure',69,44],['Back-right','Cross-court reset',54,36],['Front-left','Counter-drop',57,27],['Mid-court volley','Volley kill on loose rail',62,29]]
+        };
+        var OPP_SELECTED = { 'Savannah Moxham': true, 'Sam Yu': true, 'Kathryn Chung': true, 'Chelsea Chan': false };
+        function computeCombined(){
+          var buckets = {};
+          Object.keys(OPP_SELECTED).forEach(function(name){
+            if (!OPP_SELECTED[name]) return;
+            (OPP_DATA[name] || []).forEach(function(r){
+              var key = r[0]+'||'+r[1];
+              var b = buckets[key] || { zone:r[0], shot:r[1], totalPct:0, totalN:0, n:0 };
+              b.totalPct += r[2]*r[3]; b.totalN += r[3]; b.n += 1;
+              buckets[key] = b;
+            });
+          });
+          return Object.keys(buckets).map(function(k){
+            var b = buckets[k];
+            return { zone:b.zone, shot:b.shot, pct: b.totalN ? Math.round(b.totalPct/b.totalN) : 0, sample:b.totalN, sources:b.n };
+          }).sort(function(a,b){ return b.pct - a.pct; });
+        }
+        function renderOpponent(card){
+          var existing = card.querySelector('[data-vyro-opp]');
+          if (existing) existing.remove();
+          var rows = computeCombined();
+          var totalRallies = rows.reduce(function(s,r){ return s + r.sample; }, 0);
+          var chipsHtml = Object.keys(OPP_SELECTED).map(function(name){
+            var on = OPP_SELECTED[name];
+            return '<button data-opp-toggle="'+name+'" style="border:1px solid '+(on?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.12)')+';background:'+(on?'rgba(255,255,255,0.18)':'transparent')+';color:'+(on?'#fff':'rgba(255,255,255,0.6)')+';font:600 11px/1 system-ui;padding:7px 11px;border-radius:999px;cursor:pointer">'+(on?'✓ ':'+ ')+name+'</button>';
+          }).join('');
+          var barsHtml = rows.length ? rows.map(function(r){
+            var color = r.pct >= 65 ? '#ffffff' : '#f59e0b';
+            return ''+
+              '<div style="margin-top:12px">'+
+                '<div style="display:flex;justify-content:space-between;font-size:12px;color:#fff">'+
+                  '<div><b>'+r.zone+'</b> <span style="color:rgba(255,255,255,0.55)">· '+r.shot+'</span></div>'+
+                  '<div style="font-variant-numeric:tabular-nums;color:rgba(255,255,255,0.75)">'+r.pct+'% <span style="font-size:10px;color:rgba(255,255,255,0.4)">· n='+r.sample+' · '+r.sources+' source'+(r.sources===1?'':'s')+'</span></div>'+
+                '</div>'+
+                '<div style="margin-top:5px;height:6px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden"><div style="width:'+r.pct+'%;height:100%;background:'+color+'"></div></div>'+
+              '</div>';
+          }).join('') : '<p style="margin-top:12px;font-size:12px;color:rgba(255,255,255,0.5)">Select at least one athlete to build a tendency database.</p>';
+
+          var box = document.createElement('div');
+          box.setAttribute('data-vyro-opp','1');
+          box.style.cssText = 'margin-top:14px';
+          box.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
+              '<p style="margin:0;font-size:12px;color:rgba(255,255,255,0.55);line-height:1.45">Toggle which athletes\u2019 match databases to combine. Percentages are sample-weighted across all selected rallies.</p>'+
+              '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:#fff;white-space:nowrap">'+totalRallies+' rallies</span>'+
+            '</div>'+
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">'+chipsHtml+'</div>'+
+            barsHtml;
+          card.appendChild(box);
+          box.querySelectorAll('[data-opp-toggle]').forEach(function(btn){
+            btn.addEventListener('click', function(){
+              var name = btn.getAttribute('data-opp-toggle');
+              OPP_SELECTED[name] = !OPP_SELECTED[name];
+              renderOpponent(card);
+            });
+          });
+        }
+        function enhanceOpponentModel(){
+          var heading = null;
+          var hs = document.querySelectorAll('h1,h2,h3,h4');
+          for (var i = 0; i < hs.length; i++) {
+            if (/Combined opponent model/i.test(hs[i].textContent || '')) { heading = hs[i]; break; }
+          }
+          if (!heading) return;
+          var card = heading.closest('section') || heading.parentElement;
+          for (var k = 0; k < 6 && card && card.tagName !== 'SECTION'; k++) card = card.parentElement;
+          if (!card) return;
+          // Hide every direct child except the title row, then inject our content
+          var headRow = heading.parentElement;
+          while (headRow && headRow.parentElement !== card) headRow = headRow.parentElement;
+          Array.prototype.forEach.call(card.children, function(ch){
+            if (ch !== headRow && !ch.hasAttribute || !ch.hasAttribute('data-vyro-opp')) {
+              if (ch !== headRow && !(ch.getAttribute && ch.getAttribute('data-vyro-opp'))) ch.style.display = 'none';
+            }
+          });
+          if (!card.querySelector('[data-vyro-opp]')) renderOpponent(card);
+        }
+
+        // ===== Social: Columbia group =====
+        var COLUMBIA = [
+          { name:'Yusuf Sheikh',     handle:'@yusufs',   post:'5-game grind vs. Penn. T-control held at 73% through game 5.',                  metric:'Match win · 3\u20132', likes:142, comments:18, agility:86, recovery:81 },
+          { name:'Adam Hawal',       handle:'@adamh',    post:'Cut my return-to-T by 0.21s over two weeks. Decel quality is finally clean.',   metric:'Agility +9%',          likes:98,  comments:11, agility:88, recovery:79 },
+          { name:'Imad Athar',       handle:'@imada',    post:'Sleep score back over 90. Rest HR dropped 3 bpm in 10 days.',                  metric:'Sleep 92',             likes:76,  comments:7,  agility:82, recovery:87 },
+          { name:'Sam Du',           handle:'@samdu',    post:'Forehand consistency up 11% on the swing-path overlay. Coach is happy.',       metric:'Swing 91%',            likes:121, comments:14, agility:84, recovery:78 },
+          { name:'Ahmad Haq',        handle:'@ahmadh',   post:'First 60-min hit at threshold without HR drift past 165. Aerobic base is real.', metric:'Threshold 60\u2032',  likes:88,  comments:9,  agility:80, recovery:83 },
+          { name:'Shaurya Bawa',     handle:'@shauryab', post:'Boast from back-left dropped opponents to 38% retrieval. Logging it.',          metric:'Tactical +14%',        likes:167, comments:22, agility:87, recovery:80 },
+          { name:'Thomas Soltanian', handle:'@thomass',  post:'PR session: 612 high-quality decels with <5% asymmetry.',                       metric:'Symmetry 95%',         likes:134, comments:16, agility:89, recovery:82 },
+          { name:'Paarth Ambani',    handle:'@paartha',  post:'Cognitive flag cleared. Decision delay back to 38ms baseline.',                 metric:'Cog \u2212176ms',     likes:64,  comments:6,  agility:81, recovery:85 },
+          { name:'Arhan Chandra',    handle:'@arhanc',   post:'Volley kill conversion 64% on loose rails this week. Trusting the wrist.',     metric:'Conv 64%',             likes:109, comments:12, agility:85, recovery:77 },
+          { name:'Laszlo Godde',     handle:'@laszlog',  post:'HRV trending up 8ms over the block. Holding the deload.',                      metric:'HRV 81ms',             likes:73,  comments:8,  agility:78, recovery:88 }
+        ];
+        function memberCardHtml(m, idx){
+          return ''+
+            '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:18px;padding:14px;margin-bottom:10px">'+
+              '<div style="display:flex;align-items:center;gap:10px">'+
+                '<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.10);display:grid;place-items:center;font:700 11px/1 system-ui;color:#fff">'+initials(m.name)+'</div>'+
+                '<div style="flex:1;min-width:0">'+
+                  '<div style="font-weight:700;font-size:13px;color:#fff">'+m.name+'</div>'+
+                  '<div style="font:600 10px/1 monospace;color:rgba(255,255,255,0.45)">'+m.handle+' · Columbia</div>'+
+                '</div>'+
+                '<span style="font:700 9px/1 monospace;letter-spacing:.12em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:#fff;white-space:nowrap">'+m.metric+'</span>'+
+              '</div>'+
+              '<p style="margin:10px 0 0;font-size:12px;color:rgba(255,255,255,0.72);line-height:1.5">'+m.post+'</p>'+
+              '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;text-align:center">'+
+                '<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:6px"><b style="font-size:13px;color:#fff">'+m.agility+'</b><div style="font-size:10px;color:rgba(255,255,255,0.45)">Agility</div></div>'+
+                '<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:6px"><b style="font-size:13px;color:#fff">'+m.recovery+'</b><div style="font-size:10px;color:rgba(255,255,255,0.45)">Recovery</div></div>'+
+                '<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:6px"><b style="font-size:13px;color:#fff">♡ '+m.likes+'</b><div style="font-size:10px;color:rgba(255,255,255,0.45)">'+m.comments+' comments</div></div>'+
+              '</div>'+
+            '</div>';
+        }
+        function enhanceSocial(){
+          // Find the VYRO Social header
+          var headers = document.querySelectorAll('h1,h2,h3');
+          var socialHeader = null;
+          for (var i = 0; i < headers.length; i++) {
+            var t = (headers[i].textContent || '').trim();
+            if (/Community .* Group .* Compete/i.test(t) || /^Community\s*[·•]\s*Group/i.test(t)) { socialHeader = headers[i]; break; }
+          }
+          if (!socialHeader) return;
+          var main = socialHeader.closest('main') || document.querySelector('main') || socialHeader.parentElement.parentElement;
+          if (!main) return;
+          if (main.querySelector('[data-vyro-columbia]')) return;
+
+          // Hide all existing content sections after the tab bar (which sits right after the header)
+          var headerWrap = socialHeader.parentElement;
+          while (headerWrap && headerWrap.parentElement && !/social/i.test(headerWrap.className||'')) {
+            if (headerWrap.parentElement === main || headerWrap.parentElement.tagName === 'DIV') break;
+            headerWrap = headerWrap.parentElement;
+          }
+          // Hide every section/article under main that follows the header (these are feed cards, scout, etc.)
+          var contentNodes = main.querySelectorAll('section, article');
+          contentNodes.forEach(function(n){
+            if (n.contains(socialHeader)) return;
+            n.style.display = 'none';
+          });
+
+          var container = document.createElement('div');
+          container.setAttribute('data-vyro-columbia','1');
+          container.style.cssText = 'margin-top:16px';
+          container.innerHTML =
+            // Group banner
+            '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.055);border-radius:24px;padding:16px;margin-bottom:14px">'+
+              '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
+                '<div>'+
+                  '<div style="font:700 10px/1 monospace;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,0.45)">Group · invite-only</div>'+
+                  '<h3 style="margin:6px 0 0;font-size:20px;font-weight:900;color:#fff">Columbia Squash</h3>'+
+                  '<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.55)">10 members · 247 sessions logged this month · 86% avg recovery</p>'+
+                '</div>'+
+                '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid #f59e0b66;background:#f59e0b1a;color:#f59e0b">live</span>'+
+              '</div>'+
+              '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px;text-align:center">'+
+                ['10|Members','247|Sessions / 30d','84|Avg agility','82|Avg recovery','71%|Win rate'].map(function(s){
+                  var p = s.split('|');
+                  return '<div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:8px"><div style="font-size:18px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums">'+p[0]+'</div><div style="font:600 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-top:4px">'+p[1]+'</div></div>';
+                }).join('')+
+              '</div>'+
+            '</div>'+
+            // Members feed
+            '<div style="font:700 10px/1 monospace;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin:6px 2px 10px">Columbia feed</div>'+
+            COLUMBIA.map(memberCardHtml).join('');
+          // Insert container right after the header wrap
+          (headerWrap || socialHeader.parentElement).parentElement.appendChild(container);
+        }
+
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); }, 1500);
+        // Swap the bundle's hardcoded roster names to the user's requested names.
+        var VYRO_NAME_SWAPS = [
+          ['Shiv Patel', 'Kathryn Chung'],
+          ['Alex K.',    'Chelsea Chan'],
+          ['Marcus W.',  'Savannah Moxham'],
+          ['Diego R.',   'Sam Yu'],
+          ['Nico B.',    'Player X'],
+          ['Kira J.',    'Yusuf Sheikh']
+        ];
+        function vyroSwapNames(){
+          var skip = { SCRIPT:1, STYLE:1, NOSCRIPT:1, INPUT:1, TEXTAREA:1 };
+          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          var n, q = [];
+          while ((n = w.nextNode())) {
+            var p = n.parentElement; if (!p || skip[p.tagName]) continue;
+            var t = n.textContent, c = t;
+            for (var i = 0; i < VYRO_NAME_SWAPS.length; i++) {
+              if (c.indexOf(VYRO_NAME_SWAPS[i][0]) !== -1) c = c.split(VYRO_NAME_SWAPS[i][0]).join(VYRO_NAME_SWAPS[i][1]);
+            }
+            if (c !== t) q.push([n, c]);
+          }
+          q.forEach(function(pair){ pair[0].textContent = pair[1]; });
+        }
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); vyroSwapNames(); }, 800);
+        setTimeout(vyroSwapNames, 200);
+        setTimeout(vyroSwapNames, 800);
+
       });
     </script>
     <script type="module">
