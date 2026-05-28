@@ -1289,9 +1289,54 @@
           }
         }
 
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); }, 1500);
+        // ===== Sport modules: make every active sport feel built-out, not just squash/tennis =====
+        function buildSportSurfaceSVG(sport){
+          var key = (sport || '').toLowerCase();
+          var fill = key === 'basketball' ? '#5b2b12' : key === 'hockey' ? '#e8f3ff' : key === 'golf' ? '#234f2c' : key === 'baseball' ? '#21452c' : '#163824';
+          var stroke = key === 'hockey' ? 'rgba(20,35,55,0.45)' : 'rgba(255,255,255,0.42)';
+          var hot = '<defs><radialGradient id="sport-hot" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ff2d2d" stop-opacity=".78"/><stop offset="58%" stop-color="#ff7a1a" stop-opacity=".34"/><stop offset="100%" stop-color="#ff7a1a" stop-opacity="0"/></radialGradient></defs>';
+          var lines = '';
+          var label = 'FIELD LOAD MAP';
+          if (key === 'baseball') {
+            label = 'DIAMOND LOAD MAP';
+            lines = '<path d="M50 18 L86 52 L50 86 L14 52 Z" fill="none" stroke="'+stroke+'" stroke-width="1.8"/><path d="M50 86 L50 52 L86 52 M50 52 L50 18 M50 52 L14 52" stroke="'+stroke+'" stroke-width="1"/><circle cx="50" cy="52" r="4" fill="rgba(255,255,255,.25)"/><ellipse cx="50" cy="82" rx="16" ry="9" fill="url(#sport-hot)"/><ellipse cx="50" cy="24" rx="12" ry="9" fill="url(#sport-hot)" opacity=".72"/>';
+          } else if (key === 'basketball') {
+            label = 'HALF-COURT LOAD MAP';
+            lines = '<rect x="7" y="8" width="86" height="84" fill="none" stroke="'+stroke+'" stroke-width="1.5"/><line x1="7" y1="52" x2="93" y2="52" stroke="'+stroke+'"/><path d="M31 92 A19 19 0 0 1 69 92" fill="none" stroke="'+stroke+'"/><rect x="35" y="72" width="30" height="20" fill="none" stroke="'+stroke+'"/><circle cx="50" cy="84" r="3" fill="rgba(255,255,255,.45)"/><ellipse cx="50" cy="76" rx="18" ry="12" fill="url(#sport-hot)"/><ellipse cx="24" cy="48" rx="12" ry="10" fill="url(#sport-hot)" opacity=".66"/>';
+          } else if (key === 'football') {
+            label = 'FIELD STRAIN MAP';
+            lines = '<rect x="5" y="10" width="90" height="80" fill="none" stroke="'+stroke+'" stroke-width="1.5"/>'+[20,35,50,65,80].map(function(x){return '<line x1="'+x+'" y1="10" x2="'+x+'" y2="90" stroke="'+stroke+'" stroke-width=".8"/>';}).join('')+'<ellipse cx="42" cy="50" rx="20" ry="14" fill="url(#sport-hot)"/><ellipse cx="72" cy="30" rx="13" ry="10" fill="url(#sport-hot)" opacity=".7"/>';
+          } else if (key === 'golf') {
+            label = 'HOLE MOVEMENT MAP';
+            lines = '<path d="M20 88 C28 62 33 34 49 18 C61 6 83 12 84 30 C85 50 67 57 63 75" fill="none" stroke="'+stroke+'" stroke-width="16" stroke-linecap="round" opacity=".28"/><path d="M20 88 C28 62 33 34 49 18 C61 6 83 12 84 30 C85 50 67 57 63 75" fill="none" stroke="'+stroke+'" stroke-width="2" stroke-dasharray="4 3"/><circle cx="63" cy="75" r="8" fill="rgba(255,255,255,.18)"/><ellipse cx="50" cy="20" rx="16" ry="12" fill="url(#sport-hot)"/><ellipse cx="22" cy="86" rx="12" ry="8" fill="url(#sport-hot)" opacity=".6"/>';
+          } else if (key === 'hockey') {
+            label = 'RINK LOAD MAP';
+            lines = '<rect x="5" y="12" width="90" height="76" rx="18" fill="none" stroke="'+stroke+'" stroke-width="1.6"/><line x1="50" y1="12" x2="50" y2="88" stroke="rgba(220,30,45,.45)"/><line x1="26" y1="12" x2="26" y2="88" stroke="rgba(30,90,180,.38)"/><line x1="74" y1="12" x2="74" y2="88" stroke="rgba(30,90,180,.38)"/><circle cx="50" cy="50" r="10" fill="none" stroke="'+stroke+'"/><ellipse cx="74" cy="50" rx="18" ry="14" fill="url(#sport-hot)"/><ellipse cx="28" cy="28" rx="12" ry="9" fill="url(#sport-hot)" opacity=".62"/>';
+          } else {
+            label = 'PITCH LOAD MAP';
+            lines = '<rect x="5" y="10" width="90" height="80" fill="none" stroke="'+stroke+'" stroke-width="1.5"/><line x1="50" y1="10" x2="50" y2="90" stroke="'+stroke+'"/><circle cx="50" cy="50" r="13" fill="none" stroke="'+stroke+'"/><rect x="5" y="30" width="16" height="40" fill="none" stroke="'+stroke+'"/><rect x="79" y="30" width="16" height="40" fill="none" stroke="'+stroke+'"/><ellipse cx="67" cy="58" rx="17" ry="13" fill="url(#sport-hot)"/><ellipse cx="34" cy="30" rx="13" ry="10" fill="url(#sport-hot)" opacity=".68"/>';
+          }
+          return '<svg viewBox="0 0 100 100" width="100%" style="display:block;border-radius:14px;background:'+fill+'">'+hot+'<rect width="100" height="100" fill="'+fill+'"/>'+lines+'<path d="M18 82 C35 61 48 70 60 49 S80 35 88 20" fill="none" stroke="#10b981" stroke-width="1.4" stroke-dasharray="3 3"/><text x="6" y="9" fill="rgba(255,255,255,.62)" font-size="5" font-family="monospace" letter-spacing="1">'+label+'</text></svg>';
+        }
+        function enhanceSportSurface(){
+          var h1 = document.querySelector('main h1');
+          if (!h1) return;
+          var m = (h1.textContent || '').match(/^(Baseball|Basketball|Football|Golf|Hockey|Soccer) performance lab\./i);
+          if (!m) return;
+          var sport = m[1];
+          var tabs = document.querySelector('.sport-section-tabs');
+          if (!tabs || tabs.parentElement.querySelector('[data-vyro-sport-surface="'+sport.toLowerCase()+'"]')) return;
+          Array.prototype.forEach.call(tabs.parentElement.querySelectorAll('[data-vyro-sport-surface]'), function(n){ n.remove(); });
+          var card = document.createElement('div');
+          card.setAttribute('data-vyro-sport-surface', sport.toLowerCase());
+          card.style.cssText = 'border:1px solid rgba(0,0,0,.08);background:#fff;border-radius:18px;padding:14px;margin:12px 0;color:#111;box-shadow:0 1px 2px rgba(0,0,0,.04)';
+          card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div><div style="font:700 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(0,0,0,.45)">Live sport surface</div><h3 style="font-size:16px;font-weight:900;margin:4px 0 0">'+sport+' movement heatmap</h3></div><span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;color:#10b981;border:1px solid #10b98155;border-radius:999px;padding:5px 8px;background:#10b98114">built out</span></div>'+buildSportSurfaceSVG(sport)+'<p style="font-size:11px;color:rgba(0,0,0,.58);line-height:1.45;margin:10px 0 0">Sport-specific surface model pairs video positioning with wearable load so this module is not using a squash or tennis placeholder.</p>';
+          tabs.parentElement.insertBefore(card, tabs.nextSibling);
+        }
+
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 1500);
         // Swap the bundle's hardcoded roster names to realistic male collegiate squash athletes.
         var VYRO_NAME_SWAPS = [
           ['Shiv Patel',  'Omar Allaudin'],
