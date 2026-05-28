@@ -783,15 +783,15 @@
           grid.appendChild(card);
         }
 
-        // ===== Coach roster (Sam Yu, Kathryn Chung, Chelsea Chan, Savannah Moxham, Yow, Marina, Sam Todd) =====
+        // ===== Coach roster (collegiate men's squash squad — realistic season metrics) =====
         var COACH_ROSTER = [
-          { name: 'Sam Yu',          status: 'Peak',    statusColor: '#10b981', load: 48, hrv: 82, matches: 24, wins: 18 },
-          { name: 'Kathryn Chung',   status: 'Ready',   statusColor: '#10b981', load: 61, hrv: 74, matches: 22, wins: 15 },
-          { name: 'Chelsea Chan',    status: 'Caution', statusColor: '#f59e0b', load: 78, hrv: 58, matches: 26, wins: 17 },
-          { name: 'Savannah Moxham', status: 'Ready',   statusColor: '#10b981', load: 64, hrv: 71, matches: 21, wins: 14 },
-          { name: 'Yow',             status: 'Peak',    statusColor: '#10b981', load: 52, hrv: 79, matches: 19, wins: 13 },
-          { name: 'Marina',          status: 'Ready',   statusColor: '#10b981', load: 66, hrv: 70, matches: 23, wins: 14 },
-          { name: 'Sam Todd',        status: 'Recover', statusColor: '#ef4444', load: 81, hrv: 54, matches: 18, wins: 10 }
+          { name: 'Marwan Tarek',    status: 'Peak',    statusColor: '#10b981', load: 54, hrv: 87, matches: 23, wins: 19 },
+          { name: 'Omar Allaudin',   status: 'Ready',   statusColor: '#10b981', load: 63, hrv: 78, matches: 21, wins: 15 },
+          { name: 'Aly Hussein',     status: 'Caution', statusColor: '#f59e0b', load: 79, hrv: 61, matches: 24, wins: 16 },
+          { name: 'David Mensah',    status: 'Ready',   statusColor: '#10b981', load: 67, hrv: 73, matches: 20, wins: 13 },
+          { name: 'Karim Sadek',     status: 'Peak',    statusColor: '#10b981', load: 51, hrv: 84, matches: 22, wins: 17 },
+          { name: 'Jonah Bryan',     status: 'Ready',   statusColor: '#10b981', load: 69, hrv: 71, matches: 19, wins: 12 },
+          { name: 'Andrew Douglas',  status: 'Recover', statusColor: '#ef4444', load: 84, hrv: 56, matches: 18, wins: 10 }
         ];
         function initials(n){ return n.split(/\s+/).map(function(p){return p[0];}).join('').slice(0,2).toUpperCase(); }
         function enhanceCoachRoster(){
