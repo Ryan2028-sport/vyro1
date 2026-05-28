@@ -1316,9 +1316,33 @@
           }
           q.forEach(function(pair){ pair[0].textContent = pair[1]; });
         }
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceHeatmap(); enhanceSocialThumbnails(); vyroSwapNames(); }, 800);
+        function vyroDemoPolish(){
+          var swaps = [
+            ['2,600 kcal intake goal · projected today','2,950 kcal training-day goal · projected today'],
+            ['Eaten 680 / 2,600','Eaten 680 / 2,950'],
+            ['BURN 1,842','BURN 1,240'],
+            ['GOAL 2,600','GOAL 2,950'],
+            ['LEFT 1,920','LEFT 2,270'],
+            ['5 ATHLETES','6 ATHLETES'],
+            ['4 CONSENTED','5 CONSENTED'],
+            ['Mostafa Hesham tendency profile','Princeton #3 tendency profile'],
+            ['Mostafa Hesham\'s combined profile','Princeton #3 combined profile'],
+            ['Across Squash teammates','Across Columbia teammates']
+          ];
+          var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          var n, edits = [];
+          while ((n = w.nextNode())) {
+            var t = n.textContent || '', c = t;
+            swaps.forEach(function(s){ c = c.split(s[0]).join(s[1]); });
+            if (c !== t) edits.push([n,c]);
+          }
+          edits.forEach(function(e){ e[0].textContent = e[1]; });
+        }
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceHeatmap(); enhanceSocialThumbnails(); vyroSwapNames(); vyroDemoPolish(); }, 800);
         setTimeout(vyroSwapNames, 200);
         setTimeout(vyroSwapNames, 800);
+        setTimeout(vyroDemoPolish, 250);
+        setTimeout(vyroDemoPolish, 900);
 
       });
     </script>
