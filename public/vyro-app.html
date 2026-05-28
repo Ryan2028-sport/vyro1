@@ -839,14 +839,14 @@
           card.appendChild(wrap);
         }
 
-        // ===== Combined opponent model =====
+        // ===== Combined opponent model (Ivy League men's squash opponents — sample-weighted tendencies) =====
         var OPP_DATA = {
-          'Savannah Moxham':  [['Back-left','Straight drive on pressure',74,38],['Back-right','Cross-court reset',52,31],['Front-left','Counter-drop',61,22],['Mid-court volley','Volley kill on loose rail',58,19]],
-          'Sam Yu':           [['Back-left','Straight drive on pressure',70,41],['Back-right','Cross-court reset',47,28],['Front-left','Counter-drop',55,24],['Mid-court volley','Volley kill on loose rail',64,26]],
-          'Kathryn Chung':    [['Back-left','Straight drive on pressure',71,34],['Back-right','Cross-court reset',49,30],['Front-left','Counter-drop',59,21],['Mid-court volley','Volley kill on loose rail',60,23]],
-          'Chelsea Chan':     [['Back-left','Straight drive on pressure',69,44],['Back-right','Cross-court reset',54,36],['Front-left','Counter-drop',57,27],['Mid-court volley','Volley kill on loose rail',62,29]]
+          'Mostafa Hesham':   [['Back-left','Straight drive on pressure',73,62],['Back-right','Cross-court reset',51,44],['Front-left','Counter-drop',58,29],['Mid-court volley','Volley kill on loose rail',61,33]],
+          'Velavan Senthil':  [['Back-left','Straight drive on pressure',68,57],['Back-right','Cross-court reset',46,38],['Front-left','Counter-drop',54,31],['Mid-court volley','Volley kill on loose rail',66,36]],
+          'James Flynn':      [['Back-left','Straight drive on pressure',71,49],['Back-right','Cross-court reset',49,41],['Front-left','Counter-drop',57,27],['Mid-court volley','Volley kill on loose rail',59,31]],
+          'Saadeldin Abouaish':[['Back-left','Straight drive on pressure',69,53],['Back-right','Cross-court reset',55,42],['Front-left','Counter-drop',56,30],['Mid-court volley','Volley kill on loose rail',63,34]]
         };
-        var OPP_SELECTED = { 'Savannah Moxham': true, 'Sam Yu': true, 'Kathryn Chung': true, 'Chelsea Chan': false };
+        var OPP_SELECTED = { 'Mostafa Hesham': true, 'Velavan Senthil': true, 'James Flynn': true, 'Saadeldin Abouaish': false };
         function computeCombined(){
           var buckets = {};
           Object.keys(OPP_SELECTED).forEach(function(name){
