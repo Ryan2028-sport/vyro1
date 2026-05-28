@@ -1010,9 +1010,288 @@
           (headerWrap || socialHeader.parentElement).parentElement.appendChild(container);
         }
 
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); }, 1500);
+        // ===== Realistic court heatmaps (Squash + Tennis) =====
+        // Squash: portrait court, front wall top. Hotspots reflect real movement density —
+        // dominant T-zone occupancy, heavy back-corner work, lighter front-court touches.
+        // Tennis: landscape court. Hotspots at returner positions behind baseline corners.
+        function buildHeatmapSVG(sport, view){
+          // view: 'density' | 'fatigue' | 'attack'
+          var W = 320, H = 460;
+          var hotspots; // [x%, y%, radius%, intensity 0..1]
+          var courtLines = '';
+          var courtFill = '#0e1a14';
+          if (sport === 'tennis') {
+            W = 460; H = 320;
+            // Singles court 8.23m x 23.77m (landscape). Hotspots near baselines.
+            if (view === 'fatigue') {
+              hotspots = [
+                [8,  20, 16, 0.95], [8,  50, 14, 0.70], [8,  80, 16, 0.92],
+                [92, 22, 16, 0.88], [92, 78, 16, 0.85], [50, 50, 12, 0.35]
+              ];
+            } else if (view === 'attack') {
+              hotspots = [
+                [22, 50, 14, 0.85], [78, 50, 14, 0.82],
+                [35, 30, 10, 0.55], [65, 70, 10, 0.55], [50, 50, 14, 0.45]
+              ];
+            } else {
+              hotspots = [
+                [10, 25, 18, 1.0],  [10, 75, 18, 0.92], [10, 50, 14, 0.55],
+                [90, 25, 17, 0.85], [90, 75, 17, 0.88], [90, 50, 14, 0.50],
+                [50, 50, 12, 0.40]
+              ];
+            }
+            // Tennis lines (singles court, landscape)
+            courtLines =
+              '<rect x="2%" y="6%" width="96%" height="88%" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5"/>' +
+              '<line x1="50%" y1="6%" x2="50%" y2="94%" stroke="rgba(255,255,255,0.35)" stroke-width="1.2" stroke-dasharray="4 4"/>' +
+              '<line x1="25%" y1="30%" x2="75%" y2="30%" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>' +
+              '<line x1="25%" y1="70%" x2="75%" y2="70%" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>' +
+              '<line x1="25%" y1="30%" x2="25%" y2="70%" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>' +
+              '<line x1="75%" y1="30%" x2="75%" y2="70%" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>' +
+              '<line x1="50%" y1="30%" x2="50%" y2="70%" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>';
+          } else {
+            // Squash 6.4m x 9.75m, portrait, front wall = top
+            // T at center, ~62% down (real T position is 5.49m from front wall = 56% of 9.75m)
+            if (view === 'fatigue') {
+              hotspots = [
+                [50, 60, 14, 0.95],
+                [18, 90, 18, 1.0], [82, 90, 18, 0.92],
+                [25, 75, 11, 0.55], [75, 75, 11, 0.55],
+                [50, 88, 10, 0.45]
+              ];
+            } else if (view === 'attack') {
+              hotspots = [
+                [50, 56, 12, 0.85],
+                [22, 22, 13, 0.90], [78, 22, 13, 0.82],
+                [50, 32, 10, 0.55],
+                [28, 62, 9, 0.5], [72, 62, 9, 0.5]
+              ];
+            } else {
+              hotspots = [
+                [50, 58, 16, 1.0],
+                [18, 88, 17, 0.92], [82, 88, 17, 0.88],
+                [50, 78, 12, 0.55],
+                [25, 30, 11, 0.42], [75, 30, 11, 0.40],
+                [50, 18, 10, 0.30]
+              ];
+            }
+            // Squash lines: outline + short-line (T-line, 5.44m from front wall ≈ 56% down) + service boxes + half-court line
+            courtLines =
+              '<rect x="2%" y="2%" width="96%" height="96%" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5"/>' +
+              '<line x1="2%" y1="56%" x2="98%" y2="56%" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/>' +
+              '<line x1="50%" y1="56%" x2="50%" y2="98%" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>' +
+              // Left service box (1.6m x 1.6m → ~25% wide, ~16% tall from short line)
+              '<rect x="2%" y="56%" width="25%" height="16%" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>' +
+              '<rect x="73%" y="56%" width="25%" height="16%" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>' +
+              // T marker
+              '<circle cx="50%" cy="56%" r="3" fill="#10b981"/>' +
+              '<text x="52%" y="58.5%" fill="#10b981" font-family="monospace" font-size="9" font-weight="700">T</text>' +
+              '<text x="3%" y="5%" fill="rgba(255,255,255,0.45)" font-family="monospace" font-size="9" letter-spacing="1.5">FRONT WALL</text>' +
+              '<text x="3%" y="99%" fill="rgba(255,255,255,0.45)" font-family="monospace" font-size="9" letter-spacing="1.5">BACK WALL</text>';
+          }
+
+          var defs = '<defs>';
+          var spots = '';
+          hotspots.forEach(function(h, i){
+            var id = 'vhot-'+sport+'-'+view+'-'+i;
+            // Heat colors: orange→red gradient based on intensity
+            var inner = h[3] > 0.8 ? '#ff2d2d' : h[3] > 0.55 ? '#ff6b1a' : '#f59e0b';
+            defs += '<radialGradient id="'+id+'" cx="50%" cy="50%" r="50%">' +
+                      '<stop offset="0%" stop-color="'+inner+'" stop-opacity="'+(0.85*h[3])+'"/>' +
+                      '<stop offset="55%" stop-color="'+inner+'" stop-opacity="'+(0.30*h[3])+'"/>' +
+                      '<stop offset="100%" stop-color="'+inner+'" stop-opacity="0"/>' +
+                    '</radialGradient>';
+            spots += '<ellipse cx="'+h[0]+'%" cy="'+h[1]+'%" rx="'+h[2]+'%" ry="'+(h[2]*0.95)+'%" fill="url(#'+id+')"/>';
+          });
+          defs += '</defs>';
+
+          return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block;border-radius:14px;background:'+courtFill+'">' +
+                   defs +
+                   '<rect width="100%" height="100%" fill="'+courtFill+'"/>' +
+                   // Soft base wash
+                   '<rect width="100%" height="100%" fill="rgba(255,80,40,0.04)"/>' +
+                   spots +
+                   courtLines +
+                 '</svg>';
+        }
+
+        function enhanceHeatmap(){
+          // Find the "LIVE COURT HEAT MAP" card
+          var label = null;
+          var els = document.querySelectorAll('div,span,p,h1,h2,h3,h4');
+          for (var i = 0; i < els.length; i++) {
+            var t = (els[i].textContent || '').trim();
+            if (/^LIVE\s+COURT\s+HEAT\s+MAP$/i.test(t)) { label = els[i]; break; }
+          }
+          if (!label) return;
+          var card = label.closest('section') || label.parentElement;
+          for (var k = 0; k < 8 && card && card.tagName !== 'SECTION'; k++) card = card.parentElement;
+          if (!card) return;
+
+          // Detect current sport from active pill near the top
+          var bodyTxt = document.body.textContent || '';
+          var sport = /Tennis performance lab/i.test(bodyTxt) ? 'tennis'
+                    : /Squash performance lab/i.test(bodyTxt) ? 'squash'
+                    : 'squash';
+
+          // Detect current view (Movement density / Fatigue cost / Attack conversion)
+          var view = 'density';
+          var pills = card.querySelectorAll('button');
+          for (var p = 0; p < pills.length; p++) {
+            var pt = (pills[p].textContent || '').trim();
+            var cs = window.getComputedStyle(pills[p]);
+            var active = cs.backgroundColor && cs.backgroundColor.indexOf('16, 185') !== -1;
+            // Fall back: check for distinct active styling via opacity/bg
+            if (!active) {
+              var bg = cs.backgroundColor || '';
+              active = /rgb\(16,\s*185|rgba\(16,\s*185|#10b981/i.test(bg) || pills[p].getAttribute('data-state') === 'active';
+            }
+            if (active) {
+              if (/fatigue/i.test(pt)) view = 'fatigue';
+              else if (/attack/i.test(pt)) view = 'attack';
+              else if (/density/i.test(pt)) view = 'density';
+            }
+          }
+
+          var existing = card.querySelector('[data-vyro-heatmap]');
+          var sig = sport+'|'+view;
+          if (existing && existing.getAttribute('data-vyro-sig') === sig) return;
+          if (existing) existing.remove();
+
+          // Hide the original heatmap (large square grid of red cells). Strategy: find a child
+          // whose innerHTML contains many small same-colored cells — typically a grid container.
+          var hidTargets = [];
+          var divs = card.querySelectorAll('div');
+          for (var d = 0; d < divs.length; d++) {
+            var dv = divs[d];
+            // The grid is the big square with aspect-ratio set; find by computed style + many children
+            var st = window.getComputedStyle(dv);
+            if ((st.aspectRatio && st.aspectRatio !== 'auto') ||
+                (dv.children.length >= 20 && st.display === 'grid')) {
+              hidTargets.push(dv);
+            }
+          }
+          // Also hide any element that looks like the previous heatmap by class hint
+          hidTargets.forEach(function(n){ n.style.display = 'none'; });
+
+          var box = document.createElement('div');
+          box.setAttribute('data-vyro-heatmap','1');
+          box.setAttribute('data-vyro-sig', sig);
+          box.style.cssText = 'margin:10px 0 6px;border-radius:14px;overflow:hidden;background:#0e1a14';
+          box.innerHTML = buildHeatmapSVG(sport, view) +
+            '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;font:600 10px/1 monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,0.55);background:rgba(0,0,0,0.25)">'+
+              '<span>'+(sport==='tennis'?'Singles court':'Front wall ↑')+'</span>'+
+              '<span style="display:flex;align-items:center;gap:6px"><span>Low</span>'+
+                '<span style="width:64px;height:6px;border-radius:999px;background:linear-gradient(90deg,rgba(245,158,11,0.25),rgba(255,107,26,0.7),rgba(255,45,45,0.95))"></span>'+
+              '<span>High</span></span>'+
+            '</div>';
+
+          // Insert just after the label area / view pills if possible
+          var insertPoint = null;
+          var children = card.children;
+          for (var c2 = 0; c2 < children.length; c2++) {
+            if (children[c2].textContent && /density|fatigue cost|attack conversion/i.test(children[c2].textContent) && children[c2].querySelector('button')) {
+              insertPoint = children[c2].nextSibling;
+              break;
+            }
+          }
+          if (insertPoint) card.insertBefore(box, insertPoint);
+          else card.appendChild(box);
+        }
+
+        // ===== Social: replace dark/empty media placeholders with realistic video thumbnails =====
+        function enhanceSocialThumbnails(){
+          // The placeholder cards have short captions like "Back-right rally clip", "Forehand overlay",
+          // "Return-to-T proof" and render as a near-black box. Detect by aspect + dark bg + caption text.
+          var candidates = document.querySelectorAll('div');
+          var captions = /^(Back-right rally clip|Forehand overlay|Return-to-T proof|Back-left drive|Volley kill rep|Drop shot rep|Boast rally|3rd-shot drive)$/i;
+          for (var i = 0; i < candidates.length; i++) {
+            var el = candidates[i];
+            if (el.getAttribute('data-vyro-thumb')) continue;
+            var txt = (el.textContent || '').trim();
+            if (!captions.test(txt)) continue;
+            // Walk up to the visual card (the dark box)
+            var card = el;
+            for (var k = 0; k < 6 && card; k++) {
+              var st = window.getComputedStyle(card);
+              var rect = card.getBoundingClientRect();
+              if (rect.width > 200 && rect.height > 110 && rect.width / rect.height > 1.3 && rect.width / rect.height < 2.4) break;
+              card = card.parentElement;
+            }
+            if (!card) continue;
+            if (card.getAttribute('data-vyro-thumb')) continue;
+            card.setAttribute('data-vyro-thumb','1');
+
+            // Determine sport context from caption
+            var isTennis = /forehand|backhand|serve|rally cross/i.test(txt);
+            var grad = isTennis
+              ? 'radial-gradient(120% 80% at 50% 20%, rgba(16,185,129,0.35), transparent 60%), linear-gradient(160deg,#0d3a2a,#06140f 70%)'
+              : 'radial-gradient(120% 80% at 50% 70%, rgba(255,80,40,0.35), transparent 60%), linear-gradient(160deg,#1a0f0a,#0a0604 70%)';
+
+            // Build an SVG mini court frame as the thumbnail background
+            var thumbSvg = isTennis
+              ? '<svg viewBox="0 0 200 110" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;opacity:0.85">'+
+                  '<rect width="100%" height="100%" fill="#0d3a2a"/>'+
+                  '<rect x="6" y="14" width="188" height="82" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>'+
+                  '<line x1="100" y1="14" x2="100" y2="96" stroke="rgba(255,255,255,0.35)" stroke-width="0.8" stroke-dasharray="3 3"/>'+
+                  '<line x1="50" y1="36" x2="150" y2="36" stroke="rgba(255,255,255,0.25)" stroke-width="0.7"/>'+
+                  '<line x1="50" y1="74" x2="150" y2="74" stroke="rgba(255,255,255,0.25)" stroke-width="0.7"/>'+
+                  '<circle cx="32" cy="86" r="14" fill="rgba(255,80,40,0.55)"/>'+
+                  '<circle cx="168" cy="22" r="12" fill="rgba(255,80,40,0.45)"/>'+
+                '</svg>'
+              : '<svg viewBox="0 0 200 110" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;opacity:0.85">'+
+                  '<rect width="100%" height="100%" fill="#13080a"/>'+
+                  '<rect x="40" y="6" width="120" height="98" fill="none" stroke="rgba(255,255,255,0.32)" stroke-width="1"/>'+
+                  '<line x1="40" y1="62" x2="160" y2="62" stroke="rgba(255,255,255,0.32)" stroke-width="0.8"/>'+
+                  '<line x1="100" y1="62" x2="100" y2="104" stroke="rgba(255,255,255,0.28)" stroke-width="0.8"/>'+
+                  '<rect x="40" y="62" width="30" height="20" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.7"/>'+
+                  '<rect x="130" y="62" width="30" height="20" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.7"/>'+
+                  '<circle cx="100" cy="62" r="2" fill="#10b981"/>'+
+                  // Density hotspots
+                  '<ellipse cx="100" cy="62" rx="22" ry="14" fill="rgba(255,45,45,0.45)"/>'+
+                  '<ellipse cx="56" cy="96" rx="18" ry="11" fill="rgba(255,107,26,0.5)"/>'+
+                  '<ellipse cx="144" cy="96" rx="18" ry="11" fill="rgba(255,107,26,0.45)"/>'+
+                '</svg>';
+
+            // Sample movement trace (dashed green path)
+            var tracePath = isTennis
+              ? 'M30,90 C60,60 90,70 110,55 S160,30 175,28'
+              : 'M100,62 C90,75 60,82 40,96 M100,62 C120,72 150,86 165,96 M100,62 C100,40 90,28 70,18';
+
+            // Clear and inject
+            card.style.position = 'relative';
+            // Hide pre-existing children but keep card layout
+            Array.prototype.forEach.call(card.children, function(ch){ ch.style.visibility = 'hidden'; });
+            var layer = document.createElement('div');
+            layer.style.cssText = 'position:absolute;inset:0;border-radius:inherit;overflow:hidden;background:'+grad;
+            layer.innerHTML =
+              thumbSvg +
+              '<svg viewBox="0 0 200 110" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">'+
+                '<path d="'+tracePath+'" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 3" stroke-linecap="round"/>'+
+              '</svg>' +
+              // Top meta bar
+              '<div style="position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;font:700 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.85)">'+
+                '<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#ef4444;box-shadow:0 0 8px #ef4444"></span>REC</span>'+
+                '<span style="color:rgba(255,255,255,0.6)">'+(isTennis?'TENNIS':'SQUASH')+' · 1080p</span>'+
+              '</div>' +
+              // Center play button
+              '<div style="position:absolute;inset:0;display:grid;place-items:center">'+
+                '<div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.92);display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,0.5)">'+
+                  '<svg width="22" height="22" viewBox="0 0 24 24" fill="#0a0a0a"><polygon points="6,4 6,20 20,12"/></svg>'+
+                '</div>'+
+              '</div>' +
+              // Bottom caption + duration
+              '<div style="position:absolute;bottom:0;left:0;right:0;padding:8px 10px;background:linear-gradient(180deg,transparent,rgba(0,0,0,0.7));display:flex;justify-content:space-between;align-items:flex-end;color:#fff;font:600 11px/1.2 system-ui">'+
+                '<span>'+txt+'</span>'+
+                '<span style="font-family:monospace;font-size:10px;background:rgba(0,0,0,0.55);padding:3px 6px;border-radius:6px">'+(isTennis?'0:42':'0:38')+'</span>'+
+              '</div>';
+            card.appendChild(layer);
+          }
+        }
+
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); }, 1500);
         // Swap the bundle's hardcoded roster names to realistic male collegiate squash athletes.
         var VYRO_NAME_SWAPS = [
           ['Shiv Patel',  'Omar Allaudin'],
