@@ -1116,7 +1116,7 @@
         }
 
         function enhanceHeatmap(){
-          // Find the "LIVE COURT HEAT MAP" card
+          // Find the "LIVE COURT HEAT MAP" label
           var label = null;
           var els = document.querySelectorAll('div,span,p,h1,h2,h3,h4');
           for (var i = 0; i < els.length; i++) {
@@ -1124,15 +1124,31 @@
             if (/^LIVE\s+COURT\s+HEAT\s+MAP$/i.test(t)) { label = els[i]; break; }
           }
           if (!label) return;
-          var card = label.closest('section') || label.parentElement;
-          for (var k = 0; k < 8 && card && card.tagName !== 'SECTION'; k++) card = card.parentElement;
-          if (!card) return;
+          // Walk up to the tightest card that contains both the label and the heat-map grid.
+          var card = label.parentElement;
+          var found = null;
+          for (var k = 0; k < 8 && card; k++) {
+            var grid = null;
+            var ds = card.querySelectorAll('div');
+            for (var dd = 0; dd < ds.length; dd++) {
+              var dst = window.getComputedStyle(ds[dd]);
+              if ((dst.aspectRatio && dst.aspectRatio !== 'auto') ||
+                  (ds[dd].children.length >= 20 && dst.display === 'grid')) { grid = ds[dd]; break; }
+            }
+            if (grid) { found = card; break; }
+            card = card.parentElement;
+          }
+          if (!found) return;
+          card = found;
 
-          // Detect current sport from active pill near the top
-          var bodyTxt = document.body.textContent || '';
-          var sport = /Tennis performance lab/i.test(bodyTxt) ? 'tennis'
-                    : /Squash performance lab/i.test(bodyTxt) ? 'squash'
-                    : 'squash';
+          // Detect current sport from the visible H1 (e.g., "Squash performance lab.")
+          var sport = 'squash';
+          var h1 = document.querySelector('main h1') || document.querySelector('h1');
+          if (h1) {
+            var ht = (h1.textContent || '').toLowerCase();
+            if (ht.indexOf('tennis') !== -1) sport = 'tennis';
+            else if (ht.indexOf('squash') !== -1) sport = 'squash';
+          }
 
           // Detect current view (Movement density / Fatigue cost / Attack conversion)
           var view = 'density';
@@ -1140,12 +1156,8 @@
           for (var p = 0; p < pills.length; p++) {
             var pt = (pills[p].textContent || '').trim();
             var cs = window.getComputedStyle(pills[p]);
-            var active = cs.backgroundColor && cs.backgroundColor.indexOf('16, 185') !== -1;
-            // Fall back: check for distinct active styling via opacity/bg
-            if (!active) {
-              var bg = cs.backgroundColor || '';
-              active = /rgb\(16,\s*185|rgba\(16,\s*185|#10b981/i.test(bg) || pills[p].getAttribute('data-state') === 'active';
-            }
+            var bg = cs.backgroundColor || '';
+            var active = /rgb\(16,\s*185|rgba\(16,\s*185/.test(bg) || pills[p].getAttribute('data-state') === 'active' || /^(true|active)$/i.test(pills[p].getAttribute('aria-selected')||'');
             if (active) {
               if (/fatigue/i.test(pt)) view = 'fatigue';
               else if (/attack/i.test(pt)) view = 'attack';
@@ -1153,26 +1165,19 @@
             }
           }
 
-          var existing = card.querySelector('[data-vyro-heatmap]');
           var sig = sport+'|'+view;
+          var existing = card.querySelector('[data-vyro-heatmap]');
           if (existing && existing.getAttribute('data-vyro-sig') === sig) return;
           if (existing) existing.remove();
 
-          // Hide the original heatmap (large square grid of red cells). Strategy: find a child
-          // whose innerHTML contains many small same-colored cells — typically a grid container.
-          var hidTargets = [];
-          var divs = card.querySelectorAll('div');
-          for (var d = 0; d < divs.length; d++) {
-            var dv = divs[d];
-            // The grid is the big square with aspect-ratio set; find by computed style + many children
-            var st = window.getComputedStyle(dv);
-            if ((st.aspectRatio && st.aspectRatio !== 'auto') ||
-                (dv.children.length >= 20 && st.display === 'grid')) {
-              hidTargets.push(dv);
-            }
+          // Find the original heatmap grid and replace it in place.
+          var origGrid = null;
+          var ds2 = card.querySelectorAll('div');
+          for (var d2 = 0; d2 < ds2.length; d2++) {
+            var st2 = window.getComputedStyle(ds2[d2]);
+            if ((st2.aspectRatio && st2.aspectRatio !== 'auto') ||
+                (ds2[d2].children.length >= 20 && st2.display === 'grid')) { origGrid = ds2[d2]; break; }
           }
-          // Also hide any element that looks like the previous heatmap by class hint
-          hidTargets.forEach(function(n){ n.style.display = 'none'; });
 
           var box = document.createElement('div');
           box.setAttribute('data-vyro-heatmap','1');
@@ -1180,23 +1185,18 @@
           box.style.cssText = 'margin:10px 0 6px;border-radius:14px;overflow:hidden;background:#0e1a14';
           box.innerHTML = buildHeatmapSVG(sport, view) +
             '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;font:600 10px/1 monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,0.55);background:rgba(0,0,0,0.25)">'+
-              '<span>'+(sport==='tennis'?'Singles court':'Front wall ↑')+'</span>'+
+              '<span>'+(sport==='tennis'?'Singles court':'Front wall \u2191')+'</span>'+
               '<span style="display:flex;align-items:center;gap:6px"><span>Low</span>'+
                 '<span style="width:64px;height:6px;border-radius:999px;background:linear-gradient(90deg,rgba(245,158,11,0.25),rgba(255,107,26,0.7),rgba(255,45,45,0.95))"></span>'+
               '<span>High</span></span>'+
             '</div>';
 
-          // Insert just after the label area / view pills if possible
-          var insertPoint = null;
-          var children = card.children;
-          for (var c2 = 0; c2 < children.length; c2++) {
-            if (children[c2].textContent && /density|fatigue cost|attack conversion/i.test(children[c2].textContent) && children[c2].querySelector('button')) {
-              insertPoint = children[c2].nextSibling;
-              break;
-            }
+          if (origGrid && origGrid.parentElement) {
+            origGrid.parentElement.insertBefore(box, origGrid);
+            origGrid.style.display = 'none';
+          } else {
+            card.appendChild(box);
           }
-          if (insertPoint) card.insertBefore(box, insertPoint);
-          else card.appendChild(box);
         }
 
         // ===== Social: replace dark/empty media placeholders with realistic video thumbnails =====
