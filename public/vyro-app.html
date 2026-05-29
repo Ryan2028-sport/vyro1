@@ -1739,9 +1739,17 @@
           sportBtns.forEach(function(b){
             if (b.__vyroSportWired) return;
             b.__vyroSportWired = true;
-            b.addEventListener('click', function(){
+            b.addEventListener('click', function(e){
               var t = (b.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i);
-              if (t) window.__vyroCoachSport = t[1].charAt(0).toUpperCase() + t[1].slice(1).toLowerCase();
+              if (!t) return;
+              var picked = t[1].charAt(0).toUpperCase() + t[1].slice(1).toLowerCase();
+              window.__vyroCoachSport = picked;
+              if (picked !== 'Squash') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                if (picked !== 'Tennis') showComingSoonToast(picked);
+              }
               setTimeout(enhanceCoachSport, 30);
               setTimeout(enhanceCoachSport, 150);
             }, true);
@@ -1763,7 +1771,7 @@
           var active = sportBtns[0];
           var bestScore = -1;
           sportBtns.forEach(function(b){ var s = activeScore(b); if (s > bestScore){ bestScore = s; active = b; } });
-          var sport = ((active.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i) || [])[1] || 'Squash';
+          var sport = window.__vyroCoachSport || ((active.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i) || [])[1] || 'Squash';
           sport = sport.charAt(0).toUpperCase() + sport.slice(1).toLowerCase();
 
           // Tab row is the parent containing all the sport buttons
