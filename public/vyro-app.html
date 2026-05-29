@@ -1483,6 +1483,10 @@
         function enhanceSportSurface(){
           var h1 = document.querySelector('main h1');
           if (!h1) return;
+          if (/^(Baseball|Basketball|Football|Golf|Hockey|Soccer) performance lab\./i.test(h1.textContent || '')) {
+            Array.prototype.forEach.call(document.querySelectorAll('[data-vyro-sport-surface]'), function(n){ n.remove(); });
+            return;
+          }
           var m = (h1.textContent || '').match(/^(Baseball|Basketball|Football|Golf|Hockey|Soccer) performance lab\./i);
           if (!m) return;
           var sport = m[1];
@@ -1496,19 +1500,16 @@
           tabs.parentElement.insertBefore(card, tabs.nextSibling);
         }
 
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof hideExtraSports==='function') hideExtraSports(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof hideExtraSports==='function') hideExtraSports(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof hideExtraSports==='function') hideExtraSports(); }, 1500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof lockComingSoonSports==='function') lockComingSoonSports(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof lockComingSoonSports==='function') lockComingSoonSports(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof lockComingSoonSports==='function') lockComingSoonSports(); }, 1500);
         // Swap the bundle's hardcoded roster/opponent names to Columbia athletes.
+        var VYRO_NAME_SWAPS = [
           ['Nico B.',             'Yow Ng'],
           ['Kira J.',             'Marina Stefanoni'],
           ['Player X',            'Chelsea Chan'],
           ['Marwan Tarek',        'Yow Ng'],
           ['Diego R.',            'Sam Todd'],
-          ['Nico B.',             'Yow Soon Kit'],
-          ['Kira J.',             'Marina Stefanoni'],
-          ['Player X',            'Chelsea Chan'],
-          ['Marwan Tarek',        'Yow Soon Kit'],
           ['Omar Allaudin',       'Marina Stefanoni'],
           ['Aly Hussein',         'Adam Hawal'],
           ['David Mensah',        'Sam Todd'],
@@ -1546,12 +1547,11 @@
             ['GOAL 2,600','GOAL 2,950'],
             ['LEFT 1,920','LEFT 2,270'],
             ['Baseball, Football, Golf, Squash, and Tennis now have active VYRO sport intelligence layers.','Squash and Tennis are live in VYRO sport intelligence. Additional sports launch post-pilot.'],
-            ['Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, and Tennis all have active VYRO sport intelligence layers.','Squash and Tennis are live in VYRO sport intelligence. Additional sports launch post-pilot.']
+            ['Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, and Tennis all have active VYRO sport intelligence layers.','Squash and Tennis are live in VYRO sport intelligence. Additional sports launch post-pilot.'],
             ['4 CONSENTED','6 CONSENTED'],
             ['Princeton #3 tendency profile','Chelsea Chan tendency profile'],
             ['Princeton #3 combined profile','Chelsea Chan combined profile'],
-            ['Across Squash teammates','Across Columbia teammates'],
-            ['Baseball, Football, Golf, Squash, and Tennis now have active VYRO sport intelligence layers.','Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, and Tennis all have active VYRO sport intelligence layers.']
+            ['Across Squash teammates','Across Columbia teammates']
           ];
           var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
           var n, edits = [];
@@ -1562,30 +1562,68 @@
           }
           edits.forEach(function(e){ e[0].textContent = e[1]; });
         }
-        // Hide sport pills/buttons for sports we haven't released — only Squash and Tennis are live.
+        // Lock sport pills/buttons for sports we haven't released — only Squash and Tennis are selectable.
         var VYRO_HIDDEN_SPORTS_LIST = ['Baseball','Basketball','Football','Golf','Hockey','Soccer'];
-        function hideExtraSports(){
-          // Hide any button/tab/card whose visible text starts with a hidden sport name
+        function getSportLabel(el){
+          var text = (el && (el.getAttribute('aria-label') || el.textContent) || '').replace(/\s+/g,' ').trim();
+          for (var i=0;i<VYRO_HIDDEN_SPORTS_LIST.length;i++) if (new RegExp('(^|\\b)'+VYRO_HIDDEN_SPORTS_LIST[i]+'\\b','i').test(text)) return VYRO_HIDDEN_SPORTS_LIST[i];
+          return '';
+        }
+        function showComingSoonToast(sport){
+          var toast = document.querySelector('[data-vyro-coming-soon-toast]') || document.createElement('div');
+          toast.setAttribute('data-vyro-coming-soon-toast','1');
+          toast.textContent = sport+' is coming soon. Squash and Tennis are live now.';
+          toast.style.cssText = 'position:fixed;left:16px;right:16px;bottom:76px;z-index:99999;background:#0b0f1a;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 14px;text-align:center;font:700 12px/1.35 system-ui;box-shadow:0 14px 40px rgba(0,0,0,.28)';
+          if (!toast.parentElement) document.body.appendChild(toast);
+          clearTimeout(window.__vyroComingSoonTimer);
+          window.__vyroComingSoonTimer = setTimeout(function(){ toast.remove(); }, 2200);
+        }
+        function redirectUnreleasedSport(){
+          var h1 = document.querySelector('main h1');
+          var m = h1 && (h1.textContent || '').match(/^(Baseball|Basketball|Football|Golf|Hockey|Soccer) performance lab\./i);
+          if (!m || window.__vyroRedirectingSport) return;
+          window.__vyroRedirectingSport = true;
+          Array.prototype.forEach.call(document.querySelectorAll('[data-vyro-sport-surface]'), function(n){ n.remove(); });
+          var liveButtons = Array.prototype.slice.call(document.querySelectorAll('button, [role="tab"], [role="button"], a'));
+          var squash = liveButtons.find(function(b){ return /^Squash\b/i.test(((b.getAttribute('aria-label') || b.textContent) || '').replace(/\s+/g,' ').trim()); });
+          if (squash) squash.click();
+          showComingSoonToast(m[1]);
+          setTimeout(function(){ window.__vyroRedirectingSport = false; }, 250);
+        }
+        function lockComingSoonSports(){
+          // Disable any sport selector whose visible text starts with an unreleased sport.
           document.querySelectorAll('button, [role="tab"], [role="button"], a').forEach(function(b){
             if (b.getAttribute('data-vyro-keep') === '1') return;
-            if (b.getAttribute('data-vyro-hidden-sport') === '1') { b.style.display = 'none'; return; }
-            // Use the first visible text node / first child's text to detect the sport label
-            var label = '';
-            var firstEl = b.querySelector('*');
-            if (firstEl) label = (firstEl.textContent || '').trim();
-            if (!label) label = (b.textContent || '').trim();
-            for (var i=0;i<VYRO_HIDDEN_SPORTS_LIST.length;i++){
-              var s = VYRO_HIDDEN_SPORTS_LIST[i];
-              if (label === s || label.indexOf(s) === 0) {
-                b.setAttribute('data-vyro-hidden-sport','1');
-                b.style.display = 'none';
-                break;
-              }
+            var sport = getSportLabel(b);
+            if (!sport) return;
+            b.setAttribute('data-vyro-hidden-sport','1');
+            b.setAttribute('aria-disabled','true');
+            b.setAttribute('tabindex','-1');
+            b.style.opacity = '.46';
+            b.style.cursor = 'not-allowed';
+            b.style.pointerEvents = 'auto';
+            if (!/coming soon/i.test(b.textContent || '')) {
+              var badge = document.createElement('span');
+              badge.textContent = 'Coming soon';
+              badge.style.cssText = 'display:inline-flex;margin-left:8px;border:1px solid rgba(15,23,42,.18);border-radius:999px;padding:3px 7px;font:800 9px/1 system-ui;letter-spacing:.08em;text-transform:uppercase;color:#64748b;background:rgba(148,163,184,.14)';
+              b.appendChild(badge);
             }
           });
+          redirectUnreleasedSport();
         }
+        function blockComingSoonEvent(e){
+          var target = e.target && e.target.closest && e.target.closest('button, [role="tab"], [role="button"], a');
+          var sport = getSportLabel(target);
+          if (!sport) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          showComingSoonToast(sport);
+          setTimeout(redirectUnreleasedSport, 0);
+        }
+        ['pointerdown','mousedown','touchstart','click'].forEach(function(evt){ document.addEventListener(evt, blockComingSoonEvent, true); });
 
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); hideExtraSports(); }, 800);
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); lockComingSoonSports(); redirectUnreleasedSport(); }, 800);
         setTimeout(vyroSwapNames, 200);
         setTimeout(vyroSwapNames, 800);
         setTimeout(vyroDemoPolish, 250);

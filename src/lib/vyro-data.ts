@@ -42,7 +42,9 @@ export const trendMetrics: [string, string, string, string, string][] = [
   ["Sleep Score", "87", "/100", "+7 pts", "The next unlock is reducing wake events after high-load match days."],
 ];
 
-export const sports = ["Baseball", "Basketball", "Football", "Golf", "Hockey", "Soccer", "Squash", "Tennis"];
+export const liveSports = ["Squash", "Tennis"];
+export const comingSoonSports = ["Baseball", "Basketball", "Football", "Golf", "Hockey", "Soccer"];
+export const sports = [...comingSoonSports, ...liveSports];
 
 export type SportProfile = {
   heatmap: boolean;

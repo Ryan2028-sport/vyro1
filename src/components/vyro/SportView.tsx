@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { sportProfiles, sports, type SportProfile } from "@/lib/vyro-data";
+import { comingSoonSports, liveSports, sportProfiles, sports, type SportProfile } from "@/lib/vyro-data";
 import { Bar, Card, PageHeader, Pill } from "./shared";
 
 type Tab = "database" | "agility" | "swing";
@@ -16,13 +16,14 @@ export function SportView({
   setSportTab: (t: Tab) => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const profile = sportProfiles[selectedSport];
+  const activeSport = liveSports.includes(selectedSport) ? selectedSport : "Squash";
+  const profile = sportProfiles[activeSport];
 
   return (
     <>
       <PageHeader
         eyebrow="Sport Intelligence"
-        title={`${selectedSport} performance lab.`}
+        title={`${activeSport} performance lab.`}
         subtitle={profile.db}
         action={
           <button
@@ -36,24 +37,29 @@ export function SportView({
       {pickerOpen && (
         <div className="mb-4 rounded-[24px] border border-white/10 bg-white/[0.055] p-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {sports.map((s) => (
-              <button
-                key={s}
-                onClick={() => {
-                  setSelectedSport(s);
-                  setSportTab("database");
-                  setPickerOpen(false);
-                }}
-                className={`rounded-2xl border px-4 py-3 text-left ${
-                  selectedSport === s ? "border-white/30 bg-white/15" : "border-white/10 bg-black/20"
-                }`}
-              >
-                <div className="font-bold">{s}</div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
-                  Active VYRO sport module
-                </div>
-              </button>
-            ))}
+            {sports.map((s) => {
+              const comingSoon = comingSoonSports.includes(s);
+              return (
+                <button
+                  key={s}
+                  disabled={comingSoon}
+                  onClick={() => {
+                    if (comingSoon) return;
+                    setSelectedSport(s);
+                    setSportTab("database");
+                    setPickerOpen(false);
+                  }}
+                  className={`rounded-2xl border px-4 py-3 text-left ${
+                    activeSport === s ? "border-white/30 bg-white/15" : "border-white/10 bg-black/20"
+                  } ${comingSoon ? "cursor-not-allowed opacity-45" : ""}`}
+                >
+                  <div className="font-bold">{s}</div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+                    {comingSoon ? "Coming soon" : "Active VYRO sport module"}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -76,8 +82,8 @@ export function SportView({
           </button>
         ))}
       </div>
-      {sportTab === "database" && <SportDatabase profile={profile} selectedSport={selectedSport} />}
-      {sportTab === "agility" && <SportAgility selectedSport={selectedSport} />}
+      {sportTab === "database" && <SportDatabase profile={profile} selectedSport={activeSport} />}
+      {sportTab === "agility" && <SportAgility selectedSport={activeSport} />}
       {sportTab === "swing" && <SportSwing profile={profile} />}
     </>
   );
