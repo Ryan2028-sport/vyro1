@@ -1182,8 +1182,29 @@
             var c = colors[i] || 'rgba(255,255,255,0.18)';
             return '<div style="width:24px;height:24px;border-radius:50%;background:'+c+';color:#0b0b0b;font:800 11px/1 system-ui;display:grid;place-items:center">'+(i+1)+'</div>';
           }
-          // Groups available to browse (mirrors the bundle's "VYRO Group" list).
-          var GROUPS = [
+          // Groups available to browse (sport-aware).
+          var GROUPS = sport === 'tennis' ? [
+            { id:'columbia', name:'Columbia Tennis · 2026', tag:'live', members: COLUMBIA, online:2, joined:true,
+              note:'Coach R. · 9:14 · Practice 4pm at Dick Savitt. Strings checked.' },
+            { id:'nyc',      name:'NYC Tennis Academy',    tag:'joined', online:5, joined:true,
+              members:[
+                { name:'Patrick McEnroe', handle:'@patmac',  metric:'Coach',   agility:0,  recovery:0,  likes:0,  post:'Director, JMTA NYC.' },
+                { name:'Sofia Costoulas', handle:'@sofiac',  metric:'Junior',  agility:84, recovery:79, likes:58, post:'Slice backhand depth is back.' },
+                { name:'Ethan Quinn',     handle:'@ethanq',  metric:'Junior',  agility:82, recovery:81, likes:44, post:'First-serve % hit 71 today.' },
+                { name:'Maya Joint',      handle:'@mayaj',   metric:'Junior',  agility:85, recovery:78, likes:67, post:'PR session: 320 high-quality returns.' },
+                { name:'Coleman Wong',    handle:'@colew',   metric:'Junior',  agility:80, recovery:83, likes:41, post:'HRV up 6 over the block.' }
+              ],
+              note:'24 members · cross-club hitting and challenges.' },
+            { id:'ivy',      name:'Ivy League Tennis',     tag:'open',   online:9, joined:false,
+              members:[
+                { name:'Adam Walton',    handle:'@adamw',   metric:'Columbia', agility:88, recovery:83, likes:188, post:'Return depth up 14% on the second serve.' },
+                { name:'Daniel Milavsky',handle:'@danm',    metric:'Harvard',  agility:86, recovery:80, likes:142, post:'Cross-court winner conversion 41%.' },
+                { name:'Karl Poling',    handle:'@karlp',   metric:'Princeton',agility:85, recovery:79, likes:118, post:'First-serve speed 121 in set 3.' },
+                { name:'Michael Zheng',  handle:'@mzheng',  metric:'Columbia', agility:85, recovery:80, likes:154, post:'1st serve held 118 mph deep.' },
+                { name:'Tristan McCormick',handle:'@tristanm',metric:'Cornell',agility:84, recovery:81, likes:97,  post:'Backhand DTL on the rise.' }
+              ],
+              note:'34 members · invite via verified .edu.' }
+          ] : [
             { id:'columbia', name:'Columbia Squash · 2026', tag:'live', members: COLUMBIA, online:3, joined:true,
               note:'Coach P. · 9:14 · Practice 4pm. Bring the watches charged.' },
             { id:'nyc',      name:'NYC Squash Academy',     tag:'joined', online:6, joined:true,
@@ -1206,6 +1227,7 @@
               note:'38 members · invite via verified .edu.' }
           ];
           var ACTIVE_GROUP = GROUPS[0];
+
 
           function rankBadge(i){
             var colors = ['#f59e0b','#d1d5db','#b45309'];
