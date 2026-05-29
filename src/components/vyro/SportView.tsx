@@ -129,6 +129,83 @@ function SportDatabase({ profile, selectedSport }: { profile: SportProfile; sele
   );
 }
 
+function SquashHeatmap() {
+  return (
+    <div className="mt-4 aspect-[3/4] rounded-2xl border border-white/15 bg-black p-4">
+      <div className="relative h-full w-full rounded-xl border-2 border-white/60">
+        <div className="absolute left-0 right-0 top-[14%] border-t border-white/50" />
+        <div className="absolute left-0 right-0 top-[38%] border-t border-white/50" />
+        <div className="absolute left-1/2 top-[38%] h-[62%] border-l border-white/50" />
+        <div className="absolute inset-0 grid grid-cols-6 grid-rows-8 gap-1 p-2">
+          {Array.from({ length: 48 }, (_, i) => (
+            <div key={i} className="rounded" style={{ background: `rgba(255,43,43,${0.08 + (i % 11) / 12})` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TennisHeatmap() {
+  // Heat blobs placed in normalized SVG coordinates (court 100x200, viewed end-on with net at y=100)
+  const blobs = [
+    { x: 18, y: 22, r: 22, i: 0.92 }, // deuce-side deep corner (returner)
+    { x: 82, y: 22, r: 20, i: 0.78 }, // ad-side deep corner
+    { x: 28, y: 70, r: 14, i: 0.55 }, // approach
+    { x: 72, y: 132, r: 14, i: 0.5 }, // opponent approach
+    { x: 18, y: 178, r: 22, i: 0.88 }, // ad-side serve target (T)
+    { x: 82, y: 178, r: 18, i: 0.7 }, // deuce-side wide serve
+    { x: 50, y: 178, r: 12, i: 0.6 }, // body serve
+    { x: 50, y: 100, r: 9, i: 0.35 }, // net cord touches
+  ];
+  return (
+    <div className="mt-4 aspect-[3/4] overflow-hidden rounded-2xl border border-white/15 bg-[#0a3d1f] p-3">
+      <div className="relative h-full w-full overflow-hidden rounded-xl" style={{ background: "linear-gradient(180deg,#0d4a26 0%,#0a3d1f 50%,#0d4a26 100%)" }}>
+        <svg viewBox="0 0 100 200" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
+          <defs>
+            {blobs.map((b, idx) => (
+              <radialGradient key={idx} id={`tg${idx}`} cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#ff2b2b" stopOpacity={b.i} />
+                <stop offset="55%" stopColor="#ff5a1f" stopOpacity={b.i * 0.55} />
+                <stop offset="100%" stopColor="#ff2b2b" stopOpacity="0" />
+              </radialGradient>
+            ))}
+          </defs>
+          {/* heat */}
+          {blobs.map((b, idx) => (
+            <ellipse key={idx} cx={b.x} cy={b.y} rx={b.r} ry={b.r * 1.05} fill={`url(#tg${idx})`} />
+          ))}
+          {/* court lines — full doubles court */}
+          <g fill="none" stroke="white" strokeOpacity="0.92" strokeWidth="0.7">
+            {/* outer doubles */}
+            <rect x="6" y="6" width="88" height="188" />
+            {/* singles sidelines */}
+            <line x1="14" y1="6" x2="14" y2="194" />
+            <line x1="86" y1="6" x2="86" y2="194" />
+            {/* baselines already part of rect; service boxes */}
+            <line x1="14" y1="60" x2="86" y2="60" />
+            <line x1="14" y1="140" x2="86" y2="140" />
+            {/* center service line */}
+            <line x1="50" y1="60" x2="50" y2="140" />
+            {/* center marks on baseline */}
+            <line x1="50" y1="6" x2="50" y2="10" />
+            <line x1="50" y1="190" x2="50" y2="194" />
+            {/* net */}
+            <line x1="6" y1="100" x2="94" y2="100" strokeWidth="1.4" strokeOpacity="1" />
+          </g>
+          {/* net band shading */}
+          <rect x="6" y="98.5" width="88" height="3" fill="rgba(255,255,255,0.15)" />
+        </svg>
+        {/* labels */}
+        <div className="absolute left-2 top-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/70">opponent baseline</div>
+        <div className="absolute bottom-2 left-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/70">your baseline</div>
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 rotate-90 font-mono text-[9px] uppercase tracking-[0.18em] text-white/55">net</div>
+      </div>
+    </div>
+  );
+}
+
+
 function SportAgility({ selectedSport }: { selectedSport: string }) {
   const isSquash = selectedSport === "Squash";
   const baseLabel = isSquash ? "T" : "middle of the court";
