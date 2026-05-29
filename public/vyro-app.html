@@ -1268,23 +1268,29 @@
               g.members.map(memberCardHtml).join('');
           }
 
+          var bannerTitle = sport === 'tennis' ? 'Columbia Tennis' : 'Columbia Squash';
+          var bannerCount = COLUMBIA.length;
+          var bannerStats = sport === 'tennis'
+            ? [bannerCount+'|Members','188|Sessions / 30d','85|Avg agility','81|Avg recovery','67%|Win rate']
+            : [bannerCount+'|Members','247|Sessions / 30d','84|Avg agility','82|Avg recovery','71%|Win rate'];
           var bannerHtml =
             '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.055);border-radius:24px;padding:16px;margin-bottom:14px">'+
               '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
                 '<div>'+
                   '<div style="font:700 10px/1 monospace;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,0.45)">Group · invite-only</div>'+
-                  '<h3 style="margin:6px 0 0;font-size:20px;font-weight:900;color:#fff">Columbia Squash</h3>'+
-                  '<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.55)">10 members · 247 sessions logged this month · 86% avg recovery</p>'+
+                  '<h3 style="margin:6px 0 0;font-size:20px;font-weight:900;color:#fff">'+bannerTitle+'</h3>'+
+                  '<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.55)">'+bannerCount+' members · '+bannerStats[1].split('|')[0]+' sessions logged this month · '+bannerStats[3].split('|')[0]+'% avg recovery</p>'+
                 '</div>'+
                 '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid #f59e0b66;background:#f59e0b1a;color:#f59e0b">live</span>'+
               '</div>'+
               '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px;text-align:center">'+
-                ['10|Members','247|Sessions / 30d','84|Avg agility','82|Avg recovery','71%|Win rate'].map(function(s){
+                bannerStats.map(function(s){
                   var p = s.split('|');
                   return '<div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:8px"><div style="font-size:18px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums">'+p[0]+'</div><div style="font:600 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-top:4px">'+p[1]+'</div></div>';
                 }).join('')+
               '</div>'+
             '</div>';
+
 
           var tabsHtml =
             '<div style="display:flex;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;padding:4px;margin-bottom:12px">'+
