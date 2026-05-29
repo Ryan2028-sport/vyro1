@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { sports } from "@/lib/vyro-data";
+import { comingSoonSports, sports } from "@/lib/vyro-data";
 import { Bar, Card, PageHeader, Pill } from "./shared";
 
 type Athlete = {
@@ -105,17 +105,21 @@ export function CoachView() {
       />
       <div className="mb-4 flex gap-2 overflow-x-auto">
         {sports.map((s) => {
-          const count = s === "Squash" ? squashRoster.length : Math.floor(((s.charCodeAt(0) * 7) % 4) + 2);
+          const comingSoon = comingSoonSports.includes(s);
+          const count = s === "Squash" ? squashRoster.length : s === "Tennis" ? 5 : 0;
           const active = s === selectedSport;
           return (
             <button
               key={s}
-              onClick={() => setSelectedSport(s)}
+              disabled={comingSoon}
+              onClick={() => {
+                if (!comingSoon) setSelectedSport(s);
+              }}
               className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
                 active ? "border-white/30 bg-white/15 text-white" : "border-white/10 text-white/70"
-              }`}
+              } ${comingSoon ? "cursor-not-allowed opacity-45" : ""}`}
             >
-              {s} <span className="text-white/35">{count}</span>
+              {s} <span className="text-white/35">{comingSoon ? "Coming soon" : count}</span>
             </button>
           );
         })}
