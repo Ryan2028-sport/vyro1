@@ -1735,6 +1735,23 @@
             return SPORT_RE.test(t);
           });
 
+          sportBtns.forEach(function(b){
+            var label = ((b.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i) || [])[1];
+            if (!label) return;
+            if (/^Tennis$/i.test(label) && !/\b5\b/.test((b.textContent || '').replace(/\s+/g,' '))) {
+              Array.prototype.forEach.call(b.childNodes, function(n){
+                if (n.nodeType === 3) n.textContent = n.textContent.replace(/\b0\b/, '5');
+                else if (n.textContent && /^0$/.test(n.textContent.trim())) n.textContent = '5';
+              });
+            }
+            if (!/^(Squash|Tennis)$/i.test(label)) {
+              b.setAttribute('aria-disabled','true');
+              if (b.tagName === 'BUTTON') b.disabled = true;
+              b.style.opacity = '.46';
+              b.style.cursor = 'not-allowed';
+            }
+          });
+
           // Wire sport-tab clicks once so we remember which sport the user picked even after React blanks main.
           sportBtns.forEach(function(b){
             if (b.__vyroSportWired) return;
