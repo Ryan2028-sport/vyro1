@@ -1712,11 +1712,20 @@
         function enhanceCoachSport(){
           var main = document.querySelector('main');
           if (!main) return;
-          var isCoach = /COACH[\u2011\-\s]*ONLY PORTAL/i.test(main.textContent || '') || /Compare players/i.test(main.textContent || '');
+          // Detect coach mode via top-nav button highlight (works even when main is blank)
+          var navBtns = Array.prototype.slice.call(document.querySelectorAll('header nav button, header button'));
+          var coachBtn = navBtns.find(function(b){ return /^\s*Coach\s*$/i.test(b.textContent || ''); });
+          var isCoach = false;
+          if (coachBtn) {
+            var bg = getComputedStyle(coachBtn).backgroundColor || '';
+            if (/16,\s*185,\s*129/.test(bg) || /187,\s*247,\s*208/.test(bg) || /220,\s*252,\s*231/.test(bg) || coachBtn.getAttribute('aria-selected')==='true' || coachBtn.getAttribute('data-state')==='active') isCoach = true;
+          }
+          if (!isCoach && (/COACH[\u2011\-\s]*ONLY PORTAL/i.test(main.textContent || '') || /Compare players/i.test(main.textContent || ''))) isCoach = true;
           if (!isCoach) {
             var prior = main.querySelector('[data-vyro-coach-sport-override]');
             if (prior) prior.remove();
             Array.prototype.forEach.call(main.querySelectorAll('[data-vyro-coach-hidden="1"]'), function(n){ n.style.display = ''; n.removeAttribute('data-vyro-coach-hidden'); });
+            window.__vyroCoachSport = null;
             return;
           }
           var btns = Array.prototype.slice.call(main.querySelectorAll('button'));
@@ -1725,7 +1734,20 @@
             var t = (b.textContent || '').replace(/\s+/g,' ').trim();
             return SPORT_RE.test(t);
           });
-          if (sportBtns.length < 2) return;
+
+          // Wire sport-tab clicks once so we remember which sport the user picked even after React blanks main.
+          sportBtns.forEach(function(b){
+            if (b.__vyroSportWired) return;
+            b.__vyroSportWired = true;
+            b.addEventListener('click', function(){
+              var t = (b.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i);
+              if (t) window.__vyroCoachSport = t[1].charAt(0).toUpperCase() + t[1].slice(1).toLowerCase();
+              setTimeout(enhanceCoachSport, 30);
+              setTimeout(enhanceCoachSport, 150);
+            }, true);
+          });
+
+          if (sportBtns.length < 2 && !window.__vyroCoachSport) return;
           // Determine active by computed bg color (selected pill has green tint)
           function activeScore(b){
             var bg = getComputedStyle(b).backgroundColor || '';
