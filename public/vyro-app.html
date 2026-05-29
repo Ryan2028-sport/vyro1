@@ -1751,6 +1751,9 @@
               if (b.tagName === 'BUTTON') b.disabled = true;
               b.style.opacity = '.46';
               b.style.cursor = 'not-allowed';
+              Array.prototype.forEach.call(b.childNodes, function(n){
+                if (n.nodeType !== 3 && n.textContent && /^\d+$/.test(n.textContent.trim())) n.textContent = 'Coming soon';
+              });
             }
           });
 
@@ -1792,6 +1795,12 @@
           sportBtns.forEach(function(b){ var s = activeScore(b); if (s > bestScore){ bestScore = s; active = b; } });
           var sport = window.__vyroCoachSport || ((active.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i) || [])[1] || 'Squash';
           sport = sport.charAt(0).toUpperCase() + sport.slice(1).toLowerCase();
+
+          var titleEl = main.querySelector('h1,h2');
+          if (titleEl) {
+            if (sport === 'Tennis' && /Columbia squash roster/i.test(titleEl.textContent || '')) titleEl.textContent = 'Columbia tennis roster';
+            if (sport === 'Squash' && /Columbia tennis roster/i.test(titleEl.textContent || '')) titleEl.textContent = 'Columbia squash roster';
+          }
 
           // Tab row is the parent containing all the sport buttons
           var tabRow = active.parentElement;
