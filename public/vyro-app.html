@@ -1566,7 +1566,7 @@
         var VYRO_HIDDEN_SPORTS_LIST = ['Baseball','Basketball','Football','Golf','Hockey','Soccer'];
         function getSportLabel(el){
           var text = (el && (el.getAttribute('aria-label') || el.textContent) || '').replace(/\s+/g,' ').trim();
-          for (var i=0;i<VYRO_HIDDEN_SPORTS_LIST.length;i++) if (new RegExp('^'+VYRO_HIDDEN_SPORTS_LIST[i]+'\\b','i').test(text)) return VYRO_HIDDEN_SPORTS_LIST[i];
+          for (var i=0;i<VYRO_HIDDEN_SPORTS_LIST.length;i++) if (new RegExp('(^|\\b)'+VYRO_HIDDEN_SPORTS_LIST[i]+'\\b','i').test(text)) return VYRO_HIDDEN_SPORTS_LIST[i];
           return '';
         }
         function showComingSoonToast(sport){
