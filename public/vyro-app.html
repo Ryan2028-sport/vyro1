@@ -810,6 +810,7 @@
         }
         function initials(n){ return n.split(/\s+/).map(function(p){return p[0];}).join('').slice(0,2).toUpperCase(); }
         function enhanceCoachRoster(){
+          if (window.__vyroCoachSport && window.__vyroCoachSport !== 'Squash') return;
           // Find the roster card heading (Squash roster / Tennis roster / generic Roster)
           var heading = null;
           var hs = document.querySelectorAll('h1,h2,h3,h4');
@@ -1010,6 +1011,7 @@
           });
         }
         function enhanceOpponentModel(){
+          if (window.__vyroCoachSport && window.__vyroCoachSport !== 'Squash') return;
           var heading = null;
           var hs = document.querySelectorAll('h1,h2,h3,h4');
           for (var i = 0; i < hs.length; i++) {
@@ -1826,6 +1828,16 @@
               parentSib.setAttribute('data-vyro-coach-hidden','1');
             }
             parentSib = parentSib.nextElementSibling;
+          }
+          var topBlock = tabRow;
+          while (topBlock.parentElement && topBlock.parentElement !== main) topBlock = topBlock.parentElement;
+          var mainSib = topBlock && topBlock.nextElementSibling;
+          while (mainSib) {
+            if (!mainSib.hasAttribute || !mainSib.hasAttribute('data-vyro-coach-sport-override')) {
+              mainSib.style.display = 'none';
+              mainSib.setAttribute('data-vyro-coach-hidden','1');
+            }
+            mainSib = mainSib.nextElementSibling;
           }
 
           override = document.createElement('div');
