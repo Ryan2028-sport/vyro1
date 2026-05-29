@@ -815,7 +815,7 @@
           var hs = document.querySelectorAll('h1,h2,h3,h4');
           for (var i = 0; i < hs.length; i++) {
             var ht = (hs[i].textContent || '').trim();
-            if (/^(Squash|Tennis)\s+roster$/i.test(ht) || /^Roster$/i.test(ht)) { heading = hs[i]; break; }
+            if (/^(Squash|Tennis)\s+roster/i.test(ht) || /^Roster$/i.test(ht)) { heading = hs[i]; break; }
           }
           if (!heading) return;
           var sport = /tennis/i.test(heading.textContent || '') ? 'tennis' : (/squash/i.test(heading.textContent || '') ? 'squash' : detectSport());
