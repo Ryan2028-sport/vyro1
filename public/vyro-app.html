@@ -783,41 +783,67 @@
           grid.appendChild(card);
         }
 
-        // ===== Coach roster (collegiate men's squash squad — realistic season metrics) =====
-        var COACH_ROSTER = [
-          { name: 'Marwan Tarek',    status: 'Peak',    statusColor: '#10b981', load: 54, hrv: 87, matches: 23, wins: 19 },
-          { name: 'Omar Allaudin',   status: 'Ready',   statusColor: '#10b981', load: 63, hrv: 78, matches: 21, wins: 15 },
-          { name: 'Aly Hussein',     status: 'Caution', statusColor: '#f59e0b', load: 79, hrv: 61, matches: 24, wins: 16 },
-          { name: 'David Mensah',    status: 'Ready',   statusColor: '#10b981', load: 67, hrv: 73, matches: 20, wins: 13 },
-          { name: 'Karim Sadek',     status: 'Peak',    statusColor: '#10b981', load: 51, hrv: 84, matches: 22, wins: 17 },
-          { name: 'Jonah Bryan',     status: 'Ready',   statusColor: '#10b981', load: 69, hrv: 71, matches: 19, wins: 12 },
-          { name: 'Andrew Douglas',  status: 'Recover', statusColor: '#ef4444', load: 84, hrv: 56, matches: 18, wins: 10 }
-        ];
+        // ===== Coach roster (sport-aware: Columbia squash + Columbia tennis) =====
+        var COACH_ROSTERS = {
+          squash: [
+            { name: 'Yow Soon Kit',     status: 'Peak',    statusColor: '#10b981', load: 52, hrv: 84, matches: 22, wins: 17 },
+            { name: 'Marina Stefanoni', status: 'Ready',   statusColor: '#10b981', load: 61, hrv: 76, matches: 24, wins: 18 },
+            { name: 'Sam Todd',         status: 'Peak',    statusColor: '#10b981', load: 49, hrv: 81, matches: 21, wins: 16 },
+            { name: 'Yusuf Sheikh',     status: 'Ready',   statusColor: '#10b981', load: 64, hrv: 73, matches: 23, wins: 15 },
+            { name: 'Adam Hawal',       status: 'Caution', statusColor: '#f59e0b', load: 78, hrv: 62, matches: 22, wins: 14 },
+            { name: 'Shaurya Bawa',     status: 'Ready',   statusColor: '#10b981', load: 67, hrv: 71, matches: 20, wins: 13 },
+            { name: 'Thomas Soltanian', status: 'Recover', statusColor: '#ef4444', load: 83, hrv: 57, matches: 19, wins: 11 }
+          ],
+          tennis: [
+            { name: 'Adam Walton',    status: 'Peak',    statusColor: '#10b981', load: 51, hrv: 83, matches: 26, wins: 21 },
+            { name: 'Michael Zheng',  status: 'Ready',   statusColor: '#10b981', load: 62, hrv: 75, matches: 24, wins: 17 },
+            { name: 'Nicolas Kotzen', status: 'Peak',    statusColor: '#10b981', load: 54, hrv: 80, matches: 22, wins: 16 },
+            { name: 'Alex Kotzen',    status: 'Ready',   statusColor: '#10b981', load: 66, hrv: 72, matches: 23, wins: 15 },
+            { name: 'Andrew Kotzen',  status: 'Caution', statusColor: '#f59e0b', load: 77, hrv: 63, matches: 21, wins: 13 }
+          ]
+        };
+        function detectSport(){
+          var h1 = document.querySelector('main h1') || document.querySelector('h1');
+          var t = ((h1 && h1.textContent) || document.body.textContent || '').toLowerCase();
+          if (t.indexOf('tennis') !== -1 && t.indexOf('squash') === -1) return 'tennis';
+          return 'squash';
+        }
         function initials(n){ return n.split(/\s+/).map(function(p){return p[0];}).join('').slice(0,2).toUpperCase(); }
         function enhanceCoachRoster(){
-          // Find the "Squash roster" card
+          // Find the roster card heading (Squash roster / Tennis roster / generic Roster)
           var heading = null;
           var hs = document.querySelectorAll('h1,h2,h3,h4');
           for (var i = 0; i < hs.length; i++) {
-            if (/^\s*Squash roster\s*$/i.test(hs[i].textContent || '')) { heading = hs[i]; break; }
+            var ht = (hs[i].textContent || '').trim();
+            if (/^(Squash|Tennis)\s+roster$/i.test(ht) || /^Roster$/i.test(ht)) { heading = hs[i]; break; }
           }
           if (!heading) return;
+          var sport = /tennis/i.test(heading.textContent || '') ? 'tennis' : (/squash/i.test(heading.textContent || '') ? 'squash' : detectSport());
+          var roster = COACH_ROSTERS[sport] || COACH_ROSTERS.squash;
+
+          // Relabel the heading to Columbia branding
+          var pretty = sport === 'tennis' ? 'Columbia tennis roster' : 'Columbia squash roster';
+          if (heading.textContent.trim() !== pretty) heading.textContent = pretty;
+
           var card = heading.closest('section') || heading.parentElement;
           for (var k = 0; k < 6 && card && card.tagName !== 'SECTION'; k++) card = card.parentElement;
           if (!card) return;
-          if (card.querySelector('[data-vyro-roster]')) return;
+          var existing = card.querySelector('[data-vyro-roster]');
+          if (existing && existing.getAttribute('data-vyro-sport') === sport) return;
+          if (existing) existing.remove();
 
           // Hide every direct child of the card except the heading row
           var headRow = heading.parentElement;
           while (headRow && headRow.parentElement !== card) headRow = headRow.parentElement;
           Array.prototype.forEach.call(card.children, function(ch){
-            if (ch !== headRow) ch.style.display = 'none';
+            if (ch !== headRow && !ch.hasAttribute('data-vyro-roster')) ch.style.display = 'none';
           });
 
           var wrap = document.createElement('div');
           wrap.setAttribute('data-vyro-roster','1');
+          wrap.setAttribute('data-vyro-sport', sport);
           wrap.style.cssText = 'margin-top:14px;display:flex;flex-direction:column;gap:8px';
-          wrap.innerHTML = COACH_ROSTER.map(function(a){
+          wrap.innerHTML = roster.map(function(a){
             var loadColor = a.load > 75 ? '#f59e0b' : '#ffffff';
             return ''+
               '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:16px;padding:10px 12px">'+
@@ -839,14 +865,15 @@
           card.appendChild(wrap);
         }
 
-        // ===== Combined opponent model (Ivy League men's squash opponents — sample-weighted tendencies) =====
+        // ===== Combined opponent model: Savannah / Sam Yu / Kathryn / Chelsea all faced opponent "Chelsea Chan" — combine sample-weighted rallies =====
         var OPP_DATA = {
-          'Mostafa Hesham':   [['Back-left','Straight drive on pressure',73,62],['Back-right','Cross-court reset',51,44],['Front-left','Counter-drop',58,29],['Mid-court volley','Volley kill on loose rail',61,33]],
-          'Velavan Senthil':  [['Back-left','Straight drive on pressure',68,57],['Back-right','Cross-court reset',46,38],['Front-left','Counter-drop',54,31],['Mid-court volley','Volley kill on loose rail',66,36]],
-          'James Flynn':      [['Back-left','Straight drive on pressure',71,49],['Back-right','Cross-court reset',49,41],['Front-left','Counter-drop',57,27],['Mid-court volley','Volley kill on loose rail',59,31]],
-          'Saadeldin Abouaish':[['Back-left','Straight drive on pressure',69,53],['Back-right','Cross-court reset',55,42],['Front-left','Counter-drop',56,30],['Mid-court volley','Volley kill on loose rail',63,34]]
+          'Savannah Moxham': [['Back-left','Straight drive on pressure',74,38],['Back-right','Cross-court reset',52,31],['Front-left','Counter-drop',61,22],['Mid-court volley','Volley kill on loose rail',58,19]],
+          'Sam Yu':          [['Back-left','Straight drive on pressure',70,41],['Back-right','Cross-court reset',47,28],['Front-left','Counter-drop',55,24],['Mid-court volley','Volley kill on loose rail',64,26]],
+          'Kathryn Chung':   [['Back-left','Straight drive on pressure',71,34],['Back-right','Cross-court reset',49,30],['Front-left','Counter-drop',59,21],['Mid-court volley','Volley kill on loose rail',60,23]],
+          'Chelsea Chan':    [['Back-left','Straight drive on pressure',69,44],['Back-right','Cross-court reset',54,36],['Front-left','Counter-drop',57,27],['Mid-court volley','Volley kill on loose rail',62,29]]
         };
-        var OPP_SELECTED = { 'Mostafa Hesham': true, 'Velavan Senthil': true, 'James Flynn': true, 'Saadeldin Abouaish': false };
+        var OPP_SELECTED = { 'Savannah Moxham': true, 'Sam Yu': true, 'Kathryn Chung': true, 'Chelsea Chan': false };
+
         function computeCombined(){
           var buckets = {};
           Object.keys(OPP_SELECTED).forEach(function(name){
