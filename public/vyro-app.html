@@ -863,6 +863,85 @@
               '</div>';
           }).join('');
           card.appendChild(wrap);
+
+          // When the coach is viewing Tennis, the React surface ships no opponent
+          // history / consolidated database (it's keyed to squash athletes only).
+          // Inject a Columbia-tennis equivalent right after the roster card so the
+          // tennis tab matches the depth of the squash tab.
+          if (sport === 'tennis' && card.parentElement && !card.parentElement.querySelector('[data-vyro-tennis-opp]')) {
+            var tCard = document.createElement('div');
+            tCard.setAttribute('data-vyro-tennis-opp','1');
+            tCard.style.cssText = 'border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:24px;padding:16px;margin-top:14px;color:#fff';
+            var tMatches = [
+              { vs:'Adam Walton',    date:'Apr 26', result:'W 6-4, 7-5', tCtl:80, load:68, decel:84 },
+              { vs:'Michael Zheng',  date:'May 02', result:'W 7-6, 6-3', tCtl:77, load:71, decel:81 },
+              { vs:'Nicolas Kotzen', date:'May 09', result:'L 4-6, 6-7', tCtl:69, load:82, decel:74 }
+            ];
+            var tTeammates = [
+              { name:'Adam Walton',    date:'Apr 26', result:'W 3-1' },
+              { name:'Michael Zheng',  date:'May 02', result:'W 3-2' },
+              { name:'Nicolas Kotzen', date:'May 09', result:'L 2-3' },
+              { name:'Alex Kotzen',    date:'May 11', result:'Practice' }
+            ];
+            var tTendencies = [
+              ['Wide forehand corner',     'Cross-court forehand',     58, 44],
+              ['Backhand corner',          'Down-the-line slice reset',39, 36],
+              ['Serve +1',                 'Forehand inside-out',      47, 41],
+              ['Break point return',       'Block return to body',     52, 28]
+            ];
+            tCard.innerHTML =
+              '<div style="display:flex;justify-content:space-between;align-items:center">'+
+                '<div>'+
+                  '<div style="font:700 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.45)">Player match database</div>'+
+                  '<h3 style="margin:6px 0 0;font-size:16px;font-weight:900">Ryan Chen\u2019s opponent history</h3>'+
+                '</div>'+
+                '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid #10b98166;background:#10b9811a;color:#10b981">'+tMatches.length+' matches</span>'+
+              '</div>'+
+              '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
+                tMatches.map(function(m){
+                  return '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:16px;padding:12px">'+
+                    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
+                      '<div><div style="font-weight:800;font-size:13px">vs. '+m.vs+'</div><div style="font:600 11px/1.4 monospace;color:rgba(255,255,255,0.5);margin-top:2px">'+m.date+' · '+m.result+'</div></div>'+
+                      '<div style="display:flex;gap:14px;text-align:right">'+
+                        '<div><div style="font:700 9px/1 monospace;color:rgba(255,255,255,0.45)">T</div><div style="font:800 16px/1 system-ui;margin-top:3px">'+m.tCtl+'</div></div>'+
+                        '<div><div style="font:700 9px/1 monospace;color:rgba(255,255,255,0.45)">LOAD</div><div style="font:800 16px/1 system-ui;margin-top:3px">'+m.load+'</div></div>'+
+                        '<div><div style="font:700 9px/1 monospace;color:rgba(255,255,255,0.45)">DECEL</div><div style="font:800 16px/1 system-ui;margin-top:3px">'+m.decel+'</div></div>'+
+                      '</div>'+
+                    '</div>'+
+                  '</div>';
+                }).join('')+
+              '</div>'+
+              '<div style="margin-top:18px;border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">'+
+                '<div style="display:flex;justify-content:space-between;align-items:center">'+
+                  '<div>'+
+                    '<div style="font:700 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.45)">Combined opponent model</div>'+
+                    '<h3 style="margin:6px 0 0;font-size:16px;font-weight:900">Adam Walton tendency profile</h3>'+
+                    '<p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.55)">Aggregated from '+tTeammates.length+' consented teammate match databases.</p>'+
+                  '</div>'+
+                  '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08)">Team view</span>'+
+                '</div>'+
+                '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px">'+
+                  tTeammates.map(function(t){
+                    return '<div style="border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:9px 11px"><div style="font-weight:700;font-size:12px">'+t.name+'</div><div style="font:600 10px/1.4 monospace;color:rgba(255,255,255,0.5);margin-top:3px">'+t.date+' · '+t.result+'</div></div>';
+                  }).join('')+
+                '</div>'+
+                '<div style="margin-top:14px">'+
+                  tTendencies.map(function(r){
+                    var pct = Math.round((r[2]*r[3])/r[3]);
+                    return '<div style="margin-top:10px">'+
+                      '<div style="display:flex;justify-content:space-between;font-size:12px"><div><b>'+r[0]+'</b> <span style="color:rgba(255,255,255,0.55)">· '+r[1]+'</span></div><div style="font-variant-numeric:tabular-nums;color:rgba(255,255,255,0.75)">'+pct+'% <span style="font-size:10px;color:rgba(255,255,255,0.4)">· n='+r[3]+'</span></div></div>'+
+                      '<div style="margin-top:5px;height:6px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+(pct>=55?'#fff':'#f59e0b')+'"></div></div>'+
+                    '</div>';
+                  }).join('')+
+                '</div>'+
+              '</div>';
+            card.parentElement.insertBefore(tCard, card.nextSibling);
+          }
+          // If we switched away from tennis, remove any prior tennis injection.
+          if (sport !== 'tennis' && card.parentElement) {
+            var stale = card.parentElement.querySelector('[data-vyro-tennis-opp]');
+            if (stale) stale.remove();
+          }
         }
 
         // ===== Combined opponent model: Savannah / Sam Yu / Kathryn / Chelsea all faced opponent "Chelsea Chan" — combine sample-weighted rallies =====
