@@ -1032,8 +1032,8 @@
           if (!card.querySelector('[data-vyro-opp]')) renderOpponent(card);
         }
 
-        // ===== Social: Columbia group =====
-        var COLUMBIA = [
+        // ===== Social: Columbia group (sport-aware: Squash + Tennis) =====
+        var COLUMBIA_SQUASH = [
           { name:'Yusuf Sheikh',     handle:'@yusufs',   post:'5-game grind vs. Penn. T-control held at 73% through game 5.',                  metric:'Match win · 3\u20132', likes:142, comments:18, agility:86, recovery:81 },
           { name:'Adam Hawal',       handle:'@adamh',    post:'Cut my return-to-T by 0.21s over two weeks. Decel quality is finally clean.',   metric:'Agility +9%',          likes:98,  comments:11, agility:88, recovery:79 },
           { name:'Imad Athar',       handle:'@imada',    post:'Sleep score back over 90. Rest HR dropped 3 bpm in 10 days.',                  metric:'Sleep 92',             likes:76,  comments:7,  agility:82, recovery:87 },
@@ -1045,6 +1045,30 @@
           { name:'Arhan Chandra',    handle:'@arhanc',   post:'Volley kill conversion 64% on loose rails this week. Trusting the wrist.',     metric:'Conv 64%',             likes:109, comments:12, agility:85, recovery:77 },
           { name:'Laszlo Godde',     handle:'@laszlog',  post:'HRV trending up 8ms over the block. Holding the deload.',                      metric:'HRV 81ms',             likes:73,  comments:8,  agility:78, recovery:88 }
         ];
+        var COLUMBIA_TENNIS = [
+          { name:'Adam Walton',    handle:'@adamw',  post:'Backhand return depth up 14% on the second serve. Tracking landing zones with the overlay.', metric:'Return +14%',  likes:188, comments:21, agility:88, recovery:83 },
+          { name:'Michael Zheng',  handle:'@mzheng', post:'First-serve speed held 118 mph deep into set 3. HRV said go, body delivered.',               metric:'1st serve 118', likes:154, comments:17, agility:85, recovery:80 },
+          { name:'Nicolas Kotzen', handle:'@nkotzen',post:'Cross-court forehand winners up 9 this week. Footwork into the open stance is dialed.',     metric:'FH +9 winners', likes:131, comments:14, agility:84, recovery:81 },
+          { name:'Alex Kotzen',    handle:'@akotzen',post:'Recovery step out of the deuce corner is 0.18s faster. Court coverage opening up.',          metric:'Recover -0.18s',likes:142, comments:16, agility:86, recovery:79 },
+          { name:'Andrew Kotzen',  handle:'@aakotzen',post:'Holding the deload after the back-to-back duals. HRV climbing, rest HR down 4 bpm.',        metric:'HRV 78ms',      likes:97,  comments:9,  agility:80, recovery:84 }
+        ];
+        function currentSocialSport(){
+          if (window.__vyroCoachSport === 'Tennis') return 'tennis';
+          if (window.__vyroCoachSport === 'Squash') return 'squash';
+          var btns = document.querySelectorAll('button, [role="tab"], a');
+          for (var i=0;i<btns.length;i++){
+            var b = btns[i];
+            var txt = (b.textContent||'').trim();
+            if (!/^Tennis$/i.test(txt) && !/^Squash$/i.test(txt)) continue;
+            var sel = b.getAttribute && (b.getAttribute('aria-selected')==='true' || b.getAttribute('data-state')==='active');
+            var bg = (b.style && b.style.background) || '';
+            var active = sel || /rgb\(|#/.test(bg);
+            if (active) return /tennis/i.test(txt) ? 'tennis' : 'squash';
+          }
+          return 'squash';
+        }
+        var COLUMBIA = COLUMBIA_SQUASH;
+
         function memberCardHtml(m, idx){
           return ''+
             '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:18px;padding:14px;margin-bottom:10px">'+
