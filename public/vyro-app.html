@@ -1562,7 +1562,21 @@
           }
           edits.forEach(function(e){ e[0].textContent = e[1]; });
         }
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); }, 800);
+        // Hide sport pills/buttons for sports we haven't released — only Squash and Tennis are live.
+        var VYRO_HIDDEN_SPORTS = { 'Baseball':1, 'Basketball':1, 'Football':1, 'Golf':1, 'Hockey':1, 'Soccer':1 };
+        function hideExtraSports(){
+          // Hide buttons whose label is exactly a hidden sport (e.g. sport selector pills "Baseball", "Golf 0")
+          document.querySelectorAll('button, [role="tab"], [role="button"]').forEach(function(b){
+            if (b.getAttribute('data-vyro-keep') === '1') return;
+            var t = (b.textContent || '').trim();
+            if (!t) return;
+            var first = t.split(/\s+/)[0];
+            if (VYRO_HIDDEN_SPORTS[t] || VYRO_HIDDEN_SPORTS[first]) {
+              b.style.display = 'none';
+            }
+          });
+        }
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); hideExtraSports(); }, 800);
         setTimeout(vyroSwapNames, 200);
         setTimeout(vyroSwapNames, 800);
         setTimeout(vyroDemoPolish, 250);
