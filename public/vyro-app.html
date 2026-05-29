@@ -1305,20 +1305,28 @@
             '<div style="font:700 10px/1 monospace;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin:6px 2px 10px">Columbia feed</div>'+
             COLUMBIA.map(memberCardHtml).join('');
 
+          var competeRows = sport === 'tennis' ? [
+            { title:'1st-serve speed · 7-day',    leader:'Michael Zheng',  value:'118 mph',  delta:'+4 vs squad' },
+            { title:'Return depth · 2nd serve',   leader:'Adam Walton',    value:'+14%',     delta:'team best' },
+            { title:'Cross-court FH winners',     leader:'Nicolas Kotzen', value:'9 / wk',   delta:'+3 vs squad' },
+            { title:'Deuce-corner recovery',      leader:'Alex Kotzen',    value:'-0.18s',   delta:'fastest in squad' },
+            { title:'HRV gain · 30-day',          leader:'Andrew Kotzen',  value:'+7 ms',    delta:'+5 vs squad' },
+            { title:'Break-point conversion',     leader:'Adam Walton',    value:'58%',      delta:'+12% vs squad' }
+          ] : [
+            { title:'Decel quality · 7-day', leader:'Thomas Soltanian', value:'95% symmetry', delta:'+4% vs squad' },
+            { title:'Return-to-T · best avg', leader:'Adam Hawal',       value:'1.31s',        delta:'-0.18s vs squad' },
+            { title:'T-control · match avg',  leader:'Yusuf Sheikh',     value:'73%',          delta:'+9% vs squad' },
+            { title:'HRV gain · 30-day',      leader:'Laszlo Godde',     value:'+8 ms',        delta:'+6 vs squad' },
+            { title:'Volley kill conversion', leader:'Arhan Chandra',    value:'64%',          delta:'+11% vs squad' },
+            { title:'Aerobic threshold time', leader:'Ahmad Haq',        value:'60:00 @ 165',  delta:'team best' }
+          ];
           var competeHtml =
             '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:18px;padding:14px">'+
               '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
                 '<div style="font:700 13px/1 system-ui;color:#fff">VYRO Compete · squad challenges</div>'+
                 '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:4px 8px;border-radius:999px;border:1px solid #10b98166;background:#10b9811a;color:#10b981">Week 7</span>'+
               '</div>'+
-              [
-                { title:'Decel quality · 7-day', leader:'Thomas Soltanian', value:'95% symmetry', delta:'+4% vs squad' },
-                { title:'Return-to-T · best avg', leader:'Adam Hawal',       value:'1.31s',        delta:'-0.18s vs squad' },
-                { title:'T-control · match avg',  leader:'Yusuf Sheikh',     value:'73%',          delta:'+9% vs squad' },
-                { title:'HRV gain · 30-day',      leader:'Laszlo Godde',     value:'+8 ms',        delta:'+6 vs squad' },
-                { title:'Volley kill conversion', leader:'Arhan Chandra',    value:'64%',          delta:'+11% vs squad' },
-                { title:'Aerobic threshold time', leader:'Ahmad Haq',        value:'60:00 @ 165',  delta:'team best' }
-              ].map(function(c){
+              competeRows.map(function(c){
                 return '<div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;gap:10px">'+
                          '<div style="min-width:0">'+
                            '<div style="font:700 12px/1.2 system-ui;color:#fff">'+c.title+'</div>'+
@@ -1333,7 +1341,19 @@
             '</div>';
 
           // --- Chat (live, with send) ---
-          var CHAT = [
+          var CHAT = sport === 'tennis' ? [
+            { who:'Adam Walton',    when:'9:42 AM',  msg:'Dick Savitt court 2 free at 4? Want to rep second-serve returns.' },
+            { who:'Michael Zheng',  when:'9:44 AM',  msg:'In. Bringing the radar — track 1st-serve speed deep into set 3.' },
+            { who:'Nicolas Kotzen', when:'9:51 AM',  msg:'Sleep was rough, scaling to 70% load. Joining film at 5.' },
+            { who:'Alex Kotzen',    when:'10:08 AM', msg:'Swing overlay is sick. Forehand path 4° flatter than last week.' },
+            { who:'Andrew Kotzen',  when:'10:14 AM', msg:'HRV up across the squad this morning. Block is landing.' },
+            { who:'Adam Walton',    when:'11:01 AM', msg:'Reminder: Princeton dual film drops tonight. Notes by Friday.' },
+            { who:'Michael Zheng',  when:'11:23 AM', msg:'I’ll take Penn #2. He goes T on the second serve 71%.' },
+            { who:'Nicolas Kotzen', when:'12:05 PM', msg:'Cleared cog re-test. Back to live ball tomorrow.' },
+            { who:'Alex Kotzen',    when:'12:31 PM', msg:'Threshold hit clean. 55 min, HR capped at 168.' },
+            { who:'Andrew Kotzen',  when:'12:48 PM', msg:'Holding the deload one more day. HRV still climbing.' },
+            { who:'Adam Walton',    when:'1:12 PM',  msg:'4 PM locked in. Strings checked, intent up.' }
+          ] : [
             { who:'Yusuf Sheikh',     when:'9:42 AM',  msg:'Court 3 free at 4? Want to rep deep-game pressure drills.' },
             { who:'Shaurya Bawa',     when:'9:44 AM',  msg:'In. Bringing the radar — let’s get decel data on the back-corner brake.' },
             { who:'Adam Hawal',       when:'9:51 AM',  msg:'Sleep was trash last night, scaling to 70% load. Joining film at 5.' },
@@ -1346,6 +1366,8 @@
             { who:'Laszlo Godde',     when:'12:48 PM', msg:'Holding the deload one more day. HRV still climbing.' },
             { who:'Yusuf Sheikh',     when:'1:12 PM',  msg:'4 PM locked in. Bring water, bring intent.' }
           ];
+          var channelName = sport === 'tennis' ? '#columbia-tennis' : '#columbia-squash';
+
           function chatMsgRow(c){
             var isMe = c.who === 'Ryan Chen';
             return '<div style="display:flex;gap:10px;padding:8px 0">'+
