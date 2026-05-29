@@ -810,6 +810,7 @@
         }
         function initials(n){ return n.split(/\s+/).map(function(p){return p[0];}).join('').slice(0,2).toUpperCase(); }
         function enhanceCoachRoster(){
+          if (window.__vyroCoachSport && window.__vyroCoachSport !== 'Squash') return;
           // Find the roster card heading (Squash roster / Tennis roster / generic Roster)
           var heading = null;
           var hs = document.querySelectorAll('h1,h2,h3,h4');
@@ -1010,6 +1011,7 @@
           });
         }
         function enhanceOpponentModel(){
+          if (window.__vyroCoachSport && window.__vyroCoachSport !== 'Squash') return;
           var heading = null;
           var hs = document.querySelectorAll('h1,h2,h3,h4');
           for (var i = 0; i < hs.length; i++) {
@@ -1735,13 +1737,41 @@
             return SPORT_RE.test(t);
           });
 
+          sportBtns.forEach(function(b){
+            var label = ((b.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i) || [])[1];
+            if (!label) return;
+            if (/^Tennis$/i.test(label) && !/\b5\b/.test((b.textContent || '').replace(/\s+/g,' '))) {
+              Array.prototype.forEach.call(b.childNodes, function(n){
+                if (n.nodeType === 3) n.textContent = n.textContent.replace(/\b0\b/, '5');
+                else if (n.textContent && /^0$/.test(n.textContent.trim())) n.textContent = '5';
+              });
+            }
+            if (!/^(Squash|Tennis)$/i.test(label)) {
+              b.setAttribute('aria-disabled','true');
+              if (b.tagName === 'BUTTON') b.disabled = true;
+              b.style.opacity = '.46';
+              b.style.cursor = 'not-allowed';
+              Array.prototype.forEach.call(b.childNodes, function(n){
+                if (n.nodeType !== 3 && n.textContent && /^\d+$/.test(n.textContent.trim())) n.textContent = 'Coming soon';
+              });
+            }
+          });
+
           // Wire sport-tab clicks once so we remember which sport the user picked even after React blanks main.
           sportBtns.forEach(function(b){
             if (b.__vyroSportWired) return;
             b.__vyroSportWired = true;
-            b.addEventListener('click', function(){
+            b.addEventListener('click', function(e){
               var t = (b.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i);
-              if (t) window.__vyroCoachSport = t[1].charAt(0).toUpperCase() + t[1].slice(1).toLowerCase();
+              if (!t) return;
+              var picked = t[1].charAt(0).toUpperCase() + t[1].slice(1).toLowerCase();
+              window.__vyroCoachSport = picked;
+              if (picked !== 'Squash') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                if (picked !== 'Tennis') showComingSoonToast(picked);
+              }
               setTimeout(enhanceCoachSport, 30);
               setTimeout(enhanceCoachSport, 150);
             }, true);
@@ -1763,8 +1793,14 @@
           var active = sportBtns[0];
           var bestScore = -1;
           sportBtns.forEach(function(b){ var s = activeScore(b); if (s > bestScore){ bestScore = s; active = b; } });
-          var sport = ((active.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i) || [])[1] || 'Squash';
+          var sport = window.__vyroCoachSport || ((active.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i) || [])[1] || 'Squash';
           sport = sport.charAt(0).toUpperCase() + sport.slice(1).toLowerCase();
+
+          var titleEl = main.querySelector('h1,h2');
+          if (titleEl) {
+            if (sport === 'Tennis' && /Columbia squash roster/i.test(titleEl.textContent || '')) titleEl.textContent = 'Columbia tennis roster';
+            if (sport === 'Squash' && /Columbia tennis roster/i.test(titleEl.textContent || '')) titleEl.textContent = 'Columbia squash roster';
+          }
 
           // Tab row is the parent containing all the sport buttons
           var tabRow = active.parentElement;
@@ -1801,6 +1837,16 @@
               parentSib.setAttribute('data-vyro-coach-hidden','1');
             }
             parentSib = parentSib.nextElementSibling;
+          }
+          var topBlock = tabRow;
+          while (topBlock.parentElement && topBlock.parentElement !== main) topBlock = topBlock.parentElement;
+          var mainSib = topBlock && topBlock.nextElementSibling;
+          while (mainSib) {
+            if (!mainSib.hasAttribute || !mainSib.hasAttribute('data-vyro-coach-sport-override')) {
+              mainSib.style.display = 'none';
+              mainSib.setAttribute('data-vyro-coach-hidden','1');
+            }
+            mainSib = mainSib.nextElementSibling;
           }
 
           override = document.createElement('div');
