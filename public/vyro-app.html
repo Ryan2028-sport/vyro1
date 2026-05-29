@@ -1708,9 +1708,210 @@
           tabs.parentElement.insertBefore(card, tabs.nextSibling);
         }
 
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof lockComingSoonSports==='function') lockComingSoonSports(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof lockComingSoonSports==='function') lockComingSoonSports(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof lockComingSoonSports==='function') lockComingSoonSports(); }, 1500);
+        // ===== Coach view: render Tennis roster + lock unreleased sport tabs =====
+        function enhanceCoachSport(){
+          var main = document.querySelector('main');
+          if (!main) return;
+          // Detect coach mode via top-nav button highlight (works even when main is blank)
+          var navBtns = Array.prototype.slice.call(document.querySelectorAll('header nav button, header button'));
+          var coachBtn = navBtns.find(function(b){ return /^\s*Coach\s*$/i.test(b.textContent || ''); });
+          var isCoach = false;
+          if (coachBtn) {
+            var bg = getComputedStyle(coachBtn).backgroundColor || '';
+            if (/16,\s*185,\s*129/.test(bg) || /187,\s*247,\s*208/.test(bg) || /220,\s*252,\s*231/.test(bg) || coachBtn.getAttribute('aria-selected')==='true' || coachBtn.getAttribute('data-state')==='active') isCoach = true;
+          }
+          if (!isCoach && (/COACH[\u2011\-\s]*ONLY PORTAL/i.test(main.textContent || '') || /Compare players/i.test(main.textContent || ''))) isCoach = true;
+          if (!isCoach) {
+            var prior = main.querySelector('[data-vyro-coach-sport-override]');
+            if (prior) prior.remove();
+            Array.prototype.forEach.call(main.querySelectorAll('[data-vyro-coach-hidden="1"]'), function(n){ n.style.display = ''; n.removeAttribute('data-vyro-coach-hidden'); });
+            window.__vyroCoachSport = null;
+            return;
+          }
+          var btns = Array.prototype.slice.call(main.querySelectorAll('button'));
+          var SPORT_RE = /^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)\s*\d*\s*(coming soon)?\s*$/i;
+          var sportBtns = btns.filter(function(b){
+            var t = (b.textContent || '').replace(/\s+/g,' ').trim();
+            return SPORT_RE.test(t);
+          });
+
+          // Wire sport-tab clicks once so we remember which sport the user picked even after React blanks main.
+          sportBtns.forEach(function(b){
+            if (b.__vyroSportWired) return;
+            b.__vyroSportWired = true;
+            b.addEventListener('click', function(){
+              var t = (b.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i);
+              if (t) window.__vyroCoachSport = t[1].charAt(0).toUpperCase() + t[1].slice(1).toLowerCase();
+              setTimeout(enhanceCoachSport, 30);
+              setTimeout(enhanceCoachSport, 150);
+            }, true);
+          });
+
+          if (sportBtns.length < 2 && !window.__vyroCoachSport) return;
+          // Determine active by computed bg color (selected pill has green tint)
+          function activeScore(b){
+            var bg = getComputedStyle(b).backgroundColor || '';
+            // Green emerald or light green selected pill
+            if (/16,\s*185,\s*129/.test(bg)) return 3;
+            if (/187,\s*247,\s*208/.test(bg)) return 3;
+            if (/220,\s*252,\s*231/.test(bg)) return 3;
+            // any non-transparent fill
+            var m = bg.match(/rgba?\(([^)]+)\)/);
+            if (m){ var p = m[1].split(',').map(parseFloat); var a = p.length>3?p[3]:1; if (a > 0.05 && !(p[0]>240 && p[1]>240 && p[2]>240)) return 1; }
+            return 0;
+          }
+          var active = sportBtns[0];
+          var bestScore = -1;
+          sportBtns.forEach(function(b){ var s = activeScore(b); if (s > bestScore){ bestScore = s; active = b; } });
+          var sport = ((active.textContent || '').match(/^(Squash|Tennis|Baseball|Basketball|Football|Golf|Hockey|Soccer)/i) || [])[1] || 'Squash';
+          sport = sport.charAt(0).toUpperCase() + sport.slice(1).toLowerCase();
+
+          // Tab row is the parent containing all the sport buttons
+          var tabRow = active.parentElement;
+          while (tabRow && tabRow.parentElement && !sportBtns.every(function(b){ return tabRow.contains(b); })) tabRow = tabRow.parentElement;
+          if (!tabRow) return;
+
+          var override = main.querySelector('[data-vyro-coach-sport-override]');
+          var currentSport = override && override.getAttribute('data-sport');
+
+          if (sport === 'Squash') {
+            // Restore React content, remove override
+            if (override) override.remove();
+            Array.prototype.forEach.call(main.querySelectorAll('[data-vyro-coach-hidden="1"]'), function(n){ n.style.display = ''; n.removeAttribute('data-vyro-coach-hidden'); });
+            return;
+          }
+
+          if (override && currentSport === sport) return;
+          if (override) override.remove();
+
+          // Hide everything after the tab row in its container
+          var sib = tabRow.nextElementSibling;
+          while (sib) {
+            if (!sib.hasAttribute || !sib.hasAttribute('data-vyro-coach-sport-override')) {
+              sib.style.display = 'none';
+              sib.setAttribute('data-vyro-coach-hidden','1');
+            }
+            sib = sib.nextElementSibling;
+          }
+          // Also hide later siblings at the parent level (the roster card is usually outside the tab row container)
+          var parentSib = tabRow.parentElement && tabRow.parentElement.nextElementSibling;
+          while (parentSib) {
+            if (!parentSib.hasAttribute || !parentSib.hasAttribute('data-vyro-coach-sport-override')) {
+              parentSib.style.display = 'none';
+              parentSib.setAttribute('data-vyro-coach-hidden','1');
+            }
+            parentSib = parentSib.nextElementSibling;
+          }
+
+          override = document.createElement('div');
+          override.setAttribute('data-vyro-coach-sport-override','1');
+          override.setAttribute('data-sport', sport);
+          override.style.cssText = 'margin-top:14px;display:flex;flex-direction:column;gap:14px;color:#0b0b0b';
+
+          if (sport === 'Tennis') {
+            var roster = [
+              { name:'Adam Walton',    status:'Peak',    color:'#10b981', load:51, hrv:83, matches:26, wins:21 },
+              { name:'Michael Zheng',  status:'Ready',   color:'#10b981', load:62, hrv:75, matches:24, wins:17 },
+              { name:'Nicolas Kotzen', status:'Peak',    color:'#10b981', load:54, hrv:80, matches:22, wins:16 },
+              { name:'Alex Kotzen',    status:'Ready',   color:'#10b981', load:66, hrv:72, matches:23, wins:15 },
+              { name:'Andrew Kotzen',  status:'Caution', color:'#f59e0b', load:77, hrv:63, matches:21, wins:13 }
+            ];
+            function ini(n){ return n.split(/\s+/).map(function(p){return p[0];}).join('').slice(0,2).toUpperCase(); }
+            var rosterRows = roster.map(function(a){
+              return '<div style="border:1px solid rgba(0,0,0,0.08);background:#fff;border-radius:16px;padding:12px">'+
+                '<div style="display:flex;align-items:center;gap:10px">'+
+                  '<div style="width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,0.06);display:grid;place-items:center;font:700 11px/1 system-ui;color:#0b0b0b">'+ini(a.name)+'</div>'+
+                  '<div style="flex:1;min-width:0">'+
+                    '<div style="font-weight:800;font-size:14px;color:#0b0b0b">'+a.name+'</div>'+
+                    '<div style="font:600 11px/1.4 monospace;color:rgba(0,0,0,0.55);margin-top:2px">Tennis · '+a.matches+' matches · '+a.wins+'W-'+(a.matches-a.wins)+'L · HRV '+a.hrv+'ms</div>'+
+                  '</div>'+
+                  '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid '+a.color+'66;background:'+a.color+'1a;color:'+a.color+'">'+a.status+'</span>'+
+                '</div>'+
+                '<div style="display:flex;align-items:center;gap:8px;margin-top:10px">'+
+                  '<span style="font:600 9px/1 monospace;color:rgba(0,0,0,0.45)">LOAD</span>'+
+                  '<div style="flex:1;height:6px;background:rgba(0,0,0,0.08);border-radius:999px;overflow:hidden"><div style="width:'+a.load+'%;height:100%;background:'+(a.load>75?'#f59e0b':'#10b981')+'"></div></div>'+
+                  '<span style="font:700 11px/1 monospace;color:rgba(0,0,0,0.65);min-width:22px;text-align:right">'+a.load+'</span>'+
+                '</div>'+
+              '</div>';
+            }).join('');
+            var matches = [
+              { vs:'Adam Walton',    date:'Apr 26', result:'W 6-4, 7-5', t:80, load:68, decel:84 },
+              { vs:'Michael Zheng',  date:'May 02', result:'W 7-6, 6-3', t:77, load:71, decel:81 },
+              { vs:'Nicolas Kotzen', date:'May 09', result:'L 4-6, 6-7', t:69, load:82, decel:74 }
+            ];
+            var teammates = [
+              { name:'Adam Walton',    meta:'Apr 26 · W 3-1' },
+              { name:'Michael Zheng',  meta:'May 02 · W 3-2' },
+              { name:'Nicolas Kotzen', meta:'May 09 · L 2-3' },
+              { name:'Alex Kotzen',    meta:'May 11 · Practice' }
+            ];
+            var tendencies = [
+              ['Wide forehand corner', 'Cross-court forehand', 58],
+              ['Backhand corner',      'Down-the-line slice',  39],
+              ['Serve +1',             'Forehand inside-out',  47],
+              ['Break point return',   'Block return to body', 52]
+            ];
+            override.innerHTML =
+              '<div style="border:1px solid rgba(0,0,0,0.08);background:#fff;border-radius:18px;padding:14px">'+
+                '<div style="display:flex;justify-content:space-between;align-items:center">'+
+                  '<div>'+
+                    '<div style="font:700 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(0,0,0,0.45)">Tennis roster</div>'+
+                    '<h3 style="margin:6px 0 0;font-size:18px;font-weight:900;color:#0b0b0b">Columbia tennis roster</h3>'+
+                  '</div>'+
+                  '<span style="font:700 9px/1 monospace;letter-spacing:.14em;padding:5px 8px;border-radius:999px;border:1px solid #10b98166;background:#10b9811a;color:#10b981">5 CONSENTED</span>'+
+                '</div>'+
+                '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+rosterRows+'</div>'+
+              '</div>'+
+              '<div style="border:1px solid rgba(0,0,0,0.08);background:#fff;border-radius:18px;padding:14px;color:#0b0b0b">'+
+                '<div style="font:700 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(0,0,0,0.45)">Player match database</div>'+
+                '<h3 style="margin:6px 0 0;font-size:16px;font-weight:900">Ryan Chen\u2019s opponent history</h3>'+
+                '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
+                  matches.map(function(m){
+                    return '<div style="border:1px solid rgba(0,0,0,0.08);background:rgba(16,185,129,0.06);border-radius:14px;padding:12px">'+
+                      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
+                        '<div><div style="font-weight:800;font-size:13px">vs. '+m.vs+'</div><div style="font:600 11px/1.4 monospace;color:rgba(0,0,0,0.55);margin-top:2px">'+m.date+' · '+m.result+'</div></div>'+
+                        '<div style="display:flex;gap:14px;text-align:right">'+
+                          '<div><div style="font:700 9px/1 monospace;color:rgba(0,0,0,0.45)">T</div><div style="font:800 16px/1 system-ui;margin-top:3px">'+m.t+'</div></div>'+
+                          '<div><div style="font:700 9px/1 monospace;color:rgba(0,0,0,0.45)">LOAD</div><div style="font:800 16px/1 system-ui;margin-top:3px">'+m.load+'</div></div>'+
+                          '<div><div style="font:700 9px/1 monospace;color:rgba(0,0,0,0.45)">DECEL</div><div style="font:800 16px/1 system-ui;margin-top:3px">'+m.decel+'</div></div>'+
+                        '</div>'+
+                      '</div>'+
+                    '</div>';
+                  }).join('')+
+                '</div>'+
+                '<div style="margin-top:18px;border-top:1px solid rgba(0,0,0,0.06);padding-top:14px">'+
+                  '<div style="font:700 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(0,0,0,0.45)">Combined opponent model</div>'+
+                  '<h3 style="margin:6px 0 0;font-size:16px;font-weight:900">Adam Walton tendency profile</h3>'+
+                  '<p style="margin:4px 0 0;font-size:11px;color:rgba(0,0,0,0.55)">Aggregated from 4 consented teammate match databases.</p>'+
+                  '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px">'+
+                    teammates.map(function(t){
+                      return '<div style="border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:9px 11px"><div style="font-weight:700;font-size:12px">'+t.name+'</div><div style="font:600 10px/1.4 monospace;color:rgba(0,0,0,0.5);margin-top:3px">'+t.meta+'</div></div>';
+                    }).join('')+
+                  '</div>'+
+                  '<div style="margin-top:14px">'+
+                    tendencies.map(function(r){
+                      return '<div style="margin-top:10px">'+
+                        '<div style="display:flex;justify-content:space-between;font-size:12px"><div><b>'+r[0]+'</b> <span style="color:rgba(0,0,0,0.55)">· '+r[1]+'</span></div><div style="font-variant-numeric:tabular-nums;color:rgba(0,0,0,0.75)">'+r[2]+'%</div></div>'+
+                        '<div style="margin-top:5px;height:6px;background:rgba(0,0,0,0.08);border-radius:999px;overflow:hidden"><div style="width:'+r[2]+'%;height:100%;background:#10b981"></div></div>'+
+                      '</div>';
+                    }).join('')+
+                  '</div>'+
+                '</div>'+
+              '</div>';
+          } else {
+            override.innerHTML =
+              '<div style="border:1px dashed rgba(0,0,0,0.15);background:#fff;border-radius:18px;padding:24px;text-align:center;color:#0b0b0b">'+
+                '<div style="font:700 9px/1 monospace;letter-spacing:.22em;text-transform:uppercase;color:#64748b">Coming soon</div>'+
+                '<h3 style="margin:8px 0 6px;font-size:20px;font-weight:900">'+sport+' coach portal · launching post-pilot</h3>'+
+                '<p style="margin:0;font-size:13px;color:rgba(0,0,0,0.6);line-height:1.5;max-width:380px;margin-left:auto;margin-right:auto">Only Squash and Tennis are live in VYRO today. '+sport+' rosters, opponent models and consented teammate data will launch after the current Columbia pilot wraps.</p>'+
+              '</div>';
+          }
+          tabRow.parentElement.insertBefore(override, tabRow.nextSibling);
+        }
+
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceCoachSport(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof lockComingSoonSports==='function') lockComingSoonSports(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceCoachSport(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof lockComingSoonSports==='function') lockComingSoonSports(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceCoachSport(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof lockComingSoonSports==='function') lockComingSoonSports(); }, 1500);
         // Swap the bundle's hardcoded roster/opponent names to Columbia athletes.
         var VYRO_NAME_SWAPS = [
           ['Nico B.',             'Yow Ng'],
@@ -1859,7 +2060,7 @@
         }
         ['pointerdown','mousedown','touchstart','click'].forEach(function(evt){ window.addEventListener(evt, blockComingSoonEvent, true); document.addEventListener(evt, blockComingSoonEvent, true); });
 
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); lockComingSoonSports(); redirectUnreleasedSport(); }, 200);
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceCoachSport(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); lockComingSoonSports(); redirectUnreleasedSport(); }, 200);
         setTimeout(vyroSwapNames, 200);
         setTimeout(vyroSwapNames, 800);
         setTimeout(vyroDemoPolish, 250);
