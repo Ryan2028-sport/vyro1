@@ -1483,6 +1483,10 @@
         function enhanceSportSurface(){
           var h1 = document.querySelector('main h1');
           if (!h1) return;
+          if (/^(Baseball|Basketball|Football|Golf|Hockey|Soccer) performance lab\./i.test(h1.textContent || '')) {
+            Array.prototype.forEach.call(document.querySelectorAll('[data-vyro-sport-surface]'), function(n){ n.remove(); });
+            return;
+          }
           var m = (h1.textContent || '').match(/^(Baseball|Basketball|Football|Golf|Hockey|Soccer) performance lab\./i);
           if (!m) return;
           var sport = m[1];
@@ -1574,6 +1578,18 @@
           clearTimeout(window.__vyroComingSoonTimer);
           window.__vyroComingSoonTimer = setTimeout(function(){ toast.remove(); }, 2200);
         }
+        function redirectUnreleasedSport(){
+          var h1 = document.querySelector('main h1');
+          var m = h1 && (h1.textContent || '').match(/^(Baseball|Basketball|Football|Golf|Hockey|Soccer) performance lab\./i);
+          if (!m || window.__vyroRedirectingSport) return;
+          window.__vyroRedirectingSport = true;
+          Array.prototype.forEach.call(document.querySelectorAll('[data-vyro-sport-surface]'), function(n){ n.remove(); });
+          var liveButtons = Array.prototype.slice.call(document.querySelectorAll('button, [role="tab"], [role="button"], a'));
+          var squash = liveButtons.find(function(b){ return /^Squash\b/i.test(((b.getAttribute('aria-label') || b.textContent) || '').replace(/\s+/g,' ').trim()); });
+          if (squash) squash.click();
+          showComingSoonToast(m[1]);
+          setTimeout(function(){ window.__vyroRedirectingSport = false; }, 250);
+        }
         function lockComingSoonSports(){
           // Disable any sport selector whose visible text starts with an unreleased sport.
           document.querySelectorAll('button, [role="tab"], [role="button"], a').forEach(function(b){
@@ -1593,8 +1609,9 @@
               b.appendChild(badge);
             }
           });
+          redirectUnreleasedSport();
         }
-        document.addEventListener('click', function(e){
+        function blockComingSoonEvent(e){
           var target = e.target && e.target.closest && e.target.closest('button, [role="tab"], [role="button"], a');
           var sport = getSportLabel(target);
           if (!sport) return;
@@ -1602,9 +1619,11 @@
           e.stopPropagation();
           if (e.stopImmediatePropagation) e.stopImmediatePropagation();
           showComingSoonToast(sport);
-        }, true);
+          setTimeout(redirectUnreleasedSport, 0);
+        }
+        ['pointerdown','mousedown','touchstart','click'].forEach(function(evt){ document.addEventListener(evt, blockComingSoonEvent, true); });
 
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); lockComingSoonSports(); }, 800);
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); lockComingSoonSports(); redirectUnreleasedSport(); }, 800);
         setTimeout(vyroSwapNames, 200);
         setTimeout(vyroSwapNames, 800);
         setTimeout(vyroDemoPolish, 250);
