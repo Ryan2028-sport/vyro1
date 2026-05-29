@@ -1032,8 +1032,8 @@
           if (!card.querySelector('[data-vyro-opp]')) renderOpponent(card);
         }
 
-        // ===== Social: Columbia group =====
-        var COLUMBIA = [
+        // ===== Social: Columbia group (sport-aware: Squash + Tennis) =====
+        var COLUMBIA_SQUASH = [
           { name:'Yusuf Sheikh',     handle:'@yusufs',   post:'5-game grind vs. Penn. T-control held at 73% through game 5.',                  metric:'Match win · 3\u20132', likes:142, comments:18, agility:86, recovery:81 },
           { name:'Adam Hawal',       handle:'@adamh',    post:'Cut my return-to-T by 0.21s over two weeks. Decel quality is finally clean.',   metric:'Agility +9%',          likes:98,  comments:11, agility:88, recovery:79 },
           { name:'Imad Athar',       handle:'@imada',    post:'Sleep score back over 90. Rest HR dropped 3 bpm in 10 days.',                  metric:'Sleep 92',             likes:76,  comments:7,  agility:82, recovery:87 },
@@ -1045,6 +1045,30 @@
           { name:'Arhan Chandra',    handle:'@arhanc',   post:'Volley kill conversion 64% on loose rails this week. Trusting the wrist.',     metric:'Conv 64%',             likes:109, comments:12, agility:85, recovery:77 },
           { name:'Laszlo Godde',     handle:'@laszlog',  post:'HRV trending up 8ms over the block. Holding the deload.',                      metric:'HRV 81ms',             likes:73,  comments:8,  agility:78, recovery:88 }
         ];
+        var COLUMBIA_TENNIS = [
+          { name:'Adam Walton',    handle:'@adamw',  post:'Backhand return depth up 14% on the second serve. Tracking landing zones with the overlay.', metric:'Return +14%',  likes:188, comments:21, agility:88, recovery:83 },
+          { name:'Michael Zheng',  handle:'@mzheng', post:'First-serve speed held 118 mph deep into set 3. HRV said go, body delivered.',               metric:'1st serve 118', likes:154, comments:17, agility:85, recovery:80 },
+          { name:'Nicolas Kotzen', handle:'@nkotzen',post:'Cross-court forehand winners up 9 this week. Footwork into the open stance is dialed.',     metric:'FH +9 winners', likes:131, comments:14, agility:84, recovery:81 },
+          { name:'Alex Kotzen',    handle:'@akotzen',post:'Recovery step out of the deuce corner is 0.18s faster. Court coverage opening up.',          metric:'Recover -0.18s',likes:142, comments:16, agility:86, recovery:79 },
+          { name:'Andrew Kotzen',  handle:'@aakotzen',post:'Holding the deload after the back-to-back duals. HRV climbing, rest HR down 4 bpm.',        metric:'HRV 78ms',      likes:97,  comments:9,  agility:80, recovery:84 }
+        ];
+        function currentSocialSport(){
+          if (window.__vyroCoachSport === 'Tennis') return 'tennis';
+          if (window.__vyroCoachSport === 'Squash') return 'squash';
+          var btns = document.querySelectorAll('button, [role="tab"], a');
+          for (var i=0;i<btns.length;i++){
+            var b = btns[i];
+            var txt = (b.textContent||'').trim();
+            if (!/^Tennis$/i.test(txt) && !/^Squash$/i.test(txt)) continue;
+            var sel = b.getAttribute && (b.getAttribute('aria-selected')==='true' || b.getAttribute('data-state')==='active');
+            var bg = (b.style && b.style.background) || '';
+            var active = sel || /rgb\(|#/.test(bg);
+            if (active) return /tennis/i.test(txt) ? 'tennis' : 'squash';
+          }
+          return 'squash';
+        }
+        var COLUMBIA = COLUMBIA_SQUASH;
+
         function memberCardHtml(m, idx){
           return ''+
             '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:18px;padding:14px;margin-bottom:10px">'+
@@ -1104,11 +1128,19 @@
             sib = sib.nextElementSibling;
           }
 
-          if (main.querySelector('[data-vyro-columbia]')) return;
+          var sport = currentSocialSport();
+          var existing = main.querySelector('[data-vyro-columbia]');
+          if (existing) {
+            if (existing.getAttribute('data-vyro-sport') === sport) return;
+            existing.parentNode.removeChild(existing);
+          }
+          COLUMBIA = sport === 'tennis' ? COLUMBIA_TENNIS : COLUMBIA_SQUASH;
 
           var container = document.createElement('div');
           container.setAttribute('data-vyro-columbia','1');
+          container.setAttribute('data-vyro-sport', sport);
           container.style.cssText = 'margin-top:16px';
+
 
 
 
@@ -1150,8 +1182,29 @@
             var c = colors[i] || 'rgba(255,255,255,0.18)';
             return '<div style="width:24px;height:24px;border-radius:50%;background:'+c+';color:#0b0b0b;font:800 11px/1 system-ui;display:grid;place-items:center">'+(i+1)+'</div>';
           }
-          // Groups available to browse (mirrors the bundle's "VYRO Group" list).
-          var GROUPS = [
+          // Groups available to browse (sport-aware).
+          var GROUPS = sport === 'tennis' ? [
+            { id:'columbia', name:'Columbia Tennis · 2026', tag:'live', members: COLUMBIA, online:2, joined:true,
+              note:'Coach R. · 9:14 · Practice 4pm at Dick Savitt. Strings checked.' },
+            { id:'nyc',      name:'NYC Tennis Academy',    tag:'joined', online:5, joined:true,
+              members:[
+                { name:'Patrick McEnroe', handle:'@patmac',  metric:'Coach',   agility:0,  recovery:0,  likes:0,  post:'Director, JMTA NYC.' },
+                { name:'Sofia Costoulas', handle:'@sofiac',  metric:'Junior',  agility:84, recovery:79, likes:58, post:'Slice backhand depth is back.' },
+                { name:'Ethan Quinn',     handle:'@ethanq',  metric:'Junior',  agility:82, recovery:81, likes:44, post:'First-serve % hit 71 today.' },
+                { name:'Maya Joint',      handle:'@mayaj',   metric:'Junior',  agility:85, recovery:78, likes:67, post:'PR session: 320 high-quality returns.' },
+                { name:'Coleman Wong',    handle:'@colew',   metric:'Junior',  agility:80, recovery:83, likes:41, post:'HRV up 6 over the block.' }
+              ],
+              note:'24 members · cross-club hitting and challenges.' },
+            { id:'ivy',      name:'Ivy League Tennis',     tag:'open',   online:9, joined:false,
+              members:[
+                { name:'Adam Walton',    handle:'@adamw',   metric:'Columbia', agility:88, recovery:83, likes:188, post:'Return depth up 14% on the second serve.' },
+                { name:'Daniel Milavsky',handle:'@danm',    metric:'Harvard',  agility:86, recovery:80, likes:142, post:'Cross-court winner conversion 41%.' },
+                { name:'Karl Poling',    handle:'@karlp',   metric:'Princeton',agility:85, recovery:79, likes:118, post:'First-serve speed 121 in set 3.' },
+                { name:'Michael Zheng',  handle:'@mzheng',  metric:'Columbia', agility:85, recovery:80, likes:154, post:'1st serve held 118 mph deep.' },
+                { name:'Tristan McCormick',handle:'@tristanm',metric:'Cornell',agility:84, recovery:81, likes:97,  post:'Backhand DTL on the rise.' }
+              ],
+              note:'34 members · invite via verified .edu.' }
+          ] : [
             { id:'columbia', name:'Columbia Squash · 2026', tag:'live', members: COLUMBIA, online:3, joined:true,
               note:'Coach P. · 9:14 · Practice 4pm. Bring the watches charged.' },
             { id:'nyc',      name:'NYC Squash Academy',     tag:'joined', online:6, joined:true,
@@ -1174,6 +1227,7 @@
               note:'38 members · invite via verified .edu.' }
           ];
           var ACTIVE_GROUP = GROUPS[0];
+
 
           function rankBadge(i){
             var colors = ['#f59e0b','#d1d5db','#b45309'];
@@ -1214,23 +1268,29 @@
               g.members.map(memberCardHtml).join('');
           }
 
+          var bannerTitle = sport === 'tennis' ? 'Columbia Tennis' : 'Columbia Squash';
+          var bannerCount = COLUMBIA.length;
+          var bannerStats = sport === 'tennis'
+            ? [bannerCount+'|Members','188|Sessions / 30d','85|Avg agility','81|Avg recovery','67%|Win rate']
+            : [bannerCount+'|Members','247|Sessions / 30d','84|Avg agility','82|Avg recovery','71%|Win rate'];
           var bannerHtml =
             '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.055);border-radius:24px;padding:16px;margin-bottom:14px">'+
               '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
                 '<div>'+
                   '<div style="font:700 10px/1 monospace;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,0.45)">Group · invite-only</div>'+
-                  '<h3 style="margin:6px 0 0;font-size:20px;font-weight:900;color:#fff">Columbia Squash</h3>'+
-                  '<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.55)">10 members · 247 sessions logged this month · 86% avg recovery</p>'+
+                  '<h3 style="margin:6px 0 0;font-size:20px;font-weight:900;color:#fff">'+bannerTitle+'</h3>'+
+                  '<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.55)">'+bannerCount+' members · '+bannerStats[1].split('|')[0]+' sessions logged this month · '+bannerStats[3].split('|')[0]+'% avg recovery</p>'+
                 '</div>'+
                 '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid #f59e0b66;background:#f59e0b1a;color:#f59e0b">live</span>'+
               '</div>'+
               '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px;text-align:center">'+
-                ['10|Members','247|Sessions / 30d','84|Avg agility','82|Avg recovery','71%|Win rate'].map(function(s){
+                bannerStats.map(function(s){
                   var p = s.split('|');
                   return '<div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:8px"><div style="font-size:18px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums">'+p[0]+'</div><div style="font:600 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-top:4px">'+p[1]+'</div></div>';
                 }).join('')+
               '</div>'+
             '</div>';
+
 
           var tabsHtml =
             '<div style="display:flex;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;padding:4px;margin-bottom:12px">'+
@@ -1245,20 +1305,28 @@
             '<div style="font:700 10px/1 monospace;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin:6px 2px 10px">Columbia feed</div>'+
             COLUMBIA.map(memberCardHtml).join('');
 
+          var competeRows = sport === 'tennis' ? [
+            { title:'1st-serve speed · 7-day',    leader:'Michael Zheng',  value:'118 mph',  delta:'+4 vs squad' },
+            { title:'Return depth · 2nd serve',   leader:'Adam Walton',    value:'+14%',     delta:'team best' },
+            { title:'Cross-court FH winners',     leader:'Nicolas Kotzen', value:'9 / wk',   delta:'+3 vs squad' },
+            { title:'Deuce-corner recovery',      leader:'Alex Kotzen',    value:'-0.18s',   delta:'fastest in squad' },
+            { title:'HRV gain · 30-day',          leader:'Andrew Kotzen',  value:'+7 ms',    delta:'+5 vs squad' },
+            { title:'Break-point conversion',     leader:'Adam Walton',    value:'58%',      delta:'+12% vs squad' }
+          ] : [
+            { title:'Decel quality · 7-day', leader:'Thomas Soltanian', value:'95% symmetry', delta:'+4% vs squad' },
+            { title:'Return-to-T · best avg', leader:'Adam Hawal',       value:'1.31s',        delta:'-0.18s vs squad' },
+            { title:'T-control · match avg',  leader:'Yusuf Sheikh',     value:'73%',          delta:'+9% vs squad' },
+            { title:'HRV gain · 30-day',      leader:'Laszlo Godde',     value:'+8 ms',        delta:'+6 vs squad' },
+            { title:'Volley kill conversion', leader:'Arhan Chandra',    value:'64%',          delta:'+11% vs squad' },
+            { title:'Aerobic threshold time', leader:'Ahmad Haq',        value:'60:00 @ 165',  delta:'team best' }
+          ];
           var competeHtml =
             '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:18px;padding:14px">'+
               '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
                 '<div style="font:700 13px/1 system-ui;color:#fff">VYRO Compete · squad challenges</div>'+
                 '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:4px 8px;border-radius:999px;border:1px solid #10b98166;background:#10b9811a;color:#10b981">Week 7</span>'+
               '</div>'+
-              [
-                { title:'Decel quality · 7-day', leader:'Thomas Soltanian', value:'95% symmetry', delta:'+4% vs squad' },
-                { title:'Return-to-T · best avg', leader:'Adam Hawal',       value:'1.31s',        delta:'-0.18s vs squad' },
-                { title:'T-control · match avg',  leader:'Yusuf Sheikh',     value:'73%',          delta:'+9% vs squad' },
-                { title:'HRV gain · 30-day',      leader:'Laszlo Godde',     value:'+8 ms',        delta:'+6 vs squad' },
-                { title:'Volley kill conversion', leader:'Arhan Chandra',    value:'64%',          delta:'+11% vs squad' },
-                { title:'Aerobic threshold time', leader:'Ahmad Haq',        value:'60:00 @ 165',  delta:'team best' }
-              ].map(function(c){
+              competeRows.map(function(c){
                 return '<div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;gap:10px">'+
                          '<div style="min-width:0">'+
                            '<div style="font:700 12px/1.2 system-ui;color:#fff">'+c.title+'</div>'+
@@ -1273,7 +1341,19 @@
             '</div>';
 
           // --- Chat (live, with send) ---
-          var CHAT = [
+          var CHAT = sport === 'tennis' ? [
+            { who:'Adam Walton',    when:'9:42 AM',  msg:'Dick Savitt court 2 free at 4? Want to rep second-serve returns.' },
+            { who:'Michael Zheng',  when:'9:44 AM',  msg:'In. Bringing the radar — track 1st-serve speed deep into set 3.' },
+            { who:'Nicolas Kotzen', when:'9:51 AM',  msg:'Sleep was rough, scaling to 70% load. Joining film at 5.' },
+            { who:'Alex Kotzen',    when:'10:08 AM', msg:'Swing overlay is sick. Forehand path 4° flatter than last week.' },
+            { who:'Andrew Kotzen',  when:'10:14 AM', msg:'HRV up across the squad this morning. Block is landing.' },
+            { who:'Adam Walton',    when:'11:01 AM', msg:'Reminder: Princeton dual film drops tonight. Notes by Friday.' },
+            { who:'Michael Zheng',  when:'11:23 AM', msg:'I’ll take Penn #2. He goes T on the second serve 71%.' },
+            { who:'Nicolas Kotzen', when:'12:05 PM', msg:'Cleared cog re-test. Back to live ball tomorrow.' },
+            { who:'Alex Kotzen',    when:'12:31 PM', msg:'Threshold hit clean. 55 min, HR capped at 168.' },
+            { who:'Andrew Kotzen',  when:'12:48 PM', msg:'Holding the deload one more day. HRV still climbing.' },
+            { who:'Adam Walton',    when:'1:12 PM',  msg:'4 PM locked in. Strings checked, intent up.' }
+          ] : [
             { who:'Yusuf Sheikh',     when:'9:42 AM',  msg:'Court 3 free at 4? Want to rep deep-game pressure drills.' },
             { who:'Shaurya Bawa',     when:'9:44 AM',  msg:'In. Bringing the radar — let’s get decel data on the back-corner brake.' },
             { who:'Adam Hawal',       when:'9:51 AM',  msg:'Sleep was trash last night, scaling to 70% load. Joining film at 5.' },
@@ -1286,6 +1366,8 @@
             { who:'Laszlo Godde',     when:'12:48 PM', msg:'Holding the deload one more day. HRV still climbing.' },
             { who:'Yusuf Sheikh',     when:'1:12 PM',  msg:'4 PM locked in. Bring water, bring intent.' }
           ];
+          var channelName = sport === 'tennis' ? '#columbia-tennis' : '#columbia-squash';
+
           function chatMsgRow(c){
             var isMe = c.who === 'Ryan Chen';
             return '<div style="display:flex;gap:10px;padding:8px 0">'+
@@ -1299,15 +1381,17 @@
           function chatHtml(){
             return '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:18px;padding:0;overflow:hidden">'+
               '<div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center">'+
-                '<div><div style="font:700 13px/1 system-ui;color:#fff">#columbia-squash</div><div style="font:600 10px/1 monospace;color:rgba(255,255,255,0.45);margin-top:3px">10 members · '+CHAT.length+' messages today</div></div>'+
+                '<div><div style="font:700 13px/1 system-ui;color:#fff">'+channelName+'</div><div style="font:600 10px/1 monospace;color:rgba(255,255,255,0.45);margin-top:3px">'+COLUMBIA.length+' members · '+CHAT.length+' messages today</div></div>'+
                 '<span style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b98199"></span>'+
               '</div>'+
               '<div data-chat-stream style="max-height:380px;overflow-y:auto;padding:10px 14px">'+
                 CHAT.map(chatMsgRow).join('')+
               '</div>'+
               '<form data-chat-form style="padding:10px 14px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:8px;align-items:center">'+
-                '<input data-chat-input placeholder="Message #columbia-squash as Ryan Chen" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);color:#fff;border-radius:999px;padding:8px 12px;font-size:12px;outline:none">'+
+                '<input data-chat-input placeholder="Message '+channelName+' as Ryan Chen" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);color:#fff;border-radius:999px;padding:8px 12px;font-size:12px;outline:none">'+
                 '<button type="submit" style="background:#10b981;color:#0b0b0b;border:0;border-radius:999px;font:700 11px/1 system-ui;padding:9px 14px;cursor:pointer">Send</button>'+
+              '</form>'+
+
               '</form>'+
             '</div>';
           }
