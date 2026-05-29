@@ -991,9 +991,21 @@
             var t = (headers[i].textContent || '').trim();
             if (/Community.*Group.*Compete/i.test(t)) { socialHeader = headers[i]; break; }
           }
-          if (!socialHeader) return;
-          var main = socialHeader.closest('main') || document.querySelector('main');
+          var main = document.querySelector('main');
           if (!main) return;
+
+          // If we're NOT on the Social tab, tear down any leftover injection
+          // and restore any siblings we previously hid. This prevents the
+          // Columbia banner / blank space from leaking onto Session, Trends, Coach.
+          if (!socialHeader) {
+            var leftover = main.querySelector('[data-vyro-columbia]');
+            if (leftover && leftover.parentNode) leftover.parentNode.removeChild(leftover);
+            Array.prototype.forEach.call(main.querySelectorAll('[data-vyro-social-hidden="1"]'), function(n){
+              n.style.display = '';
+              n.removeAttribute('data-vyro-social-hidden');
+            });
+            return;
+          }
 
           // Find the top-level block in main that contains the header
           var headerSection = socialHeader;
@@ -1006,6 +1018,7 @@
           while (sib) {
             if (!sib.hasAttribute || !sib.hasAttribute('data-vyro-columbia')) {
               sib.style.display = 'none';
+              sib.setAttribute('data-vyro-social-hidden','1');
             }
             sib = sib.nextElementSibling;
           }
@@ -1015,6 +1028,8 @@
           var container = document.createElement('div');
           container.setAttribute('data-vyro-columbia','1');
           container.style.cssText = 'margin-top:16px';
+
+
 
 
           // --- Leaderboard data (sample-weighted composite score across agility + recovery + win rate) ---
