@@ -786,7 +786,7 @@
         // ===== Coach roster (sport-aware: Columbia squash + Columbia tennis) =====
         var COACH_ROSTERS = {
           squash: [
-            { name: 'Yow Soon Kit',     status: 'Peak',    statusColor: '#10b981', load: 52, hrv: 84, matches: 22, wins: 17 },
+            { name: 'Yow Ng',            status: 'Peak',    statusColor: '#10b981', load: 52, hrv: 84, matches: 22, wins: 17 },
             { name: 'Marina Stefanoni', status: 'Ready',   statusColor: '#10b981', load: 61, hrv: 76, matches: 24, wins: 18 },
             { name: 'Sam Todd',         status: 'Peak',    statusColor: '#10b981', load: 49, hrv: 81, matches: 21, wins: 16 },
             { name: 'Yusuf Sheikh',     status: 'Ready',   statusColor: '#10b981', load: 64, hrv: 73, matches: 23, wins: 15 },
@@ -815,7 +815,7 @@
           var hs = document.querySelectorAll('h1,h2,h3,h4');
           for (var i = 0; i < hs.length; i++) {
             var ht = (hs[i].textContent || '').trim();
-            if (/^(Squash|Tennis)\s+roster$/i.test(ht) || /^Roster$/i.test(ht)) { heading = hs[i]; break; }
+            if (/^(Squash|Tennis)\s+roster/i.test(ht) || /^Roster$/i.test(ht)) { heading = hs[i]; break; }
           }
           if (!heading) return;
           var sport = /tennis/i.test(heading.textContent || '') ? 'tennis' : (/squash/i.test(heading.textContent || '') ? 'squash' : detectSport());
@@ -989,29 +989,33 @@
           var socialHeader = null;
           for (var i = 0; i < headers.length; i++) {
             var t = (headers[i].textContent || '').trim();
-            if (/Community .* Group .* Compete/i.test(t) || /^Community\s*[·•]\s*Group/i.test(t)) { socialHeader = headers[i]; break; }
+            if (/Community.*Group.*Compete/i.test(t)) { socialHeader = headers[i]; break; }
           }
           if (!socialHeader) return;
-          var main = socialHeader.closest('main') || document.querySelector('main') || socialHeader.parentElement.parentElement;
+          var main = socialHeader.closest('main') || document.querySelector('main');
           if (!main) return;
-          if (main.querySelector('[data-vyro-columbia]')) return;
 
-          // Hide all existing content sections after the tab bar (which sits right after the header)
-          var headerWrap = socialHeader.parentElement;
-          while (headerWrap && headerWrap.parentElement && !/social/i.test(headerWrap.className||'')) {
-            if (headerWrap.parentElement === main || headerWrap.parentElement.tagName === 'DIV') break;
-            headerWrap = headerWrap.parentElement;
+          // Find the top-level block in main that contains the header
+          var headerSection = socialHeader;
+          while (headerSection.parentElement && headerSection.parentElement !== main) {
+            headerSection = headerSection.parentElement;
           }
-          // Hide every section/article under main that follows the header (these are feed cards, scout, etc.)
-          var contentNodes = main.querySelectorAll('section, article');
-          contentNodes.forEach(function(n){
-            if (n.contains(socialHeader)) return;
-            n.style.display = 'none';
-          });
+
+          // Hide every sibling AFTER the header that isn't our injected container
+          var sib = headerSection.nextElementSibling;
+          while (sib) {
+            if (!sib.hasAttribute || !sib.hasAttribute('data-vyro-columbia')) {
+              sib.style.display = 'none';
+            }
+            sib = sib.nextElementSibling;
+          }
+
+          if (main.querySelector('[data-vyro-columbia]')) return;
 
           var container = document.createElement('div');
           container.setAttribute('data-vyro-columbia','1');
           container.style.cssText = 'margin-top:16px';
+
 
           // --- Leaderboard data (sample-weighted composite score across agility + recovery + win rate) ---
           var lb = COLUMBIA.map(function(m,i){
@@ -1147,8 +1151,9 @@
             '</div>';
 
           container.innerHTML = bannerHtml + tabsHtml + '<div data-columbia-pane></div>';
-          // Insert container right after the header wrap
-          (headerWrap || socialHeader.parentElement).parentElement.appendChild(container);
+          // Insert right after the header section (so it appears immediately under the title)
+          headerSection.parentElement.insertBefore(container, headerSection.nextSibling);
+
 
           var panes = { feed: feedHtml, leaderboard: lbHtml, chat: chatHtml, compete: competeHtml };
           function setTab(name){
@@ -1491,14 +1496,14 @@
           tabs.parentElement.insertBefore(card, tabs.nextSibling);
         }
 
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 100);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 500);
-        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 1500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof hideExtraSports==='function') hideExtraSports(); }, 100);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof hideExtraSports==='function') hideExtraSports(); }, 500);
+        setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); if (typeof hideExtraSports==='function') hideExtraSports(); }, 1500);
         // Swap the bundle's hardcoded roster/opponent names to Columbia athletes.
-        var VYRO_NAME_SWAPS = [
-          ['Shiv Patel',          'Yusuf Sheikh'],
-          ['Alex K.',             'Adam Hawal'],
-          ['Marcus W.',           'Shaurya Bawa'],
+          ['Nico B.',             'Yow Ng'],
+          ['Kira J.',             'Marina Stefanoni'],
+          ['Player X',            'Chelsea Chan'],
+          ['Marwan Tarek',        'Yow Ng'],
           ['Diego R.',            'Sam Todd'],
           ['Nico B.',             'Yow Soon Kit'],
           ['Kira J.',             'Marina Stefanoni'],
@@ -1540,7 +1545,8 @@
             ['BURN 1,842','BURN 1,240'],
             ['GOAL 2,600','GOAL 2,950'],
             ['LEFT 1,920','LEFT 2,270'],
-            ['5 ATHLETES','7 ATHLETES'],
+            ['Baseball, Football, Golf, Squash, and Tennis now have active VYRO sport intelligence layers.','Squash and Tennis are live in VYRO sport intelligence. Additional sports launch post-pilot.'],
+            ['Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, and Tennis all have active VYRO sport intelligence layers.','Squash and Tennis are live in VYRO sport intelligence. Additional sports launch post-pilot.']
             ['4 CONSENTED','6 CONSENTED'],
             ['Princeton #3 tendency profile','Chelsea Chan tendency profile'],
             ['Princeton #3 combined profile','Chelsea Chan combined profile'],
@@ -1556,7 +1562,21 @@
           }
           edits.forEach(function(e){ e[0].textContent = e[1]; });
         }
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); }, 800);
+        // Hide sport pills/buttons for sports we haven't released — only Squash and Tennis are live.
+        var VYRO_HIDDEN_SPORTS = { 'Baseball':1, 'Basketball':1, 'Football':1, 'Golf':1, 'Hockey':1, 'Soccer':1 };
+        function hideExtraSports(){
+          // Hide buttons whose label is exactly a hidden sport (e.g. sport selector pills "Baseball", "Golf 0")
+          document.querySelectorAll('button, [role="tab"], [role="button"]').forEach(function(b){
+            if (b.getAttribute('data-vyro-keep') === '1') return;
+            var t = (b.textContent || '').trim();
+            if (!t) return;
+            var first = t.split(/\s+/)[0];
+            if (VYRO_HIDDEN_SPORTS[t] || VYRO_HIDDEN_SPORTS[first]) {
+              b.style.display = 'none';
+            }
+          });
+        }
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); hideExtraSports(); }, 800);
         setTimeout(vyroSwapNames, 200);
         setTimeout(vyroSwapNames, 800);
         setTimeout(vyroDemoPolish, 250);
