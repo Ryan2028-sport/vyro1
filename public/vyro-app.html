@@ -1052,21 +1052,40 @@
           { name:'Alex Kotzen',    handle:'@akotzen',post:'Recovery step out of the deuce corner is 0.18s faster. Court coverage opening up.',          metric:'Recover -0.18s',likes:142, comments:16, agility:86, recovery:79 },
           { name:'Andrew Kotzen',  handle:'@aakotzen',post:'Holding the deload after the back-to-back duals. HRV climbing, rest HR down 4 bpm.',        metric:'HRV 78ms',      likes:97,  comments:9,  agility:80, recovery:84 }
         ];
+        function rememberVyroSport(sport){
+          if (!/^(Squash|Tennis)$/i.test(sport || '')) return;
+          window.__vyroSelectedSport = /^tennis$/i.test(sport) ? 'Tennis' : 'Squash';
+        }
         function currentSocialSport(){
-          if (window.__vyroCoachSport === 'Tennis') return 'tennis';
-          if (window.__vyroCoachSport === 'Squash') return 'squash';
+          var h1 = document.querySelector('main h1') || document.querySelector('h1');
+          var title = (h1 && h1.textContent || '').toLowerCase();
+          if (title.indexOf('tennis performance lab') !== -1) rememberVyroSport('Tennis');
+          if (title.indexOf('squash performance lab') !== -1) rememberVyroSport('Squash');
+          if (window.__vyroCoachSport === 'Tennis' || window.__vyroSelectedSport === 'Tennis') return 'tennis';
+          if (window.__vyroCoachSport === 'Squash' || window.__vyroSelectedSport === 'Squash') return 'squash';
           var btns = document.querySelectorAll('button, [role="tab"], a');
           for (var i=0;i<btns.length;i++){
             var b = btns[i];
-            var txt = (b.textContent||'').trim();
-            if (!/^Tennis$/i.test(txt) && !/^Squash$/i.test(txt)) continue;
+            var txt = (b.textContent||'').replace(/\s+/g,' ').trim();
+            if (!/^Tennis\b/i.test(txt) && !/^Squash\b/i.test(txt)) continue;
             var sel = b.getAttribute && (b.getAttribute('aria-selected')==='true' || b.getAttribute('data-state')==='active');
             var bg = (b.style && b.style.background) || '';
             var active = sel || /rgb\(|#/.test(bg);
-            if (active) return /tennis/i.test(txt) ? 'tennis' : 'squash';
+            if (active) {
+              rememberVyroSport(/^Tennis\b/i.test(txt) ? 'Tennis' : 'Squash');
+              return /^Tennis\b/i.test(txt) ? 'tennis' : 'squash';
+            }
           }
           return 'squash';
         }
+        document.addEventListener('click', function(e){
+          var target = e.target && e.target.closest && e.target.closest('button, [role="tab"], [role="button"], a');
+          if (!target) return;
+          var text = ((target.getAttribute('aria-label') || target.textContent) || '').replace(/\s+/g,' ').trim();
+          if (/^Home$/i.test(text)) rememberVyroSport('Squash');
+          if (/^Tennis\b/i.test(text)) rememberVyroSport('Tennis');
+          if (/^Squash\b/i.test(text)) rememberVyroSport('Squash');
+        }, true);
         var COLUMBIA = COLUMBIA_SQUASH;
 
         function memberCardHtml(m, idx){
