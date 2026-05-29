@@ -783,41 +783,67 @@
           grid.appendChild(card);
         }
 
-        // ===== Coach roster (collegiate men's squash squad — realistic season metrics) =====
-        var COACH_ROSTER = [
-          { name: 'Marwan Tarek',    status: 'Peak',    statusColor: '#10b981', load: 54, hrv: 87, matches: 23, wins: 19 },
-          { name: 'Omar Allaudin',   status: 'Ready',   statusColor: '#10b981', load: 63, hrv: 78, matches: 21, wins: 15 },
-          { name: 'Aly Hussein',     status: 'Caution', statusColor: '#f59e0b', load: 79, hrv: 61, matches: 24, wins: 16 },
-          { name: 'David Mensah',    status: 'Ready',   statusColor: '#10b981', load: 67, hrv: 73, matches: 20, wins: 13 },
-          { name: 'Karim Sadek',     status: 'Peak',    statusColor: '#10b981', load: 51, hrv: 84, matches: 22, wins: 17 },
-          { name: 'Jonah Bryan',     status: 'Ready',   statusColor: '#10b981', load: 69, hrv: 71, matches: 19, wins: 12 },
-          { name: 'Andrew Douglas',  status: 'Recover', statusColor: '#ef4444', load: 84, hrv: 56, matches: 18, wins: 10 }
-        ];
+        // ===== Coach roster (sport-aware: Columbia squash + Columbia tennis) =====
+        var COACH_ROSTERS = {
+          squash: [
+            { name: 'Yow Soon Kit',     status: 'Peak',    statusColor: '#10b981', load: 52, hrv: 84, matches: 22, wins: 17 },
+            { name: 'Marina Stefanoni', status: 'Ready',   statusColor: '#10b981', load: 61, hrv: 76, matches: 24, wins: 18 },
+            { name: 'Sam Todd',         status: 'Peak',    statusColor: '#10b981', load: 49, hrv: 81, matches: 21, wins: 16 },
+            { name: 'Yusuf Sheikh',     status: 'Ready',   statusColor: '#10b981', load: 64, hrv: 73, matches: 23, wins: 15 },
+            { name: 'Adam Hawal',       status: 'Caution', statusColor: '#f59e0b', load: 78, hrv: 62, matches: 22, wins: 14 },
+            { name: 'Shaurya Bawa',     status: 'Ready',   statusColor: '#10b981', load: 67, hrv: 71, matches: 20, wins: 13 },
+            { name: 'Thomas Soltanian', status: 'Recover', statusColor: '#ef4444', load: 83, hrv: 57, matches: 19, wins: 11 }
+          ],
+          tennis: [
+            { name: 'Adam Walton',    status: 'Peak',    statusColor: '#10b981', load: 51, hrv: 83, matches: 26, wins: 21 },
+            { name: 'Michael Zheng',  status: 'Ready',   statusColor: '#10b981', load: 62, hrv: 75, matches: 24, wins: 17 },
+            { name: 'Nicolas Kotzen', status: 'Peak',    statusColor: '#10b981', load: 54, hrv: 80, matches: 22, wins: 16 },
+            { name: 'Alex Kotzen',    status: 'Ready',   statusColor: '#10b981', load: 66, hrv: 72, matches: 23, wins: 15 },
+            { name: 'Andrew Kotzen',  status: 'Caution', statusColor: '#f59e0b', load: 77, hrv: 63, matches: 21, wins: 13 }
+          ]
+        };
+        function detectSport(){
+          var h1 = document.querySelector('main h1') || document.querySelector('h1');
+          var t = ((h1 && h1.textContent) || document.body.textContent || '').toLowerCase();
+          if (t.indexOf('tennis') !== -1 && t.indexOf('squash') === -1) return 'tennis';
+          return 'squash';
+        }
         function initials(n){ return n.split(/\s+/).map(function(p){return p[0];}).join('').slice(0,2).toUpperCase(); }
         function enhanceCoachRoster(){
-          // Find the "Squash roster" card
+          // Find the roster card heading (Squash roster / Tennis roster / generic Roster)
           var heading = null;
           var hs = document.querySelectorAll('h1,h2,h3,h4');
           for (var i = 0; i < hs.length; i++) {
-            if (/^\s*Squash roster\s*$/i.test(hs[i].textContent || '')) { heading = hs[i]; break; }
+            var ht = (hs[i].textContent || '').trim();
+            if (/^(Squash|Tennis)\s+roster$/i.test(ht) || /^Roster$/i.test(ht)) { heading = hs[i]; break; }
           }
           if (!heading) return;
+          var sport = /tennis/i.test(heading.textContent || '') ? 'tennis' : (/squash/i.test(heading.textContent || '') ? 'squash' : detectSport());
+          var roster = COACH_ROSTERS[sport] || COACH_ROSTERS.squash;
+
+          // Relabel the heading to Columbia branding
+          var pretty = sport === 'tennis' ? 'Columbia tennis roster' : 'Columbia squash roster';
+          if (heading.textContent.trim() !== pretty) heading.textContent = pretty;
+
           var card = heading.closest('section') || heading.parentElement;
           for (var k = 0; k < 6 && card && card.tagName !== 'SECTION'; k++) card = card.parentElement;
           if (!card) return;
-          if (card.querySelector('[data-vyro-roster]')) return;
+          var existing = card.querySelector('[data-vyro-roster]');
+          if (existing && existing.getAttribute('data-vyro-sport') === sport) return;
+          if (existing) existing.remove();
 
           // Hide every direct child of the card except the heading row
           var headRow = heading.parentElement;
           while (headRow && headRow.parentElement !== card) headRow = headRow.parentElement;
           Array.prototype.forEach.call(card.children, function(ch){
-            if (ch !== headRow) ch.style.display = 'none';
+            if (ch !== headRow && !ch.hasAttribute('data-vyro-roster')) ch.style.display = 'none';
           });
 
           var wrap = document.createElement('div');
           wrap.setAttribute('data-vyro-roster','1');
+          wrap.setAttribute('data-vyro-sport', sport);
           wrap.style.cssText = 'margin-top:14px;display:flex;flex-direction:column;gap:8px';
-          wrap.innerHTML = COACH_ROSTER.map(function(a){
+          wrap.innerHTML = roster.map(function(a){
             var loadColor = a.load > 75 ? '#f59e0b' : '#ffffff';
             return ''+
               '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:16px;padding:10px 12px">'+
@@ -839,14 +865,15 @@
           card.appendChild(wrap);
         }
 
-        // ===== Combined opponent model (Ivy League men's squash opponents — sample-weighted tendencies) =====
+        // ===== Combined opponent model: Savannah / Sam Yu / Kathryn / Chelsea all faced opponent "Chelsea Chan" — combine sample-weighted rallies =====
         var OPP_DATA = {
-          'Mostafa Hesham':   [['Back-left','Straight drive on pressure',73,62],['Back-right','Cross-court reset',51,44],['Front-left','Counter-drop',58,29],['Mid-court volley','Volley kill on loose rail',61,33]],
-          'Velavan Senthil':  [['Back-left','Straight drive on pressure',68,57],['Back-right','Cross-court reset',46,38],['Front-left','Counter-drop',54,31],['Mid-court volley','Volley kill on loose rail',66,36]],
-          'James Flynn':      [['Back-left','Straight drive on pressure',71,49],['Back-right','Cross-court reset',49,41],['Front-left','Counter-drop',57,27],['Mid-court volley','Volley kill on loose rail',59,31]],
-          'Saadeldin Abouaish':[['Back-left','Straight drive on pressure',69,53],['Back-right','Cross-court reset',55,42],['Front-left','Counter-drop',56,30],['Mid-court volley','Volley kill on loose rail',63,34]]
+          'Savannah Moxham': [['Back-left','Straight drive on pressure',74,38],['Back-right','Cross-court reset',52,31],['Front-left','Counter-drop',61,22],['Mid-court volley','Volley kill on loose rail',58,19]],
+          'Sam Yu':          [['Back-left','Straight drive on pressure',70,41],['Back-right','Cross-court reset',47,28],['Front-left','Counter-drop',55,24],['Mid-court volley','Volley kill on loose rail',64,26]],
+          'Kathryn Chung':   [['Back-left','Straight drive on pressure',71,34],['Back-right','Cross-court reset',49,30],['Front-left','Counter-drop',59,21],['Mid-court volley','Volley kill on loose rail',60,23]],
+          'Chelsea Chan':    [['Back-left','Straight drive on pressure',69,44],['Back-right','Cross-court reset',54,36],['Front-left','Counter-drop',57,27],['Mid-court volley','Volley kill on loose rail',62,29]]
         };
-        var OPP_SELECTED = { 'Mostafa Hesham': true, 'Velavan Senthil': true, 'James Flynn': true, 'Saadeldin Abouaish': false };
+        var OPP_SELECTED = { 'Savannah Moxham': true, 'Sam Yu': true, 'Kathryn Chung': true, 'Chelsea Chan': false };
+
         function computeCombined(){
           var buckets = {};
           Object.keys(OPP_SELECTED).forEach(function(name){
@@ -985,9 +1012,46 @@
           var container = document.createElement('div');
           container.setAttribute('data-vyro-columbia','1');
           container.style.cssText = 'margin-top:16px';
-          container.innerHTML =
-            // Group banner
-            '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.055);border-radius:24px;padding:16px;margin-bottom:14px">'+
+
+          // --- Leaderboard data (sample-weighted composite score across agility + recovery + win rate) ---
+          var lb = COLUMBIA.map(function(m,i){
+            var winRate = 55 + ((i*7)%30);
+            var score = Math.round((m.agility*0.4 + m.recovery*0.3 + winRate*0.3));
+            return { name:m.name, agility:m.agility, recovery:m.recovery, winRate:winRate, score:score, sessions: 18 + ((i*5)%22) };
+          }).sort(function(a,b){ return b.score - a.score; });
+
+          // --- Chat messages (group chat, recent) ---
+          var CHAT = [
+            { who:'Yusuf Sheikh',     when:'9:42 AM', msg:'Court 3 free at 4? Want to rep deep-game pressure drills.' },
+            { who:'Shaurya Bawa',     when:'9:44 AM', msg:'In. Bringing the radar — let’s get decel data on the back-corner brake.' },
+            { who:'Adam Hawal',       when:'9:51 AM', msg:'Sleep was trash last night, scaling to 70% load. Joining film at 5.' },
+            { who:'Sam Du',           when:'10:08 AM', msg:'Swing overlay is sick. My forehand path is 4° flatter than last week.' },
+            { who:'Imad Athar',       when:'10:14 AM', msg:'HRV up across the squad this morning. Block is landing.' },
+            { who:'Thomas Soltanian', when:'11:01 AM', msg:'Reminder: Princeton scout video drops tonight. Coach wants notes by Friday.' },
+            { who:'Arhan Chandra',    when:'11:23 AM', msg:'I’ll take Penn #2. He goes cross-court 67% on the boast.' },
+            { who:'Paarth Ambani',    when:'12:05 PM', msg:'Cleared cog re-test. Back in for live ball tomorrow.' },
+            { who:'Ahmad Haq',        when:'12:31 PM', msg:'Threshold hit went clean. 60 min, no HR drift past 165.' },
+            { who:'Laszlo Godde',     when:'12:48 PM', msg:'Holding the deload one more day. HRV still climbing.' },
+            { who:'Yusuf Sheikh',     when:'1:12 PM',  msg:'4 PM locked in. Bring water, bring intent.' }
+          ];
+
+          // --- Compete: head-to-head squad challenge stats ---
+          var COMPETE = [
+            { title:'Decel quality · 7-day', leader:'Thomas Soltanian', value:'95% symmetry', delta:'+4% vs squad' },
+            { title:'Return-to-T · best avg', leader:'Adam Hawal',       value:'1.31s',        delta:'-0.18s vs squad' },
+            { title:'T-control · match avg',  leader:'Yusuf Sheikh',     value:'73%',          delta:'+9% vs squad' },
+            { title:'HRV gain · 30-day',      leader:'Laszlo Godde',     value:'+8 ms',        delta:'+6 vs squad' },
+            { title:'Volley kill conversion', leader:'Arhan Chandra',    value:'64%',          delta:'+11% vs squad' },
+            { title:'Aerobic threshold time', leader:'Ahmad Haq',        value:'60:00 @ 165',  delta:'team best' }
+          ];
+
+          function rankBadge(i){
+            var colors = ['#f59e0b','#d1d5db','#b45309'];
+            var c = colors[i] || 'rgba(255,255,255,0.18)';
+            return '<div style="width:24px;height:24px;border-radius:50%;background:'+c+';color:#0b0b0b;font:800 11px/1 system-ui;display:grid;place-items:center">'+(i+1)+'</div>';
+          }
+          var bannerHtml =
+            '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.055);border-radius:24px;padding:16px;margin-bottom:14px;cursor:pointer" data-columbia-banner>'+
               '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
                 '<div>'+
                   '<div style="font:700 10px/1 monospace;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,0.45)">Group · invite-only</div>'+
@@ -1002,13 +1066,106 @@
                   return '<div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:8px"><div style="font-size:18px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums">'+p[0]+'</div><div style="font:600 9px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-top:4px">'+p[1]+'</div></div>';
                 }).join('')+
               '</div>'+
-            '</div>'+
-            // Members feed
+            '</div>';
+
+          var tabsHtml =
+            '<div style="display:flex;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;padding:4px;margin-bottom:12px">'+
+              ['feed','Feed','leaderboard','Leaderboard','chat','Chat','compete','Compete'].reduce(function(acc,_,i,arr){
+                if (i%2) return acc;
+                acc.push('<button data-columbia-tab="'+arr[i]+'" style="flex:1;border:0;background:transparent;color:rgba(255,255,255,0.6);font:700 11px/1 system-ui;padding:9px 8px;border-radius:999px;cursor:pointer">'+arr[i+1]+'</button>');
+                return acc;
+              },[]).join('')+
+            '</div>';
+
+          var feedHtml =
             '<div style="font:700 10px/1 monospace;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin:6px 2px 10px">Columbia feed</div>'+
             COLUMBIA.map(memberCardHtml).join('');
+
+          var lbHtml =
+            '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:18px;padding:14px">'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+                '<div style="font:700 13px/1 system-ui;color:#fff">Squad leaderboard · composite</div>'+
+                '<div style="font:600 10px/1 monospace;color:rgba(255,255,255,0.5)">Agility · Recovery · Win %</div>'+
+              '</div>'+
+              lb.map(function(p,i){
+                return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,0.06)">'+
+                         rankBadge(i)+
+                         '<div style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.10);display:grid;place-items:center;font:700 10px/1 system-ui;color:#fff">'+initials(p.name)+'</div>'+
+                         '<div style="flex:1;min-width:0">'+
+                           '<div style="font-weight:700;font-size:13px;color:#fff">'+p.name+'</div>'+
+                           '<div style="font-size:10px;color:rgba(255,255,255,0.5)">Agi '+p.agility+' · Rec '+p.recovery+' · '+p.winRate+'% wins · '+p.sessions+' sessions</div>'+
+                         '</div>'+
+                         '<div style="font:800 16px/1 system-ui;color:#fff;font-variant-numeric:tabular-nums">'+p.score+'</div>'+
+                       '</div>';
+              }).join('')+
+            '</div>';
+
+          var chatHtml =
+            '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:18px;padding:0;overflow:hidden">'+
+              '<div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center">'+
+                '<div><div style="font:700 13px/1 system-ui;color:#fff">#columbia-squash</div><div style="font:600 10px/1 monospace;color:rgba(255,255,255,0.45);margin-top:3px">10 members · '+CHAT.length+' messages today</div></div>'+
+                '<span style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b98199"></span>'+
+              '</div>'+
+              '<div style="max-height:380px;overflow-y:auto;padding:10px 14px">'+
+                CHAT.map(function(c){
+                  return '<div style="display:flex;gap:10px;padding:8px 0">'+
+                           '<div style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.10);display:grid;place-items:center;font:700 10px/1 system-ui;color:#fff;flex-shrink:0">'+initials(c.who)+'</div>'+
+                           '<div style="flex:1;min-width:0">'+
+                             '<div style="display:flex;gap:8px;align-items:baseline"><b style="font-size:12px;color:#fff">'+c.who+'</b><span style="font:600 10px/1 monospace;color:rgba(255,255,255,0.4)">'+c.when+'</span></div>'+
+                             '<div style="font-size:12px;color:rgba(255,255,255,0.78);line-height:1.45;margin-top:2px">'+c.msg+'</div>'+
+                           '</div>'+
+                         '</div>';
+                }).join('')+
+              '</div>'+
+              '<div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:8px;align-items:center">'+
+                '<input placeholder="Message #columbia-squash" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);color:#fff;border-radius:999px;padding:8px 12px;font-size:12px;outline:none">'+
+                '<button style="background:#10b981;color:#0b0b0b;border:0;border-radius:999px;font:700 11px/1 system-ui;padding:9px 14px;cursor:pointer">Send</button>'+
+              '</div>'+
+            '</div>';
+
+          var competeHtml =
+            '<div style="border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);border-radius:18px;padding:14px">'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+                '<div style="font:700 13px/1 system-ui;color:#fff">VYRO Compete · squad challenges</div>'+
+                '<span style="font:700 9px/1 monospace;letter-spacing:.14em;text-transform:uppercase;padding:4px 8px;border-radius:999px;border:1px solid #10b98166;background:#10b9811a;color:#10b981">Week 7</span>'+
+              '</div>'+
+              COMPETE.map(function(c){
+                return '<div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;gap:10px">'+
+                         '<div style="min-width:0">'+
+                           '<div style="font:700 12px/1.2 system-ui;color:#fff">'+c.title+'</div>'+
+                           '<div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:3px">Leader · '+c.leader+'</div>'+
+                         '</div>'+
+                         '<div style="text-align:right;flex-shrink:0">'+
+                           '<div style="font:800 14px/1 system-ui;color:#fff;font-variant-numeric:tabular-nums">'+c.value+'</div>'+
+                           '<div style="font:600 10px/1 monospace;color:#10b981;margin-top:4px">'+c.delta+'</div>'+
+                         '</div>'+
+                       '</div>';
+              }).join('')+
+              '<div style="margin-top:12px;padding:10px 12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:14px;font-size:11px;color:rgba(255,255,255,0.7);line-height:1.5">'+
+                'Head-to-head: <b style="color:#fff">Yusuf vs Shaurya</b> · best-of-5 decel sprint at 4:30 PM. Live on VYRO Compete.'+
+              '</div>'+
+            '</div>';
+
+          container.innerHTML = bannerHtml + tabsHtml + '<div data-columbia-pane></div>';
           // Insert container right after the header wrap
           (headerWrap || socialHeader.parentElement).parentElement.appendChild(container);
+
+          var panes = { feed: feedHtml, leaderboard: lbHtml, chat: chatHtml, compete: competeHtml };
+          function setTab(name){
+            var pane = container.querySelector('[data-columbia-pane]');
+            if (pane) pane.innerHTML = panes[name] || panes.feed;
+            container.querySelectorAll('[data-columbia-tab]').forEach(function(b){
+              var on = b.getAttribute('data-columbia-tab') === name;
+              b.style.background = on ? 'rgba(255,255,255,0.16)' : 'transparent';
+              b.style.color = on ? '#fff' : 'rgba(255,255,255,0.6)';
+            });
+          }
+          container.querySelectorAll('[data-columbia-tab]').forEach(function(b){
+            b.addEventListener('click', function(){ setTab(b.getAttribute('data-columbia-tab')); });
+          });
+          setTab('feed');
         }
+
 
         // ===== Realistic court heatmaps (Squash + Tennis) =====
         // Squash: portrait court, front wall top. Hotspots reflect real movement density —
@@ -1337,15 +1494,26 @@
         setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 100);
         setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 500);
         setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 1500);
-        // Swap the bundle's hardcoded roster names to realistic male collegiate squash athletes.
+        // Swap the bundle's hardcoded roster/opponent names to Columbia athletes.
         var VYRO_NAME_SWAPS = [
-          ['Shiv Patel',  'Omar Allaudin'],
-          ['Alex K.',     'Aly Hussein'],
-          ['Marcus W.',   'David Mensah'],
-          ['Diego R.',    'Marwan Tarek'],
-          ['Nico B.',     'Mostafa Hesham'],
-          ['Kira J.',     'Karim Sadek'],
-          ['Player X',    'Mostafa Hesham']
+          ['Shiv Patel',          'Yusuf Sheikh'],
+          ['Alex K.',             'Adam Hawal'],
+          ['Marcus W.',           'Shaurya Bawa'],
+          ['Diego R.',            'Sam Todd'],
+          ['Nico B.',             'Yow Soon Kit'],
+          ['Kira J.',             'Marina Stefanoni'],
+          ['Player X',            'Chelsea Chan'],
+          ['Marwan Tarek',        'Yow Soon Kit'],
+          ['Omar Allaudin',       'Marina Stefanoni'],
+          ['Aly Hussein',         'Adam Hawal'],
+          ['David Mensah',        'Sam Todd'],
+          ['Karim Sadek',         'Yusuf Sheikh'],
+          ['Jonah Bryan',         'Shaurya Bawa'],
+          ['Andrew Douglas',      'Thomas Soltanian'],
+          ['Mostafa Hesham',      'Chelsea Chan'],
+          ['Velavan Senthil',     'Sam Yu'],
+          ['James Flynn',         'Kathryn Chung'],
+          ['Saadeldin Abouaish',  'Savannah Moxham']
         ];
         function vyroSwapNames(){
           var skip = { SCRIPT:1, STYLE:1, NOSCRIPT:1, INPUT:1, TEXTAREA:1 };
@@ -1372,10 +1540,10 @@
             ['BURN 1,842','BURN 1,240'],
             ['GOAL 2,600','GOAL 2,950'],
             ['LEFT 1,920','LEFT 2,270'],
-            ['5 ATHLETES','6 ATHLETES'],
-            ['4 CONSENTED','5 CONSENTED'],
-            ['Mostafa Hesham tendency profile','Princeton #3 tendency profile'],
-            ['Mostafa Hesham\'s combined profile','Princeton #3 combined profile'],
+            ['5 ATHLETES','7 ATHLETES'],
+            ['4 CONSENTED','6 CONSENTED'],
+            ['Princeton #3 tendency profile','Chelsea Chan tendency profile'],
+            ['Princeton #3 combined profile','Chelsea Chan combined profile'],
             ['Across Squash teammates','Across Columbia teammates'],
             ['Baseball, Football, Golf, Squash, and Tennis now have active VYRO sport intelligence layers.','Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, and Tennis all have active VYRO sport intelligence layers.']
           ];
@@ -1388,11 +1556,12 @@
           }
           edits.forEach(function(e){ e[0].textContent = e[1]; });
         }
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); }, 800);
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); }, 800);
         setTimeout(vyroSwapNames, 200);
         setTimeout(vyroSwapNames, 800);
         setTimeout(vyroDemoPolish, 250);
         setTimeout(vyroDemoPolish, 900);
+
 
       });
     </script>
