@@ -1151,8 +1151,9 @@
             '</div>';
 
           container.innerHTML = bannerHtml + tabsHtml + '<div data-columbia-pane></div>';
-          // Insert container right after the header wrap
-          (headerWrap || socialHeader.parentElement).parentElement.appendChild(container);
+          // Insert right after the header section (so it appears immediately under the title)
+          headerSection.parentElement.insertBefore(container, headerSection.nextSibling);
+
 
           var panes = { feed: feedHtml, leaderboard: lbHtml, chat: chatHtml, compete: competeHtml };
           function setTab(name){
