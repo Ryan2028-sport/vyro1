@@ -989,29 +989,33 @@
           var socialHeader = null;
           for (var i = 0; i < headers.length; i++) {
             var t = (headers[i].textContent || '').trim();
-            if (/Community .* Group .* Compete/i.test(t) || /^Community\s*[·•]\s*Group/i.test(t)) { socialHeader = headers[i]; break; }
+            if (/Community.*Group.*Compete/i.test(t)) { socialHeader = headers[i]; break; }
           }
           if (!socialHeader) return;
-          var main = socialHeader.closest('main') || document.querySelector('main') || socialHeader.parentElement.parentElement;
+          var main = socialHeader.closest('main') || document.querySelector('main');
           if (!main) return;
-          if (main.querySelector('[data-vyro-columbia]')) return;
 
-          // Hide all existing content sections after the tab bar (which sits right after the header)
-          var headerWrap = socialHeader.parentElement;
-          while (headerWrap && headerWrap.parentElement && !/social/i.test(headerWrap.className||'')) {
-            if (headerWrap.parentElement === main || headerWrap.parentElement.tagName === 'DIV') break;
-            headerWrap = headerWrap.parentElement;
+          // Find the top-level block in main that contains the header
+          var headerSection = socialHeader;
+          while (headerSection.parentElement && headerSection.parentElement !== main) {
+            headerSection = headerSection.parentElement;
           }
-          // Hide every section/article under main that follows the header (these are feed cards, scout, etc.)
-          var contentNodes = main.querySelectorAll('section, article');
-          contentNodes.forEach(function(n){
-            if (n.contains(socialHeader)) return;
-            n.style.display = 'none';
-          });
+
+          // Hide every sibling AFTER the header that isn't our injected container
+          var sib = headerSection.nextElementSibling;
+          while (sib) {
+            if (!sib.hasAttribute || !sib.hasAttribute('data-vyro-columbia')) {
+              sib.style.display = 'none';
+            }
+            sib = sib.nextElementSibling;
+          }
+
+          if (main.querySelector('[data-vyro-columbia]')) return;
 
           var container = document.createElement('div');
           container.setAttribute('data-vyro-columbia','1');
           container.style.cssText = 'margin-top:16px';
+
 
           // --- Leaderboard data (sample-weighted composite score across agility + recovery + win rate) ---
           var lb = COLUMBIA.map(function(m,i){
