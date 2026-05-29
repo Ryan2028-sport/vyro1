@@ -1586,9 +1586,13 @@
           Array.prototype.forEach.call(document.querySelectorAll('[data-vyro-sport-surface]'), function(n){ n.remove(); });
           var liveButtons = Array.prototype.slice.call(document.querySelectorAll('button, [role="tab"], [role="button"], a'));
           var squash = liveButtons.find(function(b){ return /\bSquash\b/i.test(((b.getAttribute('aria-label') || b.textContent) || '').replace(/\s+/g,' ').trim()); });
-          if (squash) squash.click();
+          if (squash) {
+            squash.disabled = false;
+            squash.style.pointerEvents = 'auto';
+            ['pointerdown','mousedown','mouseup','click'].forEach(function(type){ squash.dispatchEvent(new MouseEvent(type, { bubbles:true, cancelable:true, view:window })); });
+          }
           showComingSoonToast(m[1]);
-          setTimeout(function(){ window.__vyroRedirectingSport = false; redirectUnreleasedSport(); }, 50);
+          setTimeout(function(){ window.__vyroRedirectingSport = false; redirectUnreleasedSport(); }, 30);
         }
         function lockComingSoonSports(){
           // Disable any sport selector whose visible text starts with an unreleased sport.
