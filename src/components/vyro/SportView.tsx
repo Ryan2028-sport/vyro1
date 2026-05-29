@@ -90,22 +90,20 @@ export function SportView({
 }
 
 function SportDatabase({ profile, selectedSport }: { profile: SportProfile; selectedSport: string }) {
+  const isTennis = selectedSport === "Tennis";
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {profile.heatmap ? (
         <Card>
-          <h3 className="text-lg font-black">Red heat map</h3>
-          <div className="mt-4 aspect-[3/4] rounded-2xl border border-white/15 bg-black p-4">
-            <div className="relative h-full w-full rounded-xl border-2 border-white/60">
-              <div className="absolute left-0 right-0 top-[14%] border-t border-white/50" />
-              <div className="absolute left-0 right-0 top-[38%] border-t border-white/50" />
-              <div className="absolute left-1/2 top-[38%] h-[62%] border-l border-white/50" />
-              <div className="absolute inset-0 grid grid-cols-6 grid-rows-8 gap-1 p-2">
-                {Array.from({ length: 48 }, (_, i) => (
-                  <div key={i} className="rounded" style={{ background: `rgba(255,43,43,${0.08 + (i % 11) / 12})` }} />
-                ))}
-              </div>
-            </div>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-black">{isTennis ? "Shot location heat map" : "Red heat map"}</h3>
+            <Pill>{isTennis ? "rally landings" : "court coverage"}</Pill>
+          </div>
+          {isTennis ? <TennisHeatmap /> : <SquashHeatmap />}
+          <div className="mt-3 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-white/55">
+            <span>low density</span>
+            <div className="mx-3 h-2 flex-1 rounded-full" style={{ background: "linear-gradient(to right, rgba(255,43,43,0.08), rgba(255,43,43,0.45), rgba(255,43,43,0.95))" }} />
+            <span>hot zone</span>
           </div>
         </Card>
       ) : (
