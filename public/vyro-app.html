@@ -1495,15 +1495,26 @@
         setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 100);
         setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 500);
         setTimeout(function(){ pass(); rebuildHeader(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); }, 1500);
-        // Swap the bundle's hardcoded roster names to realistic male collegiate squash athletes.
+        // Swap the bundle's hardcoded roster/opponent names to Columbia athletes.
         var VYRO_NAME_SWAPS = [
-          ['Shiv Patel',  'Omar Allaudin'],
-          ['Alex K.',     'Aly Hussein'],
-          ['Marcus W.',   'David Mensah'],
-          ['Diego R.',    'Marwan Tarek'],
-          ['Nico B.',     'Mostafa Hesham'],
-          ['Kira J.',     'Karim Sadek'],
-          ['Player X',    'Mostafa Hesham']
+          ['Shiv Patel',          'Yusuf Sheikh'],
+          ['Alex K.',             'Adam Hawal'],
+          ['Marcus W.',           'Shaurya Bawa'],
+          ['Diego R.',            'Sam Todd'],
+          ['Nico B.',             'Yow Soon Kit'],
+          ['Kira J.',             'Marina Stefanoni'],
+          ['Player X',            'Chelsea Chan'],
+          ['Marwan Tarek',        'Yow Soon Kit'],
+          ['Omar Allaudin',       'Marina Stefanoni'],
+          ['Aly Hussein',         'Adam Hawal'],
+          ['David Mensah',        'Sam Todd'],
+          ['Karim Sadek',         'Yusuf Sheikh'],
+          ['Jonah Bryan',         'Shaurya Bawa'],
+          ['Andrew Douglas',      'Thomas Soltanian'],
+          ['Mostafa Hesham',      'Chelsea Chan'],
+          ['Velavan Senthil',     'Sam Yu'],
+          ['James Flynn',         'Kathryn Chung'],
+          ['Saadeldin Abouaish',  'Savannah Moxham']
         ];
         function vyroSwapNames(){
           var skip = { SCRIPT:1, STYLE:1, NOSCRIPT:1, INPUT:1, TEXTAREA:1 };
@@ -1530,10 +1541,10 @@
             ['BURN 1,842','BURN 1,240'],
             ['GOAL 2,600','GOAL 2,950'],
             ['LEFT 1,920','LEFT 2,270'],
-            ['5 ATHLETES','6 ATHLETES'],
-            ['4 CONSENTED','5 CONSENTED'],
-            ['Mostafa Hesham tendency profile','Princeton #3 tendency profile'],
-            ['Mostafa Hesham\'s combined profile','Princeton #3 combined profile'],
+            ['5 ATHLETES','7 ATHLETES'],
+            ['4 CONSENTED','6 CONSENTED'],
+            ['Princeton #3 tendency profile','Chelsea Chan tendency profile'],
+            ['Princeton #3 combined profile','Chelsea Chan combined profile'],
             ['Across Squash teammates','Across Columbia teammates'],
             ['Baseball, Football, Golf, Squash, and Tennis now have active VYRO sport intelligence layers.','Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, and Tennis all have active VYRO sport intelligence layers.']
           ];
@@ -1546,11 +1557,12 @@
           }
           edits.forEach(function(e){ e[0].textContent = e[1]; });
         }
-        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); }, 800);
+        setInterval(function(){ pass(); enhanceRecovery(); enhanceCoach(); enhanceCoachRoster(); enhanceOpponentModel(); enhanceSocial(); enhanceHeatmap(); enhanceSocialThumbnails(); enhanceSportSurface(); vyroSwapNames(); vyroDemoPolish(); }, 800);
         setTimeout(vyroSwapNames, 200);
         setTimeout(vyroSwapNames, 800);
         setTimeout(vyroDemoPolish, 250);
         setTimeout(vyroDemoPolish, 900);
+
 
       });
     </script>
