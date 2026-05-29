@@ -1128,11 +1128,19 @@
             sib = sib.nextElementSibling;
           }
 
-          if (main.querySelector('[data-vyro-columbia]')) return;
+          var sport = currentSocialSport();
+          var existing = main.querySelector('[data-vyro-columbia]');
+          if (existing) {
+            if (existing.getAttribute('data-vyro-sport') === sport) return;
+            existing.parentNode.removeChild(existing);
+          }
+          COLUMBIA = sport === 'tennis' ? COLUMBIA_TENNIS : COLUMBIA_SQUASH;
 
           var container = document.createElement('div');
           container.setAttribute('data-vyro-columbia','1');
+          container.setAttribute('data-vyro-sport', sport);
           container.style.cssText = 'margin-top:16px';
+
 
 
 
