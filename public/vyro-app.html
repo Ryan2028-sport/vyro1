@@ -2197,8 +2197,16 @@
         function blockComingSoonEvent(e){
           if (window.__vyroAllowComingSoonClick) return;
           var target = e.target && e.target.closest && e.target.closest('button, [role="tab"], [role="button"], a');
-          var sport = getSportLabel(target) || getSportLabel(e.target && e.target.parentElement) || getSportLabel(e.target && e.target.parentElement && e.target.parentElement.parentElement);
+          if (!target) return;
+          // Never block the Watch Test pill (or anything explicitly opted out).
+          if (target.id === 'vyro-watch-test-btn' || target.closest('#vyro-watch-test-btn') || target.getAttribute('data-vyro-keep') === '1') return;
+          // Only block actual sport pills — match on the element's own short label,
+          // never on parent text (which would contain every sport on the page).
+          var sport = getSportLabel(target);
           if (!sport) return;
+          // Guard: the element's own text must be short (a tab/pill), not a whole panel.
+          var ownText = (target.getAttribute('aria-label') || target.textContent || '').replace(/\s+/g,' ').trim();
+          if (ownText.length > 40) return;
           e.preventDefault();
           e.stopPropagation();
           if (e.stopImmediatePropagation) e.stopImmediatePropagation();
@@ -2237,8 +2245,9 @@ Error generating stack: `+d.message+`
         });
       });
     </script>
-    <a href="/watch-test.html" id="vyro-watch-test-btn"
-       style="position:fixed;right:16px;bottom:96px;z-index:9999;background:#fff;color:#000;font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700;font-size:11px;letter-spacing:.18em;text-transform:uppercase;padding:12px 16px;border-radius:999px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.5);display:inline-flex;align-items:center;gap:8px">
+    <a href="/watch-test.html" id="vyro-watch-test-btn" data-vyro-keep="1"
+       onclick="event.stopPropagation(); window.location.href='/watch-test.html'; return false;"
+       style="position:fixed;right:16px;bottom:96px;z-index:2147483646;background:#fff;color:#000;font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700;font-size:11px;letter-spacing:.18em;text-transform:uppercase;padding:12px 16px;border-radius:999px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.5);display:inline-flex;align-items:center;gap:8px;pointer-events:auto !important;opacity:1 !important;cursor:pointer">
       <span style="display:inline-block;width:8px;height:8px;background:#39ff88;border-radius:50%;box-shadow:0 0 8px #39ff88"></span>
       Watch Test
     </a>
