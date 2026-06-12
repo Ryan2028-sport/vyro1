@@ -1,63 +1,27 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import type { ViewId } from "@/lib/vyro-data";
-import { Layout } from "@/components/vyro/Layout";
-import { HomeView } from "@/components/vyro/HomeView";
-import { TrendsView } from "@/components/vyro/TrendsView";
-import { SessionView } from "@/components/vyro/SessionView";
-import { SportView } from "@/components/vyro/SportView";
-import { RecoveryView } from "@/components/vyro/RecoveryView";
-import { SleepView } from "@/components/vyro/SleepView";
-import { CoachView } from "@/components/vyro/CoachView";
-import { SocialView } from "@/components/vyro/SocialView";
-import { VideoView } from "@/components/vyro/VideoView";
-import { DietView } from "@/components/vyro/DietView";
-import { ProfileView } from "@/components/vyro/ProfileView";
-import { VyroBandProvider } from "@/components/vyro/VyroBandProvider";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/app")({
-  component: () => (
-    <VyroBandProvider>
-      <AppShell />
-    </VyroBandProvider>
-  ),
+  component: AppShell,
 });
 
+// Renders the original VYRO app (public/vyro-app.html) inside the
+// authenticated route so the post-login UI matches the original design
+// 1:1. Profile + band pairing lives at /app/profile (React).
 function AppShell() {
-  const [view, setView] = useState<ViewId>("home");
-  const [recoveryTab, setRecoveryTab] = useState<any>("live");
-  const [sportTab, setSportTab] = useState<any>("agility");
-  const [sleepTab, setSleepTab] = useState<any>("overall");
-  const [socialTab, setSocialTab] = useState<any>("feed");
-  const [selectedSport, setSelectedSport] = useState("Squash");
-
-  const jump = (v: ViewId, tab?: string) => {
-    setView(v);
-    if (v === "recovery" && tab) setRecoveryTab(tab);
-    if (v === "sport" && tab) setSportTab(tab);
-    if (v === "sleep" && tab) setSleepTab(tab);
-  };
-
   return (
-    <Layout activeView={view} setView={setView}>
-      {view === "home" && <HomeView jump={jump} />}
-      {view === "trends" && <TrendsView />}
-      {view === "session" && <SessionView />}
-      {view === "sport" && (
-        <SportView
-          selectedSport={selectedSport}
-          setSelectedSport={setSelectedSport}
-          sportTab={sportTab}
-          setSportTab={setSportTab}
-        />
-      )}
-      {view === "recovery" && <RecoveryView recoveryTab={recoveryTab} setRecoveryTab={setRecoveryTab} />}
-      {view === "sleep" && <SleepView sleepTab={sleepTab} setSleepTab={setSleepTab} />}
-      {view === "coach" && <CoachView />}
-      {view === "social" && <SocialView socialTab={socialTab} setSocialTab={setSocialTab} />}
-      {view === "video" && <VideoView />}
-      {view === "diet" && <DietView />}
-      {view === "profile" && <ProfileView />}
-    </Layout>
+    <div className="fixed inset-0 bg-black">
+      <iframe
+        src="/vyro-app.html"
+        title="VYRO"
+        className="h-full w-full border-0"
+        allow="bluetooth; camera; microphone; accelerometer; gyroscope; magnetometer"
+      />
+      <Link
+        to="/app/profile"
+        className="fixed right-3 top-3 z-50 rounded-full border border-white/20 bg-black/70 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur hover:bg-black"
+      >
+        Profile & Band
+      </Link>
+    </div>
   );
 }
