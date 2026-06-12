@@ -13,9 +13,14 @@ import { SocialView } from "@/components/vyro/SocialView";
 import { VideoView } from "@/components/vyro/VideoView";
 import { DietView } from "@/components/vyro/DietView";
 import { ProfileView } from "@/components/vyro/ProfileView";
+import { VyroBandProvider } from "@/components/vyro/VyroBandProvider";
 
 export const Route = createFileRoute("/_authenticated/app")({
-  component: AppShell,
+  component: () => (
+    <VyroBandProvider>
+      <AppShell />
+    </VyroBandProvider>
+  ),
 });
 
 function AppShell() {

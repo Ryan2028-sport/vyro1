@@ -1,5 +1,6 @@
 import { heroMetrics, vitals, type ViewId } from "@/lib/vyro-data";
 import { Bar, Card, PageHeader, Pill, ScoreRing } from "./shared";
+import { LiveMetrics } from "./LiveMetrics";
 
 export function HomeView({ jump }: { jump: (v: ViewId, tab?: string) => void }) {
   return (
@@ -10,13 +11,17 @@ export function HomeView({ jump }: { jump: (v: ViewId, tab?: string) => void }) 
         subtitle="Tactical performance intelligence synced from your VYRO watch."
       />
 
+      <div className="mb-4">
+        <LiveMetrics />
+      </div>
+
       <div className="mb-4 grid grid-cols-4 gap-3">
         {heroMetrics.map((m) => (
           <ScoreRing key={m.id} metric={m} onClick={() => jump(m.target, m.tab)} />
         ))}
       </div>
       <div className="mb-4 font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">
-        Vitals - live from Goodix GH3026 + ST 6-axis IMU
+        Vitals · streamed from the VYRO band IMU
       </div>
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Card className="col-span-2">
