@@ -23,16 +23,10 @@ export const heroMetrics: HeroMetric[] = [
   { id: "sleep", label: "Sleep", value: 87, color: "teal", target: "sleep", tab: "overall" },
 ];
 
-export const vitals: [string, string, string, string][] = [
-  ["Resting HR", "48", "bpm", "-2"],
-  ["Current HR", "72", "bpm", "LIVE"],
-  ["Resp. Rate", "14.2", "br/min", "0"],
-  ["HRV", "76", "ms", "+8"],
-  ["Stress", "28", "/100", "-6"],
-  ["SpO₂", "98", "%", "0"],
-  ["Skin Temp", "33.8", "°C", "+0.1"],
-  ["Steps", "11,842", "", "+18%"],
-];
+// NOTE: VYRO band is an IMU-only wearable (per VYRO_BLE_Packet_Reference v1).
+// It does NOT measure HR, HRV, SpO2, respiration, skin temp, stress, or steps.
+// Live IMU-derived metrics are computed in <LiveMetrics /> from the actual
+// event stream — no static vitals array.
 
 export const trendMetrics: [string, string, string, string, string][] = [
   ["Agility Score", "84", "/100", "+10.5%", "Agility score is up 10.5% over the last 12 sessions. Cleaner deceleration back to the T is the biggest driver."],
