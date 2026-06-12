@@ -87,7 +87,7 @@ export function BandPanel({
 
   const phaseLabel: Record<OtaProgress["phase"], string> = {
     hashing: "Hashing image…",
-    uploading: "Uploading firmware…",
+    uploading: "Installing update…",
     marking_test: "Marking image for test…",
     resetting: "Resetting band…",
     waiting_reconnect: "Waiting for band to reconnect…",
@@ -187,7 +187,7 @@ export function BandPanel({
       </Card>
 
       {/* OTA */}
-      <Card eyebrow="Firmware" title="Over-the-air update">
+      <Card eyebrow="Update" title="Watch software update">
         <p className="mb-3 text-xs leading-relaxed text-black/60">
           Upload a signed MCUboot image (<code className="rounded bg-black/[0.05] px-1 py-0.5 font-mono text-[10px]">app_update.bin</code>). Band reboots into the new image and auto-reverts if confirmation fails.
         </p>
@@ -234,7 +234,7 @@ export function BandPanel({
         )}
         {otaSuccess && (
           <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-            <CheckCircle2 className="h-4 w-4" /> Firmware uploaded. Band is rebooting — reconnect once it returns.
+            <CheckCircle2 className="h-4 w-4" /> Update installed. Your watch is restarting — it will reconnect automatically.
           </div>
         )}
         {otaError && (
