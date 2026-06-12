@@ -1,63 +1,41 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import type { ViewId } from "@/lib/vyro-data";
-import { Layout } from "@/components/vyro/Layout";
-import { HomeView } from "@/components/vyro/HomeView";
-import { TrendsView } from "@/components/vyro/TrendsView";
-import { SessionView } from "@/components/vyro/SessionView";
-import { SportView } from "@/components/vyro/SportView";
-import { RecoveryView } from "@/components/vyro/RecoveryView";
-import { SleepView } from "@/components/vyro/SleepView";
-import { CoachView } from "@/components/vyro/CoachView";
-import { SocialView } from "@/components/vyro/SocialView";
-import { VideoView } from "@/components/vyro/VideoView";
-import { DietView } from "@/components/vyro/DietView";
-import { ProfileView } from "@/components/vyro/ProfileView";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { VyroBandProvider } from "@/components/vyro/VyroBandProvider";
+import { ProfileView } from "@/components/vyro/ProfileView";
+import { useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/app")({
-  component: () => (
-    <VyroBandProvider>
-      <AppShell />
-    </VyroBandProvider>
-  ),
+  component: AppPage,
 });
 
-function AppShell() {
-  const [view, setView] = useState<ViewId>("home");
-  const [recoveryTab, setRecoveryTab] = useState<any>("live");
-  const [sportTab, setSportTab] = useState<any>("agility");
-  const [sleepTab, setSleepTab] = useState<any>("overall");
-  const [socialTab, setSocialTab] = useState<any>("feed");
-  const [selectedSport, setSelectedSport] = useState("Squash");
-
-  const jump = (v: ViewId, tab?: string) => {
-    setView(v);
-    if (v === "recovery" && tab) setRecoveryTab(tab);
-    if (v === "sport" && tab) setSportTab(tab);
-    if (v === "sleep" && tab) setSleepTab(tab);
-  };
+function AppPage() {
+  const [showProfile, setShowProfile] = useState(false);
 
   return (
-    <Layout activeView={view} setView={setView}>
-      {view === "home" && <HomeView jump={jump} />}
-      {view === "trends" && <TrendsView />}
-      {view === "session" && <SessionView />}
-      {view === "sport" && (
-        <SportView
-          selectedSport={selectedSport}
-          setSelectedSport={setSelectedSport}
-          sportTab={sportTab}
-          setSportTab={setSportTab}
+    <VyroBandProvider>
+      <div className="relative h-svh w-svw bg-white">
+        <iframe
+          src="/vyro-app.html"
+          title="VYRO"
+          className="absolute inset-0 h-full w-full border-0"
         />
-      )}
-      {view === "recovery" && <RecoveryView recoveryTab={recoveryTab} setRecoveryTab={setRecoveryTab} />}
-      {view === "sleep" && <SleepView sleepTab={sleepTab} setSleepTab={setSleepTab} />}
-      {view === "coach" && <CoachView />}
-      {view === "social" && <SocialView socialTab={socialTab} setSocialTab={setSocialTab} />}
-      {view === "video" && <VideoView />}
-      {view === "diet" && <DietView />}
-      {view === "profile" && <ProfileView />}
-    </Layout>
+        <button
+          onClick={() => setShowProfile(true)}
+          className="absolute top-3 right-3 z-50 rounded-full bg-black/85 px-3 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur hover:bg-black"
+        >
+          Profile & Band
+        </button>
+        {showProfile && (
+          <div className="absolute inset-0 z-40 overflow-auto bg-gradient-to-b from-slate-950 to-slate-900 p-4 text-white">
+            <button
+              onClick={() => setShowProfile(false)}
+              className="mb-4 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"
+            >
+              ← Back to app
+            </button>
+            <ProfileView />
+          </div>
+        )}
+      </div>
+    </VyroBandProvider>
   );
 }
