@@ -76,17 +76,37 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Vyro" },
-      { name: "description", content: "Athlete OS is a modern React application for athletes to track and analyze performance metrics." },
+      {
+        name: "description",
+        content:
+          "Athlete OS is a modern React application for athletes to track and analyze performance metrics.",
+      },
       { name: "author", content: "Lovable" },
       { property: "og:title", content: "Vyro" },
-      { property: "og:description", content: "Athlete OS is a modern React application for athletes to track and analyze performance metrics." },
+      {
+        property: "og:description",
+        content:
+          "Athlete OS is a modern React application for athletes to track and analyze performance metrics.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Vyro" },
-      { name: "twitter:description", content: "Athlete OS is a modern React application for athletes to track and analyze performance metrics." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/180fe930-bec7-4ee5-8fc8-a2a69d37382a/id-preview-e5bc73e5--f0e3a093-27d1-4d72-9617-df327c449381.lovable.app-1778538759526.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/180fe930-bec7-4ee5-8fc8-a2a69d37382a/id-preview-e5bc73e5--f0e3a093-27d1-4d72-9617-df327c449381.lovable.app-1778538759526.png" },
+      {
+        name: "twitter:description",
+        content:
+          "Athlete OS is a modern React application for athletes to track and analyze performance metrics.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/180fe930-bec7-4ee5-8fc8-a2a69d37382a/id-preview-e5bc73e5--f0e3a093-27d1-4d72-9617-df327c449381.lovable.app-1778538759526.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/180fe930-bec7-4ee5-8fc8-a2a69d37382a/id-preview-e5bc73e5--f0e3a093-27d1-4d72-9617-df327c449381.lovable.app-1778538759526.png",
+      },
     ],
     links: [
       {
