@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WatchRouteImport } from './routes/watch'
 import { Route as BluetoothRouteImport } from './routes/bluetooth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicAnalyzeClipRouteImport } from './routes/api/public/analyze-clip'
 
+const WatchRoute = WatchRouteImport.update({
+  id: '/watch',
+  path: '/watch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BluetoothRoute = BluetoothRouteImport.update({
   id: '/bluetooth',
   path: '/bluetooth',
@@ -32,35 +38,46 @@ const ApiPublicAnalyzeClipRoute = ApiPublicAnalyzeClipRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bluetooth': typeof BluetoothRoute
+  '/watch': typeof WatchRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bluetooth': typeof BluetoothRoute
+  '/watch': typeof WatchRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bluetooth': typeof BluetoothRoute
+  '/watch': typeof WatchRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bluetooth' | '/api/public/analyze-clip'
+  fullPaths: '/' | '/bluetooth' | '/watch' | '/api/public/analyze-clip'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bluetooth' | '/api/public/analyze-clip'
-  id: '__root__' | '/' | '/bluetooth' | '/api/public/analyze-clip'
+  to: '/' | '/bluetooth' | '/watch' | '/api/public/analyze-clip'
+  id: '__root__' | '/' | '/bluetooth' | '/watch' | '/api/public/analyze-clip'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BluetoothRoute: typeof BluetoothRoute
+  WatchRoute: typeof WatchRoute
   ApiPublicAnalyzeClipRoute: typeof ApiPublicAnalyzeClipRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/watch': {
+      id: '/watch'
+      path: '/watch'
+      fullPath: '/watch'
+      preLoaderRoute: typeof WatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/bluetooth': {
       id: '/bluetooth'
       path: '/bluetooth'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BluetoothRoute: BluetoothRoute,
+  WatchRoute: WatchRoute,
   ApiPublicAnalyzeClipRoute: ApiPublicAnalyzeClipRoute,
 }
 export const routeTree = rootRouteImport
