@@ -6,12 +6,10 @@ import {
   BarChart3,
   Bluetooth,
   ChevronRight,
-  Clock3,
   Dumbbell,
   History,
   Radio,
   ShieldCheck,
-  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import { getMyProfile } from "@/lib/profile.functions";
@@ -210,7 +208,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         </Card>
       </div>
 
-      <Card eyebrow="Performance lab" title="Old home modules restored">
+      <Card eyebrow="Performance lab" title="Sport performance">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {performanceLab.map((item) => (
             <ActionTile key={item.id} {...item} compact onClick={() => setView(item.id)} />
@@ -229,7 +227,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
                 className="group flex min-w-0 items-center gap-3 rounded-xl border border-black/[0.06] bg-black/[0.02] p-3 text-left transition-colors hover:border-black/20 hover:bg-black/[0.04]"
               >
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-black shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]">
-                  <Icon className="h-4.5 w-4.5" />
+                  <Icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-black text-black">{spec.label}</span>
@@ -291,7 +289,7 @@ function ActionTile({
     >
       <span className="mb-3 flex min-w-0 items-start justify-between gap-2">
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${toneClasses(tone)}`}>
-          <Icon className="h-4.5 w-4.5" />
+          <Icon className="h-4 w-4" />
         </span>
         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-black/25 group-hover:text-black/65" />
       </span>
