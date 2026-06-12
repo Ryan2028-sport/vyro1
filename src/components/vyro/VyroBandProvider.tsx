@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyProfile } from "@/lib/profile.functions";
 import { useVyroBand } from "@/hooks/use-vyro-band";
+import { isNative, location as despiaLocation } from "@/lib/despia";
 
 type VyroBandCtx = ReturnType<typeof useVyroBand> & {
   pairedId: string | null;
