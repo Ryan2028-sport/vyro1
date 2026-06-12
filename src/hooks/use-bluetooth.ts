@@ -198,7 +198,11 @@ export function useBluetooth() {
       return;
     }
 
-    await bluetooth.connect(id);
+    // autoConnect: true → iOS Core Bluetooth keeps the pending connection
+    // alive even when the app is backgrounded, and reconnects automatically
+    // when the peripheral comes back in range. Long timeout so the OS
+    // doesn't give up while the watch is briefly out of range.
+    await bluetooth.connect(id, { autoConnect: true, timeout: 60000 });
   }, []);
 
   const disconnect = useCallback(async (id: string) => {

@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyProfile } from "@/lib/profile.functions";
 import { useVyroBand } from "@/hooks/use-vyro-band";
+import { isNative, location as despiaLocation } from "@/lib/despia";
 
 type VyroBandCtx = ReturnType<typeof useVyroBand> & {
   pairedId: string | null;
@@ -67,7 +68,9 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
   }, [pairedId, ble.connectedId, ble.connectionState, ble.connect]);
 
   // When the page becomes visible again after a tab/app suspend, kick a
-  // reconnect immediately instead of waiting for the next tick.
+  // reconnect immediately instead of waiting for the next tick. We DO NOT
+  // disconnect on hide — the whole point of "always on" is that the BLE
+  // link survives the app being backgrounded.
   useEffect(() => {
     function onVis() {
       if (document.visibilityState === "visible" && pairedId && ble.connectedId !== pairedId) {
@@ -77,6 +80,42 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [pairedId, ble.connectedId, ble.connect]);
+
+  // Native: enable background location so iOS keeps the app alive long
+  // enough for Core Bluetooth to deliver notifications while backgrounded.
+  // Browser: request a Screen Wake Lock so the tab isn't aggressively
+  // suspended while the user is on another tab with the screen on.
+  useEffect(() => {
+    if (!pairedId) return;
+    if (isNative) {
+      void despiaLocation.backgroundOn();
+      return () => {
+        void despiaLocation.backgroundOff();
+      };
+    }
+    let wakeLock: { release: () => Promise<void> } | null = null;
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> };
+    };
+    async function acquire() {
+      try {
+        if (nav.wakeLock?.request) {
+          wakeLock = await nav.wakeLock.request("screen");
+        }
+      } catch {
+        /* user gesture or permission missing — ignore */
+      }
+    }
+    void acquire();
+    const onVis = () => {
+      if (document.visibilityState === "visible") void acquire();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      void wakeLock?.release().catch(() => undefined);
+    };
+  }, [pairedId]);
 
   return (
     <Ctx.Provider value={{ ...vyro, pairedId, pairedName }}>{children}</Ctx.Provider>
