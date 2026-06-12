@@ -189,7 +189,8 @@ export function BandPanel({
       {/* OTA */}
       <Card eyebrow="Update" title="Watch software update">
         <p className="mb-3 text-xs leading-relaxed text-black/60">
-          Upload a signed MCUboot image (<code className="rounded bg-black/[0.05] px-1 py-0.5 font-mono text-[10px]">app_update.bin</code>). Band reboots into the new image and auto-reverts if confirmation fails.
+          Choose an update file to install on your watch. It will restart and
+          reconnect automatically once the update finishes.
         </p>
         <input
           ref={otaInputRef}
