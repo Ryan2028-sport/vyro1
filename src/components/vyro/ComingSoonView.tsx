@@ -10,7 +10,7 @@ export interface ComingSoonSpec {
   eyebrow: string;
   icon: LucideIcon;
   blurb: string;
-  // What the watch firmware needs to expose before this tab becomes real.
+  // Internal-only notes. Not rendered to users.
   needs: string[];
   // Sections the tab will eventually show.
   preview: { title: string; rows: { label: string; unit?: string; hint?: string }[] }[];
