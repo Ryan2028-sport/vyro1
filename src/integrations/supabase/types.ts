@@ -14,7 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          handedness: string
+          id: string
+          paired_band_id: string | null
+          paired_band_name: string | null
+          sport: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          handedness?: string
+          id: string
+          paired_band_id?: string | null
+          paired_band_name?: string | null
+          sport?: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          handedness?: string
+          id?: string
+          paired_band_id?: string | null
+          paired_band_name?: string | null
+          sport?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sessions: {
+        Row: {
+          burst_count: number
+          created_at: string
+          dir_change_count: number
+          ended_at: string | null
+          id: string
+          rapid_count: number
+          sport: string
+          started_at: string
+          summary: Json | null
+          swing_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          burst_count?: number
+          created_at?: string
+          dir_change_count?: number
+          ended_at?: string | null
+          id?: string
+          rapid_count?: number
+          sport: string
+          started_at?: string
+          summary?: Json | null
+          swing_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          burst_count?: number
+          created_at?: string
+          dir_change_count?: number
+          ended_at?: string | null
+          id?: string
+          rapid_count?: number
+          sport?: string
+          started_at?: string
+          summary?: Json | null
+          swing_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
