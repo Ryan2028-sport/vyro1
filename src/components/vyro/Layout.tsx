@@ -47,6 +47,8 @@ function Logo({ className = "h-16" }: { className?: string }) {
       </svg>
     </div>
   );
+}
+
 function ProfileChip({ onClick }: { onClick: () => void }) {
   const fetchProfile = useServerFn(getMyProfile);
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile() });
