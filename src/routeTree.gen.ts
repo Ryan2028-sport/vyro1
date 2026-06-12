@@ -9,24 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WatchRouteImport } from './routes/watch'
-import { Route as BluetoothRouteImport } from './routes/bluetooth'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as ApiPublicAnalyzeClipRouteImport } from './routes/api/public/analyze-clip'
 
-const WatchRoute = WatchRouteImport.update({
-  id: '/watch',
-  path: '/watch',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BluetoothRoute = BluetoothRouteImport.update({
-  id: '/bluetooth',
-  path: '/bluetooth',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -55,16 +43,12 @@ const ApiPublicAnalyzeClipRoute = ApiPublicAnalyzeClipRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/bluetooth': typeof BluetoothRoute
-  '/watch': typeof WatchRoute
   '/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/bluetooth': typeof BluetoothRoute
-  '/watch': typeof WatchRoute
   '/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
@@ -73,35 +57,19 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/bluetooth': typeof BluetoothRoute
-  '/watch': typeof WatchRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/auth'
-    | '/bluetooth'
-    | '/watch'
-    | '/app'
-    | '/api/public/analyze-clip'
+  fullPaths: '/' | '/auth' | '/app' | '/api/public/analyze-clip'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/auth'
-    | '/bluetooth'
-    | '/watch'
-    | '/app'
-    | '/api/public/analyze-clip'
+  to: '/' | '/auth' | '/app' | '/api/public/analyze-clip'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
-    | '/bluetooth'
-    | '/watch'
     | '/_authenticated/app'
     | '/api/public/analyze-clip'
   fileRoutesById: FileRoutesById
@@ -110,27 +78,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
-  BluetoothRoute: typeof BluetoothRoute
-  WatchRoute: typeof WatchRoute
   ApiPublicAnalyzeClipRoute: typeof ApiPublicAnalyzeClipRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/watch': {
-      id: '/watch'
-      path: '/watch'
-      fullPath: '/watch'
-      preLoaderRoute: typeof WatchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bluetooth': {
-      id: '/bluetooth'
-      path: '/bluetooth'
-      fullPath: '/bluetooth'
-      preLoaderRoute: typeof BluetoothRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -184,10 +136,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
-  BluetoothRoute: BluetoothRoute,
-  WatchRoute: WatchRoute,
   ApiPublicAnalyzeClipRoute: ApiPublicAnalyzeClipRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
