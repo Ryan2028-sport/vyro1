@@ -54,7 +54,8 @@ export function Layout({
             onClick={() => setView("profile")}
             className="rounded-full border border-black/10 bg-black px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-black/85"
           >
-            Profile & Band
+            <span className="sm:hidden">Band</span>
+            <span className="hidden sm:inline">Profile & Band</span>
           </button>
         </div>
       </header>
