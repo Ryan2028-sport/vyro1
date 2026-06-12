@@ -1,56 +1,64 @@
 ## Goal
 
-Replace the frozen `public/vyro-app.html` export with a real, route-based TanStack app so auth, profile, and watch pairing all live in one place — and the existing `src/components/vyro/*` views become the actual UI users see.
+Stop using the static `vyro-app.html` iframe + popup overlay. Build a real Whoop-style React app where every screen is wired to live BLE data from the VYRO band — metrics shown as inline widgets, not a floating panel.
 
-## What changes
+## What's wrong today
 
-### 1. Auth (Lovable Cloud)
-- Add `/auth` route: email + password sign-up / sign-in, plus Google (managed via `lovable.auth.signInWithOAuth`).
-- Create `profiles` table (id → auth.users, display_name, avatar_url, sport, handedness, paired_band_id, paired_band_name, updated_at) with RLS scoped to `auth.uid()` and an auto-create trigger on signup.
-- Add the integration-managed `_authenticated` layout gate so every protected route redirects to `/auth` when there's no session.
+- `/app` loads `public/vyro-app.html` in an iframe — a frozen design template with hardcoded names, matches, leaderboards. None of it reacts to the watch.
+- Live data only exists in a small overlay popup floating on top.
+- The React views I already built (`HomeView`, `SessionView`, `RecoveryView`, etc.) are sitting unused.
 
-### 2. Real routing
-- Delete the redirect in `src/routes/index.tsx`.
-- Move the existing `src/components/vyro/*` views under `_authenticated`:
-  - `/` → HomeView (landing for signed-in users)
-  - `/session`, `/sport`, `/recovery`, `/sleep`, `/diet`, `/trends`, `/coach`, `/video`, `/social` → the matching view components.
-  - Wire the bottom nav in `Layout.tsx` to TanStack `<Link>` instead of internal tab state.
-- Public landing at `/welcome` (or keep `/` public + redirect signed-in users to `/home`) — confirm later; default plan: `/` is public marketing + Sign in CTA, `/home` etc. are protected.
-- Delete `public/vyro-app.html` and `public/watch-test.html`. Keep `calibration.html` etc. for now.
+## Plan
 
-### 3. Profile + Watch (the core ask)
-- New `/profile` route under `_authenticated`:
-  - Profile fields (name, sport, handedness, avatar).
-  - **Band section** — pulls the full pairing + live event feed + OTA firmware uploader out of `/watch` and into a `<BandPanel />` component used here. Persists `paired_band_id` / `paired_band_name` on the profile row.
-- Delete the standalone `/watch` route. Add a small "Manage band" entry in the profile dropdown / settings.
-- Remove all "demo mode" stubs from the views — they read live data from the `useVyroBand` hook (already built) plus Cloud-backed session history.
+### 1. Kill the iframe
+- `src/routes/_authenticated/app.tsx` renders the React `Layout` + view-switcher directly. No more iframe, no more overlay popup.
+- Delete `public/vyro-app.html` and the `restored_*.html` artifacts.
 
-### 4. Sessions persistence (so it isn't demo data)
-- `sessions` table (user_id, sport, started_at, ended_at, swing_count, rapid_count, burst_count, dir_change_count, summary jsonb) with RLS.
-- `useVyroBand` start/end now writes a row via a `createServerFn`.
-- HomeView, TrendsView, SportView read recent sessions via `ensureQueryData` + `useSuspenseQuery`.
+### 2. Light/white visual theme to match what you liked
+- Move the existing dark components to a light surface: white background, soft gray cards, black text, single accent (teal/emerald for "live"). Keep the original Whoop-like density.
+- Update `src/lib/vyro-tokens.ts` + `src/components/vyro/shared.tsx` so every view picks up the new tokens automatically.
 
-### 5. Cleanup
-- Remove orphan routes/files: `watch.tsx`, `bluetooth.tsx` (folded into BandPanel), `vyro-app.html`, `watch-test.html`, `vyro-native.js` references that targeted the static bundle.
+### 3. Real-data widgets on the Home dashboard
+Top of `HomeView`:
+- Greeting uses signed-in user's `display_name` ("Good morning, {firstName}").
+- Connection chip: `LIVE` (green, pulsing) / `CONNECTING` / `OFFLINE — pair your band`.
 
-## Technical notes
+Widget grid (each is a real component reading `useVyroBandCtx()`):
+- **Session control** — Start / Pause / End buttons + sport selector, current session timer.
+- **Event counts** — Swings, Rapid starts, Bursts, Direction changes (live counters).
+- **Peak motion** — Peak accel (g), Peak gyro (dps), Peak jerk (g/s).
+- **Swing quality** — Max intensity (0–100), Max duration (ms), avg over last 10 swings.
+- **Reaction** — Fastest direction-change gap (ms).
+- **Event stream** — Last 20 motion events with timestamp and type.
+- **Throughput** — Events / min (rolling 60s), total this session.
 
-- All new server reads/writes go through `createServerFn` + `requireSupabaseAuth`; `attachSupabaseAuth` is already wired in `src/start.ts`.
-- BLE code (`src/lib/vyro-ble/*` + `useVyroBand`) is unchanged — only its host UI moves from `/watch` to `<BandPanel />` inside `/profile`.
-- iOS Despia bridge: pairing/notify/write work today; OTA still needs binary-write support in the bridge — surfaced in BandPanel as a "Desktop Chrome required for firmware updates on iOS until bridge update" notice.
-- Google OAuth: I'll call `supabase--configure_social_auth` for `google` in the same turn it's added.
+When the watch is offline, every widget shows `—` and a "Pair your band" CTA in the empty state — never fake numbers.
 
-## Order of execution
+### 4. Other tabs rewired or removed
+- **Session** tab → full session log: timeline of events, per-swing detail rows, end-of-session summary written to the `sessions` table on End.
+- **Profile** tab → existing `ProfileView` (band pairing, profile fields). Keep as-is.
+- Remove tabs that have no data source the watch can feed: **Sleep**, **Diet**, **Coach**, **Social**, **Video**, **Trends** (the watch is IMU-only — no HR/HRV/SpO₂, no sleep staging, no nutrition). Bottom nav becomes: **Home · Session · History · Profile**.
+- **History** = list of saved `sessions` rows for the user (already in DB), each opens the recorded summary.
 
-1. Migration: `profiles` + `sessions` tables + signup trigger + RLS + grants.
-2. Enable Google provider, build `/auth` route, build managed `_authenticated/route.tsx`.
-3. Port each Vyro view into a real route under `_authenticated`; rewrite `Layout.tsx` nav to use `<Link>`.
-4. Build `/profile` with `<BandPanel />` (lifted from `watch.tsx`).
-5. Delete `watch.tsx`, `bluetooth.tsx`, `vyro-app.html`, `watch-test.html`, redirect from `index.tsx`.
-6. Wire session persistence + replace demo data reads.
+### 5. Persist sessions
+- On `End session`, write a row to the existing `sessions` table with the live counts and a `summary` JSON of peak/avg metrics. Already has RLS scoped to `auth.uid()`.
+- History tab reads via a `getMySessions` server fn.
 
-## Open questions before I start
+### 6. Cleanup
+Delete unused fake-data files: `src/lib/vyro-data.ts` (mock arrays), `SleepView`, `DietView`, `CoachView`, `SocialView`, `VideoView`, `TrendsView`, `SportView` (or fold its sport picker into Session control), `LiveMetrics.tsx` (replaced by widgets), `PerformanceCard.tsx` (if only used by removed views).
 
-1. **Landing page**: should `/` stay a public marketing page with a Sign-in CTA (signed-in users get redirected to `/home`), or should `/` itself be the signed-in home and unauth users get bounced to `/auth`?
-2. **Demo data**: OK to remove all hard-coded mock data from HomeView/TrendsView/SportView/etc., so empty states show until the user actually records a session? (Recommended — otherwise it still feels like demo mode.)
-3. **Google sign-in**: enable alongside email+password (recommended default), or email-only?
+## Technical details
+
+- All widgets subscribe via `useVyroBandCtx()` — single BLE subscription stays alive across navigation thanks to the existing provider + auto-reconnect.
+- New components under `src/components/vyro/widgets/` (one file per widget) so each is small and testable.
+- New server fns in `src/lib/sessions.functions.ts`: `saveSession`, `getMySessions`, `getSession(id)`.
+- Greeting + initials read from `profile.display_name` via existing `getMyProfile` server fn.
+
+## Out of scope (call out for you)
+
+- Backgrounding the BLE link when the browser tab is closed — Web Bluetooth tears down GATT on tab close; only the native iOS bridge keeps it alive. App auto-reconnects on tab reopen.
+- HR / HRV / SpO₂ / sleep / nutrition widgets — the band does not produce these signals.
+
+## Approve?
+
+If yes I'll execute. If you want any tabs kept (e.g. keep "Coach" as a placeholder), tell me before I delete them.

@@ -9,7 +9,7 @@ import { useVyroBandCtx } from "./VyroBandProvider";
 import type { VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
-import { startSessionRow, endSessionRow } from "@/lib/sessions.functions";
+
 
 function fmtSat(v: { value: number; saturated: boolean }, unit: string, dp = 2) {
   const s = v.value.toFixed(dp);
@@ -39,9 +39,7 @@ export function BandPanel({
   const vyro = useVyroBandCtx();
   const { ble, connected, events, counts, sessionState, sport, setSport } = vyro;
   const updateProfile = useServerFn(updateMyProfile);
-  const startSession = useServerFn(startSessionRow);
-  const endSession = useServerFn(endSessionRow);
-  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+
 
   useEffect(() => {
     setSport(defaultSport);
@@ -65,26 +63,9 @@ export function BandPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ble.connectedId]);
 
-  async function onStart() {
-    const row = await startSession({ data: { sport } });
-    setActiveRowId(row.id);
-    await vyro.startSession();
-  }
-  async function onEnd() {
-    if (activeRowId) {
-      await endSession({
-        data: {
-          id: activeRowId,
-          swing_count: counts.swing,
-          rapid_count: counts.rapid_start,
-          burst_count: counts.burst,
-          dir_change_count: counts.direction_change,
-        },
-      });
-      setActiveRowId(null);
-    }
-    await vyro.endSession();
-  }
+  // Session start/end happens in SessionView, which writes the session row.
+  // BandPanel just exposes pairing + live feed + OTA here.
+
 
   // OTA
   const [otaFile, setOtaFile] = useState<File | null>(null);
@@ -193,55 +174,8 @@ export function BandPanel({
         </div>
       </section>
 
-      {/* Session control */}
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">Session</div>
-            <div className="text-sm font-semibold capitalize">{sessionState} · {sport}</div>
-          </div>
-          <div className="flex gap-1.5">
-            {(["squash", "tennis"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSport(s)}
-                className={`rounded-lg border px-2 py-1 text-[11px] font-semibold ${
-                  sport === s
-                    ? "border-white/40 bg-white/[0.18]"
-                    : "border-white/15 bg-white/[0.04] text-white/60"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            disabled={!connected || sessionState === "live"}
-            onClick={onStart}
-            className="flex-1 rounded-xl bg-white px-4 py-2 text-sm font-bold text-black disabled:opacity-30"
-          >Start</button>
-          <button
-            disabled={!connected || sessionState !== "live"}
-            onClick={() => vyro.pauseSession()}
-            className="flex-1 rounded-xl border border-white/20 bg-white/[0.06] px-4 py-2 text-sm font-bold disabled:opacity-30"
-          >Pause</button>
-          <button
-            disabled={!connected || sessionState === "idle"}
-            onClick={onEnd}
-            className="flex-1 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-2 text-sm font-bold text-red-200 disabled:opacity-30"
-          >End</button>
-        </div>
-        <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-          {([["Swings", counts.swing], ["Rapid", counts.rapid_start], ["Bursts", counts.burst], ["Dir Δ", counts.direction_change]] as const).map(([label, n]) => (
-            <div key={label} className="rounded-lg border border-white/10 bg-black/30 px-2 py-2">
-              <div className="font-mono text-[9px] uppercase tracking-widest text-white/45">{label}</div>
-              <div className="text-lg font-black tabular-nums">{n}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Session control is handled on the Session tab. */}
+
 
       {/* Live feed */}
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">

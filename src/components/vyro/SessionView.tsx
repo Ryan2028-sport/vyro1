@@ -1,75 +1,219 @@
 import { useEffect, useRef, useState } from "react";
-import { Card, PageHeader, Spark } from "./shared";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Play, Pause, Square } from "lucide-react";
+import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
+import { useLiveMetrics, fmtNum } from "./useLiveMetrics";
+import { useVyroBandCtx } from "./VyroBandProvider";
+import { saveSession } from "@/lib/sessions.functions";
+import type { Sport } from "@/lib/vyro-ble/session-control";
+
+const SPORTS: { id: Sport; label: string }[] = [
+  { id: "squash", label: "Squash" },
+  { id: "tennis", label: "Tennis" },
+];
+
+function fmtClock(ms: number) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+}
 
 export function SessionView() {
-  const [live, setLive] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const ref = useRef<number | null>(null);
+  const band = useVyroBandCtx();
+  const live = useLiveMetrics();
+  const qc = useQueryClient();
+  const save = useServerFn(saveSession);
+  const saveMut = useMutation({ mutationFn: save, onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions"] }) });
+
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const tickRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (live) {
-      ref.current = window.setInterval(() => setSeconds((s) => s + 1), 1000);
+    if (band.sessionState !== "live") {
+      if (tickRef.current) window.clearInterval(tickRef.current);
+      tickRef.current = null;
+      return;
     }
+    tickRef.current = window.setInterval(() => setNow(Date.now()), 1000);
     return () => {
-      if (ref.current) window.clearInterval(ref.current);
+      if (tickRef.current) window.clearInterval(tickRef.current);
     };
-  }, [live]);
+  }, [band.sessionState]);
 
-  const start = () => {
-    setSeconds(0);
-    setLive(true);
-  };
-  const stop = () => setLive(false);
+  async function onStart() {
+    setStartedAt(Date.now());
+    setNow(Date.now());
+    await band.startSession(band.sport);
+  }
+  async function onPause() {
+    await band.pauseSession();
+  }
+  async function onEnd() {
+    const ended = Date.now();
+    const started = startedAt ?? ended;
+    await band.endSession();
+    try {
+      await saveMut.mutateAsync({
+        data: {
+          sport: band.sport,
+          started_at: new Date(started).toISOString(),
+          ended_at: new Date(ended).toISOString(),
+          swing_count: live.counts.swing,
+          rapid_count: live.counts.rapid_start,
+          burst_count: live.counts.burst,
+          dir_change_count: live.counts.direction_change,
+          summary: {
+            peakG: live.peakG,
+            peakDps: live.peakDps,
+            peakJerk: live.peakJerk,
+            swingIntMax: live.swingIntMax,
+            swingIntAvg: live.swingIntAvg,
+            swingDurMax: live.swingDurMax,
+            swingDurAvg: live.swingDurAvg,
+            reactMin: live.reactMin,
+            totalEvents: live.events.length,
+          },
+        },
+      });
+    } catch (e) {
+      console.warn("[vyro] failed to save session", e);
+    }
+    setStartedAt(null);
+  }
 
-  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const ss = String(seconds % 60).padStart(2, "0");
+  const elapsed = startedAt && band.sessionState !== "idle" ? now - startedAt : 0;
 
-  const stats: [string, string][] = [
-    ["Elapsed", `${mm}:${ss}`],
-    ["Heart Rate", live ? "156 bpm" : "72 bpm"],
-    ["Movement", "6.8 g"],
-    ["T Recoveries", live ? "18" : "0"],
-    ["T Control", live ? "74%" : "0%"],
-  ];
+  const recent = [...live.events].slice(-20).reverse();
 
   return (
-    <>
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="Session · T-Control Tracking"
-        title="Court session"
-        action={
-          live ? (
-            <button
-              onClick={stop}
-              className="rounded-xl border border-[#ff2b2b]/40 bg-[#ff2b2b]/15 px-4 py-2 text-sm font-bold text-[#ff2b2b]"
-            >
-              End session
-            </button>
-          ) : (
-            <button onClick={start} className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-black">
-              Start session
-            </button>
-          )
-        }
+        eyebrow="Live Console"
+        title="Session"
+        subtitle="Control your watch, watch events arrive in real time, save the session when done."
+        action={<Pill tone={band.sessionState === "live" ? "live" : live.connected ? "warn" : "off"}
+                     pulse={band.sessionState === "live"}>
+          {band.sessionState === "live" ? "RECORDING" : live.connected ? "READY" : "OFFLINE"}
+        </Pill>}
       />
-      <div className="grid gap-4 lg:grid-cols-5">
-        {stats.map((x) => (
-          <Card key={x[0]}>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">{x[0]}</div>
-            <div className="mt-2 text-4xl font-black tabular-nums">{x[1]}</div>
-          </Card>
-        ))}
-      </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Heart rate · 60s</div>
-          <Spark points={[25, 35, 48, 60, 72, 67, 80, 74, 84, 78]} color="#ff2b2b" />
-        </Card>
-        <Card>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Acceleration · burst detection</div>
-          <Spark points={[8, 12, 40, 75, 20, 18, 85, 44, 16, 10]} color="#ffb020" />
-        </Card>
-      </div>
-    </>
+
+      {!live.connected && (
+        <EmptyState
+          title="Watch is not connected"
+          hint="Pair your band from Profile to control sessions."
+        />
+      )}
+
+      <Card eyebrow="Session control" title={`${fmtClock(elapsed)} elapsed`}>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {SPORTS.map((s) => (
+            <button
+              key={s.id}
+              disabled={band.sessionState === "live"}
+              onClick={() => band.setSport(s.id)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                band.sport === s.id
+                  ? "border-emerald-600 bg-emerald-600 text-white"
+                  : "border-black/10 bg-white text-black/70 hover:bg-black/5"
+              } ${band.sessionState === "live" ? "opacity-60 cursor-not-allowed" : ""}`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          {band.sessionState === "idle" && (
+            <button
+              onClick={onStart}
+              disabled={!live.connected}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <Play className="h-4 w-4" /> Start
+            </button>
+          )}
+          {band.sessionState === "live" && (
+            <>
+              <button
+                onClick={onPause}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold text-white hover:bg-amber-600"
+              >
+                <Pause className="h-4 w-4" /> Pause
+              </button>
+              <button
+                onClick={onEnd}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-black px-4 py-3 text-sm font-bold text-white hover:bg-black/85"
+              >
+                <Square className="h-4 w-4" /> End & save
+              </button>
+            </>
+          )}
+          {band.sessionState === "paused" && (
+            <>
+              <button
+                onClick={onStart}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700"
+              >
+                <Play className="h-4 w-4" /> Resume
+              </button>
+              <button
+                onClick={onEnd}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-black px-4 py-3 text-sm font-bold text-white hover:bg-black/85"
+              >
+                <Square className="h-4 w-4" /> End & save
+              </button>
+            </>
+          )}
+        </div>
+        {saveMut.isPending && <div className="mt-2 text-[11px] text-black/55">Saving session…</div>}
+        {saveMut.isSuccess && <div className="mt-2 text-[11px] text-emerald-700">Session saved.</div>}
+      </Card>
+
+      <Card eyebrow="Live counters" title="Motion events">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="Swings" value={live.connected ? live.counts.swing : "—"} />
+          <Stat label="Rapid starts" value={live.connected ? live.counts.rapid_start : "—"} />
+          <Stat label="Bursts" value={live.connected ? live.counts.burst : "—"} />
+          <Stat label="Dir Δ" value={live.connected ? live.counts.direction_change : "—"} />
+        </div>
+      </Card>
+
+      <Card eyebrow="Peaks" title="Highest values seen">
+        <div className="grid grid-cols-3 gap-2">
+          <Stat label="Accel" value={fmtNum(live.peakG, live.connected, 2)} unit="g" />
+          <Stat label="Gyro" value={fmtNum(live.peakDps, live.connected, 0)} unit="dps" />
+          <Stat label="Jerk" value={fmtNum(live.peakJerk, live.connected, 1)} unit="g/s" />
+        </div>
+      </Card>
+
+      <Card eyebrow="Event stream" title={`Last ${recent.length} events`}>
+        {recent.length === 0 ? (
+          <div className="py-6 text-center text-xs text-black/45">
+            {live.connected ? "Waiting for motion events from your band…" : "Connect the band to see events."}
+          </div>
+        ) : (
+          <ul className="divide-y divide-black/[0.06]">
+            {recent.map((e, i) => {
+              const ev = e.event as any;
+              const time = new Date(e.ts).toLocaleTimeString();
+              return (
+                <li key={`${e.ts}-${i}`} className="flex items-center justify-between py-2 text-xs">
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-emerald-700">{ev.type}</span>
+                  <span className="font-mono text-[10px] text-black/45">{time}</span>
+                  <span className="text-right font-mono text-[10px] text-black/65">
+                    {ev.accelPeakG?.value != null && `g ${ev.accelPeakG.value.toFixed(2)} `}
+                    {ev.gyroPeakDps?.value != null && `· ω ${ev.gyroPeakDps.value.toFixed(0)} `}
+                    {ev.intensity != null && `· i ${ev.intensity} `}
+                    {ev.durationMs != null && `· ${ev.durationMs}ms`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
+    </div>
   );
 }
