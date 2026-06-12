@@ -72,7 +72,7 @@ export async function openSmpTransport(device: BTDevice): Promise<SmpTransport> 
 
   const listeners = new Set<(chunk: Uint8Array) => void>();
   const onValue = (e: Event) => {
-    const c = e.target as BTRemoteGATTCharacteristic;
+    const c = e.target as unknown as BTRemoteGATTCharacteristic;
     const v = c.value;
     if (!v) return;
     const chunk = new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength));
