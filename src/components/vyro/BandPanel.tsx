@@ -1,9 +1,11 @@
 // Pairing + live event feed + OTA firmware uploader. Used inside Profile.
-import { Activity, Bluetooth, CheckCircle2, Loader2, Upload, XCircle } from "lucide-react";
+// Reads the shared VYRO band context so events/counts persist across views
+// and the auto-reconnect loop in the provider stays in charge of the link.
+import { Activity, Bluetooth, CheckCircle2, Upload, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { runOtaUpload, type OtaProgress } from "@/lib/vyro-ble/ota";
 import { openSmpTransport, requestVyroBand } from "@/lib/vyro-ble/web-transport";
-import { useVyroBand } from "@/hooks/use-vyro-band";
+import { useVyroBandCtx } from "./VyroBandProvider";
 import type { VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
@@ -34,7 +36,7 @@ export function BandPanel({
   pairedName: string | null | undefined;
   defaultSport?: "squash" | "tennis";
 }) {
-  const vyro = useVyroBand();
+  const vyro = useVyroBandCtx();
   const { ble, connected, events, counts, sessionState, sport, setSport } = vyro;
   const updateProfile = useServerFn(updateMyProfile);
   const startSession = useServerFn(startSessionRow);
