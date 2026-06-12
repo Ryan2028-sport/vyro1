@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyProfile } from "@/lib/profile.functions";
 import { VyroBandProvider, useVyroBandCtx } from "@/components/vyro/VyroBandProvider";
 import { ProfileView } from "@/components/vyro/ProfileView";
 
@@ -15,13 +18,22 @@ function AppPage() {
   const [showProfile, setShowProfile] = useState(false);
   const [showLive, setShowLive] = useState(true);
 
+  const fetchProfile = useServerFn(getMyProfile);
+  const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile() });
+  const displayName = (profile?.display_name || "").trim();
+  const iframeSrc = displayName
+    ? `/vyro-app.html?name=${encodeURIComponent(displayName)}`
+    : "/vyro-app.html";
+
   return (
     <div className="relative h-svh w-svw bg-white">
       <iframe
-        src="/vyro-app.html"
+        key={iframeSrc}
+        src={iframeSrc}
         title="VYRO"
         className="absolute inset-0 h-full w-full border-0"
       />
+
 
       {/* Top-right controls */}
       <div className="absolute top-3 right-3 z-50 flex gap-2">

@@ -2427,5 +2427,36 @@ Error generating stack: `+d.message+`
   new MutationObserver(() => { paintVideo(); if (lastInsight) renderInsight(lastInsight); }).observe(document.documentElement,{childList:true,subtree:true});
 })();
 </script>
+<script>
+(function(){
+  function getName(){
+    try{
+      var u=new URL(location.href);
+      return u.searchParams.get('name')||'';
+    }catch(e){return ''}
+  }
+  function firstName(n){return (n||'').trim().split(/\s+/)[0]||''}
+  function swap(){
+    var name=getName(); if(!name) return;
+    var first=firstName(name);
+    var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null);
+    var node, changed=0;
+    while((node=walker.nextNode())){
+      var t=node.nodeValue; if(!t) continue;
+      if(/Ryan Chen/.test(t)){ node.nodeValue=t.replace(/Ryan Chen/g,name); changed++; }
+      else if(/Ryan/.test(t)){ node.nodeValue=t.replace(/Ryan/g,first); changed++; }
+    }
+    // also patch RC initials -> initials of new name
+    var initials=name.trim().split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();
+    if(initials){
+      var w2=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null);
+      var n2; while((n2=w2.nextNode())){ if(n2.nodeValue==='RC'){ n2.nodeValue=initials; } }
+    }
+  }
+  var tries=0; var iv=setInterval(function(){ swap(); if(++tries>40) clearInterval(iv); }, 250);
+  document.addEventListener('DOMContentLoaded', swap);
+  window.addEventListener('load', swap);
+})();
+</script>
 </body>
 </html>
