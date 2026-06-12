@@ -74,7 +74,8 @@ export type ViewId =
   | "coach"
   | "social"
   | "video"
-  | "diet";
+  | "diet"
+  | "profile";
 
 export const viewTitles: Record<ViewId, string> = {
   home: "Athlete",
@@ -87,4 +88,5 @@ export const viewTitles: Record<ViewId, string> = {
   social: "Social",
   video: "AI Video Analyzer",
   diet: "Diet Coach",
+  profile: "Profile & Band",
 };

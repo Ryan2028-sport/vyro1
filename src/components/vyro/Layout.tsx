@@ -10,12 +10,15 @@ import {
   Share2,
   TrendingUp,
   Trophy,
-  Users,
+  User,
   Video,
 } from "lucide-react";
 import type { ViewId } from "@/lib/vyro-data";
 import { viewTitles } from "@/lib/vyro-data";
 import { Pill } from "./shared";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyProfile } from "@/lib/profile.functions";
 
 const navItems: { id: ViewId; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Athlete", icon: Home },
@@ -28,9 +31,10 @@ const navItems: { id: ViewId; label: string; icon: typeof Home }[] = [
   { id: "social", label: "Social", icon: Share2 },
   { id: "video", label: "AI Video", icon: Video },
   { id: "diet", label: "Diet Coach", icon: Apple },
+  { id: "profile", label: "Profile & Band", icon: User },
 ];
 
-const topMobile: ViewId[] = ["trends", "session", "coach", "social"];
+const topMobile: ViewId[] = ["trends", "session", "coach", "profile"];
 const bottomMobile: ViewId[] = ["home", "sport", "recovery", "sleep"];
 
 function Logo({ className = "h-16" }: { className?: string }) {
@@ -75,15 +79,7 @@ export function Layout({
               </button>
             ))}
           </div>
-          <div className="mt-auto rounded-2xl border border-white/10 bg-white/[0.05] p-3">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/10 text-xs font-black">RC</div>
-              <div>
-                <div className="text-sm font-bold">Ryan Chen</div>
-                <div className="font-mono text-[10px] text-white/45">Squash · D1 / National</div>
-              </div>
-            </div>
-          </div>
+          <ProfileChip onClick={() => setView("profile")} />
         </aside>
 
         <main className="relative flex min-h-screen flex-1 flex-col pb-24 lg:pb-0">
@@ -101,7 +97,9 @@ export function Layout({
                 <button className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.06]">
                   <Bell className="h-4 w-4" />
                 </button>
-                <div className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.08] text-xs font-black">RC</div>
+                <button onClick={() => setView("profile")} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.08] text-xs font-black">
+                  <User className="h-4 w-4" />
+                </button>
               </div>
             </div>
             <nav className="mt-3 flex justify-center gap-2 overflow-x-auto lg:hidden">

@@ -11,7 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WatchRouteImport } from './routes/watch'
 import { Route as BluetoothRouteImport } from './routes/bluetooth'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as ApiPublicAnalyzeClipRouteImport } from './routes/api/public/analyze-clip'
 
 const WatchRoute = WatchRouteImport.update({
@@ -24,10 +27,24 @@ const BluetoothRoute = BluetoothRouteImport.update({
   path: '/bluetooth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiPublicAnalyzeClipRoute = ApiPublicAnalyzeClipRouteImport.update({
   id: '/api/public/analyze-clip',
@@ -37,33 +54,62 @@ const ApiPublicAnalyzeClipRoute = ApiPublicAnalyzeClipRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/bluetooth': typeof BluetoothRoute
   '/watch': typeof WatchRoute
+  '/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/bluetooth': typeof BluetoothRoute
   '/watch': typeof WatchRoute
+  '/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
   '/bluetooth': typeof BluetoothRoute
   '/watch': typeof WatchRoute
+  '/_authenticated/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bluetooth' | '/watch' | '/api/public/analyze-clip'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/bluetooth'
+    | '/watch'
+    | '/app'
+    | '/api/public/analyze-clip'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bluetooth' | '/watch' | '/api/public/analyze-clip'
-  id: '__root__' | '/' | '/bluetooth' | '/watch' | '/api/public/analyze-clip'
+  to:
+    | '/'
+    | '/auth'
+    | '/bluetooth'
+    | '/watch'
+    | '/app'
+    | '/api/public/analyze-clip'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/bluetooth'
+    | '/watch'
+    | '/_authenticated/app'
+    | '/api/public/analyze-clip'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
   BluetoothRoute: typeof BluetoothRoute
   WatchRoute: typeof WatchRoute
   ApiPublicAnalyzeClipRoute: typeof ApiPublicAnalyzeClipRoute
@@ -85,12 +131,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BluetoothRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/app': {
+      id: '/_authenticated/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AuthenticatedAppRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/analyze-clip': {
       id: '/api/public/analyze-clip'
@@ -102,8 +169,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAppRoute: typeof AuthenticatedAppRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAppRoute: AuthenticatedAppRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
   BluetoothRoute: BluetoothRoute,
   WatchRoute: WatchRoute,
   ApiPublicAnalyzeClipRoute: ApiPublicAnalyzeClipRoute,
