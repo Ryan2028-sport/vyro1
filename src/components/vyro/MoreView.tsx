@@ -9,7 +9,7 @@ export function MoreView({ setView }: { setView: (v: ViewId) => void }) {
       <PageHeader
         eyebrow="Modules"
         title="More"
-        subtitle="Every Vyro module — built UI, waiting on watch firmware to start streaming the right signals. Tap any tile to see what it will show."
+        subtitle="Every Vyro feature in one place. Tap any tile to see what's coming next."
       />
 
       <div className="grid gap-2 sm:grid-cols-2">
