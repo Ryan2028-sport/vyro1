@@ -20,9 +20,11 @@ export const Route = createFileRoute("/_authenticated/app")({
 
 function AppShell() {
   const [view, setView] = useState<ViewId>("home");
-  const [recoveryTab, setRecoveryTab] = useState("live");
-  const [sportTab, setSportTab] = useState("agility");
-  const [sleepTab, setSleepTab] = useState("overall");
+  const [recoveryTab, setRecoveryTab] = useState<any>("live");
+  const [sportTab, setSportTab] = useState<any>("agility");
+  const [sleepTab, setSleepTab] = useState<any>("overall");
+  const [socialTab, setSocialTab] = useState<any>("feed");
+  const [selectedSport, setSelectedSport] = useState("Squash");
 
   const jump = (v: ViewId, tab?: string) => {
     setView(v);
@@ -36,11 +38,18 @@ function AppShell() {
       {view === "home" && <HomeView jump={jump} />}
       {view === "trends" && <TrendsView />}
       {view === "session" && <SessionView />}
-      {view === "sport" && <SportView activeTab={sportTab} setActiveTab={setSportTab} />}
-      {view === "recovery" && <RecoveryView activeTab={recoveryTab} setActiveTab={setRecoveryTab} />}
-      {view === "sleep" && <SleepView activeTab={sleepTab} setActiveTab={setSleepTab} />}
+      {view === "sport" && (
+        <SportView
+          selectedSport={selectedSport}
+          setSelectedSport={setSelectedSport}
+          sportTab={sportTab}
+          setSportTab={setSportTab}
+        />
+      )}
+      {view === "recovery" && <RecoveryView recoveryTab={recoveryTab} setRecoveryTab={setRecoveryTab} />}
+      {view === "sleep" && <SleepView sleepTab={sleepTab} setSleepTab={setSleepTab} />}
       {view === "coach" && <CoachView />}
-      {view === "social" && <SocialView />}
+      {view === "social" && <SocialView socialTab={socialTab} setSocialTab={setSocialTab} />}
       {view === "video" && <VideoView />}
       {view === "diet" && <DietView />}
       {view === "profile" && <ProfileView />}
