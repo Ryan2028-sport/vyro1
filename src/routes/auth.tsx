@@ -66,9 +66,9 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.10),transparent_28%),linear-gradient(180deg,#080808,#000)] text-white">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-10">
-        <Link to="/" className="mb-8 self-start font-mono text-[10px] uppercase tracking-[0.3em] text-white/45">
+    <div className="h-svh overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.10),transparent_28%),linear-gradient(180deg,#080808,#000)] text-white">
+      <div className="mx-auto flex h-svh max-w-md flex-col justify-center px-5 py-6">
+        <Link to="/" className="mb-6 self-start font-mono text-[10px] uppercase tracking-[0.3em] text-white/45">
           ← VYRO
         </Link>
         <h1 className="text-3xl font-black">{mode === "signin" ? "Sign in" : "Create account"}</h1>
