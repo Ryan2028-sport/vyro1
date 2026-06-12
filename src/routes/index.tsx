@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, Bluetooth, HeartPulse } from "lucide-react";
+import { Activity, Bluetooth } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Landing,
