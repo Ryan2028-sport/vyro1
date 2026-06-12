@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, Bluetooth, HeartPulse } from "lucide-react";
+import { Activity, Bluetooth } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -56,7 +56,6 @@ function Landing() {
             {[
               { Icon: Bluetooth, t: "Pair in seconds", d: "Pair the band from your profile. Live motion events stream directly into the app." },
               { Icon: Activity, t: "Real metrics", d: "Swing, burst, rapid-start and direction-change events decoded from the band — not demo data." },
-              { Icon: HeartPulse, t: "OTA updates", d: "Push signed MCUboot firmware over BLE without leaving the app." },
             ].map(({ Icon, t, d }) => (
               <div key={t} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <Icon className="mb-3 h-5 w-5 text-emerald-300" />
