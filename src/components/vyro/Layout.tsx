@@ -47,6 +47,23 @@ function Logo({ className = "h-16" }: { className?: string }) {
       </svg>
     </div>
   );
+function ProfileChip({ onClick }: { onClick: () => void }) {
+  const fetchProfile = useServerFn(getMyProfile);
+  const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile() });
+  const name = profile?.display_name || "Athlete";
+  const initials = name.split(" ").map((s: string) => s[0]).slice(0, 2).join("").toUpperCase() || "VY";
+  const sport = profile?.sport ? profile.sport[0].toUpperCase() + profile.sport.slice(1) : "—";
+  return (
+    <button onClick={onClick} className="mt-auto w-full rounded-2xl border border-white/10 bg-white/[0.05] p-3 text-left hover:bg-white/[0.08]">
+      <div className="flex items-center gap-3">
+        <div className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/10 text-xs font-black">{initials}</div>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-bold">{name}</div>
+          <div className="font-mono text-[10px] text-white/45">{sport} · {profile?.paired_band_name || "no band"}</div>
+        </div>
+      </div>
+    </button>
+  );
 }
 
 export function Layout({
