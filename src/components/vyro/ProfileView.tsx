@@ -6,6 +6,7 @@ import { BandPanel } from "./BandPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "@tanstack/react-router";
 import { LogOut, Save } from "lucide-react";
+import { Card, PageHeader } from "./shared";
 
 export function ProfileView() {
   const fetchProfile = useServerFn(getMyProfile);
@@ -51,50 +52,75 @@ export function ProfileView() {
     navigate({ to: "/auth", replace: true });
   }
 
-  if (isLoading) return <div className="p-6 text-sm text-white/55">Loading profile…</div>;
+  if (isLoading) return <div className="p-6 text-sm text-black/55">Loading profile…</div>;
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">Profile</div>
-        <h2 className="mt-1 mb-4 text-2xl font-black">{name || "Your account"}</h2>
+    <div className="space-y-4">
+      <PageHeader eyebrow="Account" title={name || "Your profile"} subtitle="Identity, sport, and the band you're paired with." />
 
+      <Card eyebrow="Identity" title="Personal info">
         <label className="mb-3 block">
-          <span className="mb-1 block text-xs text-white/55">Display name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-xl border border-white/15 bg-white/[0.05] px-3 py-2 text-sm outline-none focus:border-white/40" />
+          <span className="mb-1 block text-[11px] font-semibold text-black/55">Display name</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm text-black outline-none focus:border-black/40"
+          />
         </label>
-        <div className="mb-3 grid grid-cols-2 gap-3">
-          <label>
-            <span className="mb-1 block text-xs text-white/55">Primary sport</span>
+        <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold text-black/55">Primary sport</span>
             <div className="flex gap-1.5">
               {(["squash", "tennis"] as const).map((s) => (
-                <button key={s} onClick={() => setSport(s)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${sport === s ? "border-white/40 bg-white/[0.18]" : "border-white/15 bg-white/[0.04] text-white/60"}`}>{s}</button>
+                <button
+                  key={s}
+                  onClick={() => setSport(s)}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${
+                    sport === s
+                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      : "border-black/10 bg-white text-black/65 hover:bg-black/[0.04]"
+                  }`}
+                >
+                  {s}
+                </button>
               ))}
             </div>
           </label>
-          <label>
-            <span className="mb-1 block text-xs text-white/55">Handedness</span>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold text-black/55">Handedness</span>
             <div className="flex gap-1.5">
               {(["left", "right"] as const).map((h) => (
-                <button key={h} onClick={() => setHand(h)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${hand === h ? "border-white/40 bg-white/[0.18]" : "border-white/15 bg-white/[0.04] text-white/60"}`}>{h}</button>
+                <button
+                  key={h}
+                  onClick={() => setHand(h)}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${
+                    hand === h
+                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      : "border-black/10 bg-white text-black/65 hover:bg-black/[0.04]"
+                  }`}
+                >
+                  {h}
+                </button>
               ))}
             </div>
           </label>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={save} disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2 text-sm font-bold text-black disabled:opacity-50">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white hover:bg-black/85 disabled:opacity-50"
+          >
             <Save className="h-4 w-4" /> {saving ? "Saving…" : saved ? "Saved" : "Save"}
           </button>
-          <button onClick={signOut}
-            className="ml-auto flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-xs text-white/70 hover:bg-white/[0.1]">
+          <button
+            onClick={signOut}
+            className="ml-auto flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-black/65 hover:bg-black/[0.04]"
+          >
             <LogOut className="h-3.5 w-3.5" /> Sign out
           </button>
         </div>
-      </div>
+      </Card>
 
       <BandPanel
         pairedId={profile?.paired_band_id ?? null}
