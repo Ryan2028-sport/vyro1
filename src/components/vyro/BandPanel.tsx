@@ -9,7 +9,7 @@ import { useVyroBandCtx } from "./VyroBandProvider";
 import type { VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
-import { startSessionRow, endSessionRow } from "@/lib/sessions.functions";
+
 
 function fmtSat(v: { value: number; saturated: boolean }, unit: string, dp = 2) {
   const s = v.value.toFixed(dp);
@@ -39,9 +39,7 @@ export function BandPanel({
   const vyro = useVyroBandCtx();
   const { ble, connected, events, counts, sessionState, sport, setSport } = vyro;
   const updateProfile = useServerFn(updateMyProfile);
-  const startSession = useServerFn(startSessionRow);
-  const endSession = useServerFn(endSessionRow);
-  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+
 
   useEffect(() => {
     setSport(defaultSport);
@@ -65,26 +63,9 @@ export function BandPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ble.connectedId]);
 
-  async function onStart() {
-    const row = await startSession({ data: { sport } });
-    setActiveRowId(row.id);
-    await vyro.startSession();
-  }
-  async function onEnd() {
-    if (activeRowId) {
-      await endSession({
-        data: {
-          id: activeRowId,
-          swing_count: counts.swing,
-          rapid_count: counts.rapid_start,
-          burst_count: counts.burst,
-          dir_change_count: counts.direction_change,
-        },
-      });
-      setActiveRowId(null);
-    }
-    await vyro.endSession();
-  }
+  // Session start/end happens in SessionView, which writes the session row.
+  // BandPanel just exposes pairing + live feed + OTA here.
+
 
   // OTA
   const [otaFile, setOtaFile] = useState<File | null>(null);
