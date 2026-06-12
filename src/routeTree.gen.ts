@@ -14,7 +14,6 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as ApiPublicAnalyzeClipRouteImport } from './routes/api/public/analyze-clip'
-import { Route as AuthenticatedAppProfileRouteImport } from './routes/_authenticated/app.profile'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -40,24 +39,17 @@ const ApiPublicAnalyzeClipRoute = ApiPublicAnalyzeClipRouteImport.update({
   path: '/api/public/analyze-clip',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAppProfileRoute = AuthenticatedAppProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/app': typeof AuthenticatedAppRouteWithChildren
-  '/app/profile': typeof AuthenticatedAppProfileRoute
+  '/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/app': typeof AuthenticatedAppRouteWithChildren
-  '/app/profile': typeof AuthenticatedAppProfileRoute
+  '/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesById {
@@ -65,27 +57,20 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
-  '/_authenticated/app/profile': typeof AuthenticatedAppProfileRoute
+  '/_authenticated/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/auth'
-    | '/app'
-    | '/app/profile'
-    | '/api/public/analyze-clip'
+  fullPaths: '/' | '/auth' | '/app' | '/api/public/analyze-clip'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/app' | '/app/profile' | '/api/public/analyze-clip'
+  to: '/' | '/auth' | '/app' | '/api/public/analyze-clip'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/app'
-    | '/_authenticated/app/profile'
     | '/api/public/analyze-clip'
   fileRoutesById: FileRoutesById
 }
@@ -133,33 +118,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAnalyzeClipRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/app/profile': {
-      id: '/_authenticated/app/profile'
-      path: '/profile'
-      fullPath: '/app/profile'
-      preLoaderRoute: typeof AuthenticatedAppProfileRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
   }
 }
 
-interface AuthenticatedAppRouteChildren {
-  AuthenticatedAppProfileRoute: typeof AuthenticatedAppProfileRoute
-}
-
-const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
-  AuthenticatedAppProfileRoute: AuthenticatedAppProfileRoute,
-}
-
-const AuthenticatedAppRouteWithChildren =
-  AuthenticatedAppRoute._addFileChildren(AuthenticatedAppRouteChildren)
-
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAppRoute: typeof AuthenticatedAppRouteWithChildren
+  AuthenticatedAppRoute: typeof AuthenticatedAppRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAppRoute: AuthenticatedAppRouteWithChildren,
+  AuthenticatedAppRoute: AuthenticatedAppRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -174,3 +141,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
