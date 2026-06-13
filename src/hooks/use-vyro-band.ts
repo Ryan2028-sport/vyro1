@@ -466,7 +466,11 @@ export function useVyroBand() {
           setBatteryPct(bat.level);
           setBatteryCharging(bat.charging);
         }
-      } else if (op === QCBAND_CMD_TODAY_SUMMARY) {
+      } else if (
+        op === QCBAND_CMD_TODAY_SUMMARY ||
+        op === QCBAND_CMD_STEPS_ALT1 ||
+        op === QCBAND_CMD_STEPS_ALT2
+      ) {
         const sum = decodeQcBandTodaySummary(bytes);
         if (sum) {
           setStepsToday(sum.steps);
@@ -488,6 +492,8 @@ export function useVyroBand() {
           if (t != null) setSkinTempC(t);
         } else if (frame.subType === QCBAND_MEASURE_HRV) {
           if (frame.value > 0 && frame.value < 250) setHrvMs(frame.value);
+        } else if (frame.subType === QCBAND_MEASURE_STRESS) {
+          if (frame.value > 0 && frame.value <= 100) setStressScore(frame.value);
         } else if (frame.subType === QCBAND_MEASURE_ONE_KEY) {
           const ok = decodeQcBandOneKeyPayload(frame.data);
           if (ok) {
