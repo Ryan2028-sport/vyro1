@@ -62,6 +62,10 @@ export function useLiveMetrics() {
     heartRateBpm,
     heartRateAt,
     batteryPct,
+    restingHrBpm,
+    hrvMs,
+    respRateBrpm,
+    stressScore,
     ...derived,
   };
 }
