@@ -199,12 +199,18 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             <div className="flex items-center justify-between gap-2">
               <Pill tone={bandTone} pulse={band === "green"}>{bandLabel}</Pill>
               <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
-                Recovery {recovery} · Sleep {sleep}
+                Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
               </span>
             </div>
-            <p className="mt-3 text-lg font-black leading-tight text-vyro-text">You're ready to train.</p>
+            <p className="mt-3 text-lg font-black leading-tight text-vyro-text">
+              {readiness == null
+                ? "Waiting on band signals…"
+                : readiness >= 67 ? "You're ready to train."
+                : readiness >= 34 ? "Train with caution."
+                : "Prioritize recovery."}
+            </p>
             <p className="mt-1 text-xs leading-relaxed text-vyro-mute">
-              Recovery is green and agility is sharp. Train hard, but protect the back-left corner.
+              Readiness is computed live from HRV, resting HR, sleep, stress, SpO₂ and accumulated load as the band reports them.
             </p>
           </div>
         </div>
