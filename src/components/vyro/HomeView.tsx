@@ -95,7 +95,7 @@ function Vital({
 }
 
 // Mini ring for the Base-readiness 4-up grid
-function MiniRing({ value, label, tone = "mint" }: { value: number; label: string; tone?: "mint" | "amber" | "rose" }) {
+function MiniRing({ value, label, tone = "mint" }: { value: number | null; label: string; tone?: "mint" | "amber" | "rose" }) {
   const stroke = tone === "amber" ? "var(--vyro-amber)" : tone === "rose" ? "var(--vyro-rose)" : "var(--vyro-mint)";
   const size = 86, sw = 8, r = (size - sw) / 2, c = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(1, value / 100));
