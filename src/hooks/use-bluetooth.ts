@@ -37,6 +37,13 @@ type BrowserBluetoothDevice = {
 
 const browserDevices = new Map<string, BrowserBluetoothDevice>();
 
+function sameDeviceId(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const clean = (v: string) => v.toLowerCase().replace(/[^a-f0-9]/g, "");
+  return clean(a) !== "" && clean(a) === clean(b);
+}
+
 export function useBluetooth() {
   const [devices, setDevices] = useState<Record<string, BleDevice>>({});
   const [scanning, setScanning] = useState(false);
@@ -191,8 +198,37 @@ export function useBluetooth() {
       return;
     }
 
+    if (isNative && !Object.values(devices).some((d) => sameDeviceId(d.id, id))) {
+      let resolvedId: string | null = null;
+      const waitForDevice = new Promise<string>((resolve, reject) => {
+        const timeout = window.setTimeout(() => {
+          off();
+          reject(new Error("Device not found nearby. Open the Band panel, tap Scan, then connect the watch that appears."));
+        }, 10_000);
+        const off = bluetooth.on("device", (d) => {
+          if (sameDeviceId(d.id, id)) {
+            window.clearTimeout(timeout);
+            off();
+            resolve(d.id);
+          }
+        });
+      });
+      try {
+        await bluetooth.scan([], 9000);
+        resolvedId = await waitForDevice;
+      } catch (err) {
+        const msg = (err as Error)?.message || String(err);
+        setConnectionState("failed");
+        setError(msg);
+        bluetooth.emitBrowserConnect({ id, state: "failed", error: msg });
+        return;
+      }
+      await bluetooth.connect(resolvedId, { autoConnect: true, timeout: 60000 });
+      return;
+    }
+
     await bluetooth.connect(id, { autoConnect: true, timeout: 60000 });
-  }, []);
+  }, [devices]);
 
   const disconnect = useCallback(async (id: string) => {
     const browserDevice = browserDevices.get(id);
