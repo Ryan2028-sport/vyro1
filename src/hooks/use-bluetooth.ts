@@ -8,7 +8,12 @@ import {
   type BleState,
 } from "@/lib/despia";
 
-export type BleConnectionState = "idle" | "connecting" | "connected" | "disconnected" | "failed";
+export type BleConnectionState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "failed";
 
 export type BlePowerState = BleState["state"] | "unknown";
 
@@ -40,7 +45,8 @@ const browserDevices = new Map<string, BrowserBluetoothDevice>();
 export function useBluetooth() {
   const [devices, setDevices] = useState<Record<string, BleDevice>>({});
   const [scanning, setScanning] = useState(false);
-  const [connectionState, setConnectionState] = useState<BleConnectionState>("idle");
+  const [connectionState, setConnectionState] =
+    useState<BleConnectionState>("idle");
   const [connectedId, setConnectedId] = useState<string | null>(null);
   const [lastData, setLastData] = useState<BleDataEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,15 +70,18 @@ export function useBluetooth() {
     const offData = bluetooth.on("data", (d: BleDataEvent) => setLastData(d));
     const offState = bluetooth.on("state", (s) => {
       setPowerState(s.state);
-      if (s.state === "unauthorized") setError("Bluetooth permission denied. Enable it in iOS Settings.");
-      else if (s.state === "off") setError("Bluetooth is off. Turn it on in Control Center.");
-      else if (s.state === "unsupported") setError("Bluetooth is not supported on this device.");
-      else setError(null);
+      if (s.state === "unauthorized") {
+        setError("Bluetooth permission denied. Enable it in iOS Settings.");
+      } else if (s.state === "off") {
+        setError("Bluetooth is off. Turn it on in Control Center.");
+      } else if (s.state === "unsupported") {
+        setError("Bluetooth is not supported on this device.");
+      } else {
+        setError(null);
+      }
     });
     const offScanEnd = bluetooth.on("scanEnd", () => setScanning(false));
 
-    // Bootstrap: query current state. This also triggers the iOS permission
-    // prompt on first BLE call and unblocks subsequent scans.
     if (isNative) void bluetooth.state();
 
     return () => {
@@ -84,14 +93,11 @@ export function useBluetooth() {
     };
   }, []);
 
-  const scan = useCallback(async (services: string[] = [], durationMs = 10000) => {
+  const scan = useCallback(
+    async (services: string[] = [], durationMs = 10000) => {
       setError(null);
       setDevices({});
 
-      // ---- Browser fallback (Web Bluetooth) ----
-      // Native iOS WebKit has no navigator.bluetooth, but desktop Chrome/Edge
-      // do. We use requestDevice() to show the OS chooser, then surface the
-      // picked device in the list so the rest of the UI keeps working.
       if (!isNative) {
         const nav = navigator as Navigator & {
           bluetooth?: {
@@ -137,20 +143,18 @@ export function useBluetooth() {
         return;
       }
 
-      // ---- Native (Despia BLE) ----
-      // Make sure we have an up-to-date power/permission read. The first call
-      // also triggers the iOS permission prompt if it hasn't appeared yet.
       try {
         await bluetooth.state();
         setScanning(true);
         await bluetooth.scan(services, durationMs);
-        // Fallback if onBleScanEnd never arrives.
         window.setTimeout(() => setScanning(false), durationMs + 500);
       } catch (err) {
         setScanning(false);
         setError((err as Error)?.message || String(err));
       }
-    }, []);
+    },
+    [],
+  );
 
   const stopScan = useCallback(async () => {
     await bluetooth.stopScan();
@@ -164,8 +168,9 @@ export function useBluetooth() {
     const browserDevice = browserDevices.get(id);
     if (browserDevice) {
       try {
-        if (!browserDevice.gatt)
+        if (!browserDevice.gatt) {
           throw new Error("This Bluetooth device has no GATT server.");
+        }
         browserDevice.addEventListener?.("gattserverdisconnected", () => {
           bluetooth.emitBrowserConnect({ id, state: "disconnected" });
         });
@@ -195,10 +200,6 @@ export function useBluetooth() {
       return;
     }
 
-    // autoConnect: true → iOS Core Bluetooth keeps the pending connection
-    // alive even when the app is backgrounded, and reconnects automatically
-    // when the peripheral comes back in range. Long timeout so the OS
-    // doesn't give up while the watch is briefly out of range.
     await bluetooth.connect(id, { autoConnect: true, timeout: 60000 });
   }, []);
 
