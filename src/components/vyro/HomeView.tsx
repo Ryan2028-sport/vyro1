@@ -196,10 +196,11 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-vyro-mute">
           Your daily readiness command center — synced from your VYRO Band.
         </p>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {m.connected
             ? <Pill tone="live" pulse>Band connected · 94%</Pill>
             : <Pill tone="off">Band offline</Pill>}
+          {usingDemo && <Pill tone="warn">Demo data</Pill>}
         </div>
       </div>
 
