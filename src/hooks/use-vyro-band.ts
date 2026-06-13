@@ -372,10 +372,33 @@ export function useVyroBand() {
       return;
     }
     if (uuidMatches(cuuid, QCBAND_NOTIFY_CHAR_UUID)) {
-      const bpm = decodeQcBandRealtimeHeartRate(payloadToBytes(lastData.value));
-      if (bpm != null) {
-        setHeartRateBpm(bpm);
-        setHeartRateAt(Date.now());
+      const bytes = payloadToBytes(lastData.value);
+      const op = bytes[0];
+      if (op === QCBAND_CMD_REALTIME_HR) {
+        const bpm = decodeQcBandRealtimeHeartRate(bytes);
+        if (bpm != null) {
+          setHeartRateBpm(bpm);
+          setHeartRateAt(Date.now());
+        }
+      } else if (op === QCBAND_CMD_BATTERY) {
+        const bat = decodeQcBandBattery(bytes);
+        if (bat) {
+          setBatteryPct(bat.level);
+          setBatteryCharging(bat.charging);
+        }
+      } else if (op === QCBAND_CMD_START_MEASURE) {
+        // SpO2 / HR start frames. sub_type 0x03 = SpO2.
+        const frame = decodeQcBandMeasureFrame(bytes);
+        if (frame && frame.subType === 0x03 && frame.errorCode === 0) {
+          const v = frame.value;
+          if (v >= 70 && v <= 100) setSpo2Pct(v);
+        } else if (frame && frame.subType === 0x01 && frame.errorCode === 0 && frame.value > 0) {
+          // Some firmwares deliver HR via the 0x69 channel too.
+          if (frame.value < 250) {
+            setHeartRateBpm(frame.value);
+            setHeartRateAt(Date.now());
+          }
+        }
       }
       return;
     }
