@@ -73,8 +73,7 @@ export function fmtNum(
   return `${n.toFixed(digits)}${unit}`;
 }
 
-// Recovery band classification. Until the band emits HRV/sleep, this stays at
-// "unknown" — UI shows it as a yellow caution chip rather than fake green.
+// Recovery band classification.
 export type RecoveryBand = "green" | "yellow" | "red" | "unknown";
 
 export function recoveryBand(score: number | null): RecoveryBand {
@@ -82,4 +81,42 @@ export function recoveryBand(score: number | null): RecoveryBand {
   if (score >= 67) return "green";
   if (score >= 34) return "yellow";
   return "red";
+}
+
+// Composite readiness (0-100) computed from whatever signals the band
+// currently provides. Weights are renormalized over present inputs so
+// missing channels don't unfairly drag the score. Returns null until
+// at least one weighted input is available.
+export type ReadinessInputs = {
+  connected: boolean;
+  hrvMs?: number | null;
+  restingHrBpm?: number | null;
+  sleepScore?: number | null;
+  recoveryScore?: number | null;
+  stress?: number | null;
+  spo2?: number | null;
+  peakJerk?: number | null;
+};
+
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+export function computeReadiness(i: ReadinessInputs): { score: number | null; parts: Record<string, number> } {
+  if (!i.connected) return { score: null, parts: {} };
+  const parts: Record<string, number> = {};
+  const w: Record<string, number> = {};
+  if (i.hrvMs != null) { parts.hrv = clamp01((i.hrvMs - 20) / 70); w.hrv = 0.30; }
+  if (i.restingHrBpm != null) { parts.rhr = clamp01((70 - i.restingHrBpm) / 25); w.rhr = 0.15; }
+  if (i.sleepScore != null) { parts.sleep = clamp01(i.sleepScore / 100); w.sleep = 0.25; }
+  if (i.recoveryScore != null) { parts.recovery = clamp01(i.recoveryScore / 100); w.recovery = 0.15; }
+  if (i.stress != null) { parts.stress = clamp01(1 - i.stress / 100); w.stress = 0.08; }
+  if (i.spo2 != null) { parts.spo2 = clamp01((i.spo2 - 92) / 7); w.spo2 = 0.04; }
+  if (i.peakJerk != null && i.peakJerk > 0) {
+    parts.load = clamp01(1 - Math.min(i.peakJerk, 200) / 200);
+    w.load = 0.03;
+  }
+  const total = Object.values(w).reduce((a, b) => a + b, 0);
+  if (total === 0) return { score: null, parts: {} };
+  let sum = 0;
+  for (const k in w) sum += parts[k] * w[k];
+  return { score: Math.round((sum / total) * 100), parts };
 }
