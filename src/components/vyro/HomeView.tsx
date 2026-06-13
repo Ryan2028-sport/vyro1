@@ -517,6 +517,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       </Card>
 
       {/* Base readiness — 4 stat panel mirroring the brief */}
+      <div id="section-trends" className="scroll-mt-24">
       <Card
         eyebrow="Base readiness"
         title="Today's subscores"
@@ -540,6 +541,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           ))}
         </div>
       </Card>
+      </div>
 
       {/* Full vitals — Goodix GH3026 + ST 6-axis IMU readout */}
       <Card
