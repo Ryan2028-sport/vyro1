@@ -206,7 +206,9 @@ export function useVyroBand() {
     let holdTimer: number | null = null;
     let restartTimer: number | null = null;
     let batteryTimer: number | null = null;
-    let spo2Timer: number | null = null;
+    let stepsTimer: number | null = null;
+    let oneKeyTimer: number | null = null;
+    let tempTimer: number | null = null;
 
     async function writeQcBand(service: string, write: string, bytes: Uint8Array) {
       const hex = bytesToHex(bytes);
