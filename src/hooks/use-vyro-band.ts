@@ -144,31 +144,26 @@ export function useVyroBand() {
     let qcBandService: { service: string; notify: string; write: string } | null = null;
     let holdTimer: number | null = null;
 
+    async function writeQcBand(service: string, write: string, bytes: Uint8Array) {
+      const hex = bytesToHex(bytes);
+      try {
+        await bluetooth.write(connectedId!, service, write, hex, true);
+      } catch {
+        await bluetooth.write(connectedId!, service, write, hex, false);
+      }
+    }
+
     async function startQcBandLiveHr(service: string, notify: string, write: string) {
       if (qcBandStarted) return;
       qcBandStarted = true;
       qcBandService = { service, notify, write };
       await bluetooth.subscribe(connectedId!, service, notify);
-      await bluetooth
-        .write(connectedId!, service, write, bytesToHex(encodeQcBandBindingAlert()), true)
-        .catch(() => undefined);
-      await bluetooth.write(
-        connectedId!,
-        service,
-        write,
-        bytesToHex(encodeQcBandRealtimeHeartRate("start")),
-        true,
-      );
+      await writeQcBand(service, write, encodeQcBandBindingAlert()).catch(() => undefined);
+      await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start"));
       holdTimer = window.setInterval(() => {
-        void bluetooth
-          .write(
-            connectedId!,
-            service,
-            write,
-            bytesToHex(encodeQcBandRealtimeHeartRate("hold")),
-            true,
-          )
-          .catch(() => undefined);
+        void writeQcBand(service, write, encodeQcBandRealtimeHeartRate("hold")).catch(
+          () => undefined,
+        );
       }, 20_000);
     }
 
@@ -205,19 +200,16 @@ export function useVyroBand() {
         }
       }
     });
+    void bluetooth.discover(connectedId).catch(() => undefined);
     return () => {
       off();
       if (holdTimer != null) window.clearInterval(holdTimer);
       if (qcBandService) {
-        void bluetooth
-          .write(
-            connectedId,
-            qcBandService.service,
-            qcBandService.write,
-            bytesToHex(encodeQcBandRealtimeHeartRate("end")),
-            true,
-          )
-          .catch(() => undefined);
+        void writeQcBand(
+          qcBandService.service,
+          qcBandService.write,
+          encodeQcBandRealtimeHeartRate("end"),
+        ).catch(() => undefined);
         void bluetooth
           .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
           .catch(() => undefined);
