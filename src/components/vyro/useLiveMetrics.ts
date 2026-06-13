@@ -120,3 +120,66 @@ export function computeReadiness(i: ReadinessInputs): { score: number | null; pa
   for (const k in w) sum += parts[k] * w[k];
   return { score: Math.round((sum / total) * 100), parts };
 }
+
+// Live "base readiness" subscores derived from whatever the band is
+// streaming right now. Each one is null until at least one underlying
+// signal is available; HomeView falls back to demo values when null so
+// the UI stays populated, then swaps to live as soon as data arrives.
+export type SubScores = {
+  fatigue: number | null;   // 0-100, higher = MORE fatigued
+  recovery: number | null;  // 0-100
+  agility: number | null;   // 0-100
+  sleep: number | null;     // 0-100
+};
+
+export type SubScoreInputs = {
+  connected: boolean;
+  hrvMs?: number | null;
+  restingHrBpm?: number | null;
+  sleepScore?: number | null;
+  stress?: number | null;
+  peakJerk?: number | null;
+  peakG?: number | null;
+  eventsLastMin?: number | null;
+  reactMin?: number | null;       // ms — lower = sharper
+  recentSessionLoad?: number | null; // 0-200
+};
+
+export function computeSubScores(i: SubScoreInputs): SubScores {
+  if (!i.connected) return { fatigue: null, recovery: null, agility: null, sleep: null };
+
+  // Fatigue — accumulated load + stress, capped so a single big spike
+  // doesn't pin the bar.
+  const loadParts: number[] = [];
+  if (i.peakJerk != null) loadParts.push(clamp01(i.peakJerk / 200));
+  if (i.eventsLastMin != null) loadParts.push(clamp01(i.eventsLastMin / 90));
+  if (i.recentSessionLoad != null) loadParts.push(clamp01(i.recentSessionLoad / 120));
+  if (i.stress != null) loadParts.push(clamp01(i.stress / 100));
+  const fatigue = loadParts.length
+    ? Math.round((loadParts.reduce((a, b) => a + b, 0) / loadParts.length) * 100)
+    : null;
+
+  // Recovery — HRV + resting HR + (1 - stress). Sleep folds into its own
+  // ring rather than double-counting here.
+  const recParts: { v: number; w: number }[] = [];
+  if (i.hrvMs != null) recParts.push({ v: clamp01((i.hrvMs - 20) / 70), w: 0.5 });
+  if (i.restingHrBpm != null) recParts.push({ v: clamp01((70 - i.restingHrBpm) / 25), w: 0.3 });
+  if (i.stress != null) recParts.push({ v: clamp01(1 - i.stress / 100), w: 0.2 });
+  const recW = recParts.reduce((a, b) => a + b.w, 0);
+  const recovery = recW > 0
+    ? Math.round((recParts.reduce((a, b) => a + b.v * b.w, 0) / recW) * 100)
+    : null;
+
+  // Agility — IMU explosiveness (peak g) + reaction speed.
+  const agParts: number[] = [];
+  if (i.peakG != null && i.peakG > 0) agParts.push(clamp01(i.peakG / 6));
+  if (i.reactMin != null) agParts.push(clamp01(1 - Math.min(i.reactMin, 400) / 400));
+  const agility = agParts.length
+    ? Math.round((agParts.reduce((a, b) => a + b, 0) / agParts.length) * 100)
+    : null;
+
+  // Sleep — passed through from the sleep engine when present.
+  const sleep = i.sleepScore != null ? Math.round(clamp01(i.sleepScore / 100) * 100) : null;
+
+  return { fatigue, recovery, agility, sleep };
+}
