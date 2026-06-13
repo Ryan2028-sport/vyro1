@@ -84,11 +84,9 @@ export function BandPanel({
 
   useEffect(() => {
     if (connected || ble.connectionState === "connecting") return;
-    const target = pairedId
-      ? ble.devices.find((d) => sameDeviceId(d.id, pairedId))
-      : ble.devices.filter(isLikelyBand).length === 1
-        ? ble.devices.filter(isLikelyBand)[0]
-        : null;
+    const pairedTarget = pairedId ? ble.devices.find((d) => sameDeviceId(d.id, pairedId)) : null;
+    const likelyBands = ble.devices.filter(isLikelyBand);
+    const target = pairedTarget || (likelyBands.length === 1 ? likelyBands[0] : null);
     if (target) void ble.connect(target.id);
   }, [pairedId, connected, ble.connectionState, ble.devices, ble.connect]);
 
@@ -159,7 +157,6 @@ export function BandPanel({
           <button
             onClick={() => {
               if (ble.scanning) void ble.stopScan();
-              else if (pairedId) void ble.connect(pairedId);
               else void ble.scan([], 8000);
             }}
             className="shrink-0 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-1.5 text-xs font-semibold text-vyro-text hover:bg-vyro-text/[0.04]"
