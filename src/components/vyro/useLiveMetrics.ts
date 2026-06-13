@@ -59,6 +59,9 @@ export function useLiveMetrics() {
     events,
     pairedId,
     pairedName,
+    heartRateBpm,
+    heartRateAt,
+    batteryPct,
     ...derived,
   };
 }
