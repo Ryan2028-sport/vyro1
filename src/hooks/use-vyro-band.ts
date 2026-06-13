@@ -14,10 +14,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useBluetooth } from "./use-bluetooth";
-import {
-  decodeMotionEventFromString,
-  type VyroMotionEvent,
-} from "@/lib/vyro-ble/packets";
+import { decodeMotionEventFromString, type VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import {
   VYRO_CONTROL_CHAR_UUID,
   VYRO_EVENT_CHAR_UUID,
@@ -51,9 +48,9 @@ const MAX_EVENTS = 120;
 
 // Standard Bluetooth SIG UUIDs (128-bit form). Lowercase so substring
 // matches work against whatever case the platform reports.
-const HR_SERVICE   = "0000180d-0000-1000-8000-00805f9b34fb";
+const HR_SERVICE = "0000180d-0000-1000-8000-00805f9b34fb";
 const HR_MEAS_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
-const BAT_SERVICE  = "0000180f-0000-1000-8000-00805f9b34fb";
+const BAT_SERVICE = "0000180f-0000-1000-8000-00805f9b34fb";
 const BAT_LVL_CHAR = "00002a19-0000-1000-8000-00805f9b34fb";
 
 function uuidMatches(a: string, b: string): boolean {
@@ -171,8 +168,12 @@ export function useVyroBand() {
       if (tree.id !== connectedId) return;
       for (const svc of tree.services) {
         if (uuidMatches(svc.uuid, QCBAND_SERVICE_UUID)) {
-          const notify = svc.characteristics.find((c) => uuidMatches(c.uuid, QCBAND_NOTIFY_CHAR_UUID));
-          const write = svc.characteristics.find((c) => uuidMatches(c.uuid, QCBAND_WRITE_CHAR_UUID));
+          const notify = svc.characteristics.find((c) =>
+            uuidMatches(c.uuid, QCBAND_NOTIFY_CHAR_UUID),
+          );
+          const write = svc.characteristics.find((c) =>
+            uuidMatches(c.uuid, QCBAND_WRITE_CHAR_UUID),
+          );
           if (notify && write) {
             void startQcBandLiveHr(svc.uuid, notify.uuid, write.uuid).catch((err) =>
               console.warn("[vyro] QCBand live HR start failed", err),
@@ -193,9 +194,7 @@ export function useVyroBand() {
             void bluetooth
               .read(connectedId, svc.uuid, ch.uuid)
               .catch((err) => console.warn("[vyro] battery read failed", err));
-            void bluetooth
-              .subscribe(connectedId, svc.uuid, ch.uuid)
-              .catch(() => undefined);
+            void bluetooth.subscribe(connectedId, svc.uuid, ch.uuid).catch(() => undefined);
           }
         }
       }
