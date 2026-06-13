@@ -84,8 +84,7 @@ export function useBluetooth() {
     };
   }, []);
 
-  const scan = useCallback(
-    async (services: string[] = [], durationMs = 10000) => {
+  const scan = useCallback(async (services: string[] = [], durationMs = 10000) => {
       setError(null);
       setDevices({});
 
@@ -151,9 +150,7 @@ export function useBluetooth() {
         setScanning(false);
         setError((err as Error)?.message || String(err));
       }
-    },
-    [],
-  );
+    }, []);
 
   const stopScan = useCallback(async () => {
     await bluetooth.stopScan();
@@ -167,7 +164,8 @@ export function useBluetooth() {
     const browserDevice = browserDevices.get(id);
     if (browserDevice) {
       try {
-        if (!browserDevice.gatt) throw new Error("This Bluetooth device has no GATT server.");
+        if (!browserDevice.gatt)
+          throw new Error("This Bluetooth device has no GATT server.");
         browserDevice.addEventListener?.("gattserverdisconnected", () => {
           bluetooth.emitBrowserConnect({ id, state: "disconnected" });
         });
