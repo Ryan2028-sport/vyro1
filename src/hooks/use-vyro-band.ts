@@ -326,10 +326,22 @@ export function useVyroBand() {
       window.setTimeout(runHrvCycle, 2 * 60_000);
       const hrvTimer = window.setInterval(runHrvCycle, 10 * 60_000);
 
+      // Standalone Stress cycle (sub-type 0x0d). Some firmwares don't fill
+      // the stress slot in One-Key but do respond to a dedicated cycle.
+      const runStressCycle = () => {
+        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_STRESS)).catch(() => undefined);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_STRESS)).catch(() => undefined);
+        }, 60_000);
+      };
+      window.setTimeout(runStressCycle, 90_000);
+      const stressTimer = window.setInterval(runStressCycle, 10 * 60_000);
+
       // Stash extra timers we created locally onto the outer refs via closure.
       const stop = () => {
         window.clearInterval(spo2Timer);
         window.clearInterval(hrvTimer);
+        window.clearInterval(stressTimer);
       };
       cleanupExtras = stop;
     }
