@@ -259,18 +259,65 @@ export function useVyroBand() {
       window.setTimeout(pollBattery, 800);
       batteryTimer = window.setInterval(pollBattery, 60_000);
 
-      // SpO2: cycle measurement every 5 min (vendor app pattern — sensor
-      // can't run continuously). Start one shot ~3s after HR comes up.
+      // Steps / distance / calories — poll opcode 0x09 every 30s. Response
+      // arrives on the same notify char and is decoded in the notify handler.
+      const pollSteps = () =>
+        void writeQcBand(service, write, encodeQcBandStepsRequest()).catch(() => undefined);
+      window.setTimeout(pollSteps, 1_200);
+      stepsTimer = window.setInterval(pollSteps, 30_000);
+
+      // SpO₂ standalone cycle — kept as a fallback for firmwares that don't
+      // populate the One-Key payload's SpO₂ field. 5-minute cadence.
       const runSpo2Cycle = () => {
-        void writeQcBand(service, write, encodeQcBandSpo2Start()).catch(() => undefined);
-        // Stop after 40s so the optical sensor can rest before the next cycle.
+        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_SPO2)).catch(() => undefined);
         window.setTimeout(() => {
-          void writeQcBand(service, write, encodeQcBandSpo2Stop()).catch(() => undefined);
+          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_SPO2)).catch(() => undefined);
         }, 40_000);
       };
       window.setTimeout(runSpo2Cycle, 3_000);
-      spo2Timer = window.setInterval(runSpo2Cycle, 5 * 60_000);
+      const spo2Timer = window.setInterval(runSpo2Cycle, 5 * 60_000);
+
+      // Skin temperature — sub-type 0x04. Same 5-min cycle as SpO₂.
+      const runTempCycle = () => {
+        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_TEMP)).catch(() => undefined);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_TEMP)).catch(() => undefined);
+        }, 40_000);
+      };
+      window.setTimeout(runTempCycle, 6_000);
+      tempTimer = window.setInterval(runTempCycle, 5 * 60_000);
+
+      // One-Key Measure — sub-type 0x06. Returns HR + HRV + Stress + SpO₂ +
+      // Temp + BP in a single frame. Fires every 5 min, offset from the
+      // single-metric cycles so the optical sensor isn't queued twice.
+      const runOneKey = () => {
+        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_ONE_KEY)).catch(() => undefined);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_ONE_KEY)).catch(() => undefined);
+        }, 45_000);
+      };
+      window.setTimeout(runOneKey, 90_000);
+      oneKeyTimer = window.setInterval(runOneKey, 5 * 60_000);
+
+      // Standalone HRV cycle (sub-type 0x05) as a fallback for firmwares
+      // that ignore the One-Key composite. Slower cadence (10 min).
+      const runHrvCycle = () => {
+        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_HRV)).catch(() => undefined);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_HRV)).catch(() => undefined);
+        }, 60_000);
+      };
+      window.setTimeout(runHrvCycle, 4 * 60_000);
+      const hrvTimer = window.setInterval(runHrvCycle, 10 * 60_000);
+
+      // Stash extra timers we created locally onto the outer refs via closure.
+      const stop = () => {
+        window.clearInterval(spo2Timer);
+        window.clearInterval(hrvTimer);
+      };
+      cleanupExtras = stop;
     }
+    let cleanupExtras: (() => void) | null = null;
 
     const off = bluetooth.on("discovered", (tree: BleDiscovered) => {
       if (tree.id !== connectedId) return;
