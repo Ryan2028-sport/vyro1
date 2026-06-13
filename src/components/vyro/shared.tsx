@@ -149,7 +149,7 @@ export function Ring({
   const pct = value == null ? 0 : Math.max(0, Math.min(1, value / max));
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90 block">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90 block" style={{ overflow: "visible" }}>
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -168,7 +168,6 @@ export function Ring({
           strokeDasharray={c}
           strokeDashoffset={c * (1 - pct)}
           strokeLinecap="round"
-          style={{ filter: "drop-shadow(0 0 6px var(--vyro-mint))" }}
         />
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
