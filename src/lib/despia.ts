@@ -240,6 +240,14 @@ function mapCapacitorScanResult(result: ScanResult): BleDevice {
   };
 }
 
+function mapCapacitorDevice(device: { deviceId: string; name?: string; uuids?: string[] }): BleDevice {
+  return {
+    id: device.deviceId,
+    name: device.name || "Unknown device",
+    services: device.uuids,
+  };
+}
+
 // Wire up the global callbacks Despia fires from native.
 // These MUST be defined before any despia() BLE command runs — the native
 // side does not buffer foreground events, so late handlers miss events.
@@ -312,6 +320,8 @@ export const bluetooth = {
   ) => {
     if (await ensureCapacitorBle()) {
       try {
+        const savedDevices = await BleClient.getDevices([id]).catch(() => []);
+        for (const device of savedDevices) emit("device", mapCapacitorDevice(device));
         await BleClient.connect(
           id,
           (deviceId) => emit("connect", { id: deviceId, state: "disconnected" }),
