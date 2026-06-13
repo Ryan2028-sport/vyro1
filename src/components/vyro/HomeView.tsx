@@ -384,13 +384,21 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             <h1 className="mt-1 truncate text-3xl font-black tracking-tight text-vyro-text">{greeting()}, {first}</h1>
             <p className="mt-1.5 text-[12px] leading-relaxed text-vyro-mute">Squash readiness, strain, fuel and recovery in one command view.</p>
           </div>
-          <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{
-            m.connected
-              ? (m.heartRateBpm != null
-                  ? `${m.heartRateBpm} bpm`
-                  : (m.batteryPct != null ? `band ${m.batteryPct}%` : "live"))
-              : "offline"
-          }</Pill>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{
+              m.connected
+                ? (m.heartRateBpm != null
+                    ? `${m.heartRateBpm} bpm`
+                    : (m.batteryPct != null ? `band ${m.batteryPct}%` : "live"))
+                : "offline"
+            }</Pill>
+            <button
+              onClick={() => setView("profile")}
+              className="rounded-full border border-vyro-line bg-vyro-panel px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-vyro-text/80 hover:border-vyro-mint/40 hover:text-vyro-mint"
+            >
+              {m.pairedId ? "Manage band" : "Pair band"}
+            </button>
+          </div>
         </div>
 
         <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4">
