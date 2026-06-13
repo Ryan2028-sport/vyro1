@@ -205,9 +205,18 @@ export function decodeQcBandOneKeyPayload(data: Uint8Array): {
   };
 }
 
-/** Decode a temperature (sub_type 0x04) payload. */
+/** Decode a temperature payload. Handles both `[int, frac]` and
+ *  `[frac, int]` byte orders seen across QCBand firmwares, and also a
+ *  little-endian fixed-point 16-bit value (×100). */
 export function decodeQcBandTempPayload(data: Uint8Array): number | null {
   if (data.length < 2) return null;
-  const tempC = data[0] + data[1] / 100;
-  return tempC >= 30 && tempC <= 42 ? tempC : null;
+  const candidates = [
+    data[0] + data[1] / 100,
+    data[1] + data[0] / 100,
+    (data[0] | (data[1] << 8)) / 100,
+  ];
+  for (const t of candidates) {
+    if (t >= 30 && t <= 42) return t;
+  }
+  return null;
 }
