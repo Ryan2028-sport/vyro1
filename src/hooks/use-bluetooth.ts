@@ -150,11 +150,16 @@ export function useBluetooth() {
       // ---- Native (Despia BLE) ----
       // Make sure we have an up-to-date power/permission read. The first call
       // also triggers the iOS permission prompt if it hasn't appeared yet.
-      await bluetooth.state();
-      setScanning(true);
-      await bluetooth.scan(services, durationMs);
-      // Fallback if onBleScanEnd never arrives.
-      window.setTimeout(() => setScanning(false), durationMs + 500);
+      try {
+        await bluetooth.state();
+        setScanning(true);
+        await bluetooth.scan(services, durationMs);
+        // Fallback if onBleScanEnd never arrives.
+        window.setTimeout(() => setScanning(false), durationMs + 500);
+      } catch (err) {
+        setScanning(false);
+        setError((err as Error)?.message || String(err));
+      }
     },
     [],
   );
