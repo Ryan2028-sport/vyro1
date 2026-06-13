@@ -48,29 +48,29 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       {/* LIVE RECOVERY HERO */}
       <button
         onClick={() => setView("recovery")}
-        className="w-full rounded-2xl border border-black/[0.07] bg-white p-4 text-left shadow-[0_1px_0_rgba(0,0,0,0.03)] hover:border-black/20"
+        className="w-full rounded-2xl border border-vyro-text/[0.07] bg-vyro-panel p-4 text-left shadow-[0_1px_0_rgba(0,0,0,0.03)] hover:border-vyro-text/20"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-black/45">LIVE recovery</div>
+          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-text/45">LIVE recovery</div>
           <Pill tone={bandTone} pulse={band === "green"}>{bandLabel}</Pill>
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-5xl font-black tabular-nums text-black">
+          <span className="text-5xl font-black tabular-nums text-vyro-text">
             {recoveryScore == null ? "—" : `${recoveryScore}`}
           </span>
-          <span className="text-sm font-bold text-black/45">%</span>
-          <span className="ml-auto inline-flex items-center text-xs font-semibold text-black/55">
+          <span className="text-sm font-bold text-vyro-text/45">%</span>
+          <span className="ml-auto inline-flex items-center text-xs font-semibold text-vyro-text/55">
             Recovery details <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
           </span>
         </div>
-        <p className="mt-1 text-[11px] leading-snug text-black/55">
+        <p className="mt-1 text-[11px] leading-snug text-vyro-text/55">
           HR · HRV · load · sleep · skin temp. Updates every second while the band is worn.
         </p>
       </button>
 
       {/* ATHLETE TOP-LINE */}
       <Card eyebrow="Athlete · 24/7" title="Health right now" action={
-        <button onClick={() => setView("athlete")} className="text-[11px] font-semibold text-emerald-700 hover:underline">View all</button>
+        <button onClick={() => setView("athlete")} className="text-[11px] font-semibold text-vyro-mint hover:underline">View all</button>
       }>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat label="Current HR" value="—" unit="bpm" />
@@ -94,7 +94,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         </div>
         <button
           onClick={() => setView("session")}
-          className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700"
+          className="mt-3 w-full rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-mint/85"
         >
           {m.sessionState === "live" ? "Open session console →" : "Start session →"}
         </button>
@@ -107,7 +107,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           action={
             <button
               onClick={() => setView("profile")}
-              className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/85"
+              className="rounded-full bg-vyro-mint px-4 py-2 text-xs font-semibold text-white hover:bg-vyro-text/85"
             >
               Pair your band
             </button>
@@ -124,18 +124,18 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
               <button
                 key={spec.id}
                 onClick={() => setView(spec.id)}
-                className="group flex min-w-0 items-center gap-3 rounded-xl border border-black/[0.06] bg-black/[0.02] p-3 text-left transition-colors hover:border-black/20 hover:bg-black/[0.04]"
+                className="group flex min-w-0 items-center gap-3 rounded-xl border border-vyro-text/[0.06] bg-vyro-text/[0.02] p-3 text-left transition-colors hover:border-vyro-text/20 hover:bg-vyro-text/[0.04]"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-black shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-vyro-panel text-vyro-text shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]">
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-black text-black">{spec.label}</span>
-                  <span className="mt-0.5 line-clamp-2 block text-[10px] leading-snug text-black/55">
+                  <span className="block truncate text-xs font-black text-vyro-text">{spec.label}</span>
+                  <span className="mt-0.5 line-clamp-2 block text-[10px] leading-snug text-vyro-text/55">
                     {spec.blurb}
                   </span>
                 </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-black/30 group-hover:text-black/65" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-vyro-text/30 group-hover:text-vyro-text/65" />
               </button>
             );
           })}

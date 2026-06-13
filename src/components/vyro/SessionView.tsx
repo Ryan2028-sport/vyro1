@@ -116,8 +116,8 @@ export function SessionView() {
               onClick={() => band.setSport(s.id)}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 band.sport === s.id
-                  ? "border-emerald-600 bg-emerald-600 text-white"
-                  : "border-black/10 bg-white text-black/70 hover:bg-black/5"
+                  ? "border-vyro-mint bg-vyro-mint text-white"
+                  : "border-vyro-text/10 bg-vyro-panel text-vyro-text/70 hover:bg-vyro-text/5"
               } ${band.sessionState === "live" ? "opacity-60 cursor-not-allowed" : ""}`}
             >
               {s.label}
@@ -129,7 +129,7 @@ export function SessionView() {
             <button
               onClick={onStart}
               disabled={!live.connected}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-mint/85 disabled:opacity-50"
             >
               <Play className="h-4 w-4" /> Start
             </button>
@@ -144,7 +144,7 @@ export function SessionView() {
               </button>
               <button
                 onClick={onEnd}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-black px-4 py-3 text-sm font-bold text-white hover:bg-black/85"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-text/85"
               >
                 <Square className="h-4 w-4" /> End & save
               </button>
@@ -154,21 +154,21 @@ export function SessionView() {
             <>
               <button
                 onClick={onStart}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-mint/85"
               >
                 <Play className="h-4 w-4" /> Resume
               </button>
               <button
                 onClick={onEnd}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-black px-4 py-3 text-sm font-bold text-white hover:bg-black/85"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-text/85"
               >
                 <Square className="h-4 w-4" /> End & save
               </button>
             </>
           )}
         </div>
-        {saveMut.isPending && <div className="mt-2 text-[11px] text-black/55">Saving session…</div>}
-        {saveMut.isSuccess && <div className="mt-2 text-[11px] text-emerald-700">Session saved.</div>}
+        {saveMut.isPending && <div className="mt-2 text-[11px] text-vyro-text/55">Saving session…</div>}
+        {saveMut.isSuccess && <div className="mt-2 text-[11px] text-vyro-mint">Session saved.</div>}
       </Card>
 
       <Card eyebrow="Live counters" title="Motion events">
@@ -190,7 +190,7 @@ export function SessionView() {
 
       <Card eyebrow="Event stream" title={`Last ${recent.length} events`}>
         {recent.length === 0 ? (
-          <div className="py-6 text-center text-xs text-black/45">
+          <div className="py-6 text-center text-xs text-vyro-text/45">
             {live.connected ? "Waiting for motion events from your band…" : "Connect the band to see events."}
           </div>
         ) : (
@@ -200,9 +200,9 @@ export function SessionView() {
               const time = new Date(e.ts).toLocaleTimeString();
               return (
                 <li key={`${e.ts}-${i}`} className="flex items-center justify-between py-2 text-xs">
-                  <span className="font-mono text-[11px] uppercase tracking-wider text-emerald-700">{ev.type}</span>
-                  <span className="font-mono text-[10px] text-black/45">{time}</span>
-                  <span className="text-right font-mono text-[10px] text-black/65">
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-vyro-mint">{ev.type}</span>
+                  <span className="font-mono text-[10px] text-vyro-text/45">{time}</span>
+                  <span className="text-right font-mono text-[10px] text-vyro-text/65">
                     {ev.accelPeakG?.value != null && `g ${ev.accelPeakG.value.toFixed(2)} `}
                     {ev.gyroPeakDps?.value != null && `· ω ${ev.gyroPeakDps.value.toFixed(0)} `}
                     {ev.intensity != null && `· i ${ev.intensity} `}

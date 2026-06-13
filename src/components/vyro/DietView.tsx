@@ -32,7 +32,7 @@ export function DietView() {
       </Card>
 
       <Card eyebrow="Today" title="Logged">
-        <div className="rounded-xl border border-dashed border-black/15 bg-black/[0.02] p-4 text-center text-[11px] text-black/45">
+        <div className="rounded-xl border border-dashed border-vyro-text/15 bg-vyro-text/[0.02] p-4 text-center text-[11px] text-vyro-text/45">
           Food log + photo-to-meal — Phase 2
         </div>
       </Card>

@@ -108,15 +108,15 @@ export function BandPanel({
         action={<Pill tone={connected ? "live" : "off"} pulse={connected}>{connected ? "Live" : "Offline"}</Pill>}
       >
         <div className="mb-3 flex items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-black/10 bg-black/[0.03]">
-            <Bluetooth className="h-4 w-4 text-black/70" />
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-vyro-text/10 bg-vyro-text/[0.03]">
+            <Bluetooth className="h-4 w-4 text-vyro-text/70" />
           </div>
-          <div className="min-w-0 flex-1 text-[11px] text-black/55">
+          <div className="min-w-0 flex-1 text-[11px] text-vyro-text/55">
             {ble.scanning ? "Scanning for nearby bands…" : "Tap scan to find your band"}
           </div>
           <button
             onClick={() => (ble.scanning ? ble.stopScan() : ble.scan([], 8000))}
-            className="shrink-0 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-black/[0.04]"
+            className="shrink-0 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-1.5 text-xs font-semibold text-vyro-text hover:bg-vyro-text/[0.04]"
           >
             {ble.scanning ? "Stop" : "Scan"}
           </button>
@@ -132,18 +132,18 @@ export function BandPanel({
             return (
               <div
                 key={d.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-black/[0.07] bg-black/[0.02] px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-xl border border-vyro-text/[0.07] bg-vyro-text/[0.02] px-3 py-2"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-black">{d.name || "Unknown"}</div>
-                  <div className="truncate font-mono text-[10px] text-black/45">{d.id}</div>
+                  <div className="truncate text-sm font-semibold text-vyro-text">{d.name || "Unknown"}</div>
+                  <div className="truncate font-mono text-[10px] text-vyro-text/45">{d.id}</div>
                 </div>
                 <button
                   onClick={() => (isConn ? ble.disconnect(d.id) : ble.connect(d.id))}
                   className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
                     isConn
                       ? "border-rose-500/30 bg-rose-50 text-rose-700"
-                      : "border-black/10 bg-white text-black hover:bg-black/[0.04]"
+                      : "border-vyro-text/10 bg-vyro-panel text-vyro-text hover:bg-vyro-text/[0.04]"
                   }`}
                 >
                   {isConn ? "Disconnect" : "Connect"}
@@ -159,27 +159,27 @@ export function BandPanel({
         eyebrow="Live motion"
         title="Recent events"
         action={
-          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-black/45">
+          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-vyro-text/45">
             <Activity className="h-3 w-3" /> {events.length}
           </span>
         }
       >
         <div className="max-h-64 space-y-1 overflow-auto">
           {events.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-black/15 bg-black/[0.02] px-3 py-6 text-center text-xs text-black/45">
+            <div className="rounded-xl border border-dashed border-vyro-text/15 bg-vyro-text/[0.02] px-3 py-6 text-center text-xs text-vyro-text/45">
               {connected ? "Move the band to see events." : "Pair the band to start receiving events."}
             </div>
           ) : (
             [...events].reverse().map((e, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between gap-2 rounded-lg border border-black/[0.05] bg-black/[0.02] px-2.5 py-1.5"
+                className="flex items-center justify-between gap-2 rounded-lg border border-vyro-text/[0.05] bg-vyro-text/[0.02] px-2.5 py-1.5"
               >
-                <span className="shrink-0 rounded-md border border-black/10 bg-white px-1.5 py-[1px] font-mono text-[10px] uppercase text-black/70">
+                <span className="shrink-0 rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px] font-mono text-[10px] uppercase text-vyro-text/70">
                   {e.event.type.replace("_", " ")}
                 </span>
-                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-black/70">{summarise(e.event)}</span>
-                <span className="shrink-0 font-mono text-[10px] text-black/40">{new Date(e.ts).toLocaleTimeString()}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-vyro-text/70">{summarise(e.event)}</span>
+                <span className="shrink-0 font-mono text-[10px] text-vyro-text/40">{new Date(e.ts).toLocaleTimeString()}</span>
               </div>
             ))
           )}
@@ -188,7 +188,7 @@ export function BandPanel({
 
       {/* OTA */}
       <Card eyebrow="Update" title="Watch software update">
-        <p className="mb-3 text-xs leading-relaxed text-black/60">
+        <p className="mb-3 text-xs leading-relaxed text-vyro-text/60">
           Choose an update file to install on your watch. It will restart and
           reconnect automatically once the update finishes.
         </p>
@@ -207,34 +207,34 @@ export function BandPanel({
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => otaInputRef.current?.click()}
-            className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-black hover:bg-black/[0.04]"
+            className="rounded-xl border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-xs font-semibold text-vyro-text hover:bg-vyro-text/[0.04]"
           >
             Choose file
           </button>
-          <div className="min-w-0 flex-1 truncate font-mono text-[11px] text-black/55">
+          <div className="min-w-0 flex-1 truncate font-mono text-[11px] text-vyro-text/55">
             {otaFile ? `${otaFile.name} · ${(otaFile.size / 1024).toFixed(1)} KB` : "No file selected"}
           </div>
           <button
             disabled={!otaFile || (!!otaProgress && otaProgress.phase !== "done" && !otaError)}
             onClick={runOta}
-            className="rounded-xl bg-black px-4 py-2 text-xs font-bold text-white disabled:opacity-30"
+            className="rounded-xl bg-vyro-mint px-4 py-2 text-xs font-bold text-white disabled:opacity-30"
           >
             {otaProgress && otaProgress.phase !== "done" && !otaError ? "Updating…" : "Start update"}
           </button>
         </div>
         {otaProgress && (
           <div className="mt-4">
-            <div className="mb-1 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest text-black/55">
+            <div className="mb-1 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest text-vyro-text/55">
               <span className="truncate">{phaseLabel[otaProgress.phase]}</span>
               <span className="shrink-0">{(otaProgress.fraction * 100).toFixed(0)}%</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-black/[0.06]">
-              <div className="h-full bg-emerald-500 transition-all" style={{ width: `${otaProgress.fraction * 100}%` }} />
+            <div className="h-2 overflow-hidden rounded-full bg-vyro-text/[0.06]">
+              <div className="h-full bg-vyro-mint/100 transition-all" style={{ width: `${otaProgress.fraction * 100}%` }} />
             </div>
           </div>
         )}
         {otaSuccess && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-vyro-mint/10 px-3 py-2 text-xs text-vyro-mint">
             <CheckCircle2 className="h-4 w-4" /> Update installed. Your watch is restarting — it will reconnect automatically.
           </div>
         )}
