@@ -288,19 +288,21 @@ export function useVyroBand() {
       window.setTimeout(runTempCycle, 6_000);
       tempTimer = window.setInterval(runTempCycle, 5 * 60_000);
 
-      // One-Key Measure — sub-type 0x06. Returns HR + HRV + Stress + SpO₂ +
-      // Temp + BP in a single frame. Fires every 5 min, offset from the
-      // single-metric cycles so the optical sensor isn't queued twice.
+      // One-Key Measure — sub-type 0x05. Returns HR + HRV + Stress + SpO₂ +
+      // Temp + BP in a single frame. Fire the first one ~30s after connect
+      // so the user sees data within ~1 minute of wearing the band, then
+      // repeat every 3 minutes.
       const runOneKey = () => {
+        console.log("[qcband] one-key measure start");
         void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_ONE_KEY)).catch(() => undefined);
         window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_ONE_KEY)).catch(() => undefined);
-        }, 45_000);
+        }, 50_000);
       };
-      window.setTimeout(runOneKey, 90_000);
-      oneKeyTimer = window.setInterval(runOneKey, 5 * 60_000);
+      window.setTimeout(runOneKey, 30_000);
+      oneKeyTimer = window.setInterval(runOneKey, 3 * 60_000);
 
-      // Standalone HRV cycle (sub-type 0x05) as a fallback for firmwares
+      // Standalone HRV cycle (sub-type 0x0e) as a fallback for firmwares
       // that ignore the One-Key composite. Slower cadence (10 min).
       const runHrvCycle = () => {
         void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_HRV)).catch(() => undefined);
@@ -308,7 +310,7 @@ export function useVyroBand() {
           void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_HRV)).catch(() => undefined);
         }, 60_000);
       };
-      window.setTimeout(runHrvCycle, 4 * 60_000);
+      window.setTimeout(runHrvCycle, 2 * 60_000);
       const hrvTimer = window.setInterval(runHrvCycle, 10 * 60_000);
 
       // Stash extra timers we created locally onto the outer refs via closure.
