@@ -1,64 +1,39 @@
 ## Goal
 
-Stop using the static `vyro-app.html` iframe + popup overlay. Build a real Whoop-style React app where every screen is wired to live BLE data from the VYRO band — metrics shown as inline widgets, not a floating panel.
+Make the in-app UI match the VYRO spec: 8 metric domains (Athlete Health, Recovery & Fatigue, Sleep, Session, Court/Heat Map, Swing, Tendency/Coach, Diet Coach) — each as a real screen wired to the existing BLE band hook, with live data where the band provides it and clearly-labeled placeholders where it doesn't yet.
 
-## What's wrong today
+Keep everything already working: TanStack Start routing, Supabase auth, `VyroBandProvider`, `useVyroBand` hook, BLE/Capacitor pairing, OTA, session start/pause/end.
 
-- `/app` loads `public/vyro-app.html` in an iframe — a frozen design template with hardcoded names, matches, leaderboards. None of it reacts to the watch.
-- Live data only exists in a small overlay popup floating on top.
-- The React views I already built (`HomeView`, `SessionView`, `RecoveryView`, etc.) are sitting unused.
+## Scope (this turn — Phase 1)
 
-## Plan
+Rebuild navigation + the 4 highest-value screens end-to-end so the new structure is in place. Remaining screens get stub views with the correct metric layout but "—" values, ready to wire next turns.
 
-### 1. Kill the iframe
-- `src/routes/_authenticated/app.tsx` renders the React `Layout` + view-switcher directly. No more iframe, no more overlay popup.
-- Delete `public/vyro-app.html` and the `restored_*.html` artifacts.
+### Files to add / change
 
-### 2. Light/white visual theme to match what you liked
-- Move the existing dark components to a light surface: white background, soft gray cards, black text, single accent (teal/emerald for "live"). Keep the original Whoop-like density.
-- Update `src/lib/vyro-tokens.ts` + `src/components/vyro/shared.tsx` so every view picks up the new tokens automatically.
+1. `src/components/vyro/featureSpecs.ts` — replace the current feature list with the 8 canonical domains from the spec (id, label, icon, blurb, route).
+2. `src/components/vyro/Layout.tsx` — bottom-tab nav becomes: **Home · Session · Recovery · Sleep · More**. "More" opens a grid of the remaining domains (Court DB, Swing, Coach, Diet).
+3. `src/components/vyro/HomeView.tsx` — Athlete dashboard from the spec: Current HR, Resting HR, HRV, Respiratory rate, SpO₂, Skin temp, Stress, Steps, Calories, Wear time, Signal confidence, plus a LIVE Recovery hero card and quick "Start Session" CTA.
+4. **NEW** `src/components/vyro/RecoveryView.tsx` — LIVE Recovery score, status band (green/yellow/red), Total fatigue + subcomponents (court coverage, cardio, muscle load debt, HRV suppression, sleep debt), Time-to-ready, Return-to-Play validator.
+5. **NEW** `src/components/vyro/SleepView.tsx` — Sleep score, time in bed, asleep duration, efficiency, stage breakdown (Deep/REM/Light/Awake), bedtime/wake, latency, debt, 7-night trend, wake events list.
+6. `src/components/vyro/SessionView.tsx` — extend existing console: live HR, avg/max HR, HR-zone bars, Z4/Z5 time, between-point HR drop, movement intensity, burst count, T-control %, T-recoveries, session load.
+7. **NEW** stubs (correct layout, "—" values): `CourtDbView.tsx`, `SwingView.tsx`, `CoachView.tsx`, `DietView.tsx`, `TendencyView.tsx`.
+8. `src/routes/_authenticated/app.tsx` — register the new view ids in the switch.
+9. `src/components/vyro/useLiveMetrics.ts` — extend with derived placeholders (RecoveryScore, FatigueScore, HR zone bucketer) so views stay reactive when real values are missing.
 
-### 3. Real-data widgets on the Home dashboard
-Top of `HomeView`:
-- Greeting uses signed-in user's `display_name` ("Good morning, {firstName}").
-- Connection chip: `LIVE` (green, pulsing) / `CONNECTING` / `OFFLINE — pair your band`.
+### Out of scope this turn
 
-Widget grid (each is a real component reading `useVyroBandCtx()`):
-- **Session control** — Start / Pause / End buttons + sport selector, current session timer.
-- **Event counts** — Swings, Rapid starts, Bursts, Direction changes (live counters).
-- **Peak motion** — Peak accel (g), Peak gyro (dps), Peak jerk (g/s).
-- **Swing quality** — Max intensity (0–100), Max duration (ms), avg over last 10 swings.
-- **Reaction** — Fastest direction-change gap (ms).
-- **Event stream** — Last 20 motion events with timestamp and type.
-- **Throughput** — Events / min (rolling 60s), total this session.
+- Heat-map canvas rendering (Phase 2 — needs a position model the band doesn't yet emit).
+- AI Video overlays (Phase 2).
+- Coach roster multi-athlete data (needs DB schema work — Phase 3).
+- Pixel-matching the minified HTML's exact colors/typography. We keep the existing Tailwind theme; visual polish pass comes after structure is right.
 
-When the watch is offline, every widget shows `—` and a "Pair your band" CTA in the empty state — never fake numbers.
+## Technical notes
 
-### 4. Other tabs rewired or removed
-- **Session** tab → full session log: timeline of events, per-swing detail rows, end-of-session summary written to the `sessions` table on End.
-- **Profile** tab → existing `ProfileView` (band pairing, profile fields). Keep as-is.
-- Remove tabs that have no data source the watch can feed: **Sleep**, **Diet**, **Coach**, **Social**, **Video**, **Trends** (the watch is IMU-only — no HR/HRV/SpO₂, no sleep staging, no nutrition). Bottom nav becomes: **Home · Session · History · Profile**.
-- **History** = list of saved `sessions` rows for the user (already in DB), each opens the recorded summary.
+- All new views use the existing `Card`, `Stat`, `Pill`, `PageHeader` primitives from `src/components/vyro/shared.tsx`.
+- BLE stays untouched: `VyroBandProvider`, `use-vyro-band.ts`, `use-bluetooth.ts`, `vyro-ble/*`, `despia.ts` are not modified.
+- All "real" metrics read from `useLiveMetrics()`; missing-sensor metrics render `—` with a small "needs firmware" hint so the UI stays honest.
+- No DB schema changes this turn.
 
-### 5. Persist sessions
-- On `End session`, write a row to the existing `sessions` table with the live counts and a `summary` JSON of peak/avg metrics. Already has RLS scoped to `auth.uid()`.
-- History tab reads via a `getMySessions` server fn.
+## After Phase 1
 
-### 6. Cleanup
-Delete unused fake-data files: `src/lib/vyro-data.ts` (mock arrays), `SleepView`, `DietView`, `CoachView`, `SocialView`, `VideoView`, `TrendsView`, `SportView` (or fold its sport picker into Session control), `LiveMetrics.tsx` (replaced by widgets), `PerformanceCard.tsx` (if only used by removed views).
-
-## Technical details
-
-- All widgets subscribe via `useVyroBandCtx()` — single BLE subscription stays alive across navigation thanks to the existing provider + auto-reconnect.
-- New components under `src/components/vyro/widgets/` (one file per widget) so each is small and testable.
-- New server fns in `src/lib/sessions.functions.ts`: `saveSession`, `getMySessions`, `getSession(id)`.
-- Greeting + initials read from `profile.display_name` via existing `getMyProfile` server fn.
-
-## Out of scope (call out for you)
-
-- Backgrounding the BLE link when the browser tab is closed — Web Bluetooth tears down GATT on tab close; only the native iOS bridge keeps it alive. App auto-reconnects on tab reopen.
-- HR / HRV / SpO₂ / sleep / nutrition widgets — the band does not produce these signals.
-
-## Approve?
-
-If yes I'll execute. If you want any tabs kept (e.g. keep "Coach" as a placeholder), tell me before I delete them.
+Confirm the new structure looks right in preview, then I'll wire heat-map canvas, route DB tables, and per-swing event detail in Phase 2.
