@@ -29,12 +29,12 @@ import {
 } from "@/lib/vyro-ble/session-control";
 import {
   decodeQcBandRealtimeHeartRate,
-  encodeQcBandBindingAlert,
   encodeQcBandRealtimeHeartRate,
   QCBAND_NOTIFY_CHAR_UUID,
   QCBAND_SERVICE_UUID,
   QCBAND_WRITE_CHAR_UUID,
 } from "@/lib/vyro-ble/qcband";
+
 import { bluetooth, type BleDiscovered } from "@/lib/despia";
 
 export type SessionState = "idle" | "live" | "paused";
