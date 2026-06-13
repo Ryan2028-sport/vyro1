@@ -16,13 +16,20 @@ export const QCBAND_CMD_REALTIME_HR = 0x1e;      // 30 — start/end/hold poll
 export const QCBAND_CMD_START_MEASURE = 0x69;    // 105 — start HR/SpO2/temp/one-key
 export const QCBAND_CMD_STOP_MEASURE = 0x6a;     // 106 — stop measurement
 
-// Measurement sub-types under 0x69 / 0x6A.
+// Measurement sub-types under 0x69 / 0x6A. Values reverse-engineered from the
+// QCBandSDK iOS framework binary (OdmBandOpenHealthDetectionSwitch). The
+// switch passes a numeric `type` to openDetection:params: that the firmware
+// maps to a specific sensor cycle:
+//   0x01 HeartRate, 0x02 BloodPressure, 0x03 BloodOxygen,
+//   0x04 BloodGlucose, 0x05 OneKey (HR+HRV+SpO2+Temp+Stress+BP),
+//   0x09 Temperature, 0x0d Stress, 0x0e HRV.
 export const QCBAND_MEASURE_HR = 0x01;
 export const QCBAND_MEASURE_BP = 0x02;
 export const QCBAND_MEASURE_SPO2 = 0x03;
-export const QCBAND_MEASURE_TEMP = 0x04;
-export const QCBAND_MEASURE_HRV = 0x05;
-export const QCBAND_MEASURE_ONE_KEY = 0x06; // returns HR + HRV + SpO2 + Temp + Stress
+export const QCBAND_MEASURE_ONE_KEY = 0x05; // returns HR + HRV + SpO2 + Temp + Stress + BP
+export const QCBAND_MEASURE_TEMP = 0x09;
+export const QCBAND_MEASURE_STRESS = 0x0d;
+export const QCBAND_MEASURE_HRV = 0x0e;
 
 export type QcBandRealtimeHrCommand = "start" | "end" | "hold";
 
