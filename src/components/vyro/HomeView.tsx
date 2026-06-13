@@ -548,18 +548,32 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       <Card
         eyebrow="Vitals · Goodix GH3026 + ST 6-axis IMU"
         title={<span className="inline-flex items-center gap-2"><HeartPulse className="h-4 w-4 text-vyro-rose" /> Live body signals</span>}
-        action={<Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{m.connected ? "live" : "off"}</Pill>}
+        action={<Pill tone={m.connected ? "warn" : "off"} pulse={false}>{m.connected ? "imu only" : "off"}</Pill>}
       >
+        {/* Firmware v0.4-alpha exposes IMU motion events only. HR / SpO2 / */}
+        {/* HRV / RR / skin-temp / step characteristics are not yet on the   */}
+        {/* band's GATT table, so these tiles show "—" instead of fakes.     */}
+        {/* Peak g and events/min ARE real — wired from the IMU stream.      */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <VitalTile label="Resting HR" value="48" unit="bpm" delta="-2" tone="mint" hint="nightly baseline" />
-          <VitalTile label="Current HR" value="77" unit="bpm" delta="+5" tone="rose" hint="updates every second" live />
-          <VitalTile label="Resp. Rate" value="14.4" unit="br/min" delta="0" tone="mint" hint="every few minutes" />
-          <VitalTile label="HRV (RMSSD)" value="76" unit="ms" delta="+8" tone="mint" hint="every 5 min" />
-          <VitalTile label="Stress" value="24" unit="/100" delta="-6" tone="mint" hint="HR · HRV · RR" />
-          <VitalTile label="SpO₂" value="98" unit="%" delta="0" tone="mint" hint="every few minutes" />
-          <VitalTile label="Skin Temp" value="33.7" unit="°C" delta="+0.1" tone="amber" hint="every few minutes" />
-          <VitalTile label="Steps" value="13,645" unit="" delta="+1,803" tone="mint" hint="updates every second" live />
+          <VitalTile label="Resting HR" value="—" unit="bpm" tone="mint" hint="awaiting HR characteristic" />
+          <VitalTile label="Current HR" value="—" unit="bpm" tone="mint" hint="awaiting HR characteristic" />
+          <VitalTile label="Resp. Rate" value="—" unit="br/min" tone="mint" hint="awaiting PPG resp band" />
+          <VitalTile label="HRV (RMSSD)" value="—" unit="ms" tone="mint" hint="awaiting HR characteristic" />
+          <VitalTile label="Stress" value="—" unit="/100" tone="mint" hint="needs HR · HRV · RR" />
+          <VitalTile label="SpO₂" value="—" unit="%" tone="mint" hint="awaiting PPG SpO₂" />
+          <VitalTile label="Skin Temp" value="—" unit="°C" tone="mint" hint="awaiting temp service" />
+          <VitalTile
+            label="Peak Accel"
+            value={m.connected && m.peakG ? m.peakG.toFixed(2) : "—"}
+            unit="g"
+            tone="mint"
+            hint={m.connected ? `${m.eventsLastMin} events / min` : "needs band"}
+            live={m.connected}
+          />
         </div>
+        <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
+          Goodix GH3026 PPG service not exposed by firmware v0.4-alpha · only IMU motion events stream today
+        </p>
       </Card>
       </div>
 
