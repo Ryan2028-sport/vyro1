@@ -353,7 +353,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             <h1 className="mt-1 truncate text-3xl font-black tracking-tight text-vyro-text">{greeting()}, {first}</h1>
             <p className="mt-1.5 text-[12px] leading-relaxed text-vyro-mute">Squash readiness, strain, fuel and recovery in one command view.</p>
           </div>
-          <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{m.connected ? "band live" : "offline"}</Pill>
+          <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{m.connected ? "band 94%" : "offline"}</Pill>
         </div>
 
         <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4">
