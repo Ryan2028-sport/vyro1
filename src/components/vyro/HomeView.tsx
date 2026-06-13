@@ -98,11 +98,11 @@ function Vital({
 function MiniRing({ value, label, tone = "mint" }: { value: number | null; label: string; tone?: "mint" | "amber" | "rose" }) {
   const stroke = tone === "amber" ? "var(--vyro-amber)" : tone === "rose" ? "var(--vyro-rose)" : "var(--vyro-mint)";
   const size = 86, sw = 8, r = (size - sw) / 2, c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(1, value / 100));
+  const pct = value == null ? 0 : Math.max(0, Math.min(1, value / 100));
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <div className="relative grid place-items-center" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90 block">
           <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--vyro-line)" strokeWidth={sw} fill="none" />
           <circle
             cx={size / 2} cy={size / 2} r={r}
@@ -111,8 +111,8 @@ function MiniRing({ value, label, tone = "mint" }: { value: number | null; label
             style={{ filter: `drop-shadow(0 0 6px ${stroke})` }}
           />
         </svg>
-        <div className="absolute inset-0 grid place-items-center">
-          <div className="text-lg font-black tabular-nums text-vyro-text">{value}</div>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="text-base font-black tabular-nums text-vyro-text">{value ?? "—"}</div>
         </div>
       </div>
       <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">{label}</div>
