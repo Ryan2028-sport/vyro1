@@ -4,9 +4,27 @@
 
 import despia from "despia-native";
 
-export const isNative =
-  typeof navigator !== "undefined" &&
-  /despia/i.test(navigator.userAgent || "");
+// Detect the native iOS wrapper. Despia injects "despia" into the UA, but
+// the Capacitor TestFlight build does NOT — it sets window.Capacitor and the
+// UA reports plain Mobile Safari. Without this, the BLE layer falls back to
+// Web Bluetooth (which iOS WKWebView does not implement) and throws
+// "Web Bluetooth is not available". We treat ANY iOS app-context webview as
+// native: Despia UA, Capacitor bridge, or the standalone PWA install.
+function detectNative(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const w = typeof window !== "undefined" ? (window as unknown as { Capacitor?: unknown; webkit?: { messageHandlers?: unknown }; despia?: unknown }) : undefined;
+  const ua = navigator.userAgent || "";
+  if (/despia/i.test(ua)) return true;
+  if (w?.Capacitor) return true;
+  if (w?.despia) return true;
+  // WKWebView on iOS (TestFlight wrappers) exposes webkit.messageHandlers
+  // and reports as iPhone/iPad with no Safari token in the UA.
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! > 1);
+  const inAppWebView = !!w?.webkit?.messageHandlers || (isIOS && !/Safari\//.test(ua));
+  return isIOS && inAppWebView;
+}
+
+export const isNative = detectNative();
 
 /** Fire-and-forget a despia:// command. No-op outside the native runtime. */
 export async function run(command: string): Promise<void> {
