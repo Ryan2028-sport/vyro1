@@ -246,7 +246,11 @@ function mapCapacitorScanResult(result: ScanResult): BleDevice {
   };
 }
 
-function mapCapacitorDevice(device: { deviceId: string; name?: string; uuids?: string[] }): BleDevice {
+function mapCapacitorDevice(device: {
+  deviceId: string;
+  name?: string;
+  uuids?: string[];
+}): BleDevice {
   return {
     id: device.deviceId,
     name: device.name || "Unknown device",
