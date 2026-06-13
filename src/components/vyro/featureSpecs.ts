@@ -1,215 +1,98 @@
+// Top-level VYRO modules. Each id maps to a dedicated view rendered by
+// `src/routes/_authenticated/app.tsx`. Drives the More grid and the Home
+// dashboard quick-nav.
 import {
   Activity,
   Apple,
   Brain,
-  Dumbbell,
   HeartPulse,
+  LayoutGrid,
   LineChart,
+  Map,
   Moon,
   Users,
-  Video,
+  Zap,
+  type LucideIcon,
 } from "lucide-react";
-import type { ComingSoonSpec } from "./ComingSoonView";
+import type { ViewId } from "./Layout";
 
-export const FEATURE_SPECS: ComingSoonSpec[] = [
+export interface NavSpec {
+  id: ViewId;
+  label: string;
+  eyebrow: string;
+  blurb: string;
+  icon: LucideIcon;
+}
+
+export const FEATURE_SPECS: NavSpec[] = [
   {
-    id: "sleep",
-    label: "Sleep",
-    eyebrow: "Recovery · overnight",
-    icon: Moon,
-    blurb:
-      "Sleep stages, time in bed, wake events and a nightly sleep score derived from heart rate and motion overnight.",
-    needs: [
-      "Heart-rate stream (PPG) at 1 Hz",
-      "Wrist temperature characteristic",
-      "Sleep-mode flag from firmware",
-    ],
-    preview: [
-      {
-        title: "Last night",
-        rows: [
-          { label: "Sleep score", unit: "/100" },
-          { label: "Time in bed", unit: "h" },
-          { label: "Efficiency", unit: "%" },
-          { label: "REM", unit: "h" },
-          { label: "Deep", unit: "h" },
-          { label: "Light", unit: "h" },
-        ],
-      },
-      {
-        title: "Trends",
-        rows: [
-          { label: "7-day avg", unit: "h" },
-          { label: "Consistency", unit: "%" },
-          { label: "Resting HR", unit: "bpm" },
-        ],
-      },
-    ],
+    id: "athlete",
+    label: "Athlete health",
+    eyebrow: "24/7 · live",
+    icon: HeartPulse,
+    blurb: "Live HR, HRV, SpO₂, respiratory rate, skin temp, steps, calories, wear time, signal confidence.",
   },
   {
     id: "recovery",
-    label: "Recovery",
-    eyebrow: "Readiness · this morning",
-    icon: HeartPulse,
-    blurb:
-      "Daily recovery score from HRV, resting heart rate and sleep quality — tells you how hard to train today.",
-    needs: ["HRV (RMSSD) calculation", "Resting heart rate", "Sleep score from firmware"],
-    preview: [
-      {
-        title: "Today",
-        rows: [
-          { label: "Recovery", unit: "%" },
-          { label: "HRV", unit: "ms" },
-          { label: "Resting HR", unit: "bpm" },
-          { label: "Strain yesterday" },
-          { label: "Sleep debt", unit: "h" },
-        ],
-      },
-    ],
+    label: "Recovery & fatigue",
+    eyebrow: "Readiness · live",
+    icon: Activity,
+    blurb: "LIVE recovery score, status band, total fatigue, time-to-ready, Return-to-Play validator.",
+  },
+  {
+    id: "sleep",
+    label: "Sleep",
+    eyebrow: "Overnight · stages",
+    icon: Moon,
+    blurb: "Sleep score, stages, debt, consistency, wake events, recommended bedtime/wake.",
+  },
+  {
+    id: "court",
+    label: "Court & heat map",
+    eyebrow: "Sport · movement",
+    icon: Map,
+    blurb: "Heat maps, route DB (T → corners / center → wide), zone occupancy, agility score.",
+  },
+  {
+    id: "swing",
+    label: "Swing & racket",
+    eyebrow: "Per-swing · IMU",
+    icon: Zap,
+    blurb: "Racket head speed, swing force, contact quality, face angle, swing consistency profiles.",
+  },
+  {
+    id: "coach",
+    label: "Coach & tendencies",
+    eyebrow: "Roster · plan",
+    icon: Brain,
+    blurb: "Player load, match-day readiness, tendency database, threat index, AI weekly plan.",
+  },
+  {
+    id: "diet",
+    label: "Diet coach",
+    eyebrow: "Fuel · calories",
+    icon: Apple,
+    blurb: "Resting + active calories burned, macro targets, daily fuel guidance.",
   },
   {
     id: "trends",
     label: "Trends",
-    eyebrow: "Long-term · weekly",
+    eyebrow: "Weeks · months",
     icon: LineChart,
-    blurb:
-      "Charts across weeks and months: training load, swing volume, peak motion and recovery balance.",
-    needs: ["At least 14 days of session data", "Daily recovery score backfill"],
-    preview: [
-      {
-        title: "30-day rollup",
-        rows: [
-          { label: "Sessions" },
-          { label: "Total swings" },
-          { label: "Avg session", unit: "min" },
-          { label: "Peak G trend" },
-          { label: "Strain trend" },
-          { label: "Recovery trend" },
-        ],
-      },
-    ],
+    blurb: "Long-term load, recovery, sleep debt, swing volume and peak motion trends.",
   },
   {
-    id: "diet",
-    label: "Diet",
-    eyebrow: "Fuel · daily",
-    icon: Apple,
-    blurb:
-      "Manual food logging plus calorie/macro targets based on your strain. Photo-to-meal scanning later.",
-    needs: ["Food log UI (manual entry — not blocked by firmware)", "Daily strain from sessions"],
-    preview: [
-      {
-        title: "Today",
-        rows: [
-          { label: "Calories", unit: "kcal" },
-          { label: "Protein", unit: "g" },
-          { label: "Carbs", unit: "g" },
-          { label: "Fat", unit: "g" },
-          { label: "Water", unit: "L" },
-          { label: "Target", unit: "kcal" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "coach",
-    label: "Coach",
-    eyebrow: "AI · weekly plan",
-    icon: Brain,
-    blurb:
-      "AI coach that reads your sessions and recovery, then suggests drills, rest days, and weekly focus.",
-    needs: ["At least 5 logged sessions", "Recovery score signal"],
-    preview: [
-      {
-        title: "This week's plan",
-        rows: [
-          { label: "Focus" },
-          { label: "Target sessions" },
-          { label: "Suggested rest days" },
-          { label: "Drill 1" },
-          { label: "Drill 2" },
-          { label: "Drill 3" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "video",
-    label: "Video",
-    eyebrow: "Capture · technique",
-    icon: Video,
-    blurb:
-      "Record a swing on phone, sync to the IMU timeline, and review frame-by-frame with motion overlay.",
-    needs: ["Phone camera capture permission", "IMU timestamp sync to video frames"],
-    preview: [
-      {
-        title: "Latest clips",
-        rows: [
-          { label: "Clips this week" },
-          { label: "Annotated" },
-          { label: "Last upload" },
-        ],
-      },
-    ],
+    id: "tendency",
+    label: "Match database",
+    eyebrow: "Tendencies · opponents",
+    icon: LayoutGrid,
+    blurb: "Shot tendencies, rally length, point outcomes, opponent threat profiles.",
   },
   {
     id: "social",
     label: "Social",
     eyebrow: "Friends · feed",
     icon: Users,
-    blurb:
-      "Follow training partners, share sessions and PRs, and compare weekly volume on a leaderboard.",
-    needs: ["Friend graph table", "Public session visibility setting"],
-    preview: [
-      {
-        title: "Your circle",
-        rows: [
-          { label: "Following" },
-          { label: "Followers" },
-          { label: "Weekly rank" },
-          { label: "Friends active" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "sport",
-    label: "Sport profiles",
-    eyebrow: "Calibration · per sport",
-    icon: Dumbbell,
-    blurb:
-      "Sport-specific tuning for swing detection (squash, tennis, padel, golf, boxing). Picks the right event thresholds.",
-    needs: ["Per-sport threshold profile in firmware", "Handedness flag stored in profile"],
-    preview: [
-      {
-        title: "Active profile",
-        rows: [
-          { label: "Sport" },
-          { label: "Handedness" },
-          { label: "Swing threshold" },
-          { label: "Burst threshold" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "activity",
-    label: "Activity",
-    eyebrow: "All-day · motion",
-    icon: Activity,
-    blurb:
-      "All-day motion summary: active minutes, intensity, and a daily move goal built from IMU energy.",
-    needs: ["Background BLE keep-alive (needs native bridge)", "Daily IMU energy aggregation"],
-    preview: [
-      {
-        title: "Today",
-        rows: [
-          { label: "Active min" },
-          { label: "Intensity" },
-          { label: "Peak window" },
-          { label: "Move goal", unit: "%" },
-        ],
-      },
-    ],
+    blurb: "Follow training partners, share sessions, compare weekly volume.",
   },
 ];
