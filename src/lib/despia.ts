@@ -273,7 +273,12 @@ async function emitConnectedCapacitorDevices(services: string[] = []): Promise<B
       const devices = await BleClient.getConnectedDevices([service]);
       for (const device of devices) {
         const mapped = mapCapacitorDevice(device);
-        seen.set(mapped.id, { ...seen.get(mapped.id), ...mapped });
+        const existing = seen.get(mapped.id);
+        seen.set(mapped.id, {
+          ...existing,
+          ...mapped,
+          services: Array.from(new Set([...(existing?.services || []), ...(mapped.services || []), service])),
+        });
       }
     } catch (err) {
       console.warn("[capacitor-ble] getConnectedDevices failed", service, err);
