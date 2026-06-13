@@ -589,7 +589,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
 
 
 
-      <section className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+      <section id="section-court" className="scroll-mt-24 grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
         <CourtLoadMap
           agility={agility}
           strain={strain}
@@ -598,6 +598,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           peakG={m.connected ? m.peakG : 0}
           connected={m.connected}
         />
+        <div id="section-coach" className="scroll-mt-24">
         <Card
           eyebrow="AI coach"
           title={<span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-vyro-mint" /> Today's edge</span>}
@@ -617,6 +618,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             />
           </div>
         </Card>
+        </div>
       </section>
 
       <Card
