@@ -14,7 +14,7 @@ import {
 import { getMyProfile } from "@/lib/profile.functions";
 import { getCoachInsight } from "@/lib/coach-insight.functions";
 import { Card, EmptyState, Pill, Ring, Stat } from "./shared";
-import { computeReadiness, recoveryBand, useLiveMetrics } from "./useLiveMetrics";
+import { computeReadiness, computeSubScores, recoveryBand, useLiveMetrics } from "./useLiveMetrics";
 import type { ViewId } from "./Layout";
 
 function greeting() {
@@ -142,22 +142,34 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   const first = (profile?.display_name || "").trim().split(/\s+/)[0] || "Athlete";
 
   const m = useLiveMetrics();
-  // Compute readiness live from band signals.
+
+  // Live composite readiness (top hero ring) from band signals.
   const { score: liveReadiness } = computeReadiness({
     connected: m.connected,
     peakJerk: m.peakJerk || null,
-    // hrvMs / restingHrBpm / sleepScore / recoveryScore / stress / spo2
-    // will be wired here as soon as the band publishes each characteristic.
   });
-  // Until any real signal arrives, fall back to demo numbers so the dashboard
-  // is fully populated (matches the VYRO reference). Replaced 1:1 the moment
-  // the band streams its first metric.
-  const usingDemo = liveReadiness == null;
-  const readiness = liveReadiness ?? 78;
-  const recovery = liveReadiness ?? 78;
-  const sleep = 87;
-  const fatigue = 41;
-  const agility = 88;
+
+  // Live subscores for the Base-readiness ring grid.
+  const subs = computeSubScores({
+    connected: m.connected,
+    peakJerk: m.peakJerk || null,
+    peakG: m.peakG || null,
+    eventsLastMin: m.eventsLastMin,
+    reactMin: m.reactMin,
+  });
+
+  // Demo defaults so the dashboard is fully populated before the band
+  // streams. Each ring swaps to its live value the moment it's available.
+  const DEMO = { readiness: 78, recovery: 78, sleep: 87, fatigue: 41, agility: 88 };
+  const readiness = liveReadiness ?? DEMO.readiness;
+  const recovery = subs.recovery ?? DEMO.recovery;
+  const sleep = subs.sleep ?? DEMO.sleep;
+  const fatigue = subs.fatigue ?? DEMO.fatigue;
+  const agility = subs.agility ?? DEMO.agility;
+  const usingDemo =
+    liveReadiness == null &&
+    subs.recovery == null && subs.sleep == null &&
+    subs.fatigue == null && subs.agility == null;
   const band = recoveryBand(readiness);
   const bandTone = band === "green" ? "live" : band === "red" ? "off" : "warn";
   const bandLabel =
