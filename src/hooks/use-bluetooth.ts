@@ -109,8 +109,11 @@ export function useBluetooth() {
           };
         };
         if (!nav.bluetooth?.requestDevice) {
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "");
           setError(
-            "Web Bluetooth is not available in this browser. Open this page inside the TestFlight build, or use Chrome/Edge on desktop.",
+            isIOS
+              ? "BLE bridge not detected. Reopen the app from the TestFlight build (Despia/Capacitor) — Safari/WKWebView have no Web Bluetooth on iOS."
+              : "Web Bluetooth is not available in this browser. Open this page inside the TestFlight build, or use Chrome/Edge on desktop.",
           );
           return;
         }
