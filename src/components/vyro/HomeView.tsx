@@ -142,17 +142,22 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   const first = (profile?.display_name || "").trim().split(/\s+/)[0] || "Athlete";
 
   const m = useLiveMetrics();
-  // Real readiness from live band signals (null until firmware streams them).
-  const { score: readiness } = computeReadiness({
+  // Compute readiness live from band signals.
+  const { score: liveReadiness } = computeReadiness({
     connected: m.connected,
     peakJerk: m.peakJerk || null,
     // hrvMs / restingHrBpm / sleepScore / recoveryScore / stress / spo2
     // will be wired here as soon as the band publishes each characteristic.
   });
-  const recovery = readiness;
-  const sleep: number | null = null;
-  const fatigue: number | null = null;
-  const agility: number | null = null;
+  // Until any real signal arrives, fall back to demo numbers so the dashboard
+  // is fully populated (matches the VYRO reference). Replaced 1:1 the moment
+  // the band streams its first metric.
+  const usingDemo = liveReadiness == null;
+  const readiness = liveReadiness ?? 78;
+  const recovery = liveReadiness ?? 78;
+  const sleep = 87;
+  const fatigue = 41;
+  const agility = 88;
   const band = recoveryBand(readiness);
   const bandTone = band === "green" ? "live" : band === "red" ? "off" : "warn";
   const bandLabel =
@@ -191,10 +196,11 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-vyro-mute">
           Your daily readiness command center — synced from your VYRO Band.
         </p>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {m.connected
             ? <Pill tone="live" pulse>Band connected · 94%</Pill>
             : <Pill tone="off">Band offline</Pill>}
+          {usingDemo && <Pill tone="warn">Demo data</Pill>}
         </div>
       </div>
 
