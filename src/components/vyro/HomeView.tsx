@@ -573,7 +573,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             value={m.heartRateBpm != null ? String(m.heartRateBpm) : "—"}
             unit="bpm"
             tone="rose"
-            hint={m.heartRateBpm != null ? "live from watch" : "awaiting HR characteristic"}
+            hint={m.heartRateBpm != null ? "live from watch" : "awaiting HR"}
             live={m.heartRateBpm != null}
           />
           <VitalTile
@@ -589,23 +589,15 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             value={m.hrvMs != null ? String(m.hrvMs) : "—"}
             unit="ms"
             tone="mint"
-            hint={m.hrvMs != null ? "60-sec rolling RR-interval" : "needs 60s of HR"}
+            hint={m.hrvMs != null ? "from watch (one-key / HRV cycle)" : "next cycle in ≤5 min"}
             live={m.hrvMs != null}
-          />
-          <VitalTile
-            label="Resp. Rate"
-            value={m.respRateBrpm != null ? String(m.respRateBrpm) : "—"}
-            unit="br/min"
-            tone="mint"
-            hint={m.respRateBrpm != null ? "HR-derived estimate" : "needs 60s of HR"}
-            live={m.respRateBrpm != null}
           />
           <VitalTile
             label="Stress"
             value={m.stressScore != null ? String(m.stressScore) : "—"}
             unit="/100"
             tone="mint"
-            hint={m.stressScore != null ? "HR load · HRV" : "needs HR + HRV"}
+            hint={m.stressScore != null ? "from watch one-key measure" : "next one-key in ≤5 min"}
             live={m.stressScore != null}
           />
           <VitalTile
@@ -613,8 +605,27 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             value={m.spo2Pct != null ? String(m.spo2Pct) : "—"}
             unit="%"
             tone="mint"
-            hint={m.spo2Pct != null ? "from watch" : "measuring — finger still on watch"}
+            hint={m.spo2Pct != null ? "from watch" : "measuring — keep watch still"}
             live={m.spo2Pct != null}
+          />
+          <VitalTile
+            label="Skin Temp"
+            value={m.skinTempC != null ? m.skinTempC.toFixed(1) : "—"}
+            unit="°C"
+            tone="mint"
+            hint={m.skinTempC != null ? "from watch temp sensor" : "next cycle in ≤5 min"}
+            live={m.skinTempC != null}
+          />
+          <VitalTile
+            label="Steps"
+            value={m.stepsToday != null ? m.stepsToday.toLocaleString() : "—"}
+            tone="mint"
+            hint={
+              m.stepsToday != null
+                ? `${((m.distanceM ?? 0) / 1000).toFixed(2)} km · ${m.caloriesKcal ?? 0} kcal`
+                : "polling every 30s"
+            }
+            live={m.stepsToday != null}
           />
           <VitalTile
             label="Watch battery"
@@ -628,20 +639,13 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
                   : "from watch"
                 : "awaiting battery service"
             }
-          />
-          <VitalTile
-            label="Peak Accel"
-            value={m.connected && m.peakG ? m.peakG.toFixed(2) : "—"}
-            unit="g"
-            tone="mint"
-            hint={m.connected ? `${m.eventsLastMin} events / min` : "needs band"}
-            live={m.connected}
+            live={m.batteryPct != null}
           />
         </div>
         <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
           {m.heartRateBpm != null
-            ? "Heart rate streaming from watch (GATT 0x2A37). HRV / SpO₂ / skin-temp require firmware support."
-            : "Connected — waiting for the watch to publish its heart-rate characteristic."}
+            ? "HR + steps + battery stream continuously. HRV / Stress / SpO₂ / Skin-Temp cycle every 5 min (sensor can't run continuously)."
+            : "Connected — waiting for the watch to publish heart rate."}
         </p>
       </Card>
       </div>
