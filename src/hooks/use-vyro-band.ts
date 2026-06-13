@@ -41,14 +41,19 @@ import {
   encodeQcBandSpo2Start,
   encodeQcBandSpo2Stop,
   encodeQcBandStepsRequest,
+  encodeQcBandStepsRequestAlt1,
+  encodeQcBandStepsRequestAlt2,
   QCBAND_CMD_BATTERY,
   QCBAND_CMD_REALTIME_HR,
   QCBAND_CMD_START_MEASURE,
+  QCBAND_CMD_STEPS_ALT1,
+  QCBAND_CMD_STEPS_ALT2,
   QCBAND_CMD_TODAY_SUMMARY,
   QCBAND_MEASURE_HR,
   QCBAND_MEASURE_HRV,
   QCBAND_MEASURE_ONE_KEY,
   QCBAND_MEASURE_SPO2,
+  QCBAND_MEASURE_STRESS,
   QCBAND_MEASURE_TEMP,
   QCBAND_NOTIFY_CHAR_UUID,
   QCBAND_SERVICE_UUID,
@@ -260,10 +265,18 @@ export function useVyroBand() {
       window.setTimeout(pollBattery, 800);
       batteryTimer = window.setInterval(pollBattery, 60_000);
 
-      // Steps / distance / calories — poll opcode 0x09 every 30s. Response
-      // arrives on the same notify char and is decoded in the notify handler.
-      const pollSteps = () =>
+      // Steps / distance / calories — poll every 30s. We send all three known
+      // opcodes (0x09 / 0x07 / 0x15) since different firmwares respond on
+      // different ones. The notify handler accepts any of them.
+      const pollSteps = () => {
         void writeQcBand(service, write, encodeQcBandStepsRequest()).catch(() => undefined);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandStepsRequestAlt1()).catch(() => undefined);
+        }, 400);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandStepsRequestAlt2()).catch(() => undefined);
+        }, 800);
+      };
       window.setTimeout(pollSteps, 1_200);
       stepsTimer = window.setInterval(pollSteps, 30_000);
 
@@ -313,10 +326,22 @@ export function useVyroBand() {
       window.setTimeout(runHrvCycle, 2 * 60_000);
       const hrvTimer = window.setInterval(runHrvCycle, 10 * 60_000);
 
+      // Standalone Stress cycle (sub-type 0x0d). Some firmwares don't fill
+      // the stress slot in One-Key but do respond to a dedicated cycle.
+      const runStressCycle = () => {
+        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_STRESS)).catch(() => undefined);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_STRESS)).catch(() => undefined);
+        }, 60_000);
+      };
+      window.setTimeout(runStressCycle, 90_000);
+      const stressTimer = window.setInterval(runStressCycle, 10 * 60_000);
+
       // Stash extra timers we created locally onto the outer refs via closure.
       const stop = () => {
         window.clearInterval(spo2Timer);
         window.clearInterval(hrvTimer);
+        window.clearInterval(stressTimer);
       };
       cleanupExtras = stop;
     }
@@ -441,7 +466,11 @@ export function useVyroBand() {
           setBatteryPct(bat.level);
           setBatteryCharging(bat.charging);
         }
-      } else if (op === QCBAND_CMD_TODAY_SUMMARY) {
+      } else if (
+        op === QCBAND_CMD_TODAY_SUMMARY ||
+        op === QCBAND_CMD_STEPS_ALT1 ||
+        op === QCBAND_CMD_STEPS_ALT2
+      ) {
         const sum = decodeQcBandTodaySummary(bytes);
         if (sum) {
           setStepsToday(sum.steps);
@@ -463,6 +492,8 @@ export function useVyroBand() {
           if (t != null) setSkinTempC(t);
         } else if (frame.subType === QCBAND_MEASURE_HRV) {
           if (frame.value > 0 && frame.value < 250) setHrvMs(frame.value);
+        } else if (frame.subType === QCBAND_MEASURE_STRESS) {
+          if (frame.value > 0 && frame.value <= 100) setStressScore(frame.value);
         } else if (frame.subType === QCBAND_MEASURE_ONE_KEY) {
           const ok = decodeQcBandOneKeyPayload(frame.data);
           if (ok) {

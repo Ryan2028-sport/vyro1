@@ -82,23 +82,48 @@ export function decodeQcBandBattery(
   return { level, charging: bytes[2] !== 0 };
 }
 
-// ---- Today summary / steps (0x09) ----------------------------------------
-// Response payload (after opcode): steps_lo, steps_hi, steps_hi2, distance_lo,
-// distance_hi, cal_lo, cal_hi (units: steps, meters, kcal). Some firmwares
-// pad the high byte — we mask defensively and only emit when the value is
-// plausible (< 200000 steps/day).
+// ---- Today summary / steps -----------------------------------------------
+// Different Oudmon/QCBand firmwares respond on different opcodes:
+//   0x09 — newest QCBand SDK ("today summary")
+//   0x07 — older Oudmon devices ("step counter")
+//   0x15 — Colmi R02 family ("activity totals")
+// Request format is always [opcode | 0x00 ...], with the day index optionally
+// at byte 1 (0 = today). We send all three on each poll; only the supported
+// one will respond.
+export const QCBAND_CMD_STEPS_ALT1 = 0x07;
+export const QCBAND_CMD_STEPS_ALT2 = 0x15;
+
 export function encodeQcBandStepsRequest(): Uint8Array {
-  return sdkCommand([QCBAND_CMD_TODAY_SUMMARY]);
+  return sdkCommand([QCBAND_CMD_TODAY_SUMMARY, 0x00]);
+}
+export function encodeQcBandStepsRequestAlt1(): Uint8Array {
+  return sdkCommand([QCBAND_CMD_STEPS_ALT1, 0x00]);
+}
+export function encodeQcBandStepsRequestAlt2(): Uint8Array {
+  return sdkCommand([QCBAND_CMD_STEPS_ALT2, 0x00]);
 }
 
 export function decodeQcBandTodaySummary(
   bytes: Uint8Array,
 ): { steps: number; distanceM: number; calories: number } | null {
   if (bytes.length < 8) return null;
-  if (bytes[0] !== QCBAND_CMD_TODAY_SUMMARY) return null;
-  const steps = bytes[1] | (bytes[2] << 8) | (bytes[3] << 16);
-  const distanceM = bytes[4] | (bytes[5] << 8);
-  const calories = bytes[6] | (bytes[7] << 8);
+  const op = bytes[0];
+  if (
+    op !== QCBAND_CMD_TODAY_SUMMARY &&
+    op !== QCBAND_CMD_STEPS_ALT1 &&
+    op !== QCBAND_CMD_STEPS_ALT2
+  )
+    return null;
+  // Try the canonical layout first: [op, steps(3), dist(2), cal(2)]
+  let steps = bytes[1] | (bytes[2] << 8) | (bytes[3] << 16);
+  let distanceM = bytes[4] | (bytes[5] << 8);
+  let calories = bytes[6] | (bytes[7] << 8);
+  // Some firmwares prefix with a day-index byte: [op, day, steps(3), dist(2), cal(2)]
+  if ((steps === 0 || steps > 200_000) && bytes.length >= 9) {
+    steps = bytes[2] | (bytes[3] << 8) | (bytes[4] << 16);
+    distanceM = bytes[5] | (bytes[6] << 8);
+    calories = bytes[7] | (bytes[8] << 8);
+  }
   if (steps < 0 || steps > 200_000) return null;
   return { steps, distanceM, calories };
 }
@@ -180,9 +205,18 @@ export function decodeQcBandOneKeyPayload(data: Uint8Array): {
   };
 }
 
-/** Decode a temperature (sub_type 0x04) payload. */
+/** Decode a temperature payload. Handles both `[int, frac]` and
+ *  `[frac, int]` byte orders seen across QCBand firmwares, and also a
+ *  little-endian fixed-point 16-bit value (×100). */
 export function decodeQcBandTempPayload(data: Uint8Array): number | null {
   if (data.length < 2) return null;
-  const tempC = data[0] + data[1] / 100;
-  return tempC >= 30 && tempC <= 42 ? tempC : null;
+  const candidates = [
+    data[0] + data[1] / 100,
+    data[1] + data[0] / 100,
+    (data[0] | (data[1] << 8)) / 100,
+  ];
+  for (const t of candidates) {
+    if (t >= 30 && t <= 42) return t;
+  }
+  return null;
 }
