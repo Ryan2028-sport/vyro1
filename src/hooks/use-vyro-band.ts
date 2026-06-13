@@ -114,6 +114,8 @@ export function useVyroBand() {
   const [heartRateBpm, setHeartRateBpm] = useState<number | null>(null);
   const [heartRateAt, setHeartRateAt] = useState<number | null>(null);
   const [batteryPct, setBatteryPct] = useState<number | null>(null);
+  const [batteryCharging, setBatteryCharging] = useState<boolean>(false);
+  const [spo2Pct, setSpo2Pct] = useState<number | null>(null);
   const [restingHrBpm, setRestingHrBpm] = useState<number | null>(null);
   const [hrvMs, setHrvMs] = useState<number | null>(null);
   const [respRateBrpm, setRespRateBrpm] = useState<number | null>(null);
