@@ -377,18 +377,19 @@ export function useVyroBand() {
       if (holdTimer != null) window.clearInterval(holdTimer);
       if (restartTimer != null) window.clearInterval(restartTimer);
       if (batteryTimer != null) window.clearInterval(batteryTimer);
-      if (spo2Timer != null) window.clearInterval(spo2Timer);
+      if (stepsTimer != null) window.clearInterval(stepsTimer);
+      if (oneKeyTimer != null) window.clearInterval(oneKeyTimer);
+      if (tempTimer != null) window.clearInterval(tempTimer);
+      cleanupExtras?.();
       if (qcBandService) {
         void writeQcBand(
           qcBandService.service,
           qcBandService.write,
           encodeQcBandRealtimeHeartRate("end"),
         ).catch(() => undefined);
-        void writeQcBand(
-          qcBandService.service,
-          qcBandService.write,
-          encodeQcBandSpo2Stop(),
-        ).catch(() => undefined);
+        for (const st of [QCBAND_MEASURE_SPO2, QCBAND_MEASURE_TEMP, QCBAND_MEASURE_HRV, QCBAND_MEASURE_ONE_KEY]) {
+          void writeQcBand(qcBandService.service, qcBandService.write, encodeQcBandMeasureStop(st)).catch(() => undefined);
+        }
         void bluetooth
           .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
           .catch(() => undefined);
