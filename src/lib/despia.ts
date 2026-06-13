@@ -259,21 +259,34 @@ export const bluetooth = {
   /** Start scanning. `services` is an optional UUID allow-list. */
   scan: async (services: string[] = [], durationMs = 10000) => {
     if (await ensureCapacitorBle()) {
-      await BleClient.requestLEScan(
-        {
-          ...(services.length ? { services } : {}),
-          optionalServices: services,
-          allowDuplicates: false,
-        },
-        (result) => emit("device", mapCapacitorScanResult(result)),
-      );
-      window.setTimeout(() => void bluetooth.stopScan(), durationMs);
+      // IMPORTANT: on iOS Core Bluetooth, passing `services: []` filters to
+      // an empty allow-list and returns ZERO devices. Only include the
+      // `services` key when the caller actually supplied UUIDs.
+      const scanOpts: Parameters<typeof BleClient.requestLEScan>[0] = {
+        allowDuplicates: false,
+      };
+      if (services.length) {
+        scanOpts.services = services;
+        scanOpts.optionalServices = services;
+      }
+      console.log("[capacitor-ble] requestLEScan", scanOpts);
+      try {
+        await BleClient.requestLEScan(scanOpts, (result) =>
+          emit("device", mapCapacitorScanResult(result)),
+        );
+        window.setTimeout(() => void bluetooth.stopScan(), durationMs);
+      } catch (err) {
+        const message = (err as Error)?.message || String(err);
+        console.warn("[capacitor-ble] scan failed", err);
+        emit("event", { type: "capacitor_scan_error", message });
+        if (/permission|unauthori[sz]ed|denied/i.test(message)) {
+          emit("state", { state: "unauthorized" });
+        }
+        throw err;
+      }
       return;
     }
     const params = new URLSearchParams();
-    // Only attach `services` when the caller actually passed UUIDs. Some
-    // native BLE bridges interpret an empty `services=` param as "filter to
-    // []" and return zero devices, instead of "no filter".
     if (services.length) params.set("services", services.join(","));
     params.set("duration", String(durationMs));
     console.log("[despia] bluetooth scan", { services, durationMs, isNative });
