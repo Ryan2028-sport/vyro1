@@ -336,7 +336,9 @@ export const bluetooth = {
   },
   disconnect: async (id: string) => {
     if (await ensureCapacitorBle()) {
-      await BleClient.disconnect(id).catch((err) => console.warn("[capacitor-ble] disconnect failed", err));
+      await BleClient.disconnect(id).catch((err) =>
+        console.warn("[capacitor-ble] disconnect failed", err),
+      );
       emit("connect", { id, state: "disconnected" });
       return;
     }
@@ -368,7 +370,9 @@ export const bluetooth = {
       emit("data", { id, service, characteristic, value: dataViewToHexString(value) });
       return;
     }
-    return run(`bluetooth://read?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`);
+    return run(
+      `bluetooth://read?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`,
+    );
   },
   write: async (
     id: string,
@@ -384,14 +388,11 @@ export const bluetooth = {
       emit("writeComplete", { id, service, characteristic, success: true });
       return;
     }
-    return run(`bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`);
+    return run(
+      `bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`,
+    );
   },
-  subscribe: async (
-    id: string,
-    service: string,
-    characteristic: string,
-    server?: string,
-  ) => {
+  subscribe: async (id: string, service: string, characteristic: string, server?: string) => {
     if (await ensureCapacitorBle()) {
       await BleClient.startNotifications(id, service, characteristic, (value) => {
         emit("data", { id, service, characteristic, value: dataViewToHexString(value) });
@@ -404,10 +405,14 @@ export const bluetooth = {
   },
   unsubscribe: async (id: string, service: string, characteristic: string) => {
     if (await ensureCapacitorBle()) {
-      await BleClient.stopNotifications(id, service, characteristic).catch((err) => console.warn("[capacitor-ble] unsubscribe failed", err));
+      await BleClient.stopNotifications(id, service, characteristic).catch((err) =>
+        console.warn("[capacitor-ble] unsubscribe failed", err),
+      );
       return;
     }
-    return run(`bluetooth://unsubscribe?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`);
+    return run(
+      `bluetooth://unsubscribe?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`,
+    );
   },
   rssi: async (id: string) => {
     if (await ensureCapacitorBle()) {
