@@ -213,6 +213,12 @@ async function ensureCapacitorBle(): Promise<boolean> {
       ? (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
       : undefined;
   if (!w?.Capacitor) return false;
+  // If Capacitor is only the web shim, @capacitor-community/bluetooth-le
+  // delegates scans to navigator.bluetooth.requestLEScan, which iOS/WKWebView
+  // does not support. Only use BleClient when the real native runtime is
+  // present; otherwise fall back to Despia's native bluetooth:// bridge or the
+  // browser Web Bluetooth path handled by useBluetooth.
+  if (!w.Capacitor.isNativePlatform?.()) return false;
   try {
     if (!capacitorBleReady) {
       await BleClient.initialize();
@@ -240,7 +246,11 @@ function mapCapacitorScanResult(result: ScanResult): BleDevice {
   };
 }
 
-function mapCapacitorDevice(device: { deviceId: string; name?: string; uuids?: string[] }): BleDevice {
+function mapCapacitorDevice(device: {
+  deviceId: string;
+  name?: string;
+  uuids?: string[];
+}): BleDevice {
   return {
     id: device.deviceId,
     name: device.name || "Unknown device",
