@@ -1,21 +1,37 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import type { LucideIcon } from "lucide-react";
 import {
-  ArrowUpRight,
   Activity,
   Brain,
   ChevronRight,
   Flame,
+  Footprints,
   HeartPulse,
+  Moon,
   ShieldCheck,
+  Sparkles,
+  Target,
   TrendingUp,
   Utensils,
+  Zap,
 } from "lucide-react";
-import { getMyProfile } from "@/lib/profile.functions";
 import { getCoachInsight } from "@/lib/coach-insight.functions";
+import { getMyProfile } from "@/lib/profile.functions";
 import { Card, EmptyState, Pill, Ring, Stat } from "./shared";
-import { computeReadiness, computeSubScores, recoveryBand, useLiveMetrics } from "./useLiveMetrics";
 import type { ViewId } from "./Layout";
+import { computeReadiness, computeSubScores, recoveryBand, useLiveMetrics } from "./useLiveMetrics";
+
+type Tone = "mint" | "amber" | "rose" | "spatial";
+
+const QUICK_LINKS: { id: ViewId; label: string; icon: LucideIcon }[] = [
+  { id: "session", label: "Start", icon: Flame },
+  { id: "recovery", label: "Recovery", icon: HeartPulse },
+  { id: "sleep", label: "Sleep", icon: Moon },
+  { id: "coach", label: "Coach", icon: Sparkles },
+  { id: "diet", label: "Fuel", icon: Utensils },
+];
 
 function greeting() {
   const h = new Date().getHours();
@@ -25,112 +41,145 @@ function greeting() {
   return "Good evening";
 }
 
-const SHORTCUTS: { id: ViewId; label: string }[] = [
-  { id: "recovery", label: "Recovery" },
-  { id: "sleep", label: "Sleep" },
-  { id: "session", label: "Session" },
-  { id: "diet", label: "Diet" },
-  { id: "coach", label: "Coach" },
-  { id: "trends", label: "Trends" },
-];
+function toneToken(tone: Tone) {
+  if (tone === "amber") return "var(--vyro-amber)";
+  if (tone === "rose") return "var(--vyro-rose)";
+  if (tone === "spatial") return "var(--vyro-spatial)";
+  return "var(--vyro-mint)";
+}
 
-// Small inline trend chip — green for positive, amber for negative-but-watch
-function Chip({
-  tone = "good",
-  icon: Icon,
-  label,
-  delta,
-}: {
-  tone?: "good" | "warn";
-  icon: typeof TrendingUp;
-  label: string;
-  delta: string;
-}) {
-  const cls =
-    tone === "good"
-      ? "border-vyro-mint/30 bg-vyro-mint/10 text-vyro-mint"
-      : "border-vyro-amber/30 bg-vyro-amber/10 text-vyro-amber";
+function toneClasses(tone: Tone) {
+  if (tone === "amber") return "border-vyro-amber/30 bg-vyro-amber/10 text-vyro-amber";
+  if (tone === "rose") return "border-vyro-rose/30 bg-vyro-rose/10 text-vyro-rose";
+  if (tone === "spatial") return "border-vyro-spatial/30 bg-vyro-spatial/10 text-vyro-spatial";
+  return "border-vyro-mint/30 bg-vyro-mint/10 text-vyro-mint";
+}
+
+function ProgressLine({ value, tone = "mint" }: { value: number; tone?: Tone }) {
+  const pct = Math.max(0, Math.min(100, value));
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${cls}`}>
-      <Icon className="h-3 w-3" /> {label} <span className="font-mono opacity-80">{delta}</span>
-    </span>
+    <div className="h-1.5 overflow-hidden rounded-full bg-vyro-line">
+      <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct}%`, background: toneToken(tone) }} />
+    </div>
   );
 }
 
-// Compact vital tile — used for the vitals grid (HR / HRV / RR / SpO2 etc.)
-function Vital({
+function MetricCard({
+  icon: Icon,
   label,
   value,
   unit,
-  delta,
-  hint,
-  live = false,
+  score,
+  tone = "mint",
+  caption,
+  onClick,
 }: {
+  icon: LucideIcon;
   label: string;
-  value: string;
+  value: string | number;
   unit?: string;
-  delta?: string;
-  hint?: string;
-  live?: boolean;
+  score: number;
+  tone?: Tone;
+  caption: string;
+  onClick?: () => void;
 }) {
-  return (
-    <div className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">{label}</div>
-        {live && <Pill tone="live" pulse>LIVE</Pill>}
+  const content = (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border ${toneClasses(tone)}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <span className="font-mono text-[10px] font-bold tabular-nums text-vyro-mute">{score}/100</span>
       </div>
-      <div className="mt-1 flex items-baseline gap-1">
-        <span className="text-2xl font-black tabular-nums text-vyro-text">{value}</span>
-        {unit && <span className="text-[10px] font-semibold text-vyro-mute">{unit}</span>}
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-2">
-        {delta && (
-          <span className={`font-mono text-[10px] ${delta.startsWith("-") ? "text-vyro-rose" : delta.startsWith("+") ? "text-vyro-mint" : "text-vyro-mute"}`}>
-            {delta}
-          </span>
-        )}
-        {hint && <span className="text-[9px] text-vyro-mute">{hint}</span>}
-      </div>
-    </div>
-  );
-}
-
-// Mini ring for the Base-readiness 4-up grid
-function MiniRing({ value, label, tone = "mint" }: { value: number | null; label: string; tone?: "mint" | "amber" | "rose" }) {
-  const stroke = tone === "amber" ? "var(--vyro-amber)" : tone === "rose" ? "var(--vyro-rose)" : "var(--vyro-mint)";
-  const size = 86, sw = 8, r = (size - sw) / 2, c = 2 * Math.PI * r;
-  const pct = value == null ? 0 : Math.max(0, Math.min(1, value / 100));
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90 block">
-          <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--vyro-line)" strokeWidth={sw} fill="none" />
-          <circle
-            cx={size / 2} cy={size / 2} r={r}
-            stroke={stroke} strokeWidth={sw} fill="none"
-            strokeDasharray={c} strokeDashoffset={c * (1 - pct)} strokeLinecap="round"
-          />
-        </svg>
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="text-base font-black tabular-nums text-vyro-text">{value ?? "—"}</div>
+      <div className="mt-5">
+        <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">{label}</div>
+        <div className="mt-1 flex items-baseline gap-1.5">
+          <span className="text-3xl font-black tabular-nums tracking-tight text-vyro-text">{value}</span>
+          {unit && <span className="text-[11px] font-bold text-vyro-mute">{unit}</span>}
         </div>
       </div>
-      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">{label}</div>
+      <div className="mt-4 space-y-2">
+        <ProgressLine value={score} tone={tone} />
+        <p className="min-h-8 text-[11px] leading-relaxed text-vyro-mute">{caption}</p>
+      </div>
+    </>
+  );
+
+  const cls = "snap-start rounded-2xl border border-vyro-line bg-vyro-panel p-4 text-left shadow-[0_1px_0_var(--vyro-line)_inset]";
+  if (onClick) {
+    return (
+      <button onClick={onClick} className={`${cls} w-[72vw] shrink-0 sm:w-64`}>
+        {content}
+      </button>
+    );
+  }
+  return <div className={`${cls} w-[72vw] shrink-0 sm:w-64`}>{content}</div>;
+}
+
+function CourtLoadMap({ agility, strain }: { agility: number; strain: number }) {
+  const attackX = 18 + (agility / 100) * 24;
+  const pressureY = 72 - (strain / 100) * 18;
+  return (
+    <div className="overflow-hidden rounded-2xl border border-vyro-line bg-vyro-elev">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 p-4">
+        <div className="min-w-0">
+          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Squash movement</div>
+          <h3 className="mt-1 text-base font-black text-vyro-text">Court pressure map</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-vyro-mute">Back-left protection stays active when fatigue rises.</p>
+        </div>
+        <Pill tone={strain > 72 ? "warn" : "live"}>{strain > 72 ? "high load" : "stable"}</Pill>
+      </div>
+      <svg viewBox="0 0 100 72" className="block h-48 w-full border-t border-vyro-line" role="img" aria-label="Squash court pressure map">
+        <rect x="9" y="7" width="82" height="58" rx="3" fill="var(--vyro-panel)" stroke="var(--vyro-line)" />
+        <path d="M9 29 H91 M50 29 V65 M28 29 V65 M72 29 V65" stroke="var(--vyro-line)" strokeWidth="1" />
+        <path d="M9 53 C24 48 36 47 50 49 C65 51 78 50 91 44" fill="none" stroke="var(--vyro-mint)" strokeWidth="2.8" strokeLinecap="round" />
+        <circle cx="50" cy="48" r="4" fill="var(--vyro-mint)" />
+        <circle cx={attackX} cy={pressureY} r="7" fill="var(--vyro-amber)" opacity="0.18" />
+        <circle cx={attackX} cy={pressureY} r="2.5" fill="var(--vyro-amber)" />
+        <text x="13" y="18" fill="var(--vyro-mute)" fontSize="5" fontFamily="monospace">BACK LEFT</text>
+        <text x="45" y="43" fill="var(--vyro-text)" fontSize="6" fontWeight="800">T</text>
+      </svg>
     </div>
   );
 }
 
-function Bar({ label, value, tone = "mint" }: { label: string; value: number; tone?: "mint" | "amber" }) {
-  const color = tone === "amber" ? "bg-vyro-amber" : "bg-vyro-mint";
+function CoachBrief({
+  title,
+  body,
+  tone = "mint",
+  icon: Icon,
+}: {
+  title: string;
+  body: string;
+  tone?: Tone;
+  icon: LucideIcon;
+}) {
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between">
-        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">{label}</span>
-        <span className="text-[11px] font-black tabular-nums text-vyro-text">{value}/100</span>
+    <div className="rounded-2xl border border-vyro-line bg-vyro-elev p-4">
+      <div className="flex items-start gap-3">
+        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border ${toneClasses(tone)}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-black text-vyro-text">{title}</div>
+          <p className="mt-1 text-[12px] leading-relaxed text-vyro-mute">{body}</p>
+        </div>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-vyro-line">
-        <div className={`h-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+    </div>
+  );
+}
+
+function PlanRow({ index, title, detail, tone }: { index: string; title: string; detail: string; tone: Tone }) {
+  return (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-vyro-line bg-vyro-elev p-3">
+      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border font-mono text-[10px] font-black ${toneClasses(tone)}`}>
+        {index}
       </div>
+      <div className="min-w-0">
+        <div className="truncate text-[13px] font-black text-vyro-text">{title}</div>
+        <div className="truncate text-[11px] text-vyro-mute">{detail}</div>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-vyro-mute" />
     </div>
   );
 }
@@ -139,16 +188,13 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   const fetchProfile = useServerFn(getMyProfile);
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile() });
   const first = (profile?.display_name || "").trim().split(/\s+/)[0] || "Athlete";
-
   const m = useLiveMetrics();
 
-  // Live composite readiness (top hero ring) from band signals.
   const { score: liveReadiness } = computeReadiness({
     connected: m.connected,
     peakJerk: m.peakJerk || null,
   });
 
-  // Live subscores for the Base-readiness ring grid.
   const subs = computeSubScores({
     connected: m.connected,
     peakJerk: m.peakJerk || null,
@@ -157,27 +203,27 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
     reactMin: m.reactMin,
   });
 
-  // Demo defaults so the dashboard is fully populated before the band
-  // streams. Each ring swaps to its live value the moment it's available.
-  const DEMO = { readiness: 78, recovery: 78, sleep: 87, fatigue: 41, agility: 88 };
-  const readiness = liveReadiness ?? DEMO.readiness;
-  const recovery = subs.recovery ?? DEMO.recovery;
-  const sleep = subs.sleep ?? DEMO.sleep;
-  const fatigue = subs.fatigue ?? DEMO.fatigue;
-  const agility = subs.agility ?? DEMO.agility;
-  const usingDemo =
-    liveReadiness == null &&
-    subs.recovery == null && subs.sleep == null &&
-    subs.fatigue == null && subs.agility == null;
+  const demo = { readiness: 78, recovery: 78, sleep: 87, fatigue: 41, agility: 88, strain: 64 };
+  const readiness = liveReadiness ?? demo.readiness;
+  const recovery = subs.recovery ?? demo.recovery;
+  const sleep = subs.sleep ?? demo.sleep;
+  const fatigue = subs.fatigue ?? demo.fatigue;
+  const agility = subs.agility ?? demo.agility;
+  const liveStrain = m.connected ? Math.round(Math.min(100, m.eventsLastMin * 1.2 + Math.min(42, m.peakJerk / 6))) : null;
+  const strain = liveStrain ?? demo.strain;
+  const usingDemo = liveReadiness == null && subs.recovery == null && subs.sleep == null && subs.fatigue == null && subs.agility == null;
+
   const band = recoveryBand(readiness);
   const bandTone = band === "green" ? "live" : band === "red" ? "off" : "warn";
-  const bandLabel =
-    band === "green" ? "READY" : band === "red" ? "NOT READY" : band === "yellow" ? "CAUTION" : "PENDING";
+  const statusLabel = band === "green" ? "Primed" : band === "red" ? "Recover" : "Manage";
+  const readinessCopy =
+    readiness >= 67
+      ? "Push court speed, keep back-left decels clean."
+      : readiness >= 34
+        ? "Build quality without chasing max volume."
+        : "Protect tissue, mobility first, hitting light.";
+  const todayLabel = new Date().toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
 
-  const todayLabel = new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
-
-  // Lovable AI coach insight — keyed on the metrics we send so it refreshes
-  // as the band's signal set changes. Returns a safe fallback on failure.
   const coachInput = {
     sport: "squash",
     readiness,
@@ -188,6 +234,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
     eventsLastMin: m.connected ? m.eventsLastMin : null,
     peakG: m.connected && m.peakG > 0 ? m.peakG : null,
     peakJerk: m.connected && m.peakJerk > 0 ? m.peakJerk : null,
+    recentSessionLoad: strain,
   };
   const fetchInsight = useServerFn(getCoachInsight);
   const { data: insight, isFetching: insightLoading } = useQuery({
@@ -197,244 +244,248 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
     refetchOnWindowFocus: false,
   });
 
+  const plan = useMemo(() => {
+    if (readiness >= 67) {
+      return [
+        { title: "Neural warm-up", detail: "6 min skips · banded hips · split-step rhythm", tone: "mint" as Tone },
+        { title: "Ghosting intervals", detail: "6×30 s hard · 60 s walk-back recovery", tone: "amber" as Tone },
+        { title: "Pressure games", detail: "Front-court hold, then protect back-left corner", tone: "spatial" as Tone },
+      ];
+    }
+    if (readiness >= 34) {
+      return [
+        { title: "Mobility primer", detail: "Hips, calves, T-spine · stay conversational", tone: "mint" as Tone },
+        { title: "Technique blocks", detail: "Rails, boasts, serve-return patterns", tone: "spatial" as Tone },
+        { title: "Short finisher", detail: "2×20 s ghosting if HR settles fast", tone: "amber" as Tone },
+      ];
+    }
+    return [
+      { title: "Recovery circuit", detail: "Walk, mobility, calf isometrics", tone: "mint" as Tone },
+      { title: "Light hit", detail: "No max lunges, no repeated redline rallies", tone: "amber" as Tone },
+      { title: "Sleep target", detail: "Move training stress to tomorrow", tone: "rose" as Tone },
+    ];
+  }, [readiness]);
 
   return (
     <div className="min-w-0 space-y-5 overflow-x-hidden">
-      {/* Header */}
-      <div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-vyro-mute">{todayLabel}</div>
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-vyro-text">{greeting()}, {first}.</h1>
-        <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-vyro-mute">
-          Your daily readiness command center — synced from your VYRO Band.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {m.connected
-            ? <Pill tone="live" pulse>Band connected · 94%</Pill>
-            : <Pill tone="off">Band offline</Pill>}
-          {usingDemo && <Pill tone="warn">Demo data</Pill>}
+      <section className="space-y-4">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
+            <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-vyro-mute">{todayLabel}</div>
+            <h1 className="mt-1 truncate text-3xl font-black tracking-tight text-vyro-text">{greeting()}, {first}</h1>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-vyro-mute">Squash readiness, strain, fuel and recovery in one command view.</p>
+          </div>
+          <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{m.connected ? "band live" : "offline"}</Pill>
         </div>
-      </div>
 
-      {/* Shortcuts */}
-      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-        {SHORTCUTS.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setView(s.id)}
-            className="shrink-0 rounded-full border border-vyro-line bg-vyro-panel px-3.5 py-1.5 text-xs font-semibold text-vyro-text/80 hover:border-vyro-mint/40 hover:text-vyro-mint"
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+        <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4">
+          {QUICK_LINKS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setView(id)}
+              className="inline-flex shrink-0 snap-start items-center gap-2 rounded-full border border-vyro-line bg-vyro-panel px-3.5 py-2 text-[12px] font-bold text-vyro-text/80 hover:border-vyro-mint/40 hover:text-vyro-mint"
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
 
-      {/* READINESS HERO */}
-      <button
-        onClick={() => setView("recovery")}
-        className="w-full rounded-2xl border border-vyro-line bg-vyro-panel p-4 text-left shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] hover:border-vyro-mint/40"
+      <section
+        className="overflow-hidden rounded-2xl border border-vyro-line bg-vyro-panel shadow-[0_1px_0_var(--vyro-line)_inset]"
+        style={{
+          background:
+            "radial-gradient(circle at 24% 0%, color-mix(in oklab, var(--vyro-mint) 20%, transparent), transparent 36%), linear-gradient(155deg, var(--vyro-panel), var(--vyro-elev))",
+        }}
       >
-        <div className="flex items-start gap-4">
-          <Ring value={readiness} label="Readiness" sub="/100" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <Pill tone={bandTone} pulse={band === "green"}>{bandLabel}</Pill>
-              <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
-                Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
-              </span>
-            </div>
-            <p className="mt-3 text-lg font-black leading-tight text-vyro-text">
-              {insight?.headline ??
-                (readiness == null
-                  ? "Waiting on band signals…"
-                  : readiness >= 67 ? "You're ready to train."
-                  : readiness >= 34 ? "Train with caution."
-                  : "Prioritize recovery.")}
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-vyro-mute">
-              Readiness is computed live from HRV, resting HR, sleep, stress, SpO₂ and accumulated load as the band reports them.
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-vyro-mute">
-              Readiness is computed live from HRV, resting HR, sleep, stress, SpO₂ and accumulated load as the band reports them.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 border-t border-vyro-line pt-3">
-          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">What changed</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Chip icon={TrendingUp} label="Recovery" delta="+6" />
-            <Chip icon={TrendingUp} label="HRV" delta="+8 ms" />
-            <Chip tone="warn" icon={ArrowUpRight} label="Sleep debt" delta="1h 24m" />
-          </div>
-        </div>
-      </button>
-
-      {/* Top opportunity + risk — generated by Lovable AI from current metrics */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Card
-          eyebrow="Top opportunity"
-          title="Push this today"
-          action={<Pill tone="live" pulse={insightLoading}>{insightLoading ? "AI" : "AI · live"}</Pill>}
-        >
-          <p className="text-xs leading-relaxed text-vyro-mute">
-            {insight?.opportunity ?? "Once HRV, sleep and load stream from the band, your top opportunity for the day will appear here."}
-          </p>
-        </Card>
-        <Card eyebrow="Top risk" title="Protect against">
-          <p className="text-xs leading-relaxed text-vyro-mute">
-            {insight?.risk ?? "Risk callouts unlock as soon as the band reports recovery, stress and accumulated load."}
-          </p>
-        </Card>
-      </div>
-
-      {/* Recent session */}
-      <Card
-        eyebrow="Recent session"
-        title="Match practice vs. Alex K."
-        action={<Pill tone="live">W 3-1</Pill>}
-      >
-        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">
-          Squash · Yesterday · 47 min · load 71
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <Stat label="T-control" value="78" unit="%" />
-          <Stat label="Decel quality" value="82" />
-          <Stat label="Recovery cost" value="64" />
-        </div>
-        <button
-          onClick={() => setView("history")}
-          className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-vyro-mint hover:underline"
-        >
-          Review session <ChevronRight className="h-3 w-3" />
-        </button>
-      </Card>
-
-      {/* Base readiness rings */}
-      <Card eyebrow="Base readiness" title="System scores">
-        <div className="grid grid-cols-4 gap-2">
-          <MiniRing value={fatigue} label="Fatigue" tone="amber" />
-          <MiniRing value={recovery} label="Recovery" />
-          <MiniRing value={agility} label="Agility" />
-          <MiniRing value={sleep} label="Sleep" />
-        </div>
-      </Card>
-
-      {/* Vitals */}
-      <Card eyebrow="Vitals — Goodix GH3026 + ST 6-axis IMU" title="Live from band">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Vital label="Resting HR" value="48" unit="bpm" delta="-2" />
-          <Vital label="Current HR" value="74" unit="bpm" delta="+2" live hint="updates every second" />
-          <Vital label="Resp. Rate" value="14.4" unit="br/min" delta="0" hint="every few minutes" />
-          <Vital label="HRV (RMSSD)" value="76" unit="ms" delta="+8" />
-          <Vital label="Stress" value="28" unit="/100" delta="-6" hint="every few minutes" />
-          <Vital label="SpO₂" value="98" unit="%" delta="0" hint="every few minutes" />
-          <Vital label="Skin Temp" value="34" unit="°C" delta="+0.1" hint="every few minutes" />
-          <Vital label="Steps" value="11,877" delta="+35" live hint="updates every second" />
-        </div>
-      </Card>
-
-      {/* Diet coach */}
-      <Card
-        eyebrow="Diet Coach"
-        title={<span className="inline-flex items-center gap-2"><Utensils className="h-4 w-4 text-vyro-mint" /> 2,600 kcal · projected today</span>}
-        action={<Pill tone="live" pulse>LIVE</Pill>}
-      >
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat label="Eaten" value="680" unit="/ 2,600" />
-          <Stat label="Burn" value="1,842" unit="kcal" />
-          <Stat label="Goal" value="2,600" unit="kcal" />
-          <Stat label="Left" value="1,920" unit="kcal" />
-        </div>
-        <div className="mt-3">
-          <div className="h-2 overflow-hidden rounded-full bg-vyro-line">
-            <div className="h-full bg-vyro-mint" style={{ width: `${(680 / 2600) * 100}%` }} />
-          </div>
-          <div className="mt-1 flex justify-between font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
-            <span>26% of intake goal</span>
-            <button onClick={() => setView("diet")} className="text-vyro-mint">Open diet →</button>
-          </div>
-        </div>
-      </Card>
-
-      {/* Return-to-Play Validator */}
-      <Card
-        eyebrow="Return-to-Play"
-        title={<span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-vyro-amber" /> RTP Validator</span>}
-        action={<Pill tone="warn">Hold</Pill>}
-      >
-        <p className="text-xs leading-relaxed text-vyro-mute">
-          Full clearance is blocked until wearable power and AI Video symmetry are both within
-          <span className="font-semibold text-vyro-text"> 5% </span> of your pre-injury baseline.
-        </p>
-        <div className="mt-3 space-y-3">
-          <div>
-            <Bar label="Video symmetry" value={93} />
-            <div className="mt-1 text-[10px] text-vyro-mute">Joint mechanics vs. baseline</div>
-          </div>
-          <div>
-            <Bar label="Wearable power" value={91} />
-            <div className="mt-1 text-[10px] text-vyro-mute">IMU force signature vs. baseline</div>
-          </div>
-          <div className="rounded-xl border border-vyro-amber/30 bg-vyro-amber/10 p-3">
-            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-amber">Clearance gap</div>
-            <div className="mt-0.5 text-base font-black text-vyro-text">4%</div>
-            <div className="text-[10px] text-vyro-mute">Needs ≤ 5% variance</div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Cognitive Fatigue Divergence */}
-      <Card
-        eyebrow="Cognitive load"
-        title={<span className="inline-flex items-center gap-2"><Brain className="h-4 w-4 text-vyro-mint" /> Cognitive Fatigue Divergence</span>}
-        action={<Pill tone="warn">Watch</Pill>}
-      >
-        <p className="text-xs leading-relaxed text-vyro-mute">
-          Detects when your brain is tired before your body is by comparing video reaction cues against first wearable burst.
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <Stat label="Decision-to-movement delay" value="+214" unit="ms" />
-          <Stat label="Heart rate status" value="Normal" />
-          <Stat label="VYRO read" value="Cognitively fried" />
-        </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-vyro-mute">
-          Heart looks ready, but reaction timing has slowed past the 200 ms alert line.
-          Best use case: goalies, batters, returners, late-game decision makers.
-        </p>
-      </Card>
-
-      {/* Today's plan */}
-      <Card
-        eyebrow="Today's plan"
-        title="Editable"
-        action={<button onClick={() => setView("session")} className="text-[11px] font-semibold text-vyro-mint hover:underline">Edit →</button>}
-      >
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {[
-            { name: "Warm-up · mobility", load: "Optimal" },
-            { name: "Ghosting · 6×30s", load: "Elevated" },
-            { name: "Match practice", load: "Elevated" },
-          ].map((row) => (
-            <div key={row.name} className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
-              <div className="flex items-center gap-2">
-                <Activity className="h-3.5 w-3.5 text-vyro-mint" />
-                <span className="text-xs font-bold text-vyro-text">{row.name}</span>
+        <div className="p-4 pb-3">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Pill tone={bandTone} pulse={band === "green"}>{statusLabel}</Pill>
+                {usingDemo && <Pill tone="warn">demo</Pill>}
+                <Pill tone={insightLoading ? "warn" : "live"}>{insightLoading ? "AI reading" : "AI coach"}</Pill>
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <Pill tone={row.load === "Optimal" ? "live" : "warn"}>{row.load}</Pill>
+              <h2 className="mt-4 text-[30px] font-black leading-[0.95] tracking-tight text-vyro-text">
+                {insight?.headline ?? readinessCopy}
+              </h2>
+              <p className="mt-3 text-[13px] leading-relaxed text-vyro-mute">{readinessCopy}</p>
+            </div>
+            <button onClick={() => setView("recovery")} className="shrink-0" aria-label="Open recovery">
+              <Ring value={readiness} label="Ready" sub="/100" size={122} stroke={9} />
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 border-t border-vyro-line bg-vyro-ink/20">
+          {[
+            ["Recovery", recovery, "mint" as Tone],
+            ["Strain", strain, strain > 72 ? "rose" as Tone : "amber" as Tone],
+            ["Sleep", sleep, "spatial" as Tone],
+            ["Agility", agility, "mint" as Tone],
+          ].map(([label, value, tone]) => (
+            <div key={String(label)} className="border-r border-vyro-line p-3 last:border-r-0">
+              <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-vyro-mute">{label}</div>
+              <div className="mt-1 text-xl font-black tabular-nums text-vyro-text">{value}</div>
+              <div className="mt-2">
+                <ProgressLine value={Number(value)} tone={tone as Tone} />
               </div>
             </div>
           ))}
         </div>
-        <button
+      </section>
+
+      <section className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4">
+        <MetricCard
+          icon={HeartPulse}
+          label="Recovery"
+          value={recovery}
+          unit="%"
+          score={recovery}
+          caption="Green enough to absorb sharp change-of-direction work."
+          onClick={() => setView("recovery")}
+        />
+        <MetricCard
+          icon={Zap}
+          label="Squash strain"
+          value={strain}
+          unit="load"
+          score={strain}
+          tone={strain > 72 ? "rose" : "amber"}
+          caption={m.connected ? `${m.eventsLastMin} events/min · ${m.peakG.toFixed(1)} g peak acceleration.` : "Projected from recent court workload until the band streams."}
           onClick={() => setView("session")}
-          className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-vyro-mint hover:underline"
+        />
+        <MetricCard
+          icon={Moon}
+          label="Sleep"
+          value={sleep}
+          unit="score"
+          score={sleep}
+          tone="spatial"
+          caption="Enough base for speed work; keep tonight protected."
+          onClick={() => setView("sleep")}
+        />
+        <MetricCard
+          icon={Footprints}
+          label="Agility"
+          value={agility}
+          unit="sharp"
+          score={agility}
+          caption="Split-step timing is trending high for return drills."
+          onClick={() => setView("swing")}
+        />
+      </section>
+
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+        <CourtLoadMap agility={agility} strain={strain} />
+        <Card
+          eyebrow="AI coach"
+          title={<span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-vyro-mint" /> Today's edge</span>}
+          action={<Pill tone={insightLoading ? "warn" : "live"}>{insightLoading ? "thinking" : "live"}</Pill>}
         >
-          <Flame className="h-3 w-3" /> Add session
-        </button>
+          <div className="space-y-3">
+            <CoachBrief
+              icon={TrendingUp}
+              title="Opportunity"
+              body={insight?.opportunity ?? "Agility is peaking — push interval ghosting while keeping rally volume controlled."}
+            />
+            <CoachBrief
+              icon={ShieldCheck}
+              title="Protection"
+              tone={strain > 72 ? "rose" : "amber"}
+              body={insight?.risk ?? "Watch back-left deceleration and calf push-off if fatigue climbs late in the session."}
+            />
+          </div>
+        </Card>
+      </section>
+
+      <Card
+        eyebrow="Court plan"
+        title="Next best session"
+        action={<button onClick={() => setView("session")} className="text-[11px] font-bold text-vyro-mint hover:underline">Edit</button>}
+      >
+        <div className="space-y-2">
+          {plan.map((row, i) => (
+            <button key={row.title} onClick={() => setView("session")} className="block w-full text-left">
+              <PlanRow index={`0${i + 1}`} title={row.title} detail={row.detail} tone={row.tone} />
+            </button>
+          ))}
+        </div>
       </Card>
 
-      {/* Live session CTA when band is active */}
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Card
+          eyebrow="Live vitals"
+          title={<span className="inline-flex items-center gap-2"><Activity className="h-4 w-4 text-vyro-mint" /> Band stream</span>}
+          action={<Pill tone={m.connected ? "live" : "neutral"}>{m.connected ? "1s" : "demo"}</Pill>}
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label="HR" value={m.connected ? "74" : "—"} unit="bpm" hint="current" />
+            <Stat label="HRV" value="76" unit="ms" hint="RMSSD" />
+            <Stat label="Peak g" value={m.connected ? m.peakG.toFixed(1) : "—"} unit="g" />
+            <Stat label="Reaction" value={m.connected && m.reactMin != null ? m.reactMin.toFixed(0) : "214"} unit="ms" />
+          </div>
+        </Card>
+
+        <Card
+          eyebrow="Fuel"
+          title={<span className="inline-flex items-center gap-2"><Utensils className="h-4 w-4 text-vyro-amber" /> Match window</span>}
+          action={<button onClick={() => setView("diet")} className="text-[11px] font-bold text-vyro-mint hover:underline">Open</button>}
+        >
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Carbs" value="42" unit="g" hint="pre-court" />
+              <Stat label="Water" value="500" unit="ml" hint="next hour" />
+            </div>
+            <ProgressLine value={64} tone="amber" />
+            <p className="text-[11px] leading-relaxed text-vyro-mute">Add sodium if the session pushes past 45 minutes.</p>
+          </div>
+        </Card>
+      </section>
+
+      <Card
+        eyebrow="Return-to-play"
+        title={<span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-vyro-amber" /> Clearance signal</span>}
+        action={<Pill tone="warn">hold</Pill>}
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="space-y-3">
+            <div>
+              <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
+                <span>Video symmetry</span><span>93</span>
+              </div>
+              <ProgressLine value={93} />
+            </div>
+            <div>
+              <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
+                <span>Wearable power</span><span>91</span>
+              </div>
+              <ProgressLine value={91} tone="amber" />
+            </div>
+          </div>
+          <div className="rounded-2xl border border-vyro-amber/30 bg-vyro-amber/10 p-4 text-center">
+            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-amber">Gap</div>
+            <div className="mt-1 text-3xl font-black text-vyro-text">4%</div>
+            <div className="text-[10px] text-vyro-mute">needs ≤ 5%</div>
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        eyebrow="Cognitive load"
+        title={<span className="inline-flex items-center gap-2"><Brain className="h-4 w-4 text-vyro-mint" /> Decision speed</span>}
+        action={<Pill tone="warn">watch</Pill>}
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+          <div className="rounded-2xl border border-vyro-line bg-vyro-elev p-4 text-center">
+            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">Delay</div>
+            <div className="mt-1 text-4xl font-black tabular-nums text-vyro-text">+214</div>
+            <div className="text-[10px] font-bold text-vyro-amber">ms</div>
+          </div>
+          <p className="text-[12px] leading-relaxed text-vyro-mute">Heart looks ready, but reaction timing is above the 200 ms alert line. Keep decisions crisp before volume climbs.</p>
+        </div>
+      </Card>
+
       {m.sessionState === "live" && (
         <Card eyebrow="Session" title="Session is live">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -443,11 +494,8 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             <Stat label="Peak g" value={m.peakG.toFixed(2)} unit="g" />
             <Stat label="Peak jerk" value={m.peakJerk.toFixed(1)} unit="g/s" />
           </div>
-          <button
-            onClick={() => setView("session")}
-            className="mt-3 w-full rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-vyro-ink hover:bg-vyro-mint/85"
-          >
-            Open session console →
+          <button onClick={() => setView("session")} className="mt-3 w-full rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-vyro-ink hover:bg-vyro-mint/85">
+            Open session console
           </button>
         </Card>
       )}
@@ -457,19 +505,15 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           title="No band paired"
           hint="Pair your VYRO band to stream live HR, motion and recovery."
           action={
-            <button
-              onClick={() => setView("profile")}
-              className="rounded-full bg-vyro-mint px-4 py-2 text-xs font-semibold text-vyro-ink hover:bg-vyro-mint/85"
-            >
+            <button onClick={() => setView("profile")} className="rounded-full bg-vyro-mint px-4 py-2 text-xs font-semibold text-vyro-ink hover:bg-vyro-mint/85">
               Pair your band
             </button>
           }
         />
       )}
 
-      {/* Footer hint */}
       <div className="flex items-center justify-center gap-1.5 pt-2 font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">
-        <HeartPulse className="h-3 w-3" /> VYRO Athlete Intelligence
+        <Target className="h-3 w-3" /> VYRO Athlete Intelligence
       </div>
     </div>
   );
