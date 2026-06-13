@@ -8,12 +8,7 @@ import {
   type BleState,
 } from "@/lib/despia";
 
-export type BleConnectionState =
-  | "idle"
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "failed";
+export type BleConnectionState = "idle" | "connecting" | "connected" | "disconnected" | "failed";
 
 export type BlePowerState = BleState["state"] | "unknown";
 
@@ -45,8 +40,7 @@ const browserDevices = new Map<string, BrowserBluetoothDevice>();
 export function useBluetooth() {
   const [devices, setDevices] = useState<Record<string, BleDevice>>({});
   const [scanning, setScanning] = useState(false);
-  const [connectionState, setConnectionState] =
-    useState<BleConnectionState>("idle");
+  const [connectionState, setConnectionState] = useState<BleConnectionState>("idle");
   const [connectedId, setConnectedId] = useState<string | null>(null);
   const [lastData, setLastData] = useState<BleDataEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,12 +64,9 @@ export function useBluetooth() {
     const offData = bluetooth.on("data", (d: BleDataEvent) => setLastData(d));
     const offState = bluetooth.on("state", (s) => {
       setPowerState(s.state);
-      if (s.state === "unauthorized")
-        setError("Bluetooth permission denied. Enable it in iOS Settings.");
-      else if (s.state === "off")
-        setError("Bluetooth is off. Turn it on in Control Center.");
-      else if (s.state === "unsupported")
-        setError("Bluetooth is not supported on this device.");
+      if (s.state === "unauthorized") setError("Bluetooth permission denied. Enable it in iOS Settings.");
+      else if (s.state === "off") setError("Bluetooth is off. Turn it on in Control Center.");
+      else if (s.state === "unsupported") setError("Bluetooth is not supported on this device.");
       else setError(null);
     });
     const offScanEnd = bluetooth.on("scanEnd", () => setScanning(false));
