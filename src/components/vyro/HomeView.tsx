@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { getMyProfile } from "@/lib/profile.functions";
 import { Card, EmptyState, Pill, Ring, Stat } from "./shared";
-import { recoveryBand, useLiveMetrics } from "./useLiveMetrics";
+import { computeReadiness, recoveryBand, useLiveMetrics } from "./useLiveMetrics";
 import type { ViewId } from "./Layout";
 
 function greeting() {
@@ -141,15 +141,21 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   const first = (profile?.display_name || "").trim().split(/\s+/)[0] || "Athlete";
 
   const m = useLiveMetrics();
-  // Demo values mirror the reference; real values flow in as firmware lands.
-  const readiness = 78;
-  const recovery = 78;
-  const sleep = 87;
-  const fatigue = 41;
-  const agility = 88;
+  // Real readiness from live band signals (null until firmware streams them).
+  const { score: readiness } = computeReadiness({
+    connected: m.connected,
+    peakJerk: m.peakJerk || null,
+    // hrvMs / restingHrBpm / sleepScore / recoveryScore / stress / spo2
+    // will be wired here as soon as the band publishes each characteristic.
+  });
+  const recovery = readiness;
+  const sleep: number | null = null;
+  const fatigue: number | null = null;
+  const agility: number | null = null;
   const band = recoveryBand(readiness);
   const bandTone = band === "green" ? "live" : band === "red" ? "off" : "warn";
-  const bandLabel = band === "green" ? "READY" : band === "red" ? "NOT READY" : "CAUTION";
+  const bandLabel =
+    band === "green" ? "READY" : band === "red" ? "NOT READY" : band === "yellow" ? "CAUTION" : "PENDING";
 
   const todayLabel = new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 
