@@ -621,6 +621,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         </div>
       </section>
 
+      <div id="section-plan" className="scroll-mt-24">
       <Card
         eyebrow="Today's plan"
         title="Next best session"
@@ -652,6 +653,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           </button>
         </div>
       </Card>
+      </div>
 
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
