@@ -30,6 +30,14 @@ import {
   encodeStartSession,
   type Sport,
 } from "@/lib/vyro-ble/session-control";
+import {
+  decodeQcBandRealtimeHeartRate,
+  encodeQcBandBindingAlert,
+  encodeQcBandRealtimeHeartRate,
+  QCBAND_NOTIFY_CHAR_UUID,
+  QCBAND_SERVICE_UUID,
+  QCBAND_WRITE_CHAR_UUID,
+} from "@/lib/vyro-ble/qcband";
 import { bluetooth, type BleDiscovered } from "@/lib/despia";
 
 export type SessionState = "idle" | "live" | "paused";
@@ -65,6 +73,19 @@ function hexToBytes(hex: string): Uint8Array {
     out[i] = parseInt(clean.substr(i * 2, 2), 16);
   }
   return out;
+}
+
+function payloadToBytes(value: string): Uint8Array {
+  const hex = value.replace(/^0x/, "").replace(/[^0-9a-fA-F]/g, "");
+  if (hex.length >= 2 && hex.length % 2 === 0 && hex.length >= value.trim().length - 2) {
+    return hexToBytes(hex);
+  }
+  try {
+    const raw = atob(value);
+    return Uint8Array.from(raw, (ch) => ch.charCodeAt(0));
+  } catch {
+    return hexToBytes(value);
+  }
 }
 
 /** Heart Rate Measurement (GATT 0x2A37) decoder. */
@@ -115,12 +136,54 @@ export function useVyroBand() {
 
   // After connection, the despia/capacitor bridge emits a `discovered`
   // event with the full service/characteristic tree. Use it to subscribe
-  // to standard GATT services (heart rate, battery) if present.
+  // to standard GATT services (heart rate, battery) and the QCBand SDK
+  // proprietary live-HR service if present.
   useEffect(() => {
     if (!connectedId) return;
+    let qcBandStarted = false;
+    let qcBandService: { service: string; notify: string; write: string } | null = null;
+    let holdTimer: number | null = null;
+
+    async function startQcBandLiveHr(service: string, notify: string, write: string) {
+      if (qcBandStarted) return;
+      qcBandStarted = true;
+      qcBandService = { service, notify, write };
+      await bluetooth.subscribe(connectedId!, service, notify);
+      await bluetooth
+        .write(connectedId!, service, write, bytesToHex(encodeQcBandBindingAlert()), true)
+        .catch(() => undefined);
+      await bluetooth.write(
+        connectedId!,
+        service,
+        write,
+        bytesToHex(encodeQcBandRealtimeHeartRate("start")),
+        true,
+      );
+      holdTimer = window.setInterval(() => {
+        void bluetooth
+          .write(
+            connectedId!,
+            service,
+            write,
+            bytesToHex(encodeQcBandRealtimeHeartRate("hold")),
+            true,
+          )
+          .catch(() => undefined);
+      }, 20_000);
+    }
+
     const off = bluetooth.on("discovered", (tree: BleDiscovered) => {
       if (tree.id !== connectedId) return;
       for (const svc of tree.services) {
+        if (uuidMatches(svc.uuid, QCBAND_SERVICE_UUID)) {
+          const notify = svc.characteristics.find((c) => uuidMatches(c.uuid, QCBAND_NOTIFY_CHAR_UUID));
+          const write = svc.characteristics.find((c) => uuidMatches(c.uuid, QCBAND_WRITE_CHAR_UUID));
+          if (notify && write) {
+            void startQcBandLiveHr(svc.uuid, notify.uuid, write.uuid).catch((err) =>
+              console.warn("[vyro] QCBand live HR start failed", err),
+            );
+          }
+        }
         if (uuidMatches(svc.uuid, HR_SERVICE)) {
           const ch = svc.characteristics.find((c) => uuidMatches(c.uuid, HR_MEAS_CHAR));
           if (ch) {
@@ -142,7 +205,24 @@ export function useVyroBand() {
         }
       }
     });
-    return () => off();
+    return () => {
+      off();
+      if (holdTimer != null) window.clearInterval(holdTimer);
+      if (qcBandService) {
+        void bluetooth
+          .write(
+            connectedId,
+            qcBandService.service,
+            qcBandService.write,
+            bytesToHex(encodeQcBandRealtimeHeartRate("end")),
+            true,
+          )
+          .catch(() => undefined);
+        void bluetooth
+          .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
+          .catch(() => undefined);
+      }
+    };
   }, [connectedId]);
 
   // Decode incoming notifications. Routes by characteristic UUID.
@@ -162,15 +242,23 @@ export function useVyroBand() {
       return;
     }
     if (uuidMatches(cuuid, HR_MEAS_CHAR)) {
-      const bpm = decodeHeartRate(hexToBytes(lastData.value));
+      const bpm = decodeHeartRate(payloadToBytes(lastData.value));
       if (bpm != null && bpm > 0 && bpm < 250) {
         setHeartRateBpm(bpm);
         setHeartRateAt(Date.now());
       }
       return;
     }
+    if (uuidMatches(cuuid, QCBAND_NOTIFY_CHAR_UUID)) {
+      const bpm = decodeQcBandRealtimeHeartRate(payloadToBytes(lastData.value));
+      if (bpm != null) {
+        setHeartRateBpm(bpm);
+        setHeartRateAt(Date.now());
+      }
+      return;
+    }
     if (uuidMatches(cuuid, BAT_LVL_CHAR)) {
-      const bytes = hexToBytes(lastData.value);
+      const bytes = payloadToBytes(lastData.value);
       if (bytes.length >= 1) setBatteryPct(bytes[0]);
       return;
     }
