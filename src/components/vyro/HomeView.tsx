@@ -388,10 +388,10 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         </div>
 
         <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4">
-          {QUICK_LINKS.map(({ id, label, icon: Icon }) => (
+          {QUICK_LINKS.map(({ anchor, label, icon: Icon }) => (
             <button
-              key={id}
-              onClick={() => setView(id)}
+              key={anchor}
+              onClick={() => scrollToAnchor(anchor)}
               className="inline-flex shrink-0 snap-start items-center gap-2 rounded-full border border-vyro-line bg-vyro-panel px-3.5 py-2 text-[12px] font-bold text-vyro-text/80 hover:border-vyro-mint/40 hover:text-vyro-mint"
             >
               <Icon className="h-3.5 w-3.5" />
