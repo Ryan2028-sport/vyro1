@@ -29,15 +29,24 @@ import { computeReadiness, computeSubScores, recoveryBand, useLiveMetrics } from
 
 type Tone = "mint" | "amber" | "rose" | "spatial";
 
-// Top-of-page quick links navigate to views that AREN'T already in the
-// bottom tab bar — bottom bar already has Home/Session/Recovery/Sleep/More.
-const QUICK_LINKS: { id: ViewId; label: string; icon: LucideIcon }[] = [
-  { id: "coach", label: "Coach", icon: Sparkles },
-  { id: "diet", label: "Fuel", icon: Utensils },
-  { id: "trends", label: "Trends", icon: LineChart },
-  { id: "video", label: "Video", icon: Video },
-  { id: "athlete", label: "Vitals", icon: HeartPulse },
+// Top-of-page quick links jump to sections WITHIN the Athlete tab so the
+// page doesn't feel like endless scrolling. The bottom tab bar handles
+// cross-view navigation (Session / Recovery / Sleep / More).
+const QUICK_LINKS: { anchor: string; label: string; icon: LucideIcon }[] = [
+  { anchor: "section-vitals", label: "Vitals", icon: HeartPulse },
+  { anchor: "section-coach", label: "Coach", icon: Sparkles },
+  { anchor: "section-diet", label: "Fuel", icon: Utensils },
+  { anchor: "section-court", label: "Court", icon: Target },
+  { anchor: "section-plan", label: "Plan", icon: Activity },
+  { anchor: "section-trends", label: "Trends", icon: LineChart },
 ];
+
+function scrollToAnchor(id: string) {
+  if (typeof document === "undefined") return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 
 function greeting() {
