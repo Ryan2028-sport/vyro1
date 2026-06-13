@@ -620,18 +620,37 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       </section>
 
       <Card
-        eyebrow="Court plan"
+        eyebrow="Today's plan"
         title="Next best session"
-        action={<button onClick={() => setView("session")} className="text-[11px] font-bold text-vyro-mint hover:underline">Edit</button>}
+        action={<Pill tone="neutral">Editable</Pill>}
       >
         <div className="space-y-2">
-          {plan.map((row, i) => (
-            <button key={row.title} onClick={() => setView("session")} className="block w-full text-left">
-              <PlanRow index={`0${i + 1}`} title={row.title} detail={row.detail} tone={row.tone} />
-            </button>
-          ))}
+          {plan.map((row, i) => {
+            const elevated = row.tone === "rose" || row.tone === "amber";
+            return (
+              <button key={row.title} onClick={() => setView("session")} className="block w-full text-left">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-vyro-line bg-vyro-elev p-3">
+                  <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border font-mono text-[10px] font-black ${toneClasses(row.tone)}`}>
+                    {`0${i + 1}`}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] font-black text-vyro-text">{row.title}</div>
+                    <div className="truncate text-[11px] text-vyro-mute">{row.detail}</div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Pill tone="live">Optimal</Pill>
+                    <Pill tone={elevated ? "warn" : "neutral"}>Elevated</Pill>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+          <button onClick={() => setView("session")} className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-vyro-line bg-vyro-elev px-3 py-3 text-[12px] font-bold text-vyro-mute hover:border-vyro-mint/40 hover:text-vyro-mint">
+            <Plus className="h-3.5 w-3.5" /> Add
+          </button>
         </div>
       </Card>
+
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Card
