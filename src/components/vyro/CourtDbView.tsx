@@ -40,7 +40,7 @@ export function CourtDbView() {
           <Stat label="Fatigue cost" value="—" hint="decel × density" />
           <Stat label="Attack conversion" value="—" unit="%" />
         </div>
-        <div className="mt-3 grid aspect-[4/3] place-items-center rounded-xl border border-dashed border-black/15 bg-black/[0.02] text-[11px] text-black/45">
+        <div className="mt-3 grid aspect-[4/3] place-items-center rounded-xl border border-dashed border-vyro-text/15 bg-vyro-text/[0.02] text-[11px] text-vyro-text/45">
           Heat-map render — Phase 2
         </div>
       </Card>
@@ -62,8 +62,8 @@ export function CourtDbView() {
         <ul className="divide-y divide-black/[0.06]">
           {SQUASH_ROUTES.map((r) => (
             <li key={r} className="flex items-center justify-between py-2 text-xs">
-              <span className="font-mono text-[11px] text-black/75">{r}</span>
-              <span className="font-mono text-[10px] text-black/40">samples — · score — · band —</span>
+              <span className="font-mono text-[11px] text-vyro-text/75">{r}</span>
+              <span className="font-mono text-[10px] text-vyro-text/40">samples — · score — · band —</span>
             </li>
           ))}
         </ul>
@@ -73,8 +73,8 @@ export function CourtDbView() {
         <ul className="divide-y divide-black/[0.06]">
           {TENNIS_ROUTES.map((r) => (
             <li key={r} className="flex items-center justify-between py-2 text-xs">
-              <span className="font-mono text-[11px] text-black/75">{r}</span>
-              <span className="font-mono text-[10px] text-black/40">samples — · score — · band —</span>
+              <span className="font-mono text-[11px] text-vyro-text/75">{r}</span>
+              <span className="font-mono text-[10px] text-vyro-text/40">samples — · score — · band —</span>
             </li>
           ))}
         </ul>

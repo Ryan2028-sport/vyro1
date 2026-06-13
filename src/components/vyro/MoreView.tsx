@@ -19,18 +19,18 @@ export function MoreView({ setView }: { setView: (v: ViewId) => void }) {
             <button
               key={spec.id}
               onClick={() => setView(spec.id)}
-              className="group flex items-center gap-3 rounded-2xl border border-black/[0.07] bg-white p-4 text-left transition-colors hover:border-black/20"
+              className="group flex items-center gap-3 rounded-2xl border border-vyro-text/[0.07] bg-vyro-panel p-4 text-left transition-colors hover:border-vyro-text/20"
             >
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black text-white">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-vyro-mint text-vyro-ink">
                 <Icon className="h-5 w-5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold text-black">{spec.label}</span>
-                <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-black/55">
+                <span className="block text-sm font-bold text-vyro-text">{spec.label}</span>
+                <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-vyro-text/55">
                   {spec.blurb}
                 </span>
               </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-black/30 group-hover:text-black/60" />
+              <ChevronRight className="h-4 w-4 shrink-0 text-vyro-text/30 group-hover:text-vyro-text/60" />
             </button>
           );
         })}

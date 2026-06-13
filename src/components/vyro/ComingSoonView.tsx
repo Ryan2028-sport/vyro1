@@ -30,7 +30,7 @@ export function ComingSoonView({
     <div>
       <button
         onClick={() => setView("more")}
-        className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black/70 hover:text-black"
+        className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-vyro-text/10 bg-vyro-panel px-3 py-1.5 text-[11px] font-semibold text-vyro-text/70 hover:text-vyro-text"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Back
       </button>
@@ -47,12 +47,12 @@ export function ComingSoonView({
         title="Waiting on watch data"
         className="mb-4"
         action={
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-black/45">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-vyro-text/45">
             <Radio className="h-3 w-3" /> not streaming
           </span>
         }
       >
-        <p className="text-xs leading-relaxed text-black/65">
+        <p className="text-xs leading-relaxed text-vyro-text/65">
           The current watch firmware only emits motion (IMU) data. This tab activates
           automatically once the band starts publishing the signals listed below — no
           app update required.
@@ -61,7 +61,7 @@ export function ComingSoonView({
           {spec.needs.map((n) => (
             <li
               key={n}
-              className="flex items-start gap-2 rounded-lg border border-black/[0.06] bg-black/[0.02] p-2.5 text-[11px] text-black/70"
+              className="flex items-start gap-2 rounded-lg border border-vyro-text/[0.06] bg-vyro-text/[0.02] p-2.5 text-[11px] text-vyro-text/70"
             >
               <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
               <span className="font-mono">{n}</span>
@@ -82,7 +82,7 @@ export function ComingSoonView({
 
       {spec.extra}
 
-      <div className="mt-6 flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-black/40">
+      <div className="mt-6 flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-vyro-text/40">
         <Icon className="h-3.5 w-3.5" /> {spec.id}
       </div>
     </div>

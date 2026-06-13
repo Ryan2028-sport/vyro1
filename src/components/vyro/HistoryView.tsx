@@ -22,7 +22,7 @@ export function HistoryView() {
     <div className="space-y-4">
       <PageHeader eyebrow="Saved" title="Session history" subtitle="Every session you end is saved here." />
 
-      {isLoading && <div className="text-sm text-black/55">Loading…</div>}
+      {isLoading && <div className="text-sm text-vyro-text/55">Loading…</div>}
 
       {!isLoading && (!sessions || sessions.length === 0) && (
         <EmptyState
@@ -38,14 +38,14 @@ export function HistoryView() {
             <Card key={s.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-bold text-black capitalize">{s.sport}</div>
-                  <div className="font-mono text-[11px] text-black/55">
+                  <div className="text-sm font-bold text-vyro-text capitalize">{s.sport}</div>
+                  <div className="font-mono text-[11px] text-vyro-text/55">
                     {new Date(s.started_at).toLocaleString()} · {fmtDur(s.started_at, s.ended_at)}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-[10px] uppercase tracking-wider text-black/45">Events</div>
-                  <div className="text-lg font-black tabular-nums text-black">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-vyro-text/45">Events</div>
+                  <div className="text-lg font-black tabular-nums text-vyro-text">
                     {(s.swing_count ?? 0) + (s.rapid_count ?? 0) + (s.burst_count ?? 0) + (s.dir_change_count ?? 0)}
                   </div>
                 </div>
@@ -73,9 +73,9 @@ export function HistoryView() {
 
 function Mini({ label, v }: { label: string; v: any }) {
   return (
-    <div className="rounded-lg bg-black/[0.04] py-1.5">
-      <div className="font-mono text-[9px] uppercase tracking-wider text-black/45">{label}</div>
-      <div className="text-sm font-bold tabular-nums text-black">{v ?? "—"}</div>
+    <div className="rounded-lg bg-vyro-text/[0.04] py-1.5">
+      <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-text/45">{label}</div>
+      <div className="text-sm font-bold tabular-nums text-vyro-text">{v ?? "—"}</div>
     </div>
   );
 }

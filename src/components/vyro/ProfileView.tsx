@@ -52,7 +52,7 @@ export function ProfileView() {
     navigate({ to: "/auth", replace: true });
   }
 
-  if (isLoading) return <div className="p-6 text-sm text-black/55">Loading profile…</div>;
+  if (isLoading) return <div className="p-6 text-sm text-vyro-text/55">Loading profile…</div>;
 
   return (
     <div className="space-y-4">
@@ -60,16 +60,16 @@ export function ProfileView() {
 
       <Card eyebrow="Identity" title="Personal info">
         <label className="mb-3 block">
-          <span className="mb-1 block text-[11px] font-semibold text-black/55">Display name</span>
+          <span className="mb-1 block text-[11px] font-semibold text-vyro-text/55">Display name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm text-black outline-none focus:border-black/40"
+            className="w-full rounded-xl border border-vyro-text/10 bg-vyro-panel px-3 py-2.5 text-sm text-vyro-text outline-none focus:border-vyro-text/40"
           />
         </label>
         <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-[11px] font-semibold text-black/55">Primary sport</span>
+            <span className="mb-1 block text-[11px] font-semibold text-vyro-text/55">Primary sport</span>
             <div className="flex gap-1.5">
               {(["squash", "tennis"] as const).map((s) => (
                 <button
@@ -77,8 +77,8 @@ export function ProfileView() {
                   onClick={() => setSport(s)}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${
                     sport === s
-                      ? "border-emerald-600 bg-emerald-600 text-white"
-                      : "border-black/10 bg-white text-black/65 hover:bg-black/[0.04]"
+                      ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
+                      : "border-vyro-text/10 bg-vyro-panel text-vyro-text/65 hover:bg-vyro-text/[0.04]"
                   }`}
                 >
                   {s}
@@ -87,7 +87,7 @@ export function ProfileView() {
             </div>
           </label>
           <label className="block">
-            <span className="mb-1 block text-[11px] font-semibold text-black/55">Handedness</span>
+            <span className="mb-1 block text-[11px] font-semibold text-vyro-text/55">Handedness</span>
             <div className="flex gap-1.5">
               {(["left", "right"] as const).map((h) => (
                 <button
@@ -95,8 +95,8 @@ export function ProfileView() {
                   onClick={() => setHand(h)}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${
                     hand === h
-                      ? "border-emerald-600 bg-emerald-600 text-white"
-                      : "border-black/10 bg-white text-black/65 hover:bg-black/[0.04]"
+                      ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
+                      : "border-vyro-text/10 bg-vyro-panel text-vyro-text/65 hover:bg-vyro-text/[0.04]"
                   }`}
                 >
                   {h}
@@ -109,13 +109,13 @@ export function ProfileView() {
           <button
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white hover:bg-black/85 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl bg-vyro-mint px-4 py-2.5 text-sm font-bold text-vyro-ink hover:bg-vyro-text/85 disabled:opacity-50"
           >
             <Save className="h-4 w-4" /> {saving ? "Saving…" : saved ? "Saved" : "Save"}
           </button>
           <button
             onClick={signOut}
-            className="ml-auto flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-black/65 hover:bg-black/[0.04]"
+            className="ml-auto flex items-center gap-2 rounded-xl border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-xs font-semibold text-vyro-text/65 hover:bg-vyro-text/[0.04]"
           >
             <LogOut className="h-3.5 w-3.5" /> Sign out
           </button>
