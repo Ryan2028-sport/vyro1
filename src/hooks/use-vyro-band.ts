@@ -28,8 +28,16 @@ import {
   type Sport,
 } from "@/lib/vyro-ble/session-control";
 import {
+  decodeQcBandBattery,
+  decodeQcBandMeasureFrame,
   decodeQcBandRealtimeHeartRate,
+  encodeQcBandBatteryRequest,
   encodeQcBandRealtimeHeartRate,
+  encodeQcBandSpo2Start,
+  encodeQcBandSpo2Stop,
+  QCBAND_CMD_BATTERY,
+  QCBAND_CMD_REALTIME_HR,
+  QCBAND_CMD_START_MEASURE,
   QCBAND_NOTIFY_CHAR_UUID,
   QCBAND_SERVICE_UUID,
   QCBAND_WRITE_CHAR_UUID,
@@ -106,6 +114,8 @@ export function useVyroBand() {
   const [heartRateBpm, setHeartRateBpm] = useState<number | null>(null);
   const [heartRateAt, setHeartRateAt] = useState<number | null>(null);
   const [batteryPct, setBatteryPct] = useState<number | null>(null);
+  const [batteryCharging, setBatteryCharging] = useState<boolean>(false);
+  const [spo2Pct, setSpo2Pct] = useState<number | null>(null);
   const [restingHrBpm, setRestingHrBpm] = useState<number | null>(null);
   const [hrvMs, setHrvMs] = useState<number | null>(null);
   const [respRateBrpm, setRespRateBrpm] = useState<number | null>(null);
@@ -133,6 +143,8 @@ export function useVyroBand() {
       setHeartRateBpm(null);
       setHeartRateAt(null);
       setBatteryPct(null);
+      setBatteryCharging(false);
+      setSpo2Pct(null);
       setRestingHrBpm(null);
       setHrvMs(null);
       setRespRateBrpm(null);
@@ -192,6 +204,8 @@ export function useVyroBand() {
     let qcBandService: { service: string; notify: string; write: string } | null = null;
     let holdTimer: number | null = null;
     let restartTimer: number | null = null;
+    let batteryTimer: number | null = null;
+    let spo2Timer: number | null = null;
 
     async function writeQcBand(service: string, write: string, bytes: Uint8Array) {
       const hex = bytesToHex(bytes);
@@ -232,6 +246,27 @@ export function useVyroBand() {
           () => undefined,
         );
       }, 60_000);
+
+      // Battery: query immediately and every 60s. Response arrives on the
+      // same notify char (opcode 0x03).
+      const pollBattery = () =>
+        void writeQcBand(service, write, encodeQcBandBatteryRequest()).catch(
+          () => undefined,
+        );
+      window.setTimeout(pollBattery, 800);
+      batteryTimer = window.setInterval(pollBattery, 60_000);
+
+      // SpO2: cycle measurement every 5 min (vendor app pattern — sensor
+      // can't run continuously). Start one shot ~3s after HR comes up.
+      const runSpo2Cycle = () => {
+        void writeQcBand(service, write, encodeQcBandSpo2Start()).catch(() => undefined);
+        // Stop after 40s so the optical sensor can rest before the next cycle.
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandSpo2Stop()).catch(() => undefined);
+        }, 40_000);
+      };
+      window.setTimeout(runSpo2Cycle, 3_000);
+      spo2Timer = window.setInterval(runSpo2Cycle, 5 * 60_000);
     }
 
     const off = bluetooth.on("discovered", (tree: BleDiscovered) => {
@@ -291,11 +326,18 @@ export function useVyroBand() {
       window.clearTimeout(fallback);
       if (holdTimer != null) window.clearInterval(holdTimer);
       if (restartTimer != null) window.clearInterval(restartTimer);
+      if (batteryTimer != null) window.clearInterval(batteryTimer);
+      if (spo2Timer != null) window.clearInterval(spo2Timer);
       if (qcBandService) {
         void writeQcBand(
           qcBandService.service,
           qcBandService.write,
           encodeQcBandRealtimeHeartRate("end"),
+        ).catch(() => undefined);
+        void writeQcBand(
+          qcBandService.service,
+          qcBandService.write,
+          encodeQcBandSpo2Stop(),
         ).catch(() => undefined);
         void bluetooth
           .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
@@ -330,10 +372,33 @@ export function useVyroBand() {
       return;
     }
     if (uuidMatches(cuuid, QCBAND_NOTIFY_CHAR_UUID)) {
-      const bpm = decodeQcBandRealtimeHeartRate(payloadToBytes(lastData.value));
-      if (bpm != null) {
-        setHeartRateBpm(bpm);
-        setHeartRateAt(Date.now());
+      const bytes = payloadToBytes(lastData.value);
+      const op = bytes[0];
+      if (op === QCBAND_CMD_REALTIME_HR) {
+        const bpm = decodeQcBandRealtimeHeartRate(bytes);
+        if (bpm != null) {
+          setHeartRateBpm(bpm);
+          setHeartRateAt(Date.now());
+        }
+      } else if (op === QCBAND_CMD_BATTERY) {
+        const bat = decodeQcBandBattery(bytes);
+        if (bat) {
+          setBatteryPct(bat.level);
+          setBatteryCharging(bat.charging);
+        }
+      } else if (op === QCBAND_CMD_START_MEASURE) {
+        // SpO2 / HR start frames. sub_type 0x03 = SpO2.
+        const frame = decodeQcBandMeasureFrame(bytes);
+        if (frame && frame.subType === 0x03 && frame.errorCode === 0) {
+          const v = frame.value;
+          if (v >= 70 && v <= 100) setSpo2Pct(v);
+        } else if (frame && frame.subType === 0x01 && frame.errorCode === 0 && frame.value > 0) {
+          // Some firmwares deliver HR via the 0x69 channel too.
+          if (frame.value < 250) {
+            setHeartRateBpm(frame.value);
+            setHeartRateAt(Date.now());
+          }
+        }
       }
       return;
     }
@@ -390,6 +455,8 @@ export function useVyroBand() {
     heartRateBpm,
     heartRateAt,
     batteryPct,
+    batteryCharging,
+    spo2Pct,
     restingHrBpm,
     hrvMs,
     respRateBrpm,

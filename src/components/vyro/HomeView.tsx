@@ -608,13 +608,26 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             hint={m.stressScore != null ? "HR load · HRV" : "needs HR + HRV"}
             live={m.stressScore != null}
           />
-          <VitalTile label="SpO₂" value="—" unit="%" tone="mint" hint="not exposed by firmware" />
+          <VitalTile
+            label="SpO₂"
+            value={m.spo2Pct != null ? String(m.spo2Pct) : "—"}
+            unit="%"
+            tone="mint"
+            hint={m.spo2Pct != null ? "from watch" : "measuring — finger still on watch"}
+            live={m.spo2Pct != null}
+          />
           <VitalTile
             label="Watch battery"
             value={m.batteryPct != null ? String(m.batteryPct) : "—"}
             unit="%"
             tone="mint"
-            hint={m.batteryPct != null ? "from watch" : "awaiting battery service"}
+            hint={
+              m.batteryPct != null
+                ? m.batteryCharging
+                  ? "charging"
+                  : "from watch"
+                : "awaiting battery service"
+            }
           />
           <VitalTile
             label="Peak Accel"
