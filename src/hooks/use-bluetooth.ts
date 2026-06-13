@@ -88,64 +88,56 @@ export function useBluetooth() {
   }, []);
 
   const scan = useCallback(async (services: string[] = [], durationMs = 10000) => {
-      setError(null);
-      setDevices({});
+    setError(null);
+    setDevices({});
 
-      if (!isNative) {
-        const nav = navigator as Navigator & {
-          bluetooth?: {
-            requestDevice: (opts: unknown) => Promise<BrowserBluetoothDevice>;
-          };
+    if (!isNative) {
+      const nav = navigator as Navigator & {
+        bluetooth?: {
+          requestDevice: (opts: unknown) => Promise<BrowserBluetoothDevice>;
         };
-        if (!nav.bluetooth?.requestDevice) {
-          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "");
-          setError(
-            isIOS
-              ? "BLE bridge not detected. Reopen the app from the TestFlight build (Despia/Capacitor) — Safari/WKWebView have no Web Bluetooth on iOS."
-              : "Web Bluetooth is not available in this browser. Open this page inside the TestFlight build, or use Chrome/Edge on desktop.",
-          );
-          return;
-        }
-        setScanning(true);
-        try {
-          const d = await nav.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: services.length
-              ? services
-              : [
-                  "battery_service",
-                  "device_information",
-                  "heart_rate",
-                  0xfee7,
-                  0xfee0,
-                  0xfff0,
-                  0xffe0,
-                ],
-          });
-          browserDevices.set(d.id, d);
-          setDevices((prev) => ({
-            ...prev,
-            [d.id]: { id: d.id, name: d.name || "Unknown device" },
-          }));
-        } catch (err) {
-          const msg = (err as Error)?.message || String(err);
-          if (!/cancell?ed|NotFoundError/i.test(msg)) setError(msg);
-        } finally {
-          setScanning(false);
-        }
+      };
+      if (!nav.bluetooth?.requestDevice) {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "");
+        setError(
+          isIOS
+            ? "BLE bridge not detected. Reopen the app from the TestFlight build (Despia/Capacitor) — Safari/WKWebView have no Web Bluetooth on iOS."
+            : "Web Bluetooth is not available in this browser. Open this page inside the TestFlight build, or use Chrome/Edge on desktop.",
+        );
         return;
       }
-
+      setScanning(true);
       try {
-        await bluetooth.state();
-        setScanning(true);
-        await bluetooth.scan(services, durationMs);
-        window.setTimeout(() => setScanning(false), durationMs + 500);
+        const d = await nav.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: services.length
+            ? services
+            : ["battery_service", "device_information", "heart_rate", 0xfee7, 0xfee0, 0xfff0, 0xffe0],
+        });
+        browserDevices.set(d.id, d);
+        setDevices((prev) => ({
+          ...prev,
+          [d.id]: { id: d.id, name: d.name || "Unknown device" },
+        }));
       } catch (err) {
+        const msg = (err as Error)?.message || String(err);
+        if (!/cancell?ed|NotFoundError/i.test(msg)) setError(msg);
+      } finally {
         setScanning(false);
-        setError((err as Error)?.message || String(err));
       }
-    }, []);
+      return;
+    }
+
+    try {
+      await bluetooth.state();
+      setScanning(true);
+      await bluetooth.scan(services, durationMs);
+      window.setTimeout(() => setScanning(false), durationMs + 500);
+    } catch (err) {
+      setScanning(false);
+      setError((err as Error)?.message || String(err));
+    }
+  }, []);
 
   const stopScan = useCallback(async () => {
     await bluetooth.stopScan();
