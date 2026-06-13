@@ -247,6 +247,43 @@ function CoachBrief({
   );
 }
 
+function VitalTile({
+  label,
+  value,
+  unit,
+  delta,
+  tone,
+  hint,
+  live,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  delta?: string;
+  tone: Tone;
+  hint?: string;
+  live?: boolean;
+}) {
+  const deltaCls = !delta || delta === "0" ? "text-vyro-mute" : tone === "rose" ? "text-vyro-rose" : tone === "amber" ? "text-vyro-amber" : "text-vyro-mint";
+  return (
+    <div className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">{label}</div>
+        {live && <Pill tone="live" pulse>live</Pill>}
+      </div>
+      <div className="mt-1 flex items-baseline gap-1">
+        <span className="text-xl font-black tabular-nums text-vyro-text">{value}</span>
+        {unit && <span className="text-[10px] font-semibold text-vyro-mute">{unit}</span>}
+      </div>
+      <div className="mt-0.5 flex items-center justify-between gap-2">
+        {delta && <span className={`font-mono text-[10px] font-bold tabular-nums ${deltaCls}`}>{delta}</span>}
+        {hint && <span className="truncate text-[9px] text-vyro-mute">{hint}</span>}
+      </div>
+    </div>
+  );
+}
+
+
 function PlanRow({ index, title, detail, tone }: { index: string; title: string; detail: string; tone: Tone }) {
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-vyro-line bg-vyro-elev p-3">
