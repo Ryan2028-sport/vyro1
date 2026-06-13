@@ -3,6 +3,7 @@
 // so calls become safe no-ops in regular browsers.
 
 import despia from "despia-native";
+import { BleClient, dataViewToHexString, hexStringToDataView, type ScanResult } from "@capacitor-community/bluetooth-le";
 
 // Detect the native iOS wrapper. Despia injects "despia" into the UA, but
 // the Capacitor TestFlight build does NOT — it sets window.Capacitor and the
@@ -194,6 +195,38 @@ function emit<K extends keyof BleEventMap>(key: K, payload: BleEventMap[K]) {
       console.warn("[despia] ble listener error", err);
     }
   }
+}
+
+let capacitorBleReady = false;
+
+async function ensureCapacitorBle(): Promise<boolean> {
+  const w = typeof window !== "undefined" ? (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }) : undefined;
+  if (!w?.Capacitor) return false;
+  try {
+    if (!capacitorBleReady) {
+      await BleClient.initialize();
+      capacitorBleReady = true;
+    }
+    const enabled = await BleClient.isEnabled();
+    emit("state", { state: enabled ? "on" : "off" });
+    return true;
+  } catch (err) {
+    const message = (err as Error)?.message || String(err);
+    const denied = /permission|unauthori[sz]ed|denied/i.test(message);
+    emit("state", { state: denied ? "unauthorized" : "unsupported" });
+    emit("event", { type: "capacitor_ble_error", message });
+    console.warn("[capacitor-ble] init/state failed", err);
+    return true;
+  }
+}
+
+function mapCapacitorScanResult(result: ScanResult): BleDevice {
+  return {
+    id: result.device.deviceId,
+    name: result.localName || result.device.name || "Unknown device",
+    rssi: result.rssi,
+    services: result.uuids || result.device.uuids,
+  };
 }
 
 // Wire up the global callbacks Despia fires from native.
