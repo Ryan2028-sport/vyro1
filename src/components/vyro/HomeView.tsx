@@ -18,7 +18,7 @@ import {
   Trophy,
   TrendingUp,
   Utensils,
-  Video,
+  
   Zap,
 } from "lucide-react";
 import { getCoachInsight } from "@/lib/coach-insight.functions";
@@ -29,15 +29,24 @@ import { computeReadiness, computeSubScores, recoveryBand, useLiveMetrics } from
 
 type Tone = "mint" | "amber" | "rose" | "spatial";
 
-// Top-of-page quick links navigate to views that AREN'T already in the
-// bottom tab bar — bottom bar already has Home/Session/Recovery/Sleep/More.
-const QUICK_LINKS: { id: ViewId; label: string; icon: LucideIcon }[] = [
-  { id: "coach", label: "Coach", icon: Sparkles },
-  { id: "diet", label: "Fuel", icon: Utensils },
-  { id: "trends", label: "Trends", icon: LineChart },
-  { id: "video", label: "Video", icon: Video },
-  { id: "athlete", label: "Vitals", icon: HeartPulse },
+// Top-of-page quick links jump to sections WITHIN the Athlete tab so the
+// page doesn't feel like endless scrolling. The bottom tab bar handles
+// cross-view navigation (Session / Recovery / Sleep / More).
+const QUICK_LINKS: { anchor: string; label: string; icon: LucideIcon }[] = [
+  { anchor: "section-vitals", label: "Vitals", icon: HeartPulse },
+  { anchor: "section-coach", label: "Coach", icon: Sparkles },
+  { anchor: "section-diet", label: "Fuel", icon: Utensils },
+  { anchor: "section-court", label: "Court", icon: Target },
+  { anchor: "section-plan", label: "Plan", icon: Activity },
+  { anchor: "section-trends", label: "Trends", icon: LineChart },
 ];
+
+function scrollToAnchor(id: string) {
+  if (typeof document === "undefined") return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 
 function greeting() {
@@ -379,10 +388,10 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         </div>
 
         <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4">
-          {QUICK_LINKS.map(({ id, label, icon: Icon }) => (
+          {QUICK_LINKS.map(({ anchor, label, icon: Icon }) => (
             <button
-              key={id}
-              onClick={() => setView(id)}
+              key={anchor}
+              onClick={() => scrollToAnchor(anchor)}
               className="inline-flex shrink-0 snap-start items-center gap-2 rounded-full border border-vyro-line bg-vyro-panel px-3.5 py-2 text-[12px] font-bold text-vyro-text/80 hover:border-vyro-mint/40 hover:text-vyro-mint"
             >
               <Icon className="h-3.5 w-3.5" />
@@ -508,6 +517,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       </Card>
 
       {/* Base readiness — 4 stat panel mirroring the brief */}
+      <div id="section-trends" className="scroll-mt-24">
       <Card
         eyebrow="Base readiness"
         title="Today's subscores"
@@ -531,8 +541,10 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           ))}
         </div>
       </Card>
+      </div>
 
       {/* Full vitals — Goodix GH3026 + ST 6-axis IMU readout */}
+      <div id="section-vitals" className="scroll-mt-24">
       <Card
         eyebrow="Vitals · Goodix GH3026 + ST 6-axis IMU"
         title={<span className="inline-flex items-center gap-2"><HeartPulse className="h-4 w-4 text-vyro-rose" /> Live body signals</span>}
@@ -549,8 +561,10 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           <VitalTile label="Steps" value="13,645" unit="" delta="+1,803" tone="mint" hint="updates every second" live />
         </div>
       </Card>
+      </div>
 
       {/* Diet coach — daily kcal balance */}
+      <div id="section-diet" className="scroll-mt-24">
       <Card
         eyebrow="Diet Coach"
         title={<span className="inline-flex items-center gap-2"><Utensils className="h-4 w-4 text-vyro-amber" /> 2,600 kcal intake goal</span>}
@@ -571,10 +585,11 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           <Plus className="h-3.5 w-3.5" /> Log a meal
         </button>
       </Card>
+      </div>
 
 
 
-      <section className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+      <section id="section-court" className="scroll-mt-24 grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
         <CourtLoadMap
           agility={agility}
           strain={strain}
@@ -583,6 +598,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           peakG={m.connected ? m.peakG : 0}
           connected={m.connected}
         />
+        <div id="section-coach" className="scroll-mt-24">
         <Card
           eyebrow="AI coach"
           title={<span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-vyro-mint" /> Today's edge</span>}
@@ -602,8 +618,10 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             />
           </div>
         </Card>
+        </div>
       </section>
 
+      <div id="section-plan" className="scroll-mt-24">
       <Card
         eyebrow="Today's plan"
         title="Next best session"
@@ -635,6 +653,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           </button>
         </div>
       </Card>
+      </div>
 
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
