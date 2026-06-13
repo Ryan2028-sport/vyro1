@@ -447,7 +447,14 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       </section>
 
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-        <CourtLoadMap agility={agility} strain={strain} />
+        <CourtLoadMap
+          agility={agility}
+          strain={strain}
+          fatigue={fatigue}
+          eventsLastMin={m.connected ? m.eventsLastMin : 0}
+          peakG={m.connected ? m.peakG : 0}
+          connected={m.connected}
+        />
         <Card
           eyebrow="AI coach"
           title={<span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-vyro-mint" /> Today's edge</span>}
