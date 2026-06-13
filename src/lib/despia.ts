@@ -3,7 +3,12 @@
 // so calls become safe no-ops in regular browsers.
 
 import despia from "despia-native";
-import { BleClient, dataViewToHexString, hexStringToDataView, type ScanResult } from "@capacitor-community/bluetooth-le";
+import {
+  BleClient,
+  dataViewToHexString,
+  hexStringToDataView,
+  type ScanResult,
+} from "@capacitor-community/bluetooth-le";
 
 // Detect the native iOS wrapper. Despia injects "despia" into the UA, but
 // the Capacitor TestFlight build does NOT — it sets window.Capacitor and the
@@ -13,14 +18,25 @@ import { BleClient, dataViewToHexString, hexStringToDataView, type ScanResult } 
 // native: Despia UA, Capacitor bridge, or the standalone PWA install.
 function detectNative(): boolean {
   if (typeof navigator === "undefined") return false;
-  const w = typeof window !== "undefined" ? (window as unknown as { Capacitor?: unknown; webkit?: { messageHandlers?: unknown }; despia?: unknown }) : undefined;
+  const w =
+    typeof window !== "undefined"
+      ? (window as unknown as {
+          Capacitor?: unknown;
+          webkit?: { messageHandlers?: unknown };
+          despia?: unknown;
+        })
+      : undefined;
   const ua = navigator.userAgent || "";
   if (/despia/i.test(ua)) return true;
   if (w?.Capacitor) return true;
   if (w?.despia) return true;
   // WKWebView on iOS (TestFlight wrappers) exposes webkit.messageHandlers
   // and reports as iPhone/iPad with no Safari token in the UA.
-  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! > 1);
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (ua.includes("Mac") &&
+      (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! >
+        1);
   const inAppWebView = !!w?.webkit?.messageHandlers || (isIOS && !/Safari\//.test(ua));
   return isIOS && inAppWebView;
 }
@@ -74,12 +90,9 @@ export const biometrics = {
 };
 
 export const share = (message: string, url: string) =>
-  run(
-    `shareapp://message?=${encodeURIComponent(message)}&url=${encodeURIComponent(url)}`,
-  );
+  run(`shareapp://message?=${encodeURIComponent(message)}&url=${encodeURIComponent(url)}`);
 
-export const saveImage = (url: string) =>
-  run(`savethisimage://?url=${encodeURIComponent(url)}`);
+export const saveImage = (url: string) => run(`savethisimage://?url=${encodeURIComponent(url)}`);
 
 export const statusBar = {
   color: (hex: string) => run(`statusbarcolor://{${hex}}`),
@@ -89,22 +102,18 @@ export const statusBar = {
 };
 
 export const appInfo = () =>
-  runWatch<{ versionNumber: string; bundleNumber: string }>(
-    "getappversion://",
-    ["versionNumber", "bundleNumber"],
-  );
+  runWatch<{ versionNumber: string; bundleNumber: string }>("getappversion://", [
+    "versionNumber",
+    "bundleNumber",
+  ]);
 
-export const deviceUuid = () =>
-  runWatch<{ uuid: string }>("get-uuid://", ["uuid"]);
+export const deviceUuid = () => runWatch<{ uuid: string }>("get-uuid://", ["uuid"]);
 
 export const push = {
   register: () => run("registerpush://"),
   playerId: () =>
-    runWatch<{ onesignalPlayerId: string }>("getonesignalplayerid://", [
-      "onesignalPlayerId",
-    ]),
-  localMessage: (msg: string) =>
-    run(`sendlocalpushmsg://${encodeURIComponent(msg)}`),
+    runWatch<{ onesignalPlayerId: string }>("getonesignalplayerid://", ["onesignalPlayerId"]),
+  localMessage: (msg: string) => run(`sendlocalpushmsg://${encodeURIComponent(msg)}`),
 };
 
 export const location = {
