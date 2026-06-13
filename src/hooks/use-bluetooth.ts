@@ -162,6 +162,10 @@ export function useBluetooth() {
   const connect = useCallback(async (id: string) => {
     setConnectionState("connecting");
     setError(null);
+    if (isNative && scanning) {
+      await bluetooth.stopScan().catch(() => undefined);
+      setScanning(false);
+    }
 
     const browserDevice = browserDevices.get(id);
     if (browserDevice) {
@@ -228,7 +232,7 @@ export function useBluetooth() {
     }
 
     await bluetooth.connect(id, { autoConnect: true, timeout: 60000 });
-  }, [devices]);
+  }, [devices, scanning]);
 
   const disconnect = useCallback(async (id: string) => {
     const browserDevice = browserDevices.get(id);

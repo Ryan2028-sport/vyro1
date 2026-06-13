@@ -207,6 +207,13 @@ function emit<K extends keyof BleEventMap>(key: K, payload: BleEventMap[K]) {
 
 let capacitorBleReady = false;
 
+const KNOWN_WATCH_SERVICES = [
+  "6e40fff0-b5a3-f393-e0a9-e50e24dcca9e",
+  "0000180d-0000-1000-8000-00805f9b34fb",
+  "0000180f-0000-1000-8000-00805f9b34fb",
+  "0000180a-0000-1000-8000-00805f9b34fb",
+];
+
 async function ensureCapacitorBle(): Promise<boolean> {
   const w =
     typeof window !== "undefined"
@@ -258,6 +265,29 @@ function mapCapacitorDevice(device: {
   };
 }
 
+async function emitConnectedCapacitorDevices(services: string[] = []): Promise<BleDevice[]> {
+  const serviceList = services.length ? services : KNOWN_WATCH_SERVICES;
+  const seen = new Map<string, BleDevice>();
+  for (const service of serviceList) {
+    try {
+      const devices = await BleClient.getConnectedDevices([service]);
+      for (const device of devices) {
+        const mapped = mapCapacitorDevice(device);
+        const existing = seen.get(mapped.id);
+        seen.set(mapped.id, {
+          ...existing,
+          ...mapped,
+          services: Array.from(new Set([...(existing?.services || []), ...(mapped.services || []), service])),
+        });
+      }
+    } catch (err) {
+      console.warn("[capacitor-ble] getConnectedDevices failed", service, err);
+    }
+  }
+  for (const device of seen.values()) emit("device", device);
+  return [...seen.values()];
+}
+
 // Wire up the global callbacks Despia fires from native.
 // These MUST be defined before any despia() BLE command runs — the native
 // side does not buffer foreground events, so late handlers miss events.
@@ -277,6 +307,7 @@ export const bluetooth = {
   /** Start scanning. `services` is an optional UUID allow-list. */
   scan: async (services: string[] = [], durationMs = 10000) => {
     if (await ensureCapacitorBle()) {
+      await emitConnectedCapacitorDevices(services);
       // IMPORTANT: on iOS Core Bluetooth, passing `services: []` filters to
       // an empty allow-list and returns ZERO devices. Only include the
       // `services` key when the caller actually supplied UUIDs.
@@ -332,6 +363,7 @@ export const bluetooth = {
       try {
         const savedDevices = await BleClient.getDevices([id]).catch(() => []);
         for (const device of savedDevices) emit("device", mapCapacitorDevice(device));
+        if (savedDevices.length === 0) await emitConnectedCapacitorDevices();
         await BleClient.connect(
           id,
           (deviceId) => emit("connect", { id: deviceId, state: "disconnected" }),

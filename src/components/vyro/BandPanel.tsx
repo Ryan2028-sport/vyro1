@@ -9,6 +9,7 @@ import type { VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
 import { Card, Pill } from "./shared";
+import { QCBAND_SERVICE_UUID } from "@/lib/vyro-ble/qcband";
 
 
 function fmtSat(v: { value: number; saturated: boolean }, unit: string, dp = 2) {
@@ -25,6 +26,27 @@ function summarise(ev: VyroMotionEvent): string {
     case "direction_change":
       return `${fmtSat(ev.accelPeakG, "g")} · gap ${ev.gapMs}ms`;
   }
+}
+
+function sameDeviceId(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const clean = (v: string) => v.toLowerCase().replace(/[^a-f0-9]/g, "");
+  return clean(a) !== "" && clean(a) === clean(b);
+}
+
+function isLikelyBand(device: { name?: string; services?: string[] }): boolean {
+  const name = (device.name || "").toLowerCase();
+  const services = (device.services || []).map((s) => s.toLowerCase());
+  return (
+    /vyro|qc|band|watch|oudmon|smart/i.test(name) ||
+    services.some(
+      (s) =>
+        s.includes(QCBAND_SERVICE_UUID.toLowerCase()) ||
+        s.includes("180d") ||
+        s.includes("180f"),
+    )
+  );
 }
 
 export function BandPanel({
@@ -59,6 +81,14 @@ export function BandPanel({
   useEffect(() => {
     setDiscoveryTicks((n) => n + 1);
   }, [ble.devices.length]);
+
+  useEffect(() => {
+    if (connected || ble.connectionState === "connecting") return;
+    const pairedTarget = pairedId ? ble.devices.find((d) => sameDeviceId(d.id, pairedId)) : null;
+    const likelyBands = ble.devices.filter(isLikelyBand);
+    const target = pairedTarget || (likelyBands.length === 1 ? likelyBands[0] : null);
+    if (target) void ble.connect(target.id);
+  }, [pairedId, connected, ble.connectionState, ble.devices, ble.connect]);
 
   useEffect(() => {
     if (!ble.connectedId) return;
@@ -125,7 +155,10 @@ export function BandPanel({
             {ble.scanning ? "Scanning for nearby bands…" : "Tap scan to find your band"}
           </div>
           <button
-            onClick={() => (ble.scanning ? ble.stopScan() : ble.scan([], 8000))}
+            onClick={() => {
+              if (ble.scanning) void ble.stopScan();
+              else void ble.scan([], 8000);
+            }}
             className="shrink-0 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-1.5 text-xs font-semibold text-vyro-text hover:bg-vyro-text/[0.04]"
           >
             {ble.scanning ? "Stop" : "Scan"}
