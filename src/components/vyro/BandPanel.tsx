@@ -9,6 +9,7 @@ import type { VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
 import { Card, Pill } from "./shared";
+import { QCBAND_SERVICE_UUID } from "@/lib/vyro-ble/qcband";
 
 
 function fmtSat(v: { value: number; saturated: boolean }, unit: string, dp = 2) {
@@ -32,6 +33,20 @@ function sameDeviceId(a: string | null | undefined, b: string | null | undefined
   if (a === b) return true;
   const clean = (v: string) => v.toLowerCase().replace(/[^a-f0-9]/g, "");
   return clean(a) !== "" && clean(a) === clean(b);
+}
+
+function isLikelyBand(device: { name?: string; services?: string[] }): boolean {
+  const name = (device.name || "").toLowerCase();
+  const services = (device.services || []).map((s) => s.toLowerCase());
+  return (
+    /vyro|qc|band|watch|oudmon|smart/i.test(name) ||
+    services.some(
+      (s) =>
+        s.includes(QCBAND_SERVICE_UUID.toLowerCase()) ||
+        s.includes("180d") ||
+        s.includes("180f"),
+    )
+  );
 }
 
 export function BandPanel({
@@ -68,8 +83,12 @@ export function BandPanel({
   }, [ble.devices.length]);
 
   useEffect(() => {
-    if (!pairedId || connected || ble.connectionState === "connecting") return;
-    const target = ble.devices.find((d) => sameDeviceId(d.id, pairedId));
+    if (connected || ble.connectionState === "connecting") return;
+    const target = pairedId
+      ? ble.devices.find((d) => sameDeviceId(d.id, pairedId))
+      : ble.devices.filter(isLikelyBand).length === 1
+        ? ble.devices.filter(isLikelyBand)[0]
+        : null;
     if (target) void ble.connect(target.id);
   }, [pairedId, connected, ble.connectionState, ble.devices, ble.connect]);
 
