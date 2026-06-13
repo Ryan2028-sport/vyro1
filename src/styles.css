@@ -60,17 +60,25 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* VYRO design tokens (Cupertino bento, light mode) */
-  --color-vyro-canvas: var(--vyro-canvas);
-  --color-vyro-surface: var(--vyro-surface);
-  --color-vyro-recovery: var(--vyro-recovery);
+  /* VYRO design tokens — dark athlete-intelligence theme */
+  --color-vyro-ink: var(--vyro-ink);
+  --color-vyro-panel: var(--vyro-panel);
+  --color-vyro-elev: var(--vyro-elev);
+  --color-vyro-line: var(--vyro-line);
+  --color-vyro-text: var(--vyro-text);
+  --color-vyro-mute: var(--vyro-mute);
+  --color-vyro-mint: var(--vyro-mint);
+  --color-vyro-amber: var(--vyro-amber);
+  --color-vyro-rose: var(--vyro-rose);
+  --color-vyro-canvas: var(--vyro-ink);
+  --color-vyro-surface: var(--vyro-panel);
+  --color-vyro-recovery: var(--vyro-mint);
   --color-vyro-spatial: var(--vyro-spatial);
-  --color-vyro-fatigue: var(--vyro-fatigue);
-  /* Aliases matching tailwind.config naming */
-  --color-vyro-positive: var(--vyro-recovery);
-  --color-vyro-alert: var(--vyro-fatigue);
-  --color-vyro-session: var(--vyro-session);
-  --color-vyro-coach: var(--vyro-coach);
+  --color-vyro-fatigue: var(--vyro-rose);
+  --color-vyro-positive: var(--vyro-mint);
+  --color-vyro-alert: var(--vyro-amber);
+  --color-vyro-session: var(--vyro-mint);
+  --color-vyro-coach: var(--vyro-amber);
 }
 
 /* Slim scrollbar for a "thin" feel */
