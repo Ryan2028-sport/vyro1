@@ -390,5 +390,9 @@ export function useVyroBand() {
     heartRateBpm,
     heartRateAt,
     batteryPct,
+    restingHrBpm,
+    hrvMs,
+    respRateBrpm,
+    stressScore,
   };
 }
