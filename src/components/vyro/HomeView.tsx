@@ -564,6 +564,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       </div>
 
       {/* Diet coach — daily kcal balance */}
+      <div id="section-diet" className="scroll-mt-24">
       <Card
         eyebrow="Diet Coach"
         title={<span className="inline-flex items-center gap-2"><Utensils className="h-4 w-4 text-vyro-amber" /> 2,600 kcal intake goal</span>}
@@ -584,6 +585,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           <Plus className="h-3.5 w-3.5" /> Log a meal
         </button>
       </Card>
+      </div>
 
 
 
