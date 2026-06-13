@@ -34,9 +34,7 @@ function detectNative(): boolean {
   // and reports as iPhone/iPad with no Safari token in the UA.
   const isIOS =
     /iPad|iPhone|iPod/.test(ua) ||
-    (ua.includes("Mac") &&
-      (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! >
-        1);
+    (ua.includes("Mac") && (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! > 1);
   const inAppWebView = !!w?.webkit?.messageHandlers || (isIOS && !/Safari\//.test(ua));
   return isIOS && inAppWebView;
 }
@@ -253,8 +251,7 @@ if (typeof window !== "undefined") {
   w.onBleScanEnd = (e: { count?: number } = {}) => emit("scanEnd", e);
   w.onBleDiscovered = (t: BleDiscovered) => emit("discovered", t);
   w.onBleWriteComplete = (e: BleWriteComplete) => emit("writeComplete", e);
-  w.onBleEvent = (e: { type: string; [k: string]: unknown }) =>
-    emit("event", e);
+  w.onBleEvent = (e: { type: string; [k: string]: unknown }) => emit("event", e);
 }
 
 export const bluetooth = {
