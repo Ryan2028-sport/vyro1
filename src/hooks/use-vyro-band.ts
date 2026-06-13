@@ -143,6 +143,8 @@ export function useVyroBand() {
       setHeartRateBpm(null);
       setHeartRateAt(null);
       setBatteryPct(null);
+      setBatteryCharging(false);
+      setSpo2Pct(null);
       setRestingHrBpm(null);
       setHrvMs(null);
       setRespRateBrpm(null);
