@@ -8,12 +8,7 @@ import {
   type BleState,
 } from "@/lib/despia";
 
-export type BleConnectionState =
-  | "idle"
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "failed";
+export type BleConnectionState = "idle" | "connecting" | "connected" | "disconnected" | "failed";
 
 export type BlePowerState = BleState["state"] | "unknown";
 
@@ -45,8 +40,7 @@ const browserDevices = new Map<string, BrowserBluetoothDevice>();
 export function useBluetooth() {
   const [devices, setDevices] = useState<Record<string, BleDevice>>({});
   const [scanning, setScanning] = useState(false);
-  const [connectionState, setConnectionState] =
-    useState<BleConnectionState>("idle");
+  const [connectionState, setConnectionState] = useState<BleConnectionState>("idle");
   const [connectedId, setConnectedId] = useState<string | null>(null);
   const [lastData, setLastData] = useState<BleDataEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,18 +64,18 @@ export function useBluetooth() {
     const offData = bluetooth.on("data", (d: BleDataEvent) => setLastData(d));
     const offState = bluetooth.on("state", (s) => {
       setPowerState(s.state);
-      if (s.state === "unauthorized")
+      if (s.state === "unauthorized") {
         setError("Bluetooth permission denied. Enable it in iOS Settings.");
-      else if (s.state === "off")
+      } else if (s.state === "off") {
         setError("Bluetooth is off. Turn it on in Control Center.");
-      else if (s.state === "unsupported")
+      } else if (s.state === "unsupported") {
         setError("Bluetooth is not supported on this device.");
-      else setError(null);
+      } else {
+        setError(null);
+      }
     });
     const offScanEnd = bluetooth.on("scanEnd", () => setScanning(false));
 
-    // Bootstrap: query current state. This also triggers the iOS permission
-    // prompt on first BLE call and unblocks subsequent scans.
     if (isNative) void bluetooth.state();
 
     return () => {
@@ -93,71 +87,65 @@ export function useBluetooth() {
     };
   }, []);
 
-  const scan = useCallback(
-    async (services: string[] = [], durationMs = 10000) => {
-      setError(null);
-      setDevices({});
+  const scan = useCallback(async (services: string[] = [], durationMs = 10000) => {
+    setError(null);
+    setDevices({});
 
-      // ---- Browser fallback (Web Bluetooth) ----
-      // Native iOS WebKit has no navigator.bluetooth, but desktop Chrome/Edge
-      // do. We use requestDevice() to show the OS chooser, then surface the
-      // picked device in the list so the rest of the UI keeps working.
-      if (!isNative) {
-        const nav = navigator as Navigator & {
-          bluetooth?: {
-            requestDevice: (opts: unknown) => Promise<BrowserBluetoothDevice>;
-          };
+    if (!isNative) {
+      const nav = navigator as Navigator & {
+        bluetooth?: {
+          requestDevice: (opts: unknown) => Promise<BrowserBluetoothDevice>;
         };
-        if (!nav.bluetooth?.requestDevice) {
-          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "");
-          setError(
-            isIOS
-              ? "BLE bridge not detected. Reopen the app from the TestFlight build (Despia/Capacitor) — Safari/WKWebView have no Web Bluetooth on iOS."
-              : "Web Bluetooth is not available in this browser. Open this page inside the TestFlight build, or use Chrome/Edge on desktop.",
-          );
-          return;
-        }
-        setScanning(true);
-        try {
-          const d = await nav.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: services.length
-              ? services
-              : [
-                  "battery_service",
-                  "device_information",
-                  "heart_rate",
-                  0xfee7,
-                  0xfee0,
-                  0xfff0,
-                  0xffe0,
-                ],
-          });
-          browserDevices.set(d.id, d);
-          setDevices((prev) => ({
-            ...prev,
-            [d.id]: { id: d.id, name: d.name || "Unknown device" },
-          }));
-        } catch (err) {
-          const msg = (err as Error)?.message || String(err);
-          if (!/cancell?ed|NotFoundError/i.test(msg)) setError(msg);
-        } finally {
-          setScanning(false);
-        }
+      };
+      if (!nav.bluetooth?.requestDevice) {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "");
+        setError(
+          isIOS
+            ? "BLE bridge not detected. Reopen the app from the TestFlight build (Despia/Capacitor) — Safari/WKWebView have no Web Bluetooth on iOS."
+            : "Web Bluetooth is not available in this browser. Open this page inside the TestFlight build, or use Chrome/Edge on desktop.",
+        );
         return;
       }
+      setScanning(true);
+      try {
+        const d = await nav.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: services.length
+            ? services
+            : [
+                "battery_service",
+                "device_information",
+                "heart_rate",
+                0xfee7,
+                0xfee0,
+                0xfff0,
+                0xffe0,
+              ],
+        });
+        browserDevices.set(d.id, d);
+        setDevices((prev) => ({
+          ...prev,
+          [d.id]: { id: d.id, name: d.name || "Unknown device" },
+        }));
+      } catch (err) {
+        const msg = (err as Error)?.message || String(err);
+        if (!/cancell?ed|NotFoundError/i.test(msg)) setError(msg);
+      } finally {
+        setScanning(false);
+      }
+      return;
+    }
 
-      // ---- Native (Despia BLE) ----
-      // Make sure we have an up-to-date power/permission read. The first call
-      // also triggers the iOS permission prompt if it hasn't appeared yet.
+    try {
       await bluetooth.state();
       setScanning(true);
       await bluetooth.scan(services, durationMs);
-      // Fallback if onBleScanEnd never arrives.
       window.setTimeout(() => setScanning(false), durationMs + 500);
-    },
-    [],
-  );
+    } catch (err) {
+      setScanning(false);
+      setError((err as Error)?.message || String(err));
+    }
+  }, []);
 
   const stopScan = useCallback(async () => {
     await bluetooth.stopScan();
@@ -171,7 +159,9 @@ export function useBluetooth() {
     const browserDevice = browserDevices.get(id);
     if (browserDevice) {
       try {
-        if (!browserDevice.gatt) throw new Error("This Bluetooth device has no GATT server.");
+        if (!browserDevice.gatt) {
+          throw new Error("This Bluetooth device has no GATT server.");
+        }
         browserDevice.addEventListener?.("gattserverdisconnected", () => {
           bluetooth.emitBrowserConnect({ id, state: "disconnected" });
         });
@@ -201,10 +191,6 @@ export function useBluetooth() {
       return;
     }
 
-    // autoConnect: true → iOS Core Bluetooth keeps the pending connection
-    // alive even when the app is backgrounded, and reconnects automatically
-    // when the peripheral comes back in range. Long timeout so the OS
-    // doesn't give up while the watch is briefly out of range.
     await bluetooth.connect(id, { autoConnect: true, timeout: 60000 });
   }, []);
 
