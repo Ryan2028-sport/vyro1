@@ -302,6 +302,7 @@ export const bluetooth = {
   /** Start scanning. `services` is an optional UUID allow-list. */
   scan: async (services: string[] = [], durationMs = 10000) => {
     if (await ensureCapacitorBle()) {
+      await emitConnectedCapacitorDevices(services);
       // IMPORTANT: on iOS Core Bluetooth, passing `services: []` filters to
       // an empty allow-list and returns ZERO devices. Only include the
       // `services` key when the caller actually supplied UUIDs.
@@ -357,6 +358,7 @@ export const bluetooth = {
       try {
         const savedDevices = await BleClient.getDevices([id]).catch(() => []);
         for (const device of savedDevices) emit("device", mapCapacitorDevice(device));
+        if (savedDevices.length === 0) await emitConnectedCapacitorDevices();
         await BleClient.connect(
           id,
           (deviceId) => emit("connect", { id: deviceId, state: "disconnected" }),
