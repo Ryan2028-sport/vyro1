@@ -28,8 +28,16 @@ import {
   type Sport,
 } from "@/lib/vyro-ble/session-control";
 import {
+  decodeQcBandBattery,
+  decodeQcBandMeasureFrame,
   decodeQcBandRealtimeHeartRate,
+  encodeQcBandBatteryRequest,
   encodeQcBandRealtimeHeartRate,
+  encodeQcBandSpo2Start,
+  encodeQcBandSpo2Stop,
+  QCBAND_CMD_BATTERY,
+  QCBAND_CMD_REALTIME_HR,
+  QCBAND_CMD_START_MEASURE,
   QCBAND_NOTIFY_CHAR_UUID,
   QCBAND_SERVICE_UUID,
   QCBAND_WRITE_CHAR_UUID,
