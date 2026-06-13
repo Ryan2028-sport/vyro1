@@ -18,7 +18,7 @@ import {
   Trophy,
   TrendingUp,
   Utensils,
-  Video,
+  
   Zap,
 } from "lucide-react";
 import { getCoachInsight } from "@/lib/coach-insight.functions";
