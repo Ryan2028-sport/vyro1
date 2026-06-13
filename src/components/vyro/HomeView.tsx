@@ -6,15 +6,20 @@ import {
   Activity,
   Brain,
   ChevronRight,
+  Droplets,
   Flame,
   Footprints,
   HeartPulse,
+  LineChart,
   Moon,
+  Plus,
   ShieldCheck,
   Sparkles,
   Target,
+  Trophy,
   TrendingUp,
   Utensils,
+  Video,
   Zap,
 } from "lucide-react";
 import { getCoachInsight } from "@/lib/coach-insight.functions";
@@ -25,13 +30,16 @@ import { computeReadiness, computeSubScores, recoveryBand, useLiveMetrics } from
 
 type Tone = "mint" | "amber" | "rose" | "spatial";
 
+// Top-of-page quick links navigate to views that AREN'T already in the
+// bottom tab bar — bottom bar already has Home/Session/Recovery/Sleep/More.
 const QUICK_LINKS: { id: ViewId; label: string; icon: LucideIcon }[] = [
-  { id: "session", label: "Start", icon: Flame },
-  { id: "recovery", label: "Recovery", icon: HeartPulse },
-  { id: "sleep", label: "Sleep", icon: Moon },
   { id: "coach", label: "Coach", icon: Sparkles },
   { id: "diet", label: "Fuel", icon: Utensils },
+  { id: "trends", label: "Trends", icon: LineChart },
+  { id: "video", label: "Video", icon: Video },
+  { id: "athlete", label: "Vitals", icon: HeartPulse },
 ];
+
 
 function greeting() {
   const h = new Date().getHours();
