@@ -455,6 +455,8 @@ export function useVyroBand() {
     heartRateBpm,
     heartRateAt,
     batteryPct,
+    batteryCharging,
+    spo2Pct,
     restingHrBpm,
     hrvMs,
     respRateBrpm,
