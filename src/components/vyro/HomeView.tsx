@@ -103,13 +103,12 @@ function MiniRing({ value, label, tone = "mint" }: { value: number | null; label
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90 block">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90 block">
           <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--vyro-line)" strokeWidth={sw} fill="none" />
           <circle
             cx={size / 2} cy={size / 2} r={r}
             stroke={stroke} strokeWidth={sw} fill="none"
             strokeDasharray={c} strokeDashoffset={c * (1 - pct)} strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 6px ${stroke})` }}
           />
         </svg>
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
