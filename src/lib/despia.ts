@@ -216,8 +216,12 @@ export const bluetooth = {
   /** Start scanning. `services` is an optional UUID allow-list. */
   scan: (services: string[] = [], durationMs = 10000) => {
     const params = new URLSearchParams();
+    // Only attach `services` when the caller actually passed UUIDs. Some
+    // native BLE bridges interpret an empty `services=` param as "filter to
+    // []" and return zero devices, instead of "no filter".
     if (services.length) params.set("services", services.join(","));
     params.set("duration", String(durationMs));
+    console.log("[despia] bluetooth scan", { services, durationMs, isNative });
     return run(`bluetooth://scan?${params.toString()}`);
   },
   stopScan: () => run("bluetooth://stopscan"),
