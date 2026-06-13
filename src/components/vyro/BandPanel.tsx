@@ -217,7 +217,7 @@ export function BandPanel({
           <button
             disabled={!otaFile || (!!otaProgress && otaProgress.phase !== "done" && !otaError)}
             onClick={runOta}
-            className="rounded-xl bg-vyro-mint px-4 py-2 text-xs font-bold text-white disabled:opacity-30"
+            className="rounded-xl bg-vyro-mint px-4 py-2 text-xs font-bold text-vyro-ink disabled:opacity-30"
           >
             {otaProgress && otaProgress.phase !== "done" && !otaError ? "Updating…" : "Start update"}
           </button>

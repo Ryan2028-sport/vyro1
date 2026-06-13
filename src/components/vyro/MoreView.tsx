@@ -21,7 +21,7 @@ export function MoreView({ setView }: { setView: (v: ViewId) => void }) {
               onClick={() => setView(spec.id)}
               className="group flex items-center gap-3 rounded-2xl border border-vyro-text/[0.07] bg-vyro-panel p-4 text-left transition-colors hover:border-vyro-text/20"
             >
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-vyro-mint text-white">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-vyro-mint text-vyro-ink">
                 <Icon className="h-5 w-5" />
               </span>
               <span className="min-w-0 flex-1">

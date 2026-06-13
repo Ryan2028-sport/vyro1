@@ -77,7 +77,7 @@ export function ProfileView() {
                   onClick={() => setSport(s)}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${
                     sport === s
-                      ? "border-vyro-mint bg-vyro-mint text-white"
+                      ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
                       : "border-vyro-text/10 bg-vyro-panel text-vyro-text/65 hover:bg-vyro-text/[0.04]"
                   }`}
                 >
@@ -95,7 +95,7 @@ export function ProfileView() {
                   onClick={() => setHand(h)}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${
                     hand === h
-                      ? "border-vyro-mint bg-vyro-mint text-white"
+                      ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
                       : "border-vyro-text/10 bg-vyro-panel text-vyro-text/65 hover:bg-vyro-text/[0.04]"
                   }`}
                 >
@@ -109,7 +109,7 @@ export function ProfileView() {
           <button
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-vyro-mint px-4 py-2.5 text-sm font-bold text-white hover:bg-vyro-text/85 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl bg-vyro-mint px-4 py-2.5 text-sm font-bold text-vyro-ink hover:bg-vyro-text/85 disabled:opacity-50"
           >
             <Save className="h-4 w-4" /> {saving ? "Saving…" : saved ? "Saved" : "Save"}
           </button>

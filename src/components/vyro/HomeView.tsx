@@ -94,7 +94,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         </div>
         <button
           onClick={() => setView("session")}
-          className="mt-3 w-full rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-mint/85"
+          className="mt-3 w-full rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-vyro-ink hover:bg-vyro-mint/85"
         >
           {m.sessionState === "live" ? "Open session console →" : "Start session →"}
         </button>
@@ -107,7 +107,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           action={
             <button
               onClick={() => setView("profile")}
-              className="rounded-full bg-vyro-mint px-4 py-2 text-xs font-semibold text-white hover:bg-vyro-text/85"
+              className="rounded-full bg-vyro-mint px-4 py-2 text-xs font-semibold text-vyro-ink hover:bg-vyro-text/85"
             >
               Pair your band
             </button>

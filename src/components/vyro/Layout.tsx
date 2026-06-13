@@ -72,7 +72,7 @@ export function Layout({
           <Logo />
           <button
             onClick={() => setView("profile")}
-            className="rounded-full border border-vyro-text/10 bg-vyro-mint px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-vyro-text/85"
+            className="rounded-full border border-vyro-text/10 bg-vyro-mint px-3 py-1.5 text-[11px] font-semibold text-vyro-ink hover:bg-vyro-text/85"
           >
             <span className="sm:hidden">Band</span>
             <span className="hidden sm:inline">Profile & Band</span>

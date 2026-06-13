@@ -116,7 +116,7 @@ export function SessionView() {
               onClick={() => band.setSport(s.id)}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 band.sport === s.id
-                  ? "border-vyro-mint bg-vyro-mint text-white"
+                  ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
                   : "border-vyro-text/10 bg-vyro-panel text-vyro-text/70 hover:bg-vyro-text/5"
               } ${band.sessionState === "live" ? "opacity-60 cursor-not-allowed" : ""}`}
             >
@@ -129,7 +129,7 @@ export function SessionView() {
             <button
               onClick={onStart}
               disabled={!live.connected}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-mint/85 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-vyro-ink hover:bg-vyro-mint/85 disabled:opacity-50"
             >
               <Play className="h-4 w-4" /> Start
             </button>
@@ -144,7 +144,7 @@ export function SessionView() {
               </button>
               <button
                 onClick={onEnd}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-text/85"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-vyro-ink hover:bg-vyro-text/85"
               >
                 <Square className="h-4 w-4" /> End & save
               </button>
@@ -154,13 +154,13 @@ export function SessionView() {
             <>
               <button
                 onClick={onStart}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-mint/85"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-vyro-ink hover:bg-vyro-mint/85"
               >
                 <Play className="h-4 w-4" /> Resume
               </button>
               <button
                 onClick={onEnd}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-white hover:bg-vyro-text/85"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-vyro-mint px-4 py-3 text-sm font-bold text-vyro-ink hover:bg-vyro-text/85"
               >
                 <Square className="h-4 w-4" /> End & save
               </button>
