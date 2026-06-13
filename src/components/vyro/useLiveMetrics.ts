@@ -5,7 +5,7 @@ export type LiveMetrics = ReturnType<typeof useLiveMetrics>;
 
 export function useLiveMetrics() {
   const ctx = useVyroBandCtx();
-  const { events, counts, connected, sessionState, ble, pairedId, pairedName } = ctx;
+  const { events, counts, connected, sessionState, ble, pairedId, pairedName, heartRateBpm, heartRateAt, batteryPct } = ctx;
   const connecting = ble.connectionState === "connecting";
 
   const derived = useMemo(() => {
@@ -59,6 +59,9 @@ export function useLiveMetrics() {
     events,
     pairedId,
     pairedName,
+    heartRateBpm,
+    heartRateAt,
+    batteryPct,
     ...derived,
   };
 }

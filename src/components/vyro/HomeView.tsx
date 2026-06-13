@@ -384,7 +384,13 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             <h1 className="mt-1 truncate text-3xl font-black tracking-tight text-vyro-text">{greeting()}, {first}</h1>
             <p className="mt-1.5 text-[12px] leading-relaxed text-vyro-mute">Squash readiness, strain, fuel and recovery in one command view.</p>
           </div>
-          <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{m.connected ? "band 94%" : "offline"}</Pill>
+          <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{
+            m.connected
+              ? (m.heartRateBpm != null
+                  ? `${m.heartRateBpm} bpm`
+                  : (m.batteryPct != null ? `band ${m.batteryPct}%` : "live"))
+              : "offline"
+          }</Pill>
         </div>
 
         <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4">
@@ -548,20 +554,32 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       <Card
         eyebrow="Vitals · Goodix GH3026 + ST 6-axis IMU"
         title={<span className="inline-flex items-center gap-2"><HeartPulse className="h-4 w-4 text-vyro-rose" /> Live body signals</span>}
-        action={<Pill tone={m.connected ? "warn" : "off"} pulse={false}>{m.connected ? "imu only" : "off"}</Pill>}
+        action={<Pill tone={m.connected ? (m.heartRateBpm != null ? "live" : "warn") : "off"} pulse={m.heartRateBpm != null}>{m.connected ? (m.heartRateBpm != null ? "streaming" : "imu only") : "off"}</Pill>}
       >
-        {/* Firmware v0.4-alpha exposes IMU motion events only. HR / SpO2 / */}
-        {/* HRV / RR / skin-temp / step characteristics are not yet on the   */}
-        {/* band's GATT table, so these tiles show "—" instead of fakes.     */}
-        {/* Peak g and events/min ARE real — wired from the IMU stream.      */}
+        {/* HR + battery tiles populate from standard GATT services on the */}
+        {/* connected watch (0x180D Heart Rate, 0x180F Battery). PPG-derived */}
+        {/* metrics still need their own characteristics on the band.       */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <VitalTile label="Resting HR" value="—" unit="bpm" tone="mint" hint="awaiting HR characteristic" />
-          <VitalTile label="Current HR" value="—" unit="bpm" tone="mint" hint="awaiting HR characteristic" />
-          <VitalTile label="Resp. Rate" value="—" unit="br/min" tone="mint" hint="awaiting PPG resp band" />
+          <VitalTile
+            label="Current HR"
+            value={m.heartRateBpm != null ? String(m.heartRateBpm) : "—"}
+            unit="bpm"
+            tone="rose"
+            hint={m.heartRateBpm != null ? "live from watch" : "awaiting HR characteristic"}
+            live={m.heartRateBpm != null}
+          />
+          <VitalTile label="Resting HR" value="—" unit="bpm" tone="mint" hint="needs 5+ min baseline" />
           <VitalTile label="HRV (RMSSD)" value="—" unit="ms" tone="mint" hint="awaiting HR characteristic" />
+          <VitalTile label="Resp. Rate" value="—" unit="br/min" tone="mint" hint="awaiting PPG resp band" />
           <VitalTile label="Stress" value="—" unit="/100" tone="mint" hint="needs HR · HRV · RR" />
           <VitalTile label="SpO₂" value="—" unit="%" tone="mint" hint="awaiting PPG SpO₂" />
-          <VitalTile label="Skin Temp" value="—" unit="°C" tone="mint" hint="awaiting temp service" />
+          <VitalTile
+            label="Watch battery"
+            value={m.batteryPct != null ? String(m.batteryPct) : "—"}
+            unit="%"
+            tone="mint"
+            hint={m.batteryPct != null ? "from watch" : "awaiting battery service"}
+          />
           <VitalTile
             label="Peak Accel"
             value={m.connected && m.peakG ? m.peakG.toFixed(2) : "—"}
@@ -572,7 +590,9 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           />
         </div>
         <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
-          Goodix GH3026 PPG service not exposed by firmware v0.4-alpha · only IMU motion events stream today
+          {m.heartRateBpm != null
+            ? "Heart rate streaming from watch (GATT 0x2A37). HRV / SpO₂ / skin-temp require firmware support."
+            : "Connected — waiting for the watch to publish its heart-rate characteristic."}
         </p>
       </Card>
       </div>
