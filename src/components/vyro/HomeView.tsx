@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { getMyProfile } from "@/lib/profile.functions";
 import { Card, EmptyState, Pill, Ring, Stat } from "./shared";
-import { recoveryBand, useLiveMetrics } from "./useLiveMetrics";
+import { computeReadiness, recoveryBand, useLiveMetrics } from "./useLiveMetrics";
 import type { ViewId } from "./Layout";
 
 function greeting() {
@@ -95,14 +95,14 @@ function Vital({
 }
 
 // Mini ring for the Base-readiness 4-up grid
-function MiniRing({ value, label, tone = "mint" }: { value: number; label: string; tone?: "mint" | "amber" | "rose" }) {
+function MiniRing({ value, label, tone = "mint" }: { value: number | null; label: string; tone?: "mint" | "amber" | "rose" }) {
   const stroke = tone === "amber" ? "var(--vyro-amber)" : tone === "rose" ? "var(--vyro-rose)" : "var(--vyro-mint)";
   const size = 86, sw = 8, r = (size - sw) / 2, c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(1, value / 100));
+  const pct = value == null ? 0 : Math.max(0, Math.min(1, value / 100));
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <div className="relative grid place-items-center" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90 block">
           <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--vyro-line)" strokeWidth={sw} fill="none" />
           <circle
             cx={size / 2} cy={size / 2} r={r}
@@ -111,8 +111,8 @@ function MiniRing({ value, label, tone = "mint" }: { value: number; label: strin
             style={{ filter: `drop-shadow(0 0 6px ${stroke})` }}
           />
         </svg>
-        <div className="absolute inset-0 grid place-items-center">
-          <div className="text-lg font-black tabular-nums text-vyro-text">{value}</div>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="text-base font-black tabular-nums text-vyro-text">{value ?? "—"}</div>
         </div>
       </div>
       <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">{label}</div>
@@ -141,15 +141,21 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   const first = (profile?.display_name || "").trim().split(/\s+/)[0] || "Athlete";
 
   const m = useLiveMetrics();
-  // Demo values mirror the reference; real values flow in as firmware lands.
-  const readiness = 78;
-  const recovery = 78;
-  const sleep = 87;
-  const fatigue = 41;
-  const agility = 88;
+  // Real readiness from live band signals (null until firmware streams them).
+  const { score: readiness } = computeReadiness({
+    connected: m.connected,
+    peakJerk: m.peakJerk || null,
+    // hrvMs / restingHrBpm / sleepScore / recoveryScore / stress / spo2
+    // will be wired here as soon as the band publishes each characteristic.
+  });
+  const recovery = readiness;
+  const sleep: number | null = null;
+  const fatigue: number | null = null;
+  const agility: number | null = null;
   const band = recoveryBand(readiness);
   const bandTone = band === "green" ? "live" : band === "red" ? "off" : "warn";
-  const bandLabel = band === "green" ? "READY" : band === "red" ? "NOT READY" : "CAUTION";
+  const bandLabel =
+    band === "green" ? "READY" : band === "red" ? "NOT READY" : band === "yellow" ? "CAUTION" : "PENDING";
 
   const todayLabel = new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 
@@ -193,12 +199,18 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             <div className="flex items-center justify-between gap-2">
               <Pill tone={bandTone} pulse={band === "green"}>{bandLabel}</Pill>
               <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
-                Recovery {recovery} · Sleep {sleep}
+                Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
               </span>
             </div>
-            <p className="mt-3 text-lg font-black leading-tight text-vyro-text">You're ready to train.</p>
+            <p className="mt-3 text-lg font-black leading-tight text-vyro-text">
+              {readiness == null
+                ? "Waiting on band signals…"
+                : readiness >= 67 ? "You're ready to train."
+                : readiness >= 34 ? "Train with caution."
+                : "Prioritize recovery."}
+            </p>
             <p className="mt-1 text-xs leading-relaxed text-vyro-mute">
-              Recovery is green and agility is sharp. Train hard, but protect the back-left corner.
+              Readiness is computed live from HRV, resting HR, sleep, stress, SpO₂ and accumulated load as the band reports them.
             </p>
           </div>
         </div>

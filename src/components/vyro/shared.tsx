@@ -148,8 +148,8 @@ export function Ring({
   const c = 2 * Math.PI * r;
   const pct = value == null ? 0 : Math.max(0, Math.min(1, value / max));
   return (
-    <div className="relative grid place-items-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90 block">
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -168,16 +168,15 @@ export function Ring({
           strokeDasharray={c}
           strokeDashoffset={c * (1 - pct)}
           strokeLinecap="round"
-          style={{ filter: "drop-shadow(0 0 8px var(--vyro-mint))" }}
+          style={{ filter: "drop-shadow(0 0 6px var(--vyro-mint))" }}
         />
       </svg>
-      <div className="absolute inset-0 grid place-items-center text-center">
-        <div>
-          <div className="text-3xl font-black tabular-nums text-vyro-text">{value ?? "—"}</div>
-          {label && <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">{label}</div>}
-          {sub && <div className="mt-0.5 font-mono text-[9px] text-vyro-mute">{sub}</div>}
-        </div>
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
+        <div className="text-2xl font-black tabular-nums text-vyro-text">{value ?? "—"}</div>
+        {label && <div className="mt-1 font-mono text-[8px] uppercase tracking-[0.18em] text-vyro-mute">{label}</div>}
+        {sub && <div className="mt-0.5 font-mono text-[8px] text-vyro-mute">{sub}</div>}
       </div>
     </div>
   );
 }
+
