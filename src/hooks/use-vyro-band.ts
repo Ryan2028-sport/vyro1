@@ -437,17 +437,42 @@ export function useVyroBand() {
           setBatteryPct(bat.level);
           setBatteryCharging(bat.charging);
         }
+      } else if (op === QCBAND_CMD_TODAY_SUMMARY) {
+        const sum = decodeQcBandTodaySummary(bytes);
+        if (sum) {
+          setStepsToday(sum.steps);
+          setDistanceM(sum.distanceM);
+          setCaloriesKcal(sum.calories);
+        }
       } else if (op === QCBAND_CMD_START_MEASURE) {
-        // SpO2 / HR start frames. sub_type 0x03 = SpO2.
         const frame = decodeQcBandMeasureFrame(bytes);
-        if (frame && frame.subType === 0x03 && frame.errorCode === 0) {
-          const v = frame.value;
-          if (v >= 70 && v <= 100) setSpo2Pct(v);
-        } else if (frame && frame.subType === 0x01 && frame.errorCode === 0 && frame.value > 0) {
-          // Some firmwares deliver HR via the 0x69 channel too.
-          if (frame.value < 250) {
+        if (!frame || frame.errorCode !== 0) return;
+        if (frame.subType === QCBAND_MEASURE_SPO2) {
+          if (frame.value >= 70 && frame.value <= 100) setSpo2Pct(frame.value);
+        } else if (frame.subType === QCBAND_MEASURE_HR) {
+          if (frame.value > 30 && frame.value < 250) {
             setHeartRateBpm(frame.value);
             setHeartRateAt(Date.now());
+          }
+        } else if (frame.subType === QCBAND_MEASURE_TEMP) {
+          const t = decodeQcBandTempPayload(frame.data);
+          if (t != null) setSkinTempC(t);
+        } else if (frame.subType === QCBAND_MEASURE_HRV) {
+          if (frame.value > 0 && frame.value < 250) setHrvMs(frame.value);
+        } else if (frame.subType === QCBAND_MEASURE_ONE_KEY) {
+          const ok = decodeQcBandOneKeyPayload(frame.data);
+          if (ok) {
+            if (ok.hr != null) {
+              setHeartRateBpm(ok.hr);
+              setHeartRateAt(Date.now());
+            }
+            if (ok.spo2 != null) setSpo2Pct(ok.spo2);
+            if (ok.tempC != null) setSkinTempC(ok.tempC);
+            if (ok.hrvMs != null) setHrvMs(ok.hrvMs);
+            if (ok.stress != null) setStressScore(ok.stress);
+            if (ok.sbp != null && ok.dbp != null) setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
+            // Respiratory rate is not in the one-key payload — leave it
+            // null until the firmware adds it (it's a separate sub-type).
           }
         }
       }
