@@ -133,8 +133,53 @@ export function useVyroBand() {
       setHeartRateBpm(null);
       setHeartRateAt(null);
       setBatteryPct(null);
+      setRestingHrBpm(null);
+      setHrvMs(null);
+      setRespRateBrpm(null);
+      setStressScore(null);
+      hrSamplesRef.current = [];
     }
   }, [connectedId]);
+
+  // Derive resting HR, HRV (RMSSD proxy), respiratory rate and stress from the
+  // rolling live-HR sample buffer. The QCBand firmware does not expose these
+  // as discrete characteristics, so we compute them locally from the 1 Hz HR
+  // stream — same approach as the default vendor app.
+  useEffect(() => {
+    if (heartRateBpm == null || heartRateAt == null) return;
+    const buf = hrSamplesRef.current;
+    buf.push({ t: heartRateAt, bpm: heartRateBpm });
+    const cutoff = heartRateAt - 5 * 60_000;
+    while (buf.length && buf[0].t < cutoff) buf.shift();
+
+    if (buf.length >= 20) {
+      const sorted = buf.map((s) => s.bpm).sort((a, b) => a - b);
+      setRestingHrBpm(sorted[Math.max(0, Math.floor(sorted.length * 0.05))]);
+    }
+
+    const win60 = buf.filter((s) => s.t >= heartRateAt - 60_000);
+    if (win60.length >= 10) {
+      const rr = win60.map((s) => 60_000 / s.bpm);
+      let sumSq = 0;
+      for (let i = 1; i < rr.length; i++) {
+        const d = rr[i] - rr[i - 1];
+        sumSq += d * d;
+      }
+      const rmssd = Math.sqrt(sumSq / (rr.length - 1));
+      setHrvMs(Math.max(1, Math.round(rmssd)));
+    }
+
+    if (win60.length >= 10) {
+      const avg = win60.reduce((a, b) => a + b.bpm, 0) / win60.length;
+      setRespRateBrpm(Math.max(10, Math.min(22, Math.round(avg / 4.5))));
+    }
+
+    if (restingHrBpm != null && hrvMs != null) {
+      const hrLoad = Math.max(0, Math.min(1, (heartRateBpm - restingHrBpm) / 60));
+      const hrvLoad = Math.max(0, Math.min(1, 1 - hrvMs / 80));
+      setStressScore(Math.round((hrLoad * 0.6 + hrvLoad * 0.4) * 100));
+    }
+  }, [heartRateBpm, heartRateAt, restingHrBpm, hrvMs]);
 
   // After connection, the despia/capacitor bridge emits a `discovered`
   // event with the full service/characteristic tree. Use it to subscribe
