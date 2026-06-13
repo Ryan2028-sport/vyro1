@@ -11,9 +11,18 @@ export const QCBAND_NOTIFY_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
 // Opcodes (selected — see Oudmon protocol).
 export const QCBAND_CMD_BATTERY = 0x03;          // 3
+export const QCBAND_CMD_TODAY_SUMMARY = 0x09;    // 9 — steps/distance/calories
 export const QCBAND_CMD_REALTIME_HR = 0x1e;      // 30 — start/end/hold poll
-export const QCBAND_CMD_START_MEASURE = 0x69;    // 105 — start HR or SpO2
-export const QCBAND_CMD_STOP_MEASURE = 0x6a;     // 106 — stop HR or SpO2
+export const QCBAND_CMD_START_MEASURE = 0x69;    // 105 — start HR/SpO2/temp/one-key
+export const QCBAND_CMD_STOP_MEASURE = 0x6a;     // 106 — stop measurement
+
+// Measurement sub-types under 0x69 / 0x6A.
+export const QCBAND_MEASURE_HR = 0x01;
+export const QCBAND_MEASURE_BP = 0x02;
+export const QCBAND_MEASURE_SPO2 = 0x03;
+export const QCBAND_MEASURE_TEMP = 0x04;
+export const QCBAND_MEASURE_HRV = 0x05;
+export const QCBAND_MEASURE_ONE_KEY = 0x06; // returns HR + HRV + SpO2 + Temp + Stress
 
 export type QcBandRealtimeHrCommand = "start" | "end" | "hold";
 
@@ -66,23 +75,107 @@ export function decodeQcBandBattery(
   return { level, charging: bytes[2] !== 0 };
 }
 
-// ---- SpO2 (cmd 0x69 / 0x6A, sub-type 0x03) -------------------------------
-// Same start/stop opcodes used for HR (sub-type 0x01) but with sub-type 0x03
-// to put the optical sensor in SpO₂ mode. Response arrives as 0x69 frames
-// shaped as: [0x69, type, error_code, value, ...].
-export function encodeQcBandSpo2Start(): Uint8Array {
-  // payload [0x03, 0x25] — sub-type=SpO2, duration marker (matches vendor app).
-  return sdkCommand([QCBAND_CMD_START_MEASURE, 0x03, 0x25]);
+// ---- Today summary / steps (0x09) ----------------------------------------
+// Response payload (after opcode): steps_lo, steps_hi, steps_hi2, distance_lo,
+// distance_hi, cal_lo, cal_hi (units: steps, meters, kcal). Some firmwares
+// pad the high byte — we mask defensively and only emit when the value is
+// plausible (< 200000 steps/day).
+export function encodeQcBandStepsRequest(): Uint8Array {
+  return sdkCommand([QCBAND_CMD_TODAY_SUMMARY]);
 }
 
-export function encodeQcBandSpo2Stop(): Uint8Array {
-  return sdkCommand([QCBAND_CMD_STOP_MEASURE, 0x03, 0x00, 0x00]);
-}
-
-export function decodeQcBandMeasureFrame(
+export function decodeQcBandTodaySummary(
   bytes: Uint8Array,
-): { subType: number; errorCode: number; value: number } | null {
+): { steps: number; distanceM: number; calories: number } | null {
+  if (bytes.length < 8) return null;
+  if (bytes[0] !== QCBAND_CMD_TODAY_SUMMARY) return null;
+  const steps = bytes[1] | (bytes[2] << 8) | (bytes[3] << 16);
+  const distanceM = bytes[4] | (bytes[5] << 8);
+  const calories = bytes[6] | (bytes[7] << 8);
+  if (steps < 0 || steps > 200_000) return null;
+  return { steps, distanceM, calories };
+}
+
+// ---- Measurement channel (0x69 / 0x6A) -----------------------------------
+// All optical-sensor measurements share the same start/stop opcodes with a
+// sub-type byte selecting which biometric to run. Response frames arrive as:
+//   [0x69, sub_type, error_code, ...values]
+// with shape per sub-type:
+//   HR    (0x01): [op, st, err, bpm]
+//   SpO2  (0x03): [op, st, err, percent]
+//   Temp  (0x04): [op, st, err, temp_int, temp_frac]   (°C = int + frac/100)
+//   HRV   (0x05): [op, st, err, rmssd_ms]
+//   1-Key (0x06): [op, st, err, hr, sbp, dbp, spo2, temp_int, temp_frac, hrv, stress]
+export function encodeQcBandMeasureStart(subType: number, duration = 0x25): Uint8Array {
+  return sdkCommand([QCBAND_CMD_START_MEASURE, subType, duration]);
+}
+export function encodeQcBandMeasureStop(subType: number): Uint8Array {
+  return sdkCommand([QCBAND_CMD_STOP_MEASURE, subType, 0x00, 0x00]);
+}
+
+// Back-compat wrappers used elsewhere.
+export function encodeQcBandSpo2Start(): Uint8Array {
+  return encodeQcBandMeasureStart(QCBAND_MEASURE_SPO2);
+}
+export function encodeQcBandSpo2Stop(): Uint8Array {
+  return encodeQcBandMeasureStop(QCBAND_MEASURE_SPO2);
+}
+
+export type QcBandMeasureFrame = {
+  subType: number;
+  errorCode: number;
+  /** First scalar value — bpm/%/etc. — kept for back-compat. */
+  value: number;
+  /** Full payload after [op, sub, err], for richer decoders. */
+  data: Uint8Array;
+};
+
+export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame | null {
   if (bytes.length < 4) return null;
   if (bytes[0] !== QCBAND_CMD_START_MEASURE) return null;
-  return { subType: bytes[1], errorCode: bytes[2], value: bytes[3] };
+  return {
+    subType: bytes[1],
+    errorCode: bytes[2],
+    value: bytes[3],
+    data: bytes.slice(3),
+  };
+}
+
+/** Decode a one-key (sub_type 0x06) payload. Returns nulls for fields the
+ *  firmware reports as 0 (means "not measured / not supported"). */
+export function decodeQcBandOneKeyPayload(data: Uint8Array): {
+  hr: number | null;
+  sbp: number | null;
+  dbp: number | null;
+  spo2: number | null;
+  tempC: number | null;
+  hrvMs: number | null;
+  stress: number | null;
+} | null {
+  if (data.length < 8) return null;
+  const hr = data[0];
+  const sbp = data[1];
+  const dbp = data[2];
+  const spo2 = data[3];
+  const tempInt = data[4];
+  const tempFrac = data[5];
+  const hrv = data[6];
+  const stress = data[7];
+  const tempC = tempInt > 0 ? tempInt + tempFrac / 100 : 0;
+  return {
+    hr: hr > 30 && hr < 220 ? hr : null,
+    sbp: sbp > 60 && sbp < 220 ? sbp : null,
+    dbp: dbp > 30 && dbp < 160 ? dbp : null,
+    spo2: spo2 >= 70 && spo2 <= 100 ? spo2 : null,
+    tempC: tempC >= 30 && tempC <= 42 ? tempC : null,
+    hrvMs: hrv > 0 && hrv < 250 ? hrv : null,
+    stress: stress > 0 && stress <= 100 ? stress : null,
+  };
+}
+
+/** Decode a temperature (sub_type 0x04) payload. */
+export function decodeQcBandTempPayload(data: Uint8Array): number | null {
+  if (data.length < 2) return null;
+  const tempC = data[0] + data[1] / 100;
+  return tempC >= 30 && tempC <= 42 ? tempC : null;
 }
