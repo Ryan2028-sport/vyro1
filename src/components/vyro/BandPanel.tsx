@@ -46,9 +46,19 @@ export function BandPanel({
   }, [defaultSport]);
 
   useEffect(() => {
-    if (!ble.scanning && ble.devices.length === 0) void ble.scan([], 8000);
+    if (!ble.scanning && ble.devices.length === 0) {
+      console.log("[BandPanel] kicking initial scan", { isNative: ble.isNative, powerState: ble.powerState });
+      void ble.scan([], 8000);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Count device-discovery callbacks so the user can see whether the native
+  // BLE bridge is firing onBleDevice at all (vs the JS layer dropping them).
+  const [discoveryTicks, setDiscoveryTicks] = useState(0);
+  useEffect(() => {
+    setDiscoveryTicks((n) => n + 1);
+  }, [ble.devices.length]);
 
   useEffect(() => {
     if (!ble.connectedId) return;
