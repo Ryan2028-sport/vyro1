@@ -6,7 +6,8 @@ import {
   Activity,
   Brain,
   ChevronRight,
-  ChevronRight,
+  Footprints,
+
 
   Footprints,
   HeartPulse,
