@@ -555,13 +555,13 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         {/* band's GATT table, so these tiles show "—" instead of fakes.     */}
         {/* Peak g and events/min ARE real — wired from the IMU stream.      */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <VitalTile label="Resting HR" value="—" unit="bpm" tone="mute" hint="awaiting HR characteristic" />
-          <VitalTile label="Current HR" value="—" unit="bpm" tone="mute" hint="awaiting HR characteristic" />
-          <VitalTile label="Resp. Rate" value="—" unit="br/min" tone="mute" hint="awaiting PPG resp band" />
-          <VitalTile label="HRV (RMSSD)" value="—" unit="ms" tone="mute" hint="awaiting HR characteristic" />
-          <VitalTile label="Stress" value="—" unit="/100" tone="mute" hint="needs HR · HRV · RR" />
-          <VitalTile label="SpO₂" value="—" unit="%" tone="mute" hint="awaiting PPG SpO₂" />
-          <VitalTile label="Skin Temp" value="—" unit="°C" tone="mute" hint="awaiting temp service" />
+          <VitalTile label="Resting HR" value="—" unit="bpm" tone="mint" hint="awaiting HR characteristic" />
+          <VitalTile label="Current HR" value="—" unit="bpm" tone="mint" hint="awaiting HR characteristic" />
+          <VitalTile label="Resp. Rate" value="—" unit="br/min" tone="mint" hint="awaiting PPG resp band" />
+          <VitalTile label="HRV (RMSSD)" value="—" unit="ms" tone="mint" hint="awaiting HR characteristic" />
+          <VitalTile label="Stress" value="—" unit="/100" tone="mint" hint="needs HR · HRV · RR" />
+          <VitalTile label="SpO₂" value="—" unit="%" tone="mint" hint="awaiting PPG SpO₂" />
+          <VitalTile label="Skin Temp" value="—" unit="°C" tone="mint" hint="awaiting temp service" />
           <VitalTile
             label="Peak Accel"
             value={m.connected && m.peakG ? m.peakG.toFixed(2) : "—"}
