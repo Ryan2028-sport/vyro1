@@ -469,6 +469,89 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         />
       </section>
 
+      {/* Recent session */}
+      <Card
+        eyebrow="Recent session"
+        title={<span className="inline-flex items-center gap-2"><Trophy className="h-4 w-4 text-vyro-mint" /> Match practice vs. Alex K.</span>}
+        action={<Pill tone="live">W 3-1</Pill>}
+      >
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">
+          <span>Squash</span><span>·</span><span>Yesterday</span><span>·</span><span>47 min</span><span>·</span><span className="text-vyro-amber">load 71</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <Stat label="T-control" value="78" unit="%" />
+          <Stat label="Decel quality" value="82" />
+          <Stat label="Recovery cost" value="64" />
+        </div>
+      </Card>
+
+      {/* Base readiness — 4 stat panel mirroring the brief */}
+      <Card
+        eyebrow="Base readiness"
+        title="Today's subscores"
+        action={<button onClick={() => setView("trends")} className="text-[11px] font-bold text-vyro-mint hover:underline">Trends</button>}
+      >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            { label: "Fatigue", value: fatigue, tone: fatigue > 60 ? "rose" : fatigue > 40 ? "amber" : "mint" },
+            { label: "Recovery", value: recovery, tone: "mint" },
+            { label: "Agility", value: agility, tone: "mint" },
+            { label: "Sleep", value: sleep, tone: "spatial" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
+              <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">{s.label}</div>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-2xl font-black tabular-nums text-vyro-text">{s.value}</span>
+                <span className="text-[10px] text-vyro-mute">/100</span>
+              </div>
+              <div className="mt-2"><ProgressLine value={Number(s.value)} tone={s.tone as Tone} /></div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Full vitals — Goodix GH3026 + ST 6-axis IMU readout */}
+      <Card
+        eyebrow="Vitals · Goodix GH3026 + ST 6-axis IMU"
+        title={<span className="inline-flex items-center gap-2"><HeartPulse className="h-4 w-4 text-vyro-rose" /> Live body signals</span>}
+        action={<Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{m.connected ? "live" : "off"}</Pill>}
+      >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <VitalTile label="Resting HR" value="48" unit="bpm" delta="-2" tone="mint" hint="nightly baseline" />
+          <VitalTile label="Current HR" value="77" unit="bpm" delta="+5" tone="rose" hint="updates every second" live />
+          <VitalTile label="Resp. Rate" value="14.4" unit="br/min" delta="0" tone="mint" hint="every few minutes" />
+          <VitalTile label="HRV (RMSSD)" value="76" unit="ms" delta="+8" tone="mint" hint="every 5 min" />
+          <VitalTile label="Stress" value="24" unit="/100" delta="-6" tone="mint" hint="HR · HRV · RR" />
+          <VitalTile label="SpO₂" value="98" unit="%" delta="0" tone="mint" hint="every few minutes" />
+          <VitalTile label="Skin Temp" value="33.7" unit="°C" delta="+0.1" tone="amber" hint="every few minutes" />
+          <VitalTile label="Steps" value="13,645" unit="" delta="+1,803" tone="mint" hint="updates every second" live />
+        </div>
+      </Card>
+
+      {/* Diet coach — daily kcal balance */}
+      <Card
+        eyebrow="Diet Coach"
+        title={<span className="inline-flex items-center gap-2"><Utensils className="h-4 w-4 text-vyro-amber" /> 2,600 kcal intake goal</span>}
+        action={<Pill tone="live">live</Pill>}
+      >
+        <div className="grid grid-cols-3 gap-2">
+          <Stat label="Eaten" value="680" unit="kcal" hint="680 / 2,600" />
+          <Stat label="Burn" value="1,842" unit="kcal" hint="active + RMR" />
+          <Stat label="Left" value="1,920" unit="kcal" hint="to hit goal" />
+        </div>
+        <div className="mt-3">
+          <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
+            <span>Intake</span><span>680 / 2,600</span>
+          </div>
+          <ProgressLine value={(680 / 2600) * 100} tone="amber" />
+        </div>
+        <button onClick={() => setView("diet")} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-vyro-amber/30 bg-vyro-amber/10 px-3 py-2 text-[12px] font-bold text-vyro-amber hover:bg-vyro-amber/15">
+          <Plus className="h-3.5 w-3.5" /> Log a meal
+        </button>
+      </Card>
+
+
+
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
         <CourtLoadMap
           agility={agility}
