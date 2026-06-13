@@ -27,6 +27,13 @@ function summarise(ev: VyroMotionEvent): string {
   }
 }
 
+function sameDeviceId(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const clean = (v: string) => v.toLowerCase().replace(/[^a-f0-9]/g, "");
+  return clean(a) !== "" && clean(a) === clean(b);
+}
+
 export function BandPanel({
   pairedId,
   pairedName,
@@ -59,6 +66,12 @@ export function BandPanel({
   useEffect(() => {
     setDiscoveryTicks((n) => n + 1);
   }, [ble.devices.length]);
+
+  useEffect(() => {
+    if (!pairedId || connected || ble.connectionState === "connecting") return;
+    const target = ble.devices.find((d) => sameDeviceId(d.id, pairedId));
+    if (target) void ble.connect(target.id);
+  }, [pairedId, connected, ble.connectionState, ble.devices, ble.connect]);
 
   useEffect(() => {
     if (!ble.connectedId) return;
@@ -125,7 +138,11 @@ export function BandPanel({
             {ble.scanning ? "Scanning for nearby bands…" : "Tap scan to find your band"}
           </div>
           <button
-            onClick={() => (ble.scanning ? ble.stopScan() : ble.scan([], 8000))}
+            onClick={() => {
+              if (ble.scanning) void ble.stopScan();
+              else if (pairedId) void ble.connect(pairedId);
+              else void ble.scan([], 8000);
+            }}
             className="shrink-0 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-1.5 text-xs font-semibold text-vyro-text hover:bg-vyro-text/[0.04]"
           >
             {ble.scanning ? "Stop" : "Scan"}
