@@ -265,10 +265,18 @@ export function useVyroBand() {
       window.setTimeout(pollBattery, 800);
       batteryTimer = window.setInterval(pollBattery, 60_000);
 
-      // Steps / distance / calories — poll opcode 0x09 every 30s. Response
-      // arrives on the same notify char and is decoded in the notify handler.
-      const pollSteps = () =>
+      // Steps / distance / calories — poll every 30s. We send all three known
+      // opcodes (0x09 / 0x07 / 0x15) since different firmwares respond on
+      // different ones. The notify handler accepts any of them.
+      const pollSteps = () => {
         void writeQcBand(service, write, encodeQcBandStepsRequest()).catch(() => undefined);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandStepsRequestAlt1()).catch(() => undefined);
+        }, 400);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandStepsRequestAlt2()).catch(() => undefined);
+        }, 800);
+      };
       window.setTimeout(pollSteps, 1_200);
       stepsTimer = window.setInterval(pollSteps, 30_000);
 
