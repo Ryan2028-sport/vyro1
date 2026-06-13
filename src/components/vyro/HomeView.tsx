@@ -413,6 +413,21 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         </div>
       </section>
 
+      {/* What changed — quick delta strip */}
+      <section className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Recovery", delta: "+6", tone: "mint" as Tone },
+          { label: "HRV", delta: "+8 ms", tone: "mint" as Tone },
+          { label: "Sleep debt", delta: "1h 24m", tone: "amber" as Tone },
+        ].map((d) => (
+          <div key={d.label} className="rounded-2xl border border-vyro-line bg-vyro-panel p-3">
+            <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">{d.label}</div>
+            <div className={`mt-1 text-base font-black tabular-nums ${d.tone === "mint" ? "text-vyro-mint" : "text-vyro-amber"}`}>{d.delta}</div>
+          </div>
+        ))}
+      </section>
+
+
       <section className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4">
         <MetricCard
           icon={HeartPulse}
