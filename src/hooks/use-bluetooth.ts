@@ -112,7 +112,15 @@ export function useBluetooth() {
           acceptAllDevices: true,
           optionalServices: services.length
             ? services
-            : ["battery_service", "device_information", "heart_rate", 0xfee7, 0xfee0, 0xfff0, 0xffe0],
+            : [
+                "battery_service",
+                "device_information",
+                "heart_rate",
+                0xfee7,
+                0xfee0,
+                0xfff0,
+                0xffe0,
+              ],
         });
         browserDevices.set(d.id, d);
         setDevices((prev) => ({
