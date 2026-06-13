@@ -116,29 +116,99 @@ function MetricCard({
   return <div className={`${cls} w-[72vw] shrink-0 sm:w-64`}>{content}</div>;
 }
 
-function CourtLoadMap({ agility, strain }: { agility: number; strain: number }) {
-  const attackX = 18 + (agility / 100) * 24;
-  const pressureY = 72 - (strain / 100) * 18;
+function CourtLoadMap({
+  agility,
+  strain,
+  fatigue,
+  eventsLastMin,
+  peakG,
+  connected,
+}: {
+  agility: number;
+  strain: number;
+  fatigue: number;
+  eventsLastMin: number;
+  peakG: number;
+  connected: boolean;
+}) {
+  // Real squash court (top-down, front wall at top, back wall at bottom):
+  // 6.4 m wide × 9.75 m long; short line 5.49 m from front wall; service
+  // boxes 1.6 m × 1.6 m in the back corners against the short line.
+  const X = 8, Y = 8, W = 112, H = 164;
+  const shortY = Y + (5.49 / 9.75) * H;
+  const halfX = X + W / 2;
+  const sbW = (1.6 / 6.4) * W;
+  const sbH = (1.6 / 9.75) * H;
+
+  const a = Math.max(0, Math.min(1, agility / 100));
+  const s = Math.max(0, Math.min(1, strain / 100));
+  const f = Math.max(0, Math.min(1, fatigue / 100));
+  const burst = Math.max(0, Math.min(1, (peakG || 0) / 6));
+  const tempo = Math.max(0, Math.min(1, (eventsLastMin || 0) / 90));
+  const backLeft = Math.min(1, 0.30 + s * 0.55 + f * 0.30);
+  const backRight = Math.min(1, 0.18 + s * 0.45 + tempo * 0.25);
+  const frontLeft = Math.min(1, 0.16 + a * 0.45 + burst * 0.25);
+  const frontRight = Math.min(1, 0.20 + a * 0.55 + tempo * 0.20);
+  const tZone = Math.min(1, 0.30 + a * 0.30 + tempo * 0.30);
+
+  const heat = (v: number) => `color-mix(in oklab, var(--vyro-amber) ${Math.round(v * 70)}%, transparent)`;
+  const status = backLeft > 0.75 || s > 0.72 ? "high load" : backLeft > 0.55 ? "watch" : "stable";
+
   return (
     <div className="overflow-hidden rounded-2xl border border-vyro-line bg-vyro-elev">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 p-4">
         <div className="min-w-0">
-          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Squash movement</div>
-          <h3 className="mt-1 text-base font-black text-vyro-text">Court pressure map</h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-vyro-mute">Back-left protection stays active when fatigue rises.</p>
+          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Squash court load</div>
+          <h3 className="mt-1 text-base font-black text-vyro-text">Pressure map</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-vyro-mute">
+            {connected ? "Live zone heat from band motion." : "Projected zones — connect band for live data."}
+          </p>
         </div>
-        <Pill tone={strain > 72 ? "warn" : "live"}>{strain > 72 ? "high load" : "stable"}</Pill>
+        <Pill tone={status === "stable" ? "live" : "warn"}>{status}</Pill>
       </div>
-      <svg viewBox="0 0 100 72" className="block h-48 w-full border-t border-vyro-line" role="img" aria-label="Squash court pressure map">
-        <rect x="9" y="7" width="82" height="58" rx="3" fill="var(--vyro-panel)" stroke="var(--vyro-line)" />
-        <path d="M9 29 H91 M50 29 V65 M28 29 V65 M72 29 V65" stroke="var(--vyro-line)" strokeWidth="1" />
-        <path d="M9 53 C24 48 36 47 50 49 C65 51 78 50 91 44" fill="none" stroke="var(--vyro-mint)" strokeWidth="2.8" strokeLinecap="round" />
-        <circle cx="50" cy="48" r="4" fill="var(--vyro-mint)" />
-        <circle cx={attackX} cy={pressureY} r="7" fill="var(--vyro-amber)" opacity="0.18" />
-        <circle cx={attackX} cy={pressureY} r="2.5" fill="var(--vyro-amber)" />
-        <text x="13" y="18" fill="var(--vyro-mute)" fontSize="5" fontFamily="monospace">BACK LEFT</text>
-        <text x="45" y="43" fill="var(--vyro-text)" fontSize="6" fontWeight="800">T</text>
-      </svg>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-t border-vyro-line p-4">
+        <svg viewBox="0 0 128 180" className="block h-72 w-full" role="img" aria-label="Squash court pressure map">
+          <rect x={X} y={Y} width={W} height={H} rx="2" fill="var(--vyro-panel)" stroke="var(--vyro-line)" strokeWidth="1.2" />
+          <rect x={X} y={Y} width={W / 2} height={shortY - Y} fill={heat(frontLeft)} />
+          <rect x={halfX} y={Y} width={W / 2} height={shortY - Y} fill={heat(frontRight)} />
+          <rect x={X} y={shortY} width={W / 2} height={Y + H - shortY} fill={heat(backLeft)} />
+          <rect x={halfX} y={shortY} width={W / 2} height={Y + H - shortY} fill={heat(backRight)} />
+          <circle cx={halfX} cy={shortY} r="14" fill={heat(tZone)} opacity="0.6" />
+          <line x1={X} y1={shortY} x2={X + W} y2={shortY} stroke="var(--vyro-text)" strokeOpacity="0.55" strokeWidth="1.4" />
+          <line x1={halfX} y1={shortY} x2={halfX} y2={Y + H} stroke="var(--vyro-text)" strokeOpacity="0.55" strokeWidth="1.4" />
+          <rect x={X} y={shortY} width={sbW} height={sbH} fill="none" stroke="var(--vyro-text)" strokeOpacity="0.55" strokeWidth="1.2" />
+          <rect x={X + W - sbW} y={shortY} width={sbW} height={sbH} fill="none" stroke="var(--vyro-text)" strokeOpacity="0.55" strokeWidth="1.2" />
+          <line x1={X} y1={Y} x2={X + W} y2={Y} stroke="var(--vyro-mint)" strokeWidth="2" />
+          <circle cx={halfX} cy={shortY} r="2.4" fill="var(--vyro-mint)" />
+          <text x={halfX + 4} y={shortY - 4} fill="var(--vyro-text)" fontSize="6" fontWeight="800">T</text>
+          <text x={X + W / 2} y={Y - 2} textAnchor="middle" fill="var(--vyro-mute)" fontSize="5" fontFamily="monospace">FRONT WALL</text>
+          <text x={X + W / 2} y={Y + H + 6} textAnchor="middle" fill="var(--vyro-mute)" fontSize="5" fontFamily="monospace">BACK WALL</text>
+          {backLeft > 0.7 && (
+            <>
+              <circle cx={X + sbW / 2} cy={shortY + sbH / 2} r="7" fill="var(--vyro-rose)" opacity="0.22" />
+              <circle cx={X + sbW / 2} cy={shortY + sbH / 2} r="2.6" fill="var(--vyro-rose)" />
+            </>
+          )}
+        </svg>
+        <div className="flex w-24 shrink-0 flex-col gap-2 text-[10px]">
+          {[
+            ["Back-L", backLeft],
+            ["Back-R", backRight],
+            ["T zone", tZone],
+            ["Front-L", frontLeft],
+            ["Front-R", frontRight],
+          ].map(([label, v]) => (
+            <div key={String(label)} className="space-y-1">
+              <div className="flex items-center justify-between font-mono uppercase tracking-[0.14em] text-vyro-mute">
+                <span>{label}</span><span>{Math.round(Number(v) * 100)}</span>
+              </div>
+              <div className="h-1 overflow-hidden rounded-full bg-vyro-line">
+                <div className="h-full rounded-full" style={{ width: `${Math.round(Number(v) * 100)}%`, background: "var(--vyro-amber)" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -377,7 +447,14 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       </section>
 
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-        <CourtLoadMap agility={agility} strain={strain} />
+        <CourtLoadMap
+          agility={agility}
+          strain={strain}
+          fatigue={fatigue}
+          eventsLastMin={m.connected ? m.eventsLastMin : 0}
+          peakG={m.connected ? m.peakG : 0}
+          connected={m.connected}
+        />
         <Card
           eyebrow="AI coach"
           title={<span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-vyro-mint" /> Today's edge</span>}
