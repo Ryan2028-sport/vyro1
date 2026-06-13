@@ -46,9 +46,19 @@ export function BandPanel({
   }, [defaultSport]);
 
   useEffect(() => {
-    if (!ble.scanning && ble.devices.length === 0) void ble.scan([], 8000);
+    if (!ble.scanning && ble.devices.length === 0) {
+      console.log("[BandPanel] kicking initial scan", { isNative: ble.isNative, powerState: ble.powerState });
+      void ble.scan([], 8000);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Count device-discovery callbacks so the user can see whether the native
+  // BLE bridge is firing onBleDevice at all (vs the JS layer dropping them).
+  const [discoveryTicks, setDiscoveryTicks] = useState(0);
+  useEffect(() => {
+    setDiscoveryTicks((n) => n + 1);
+  }, [ble.devices.length]);
 
   useEffect(() => {
     if (!ble.connectedId) return;
@@ -121,6 +131,38 @@ export function BandPanel({
             {ble.scanning ? "Stop" : "Scan"}
           </button>
         </div>
+        <div className="mb-2 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-vyro-text/55">
+          <span className="rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px]">
+            bridge: {ble.isNative ? "native" : "web"}
+          </span>
+          <span
+            className={`rounded-md border px-1.5 py-[1px] ${
+              ble.powerState === "on"
+                ? "border-emerald-500/30 bg-emerald-50 text-emerald-700"
+                : ble.powerState === "unauthorized"
+                  ? "border-rose-500/30 bg-rose-50 text-rose-700"
+                  : "border-vyro-text/10 bg-vyro-panel"
+            }`}
+          >
+            bt: {ble.powerState}
+          </span>
+          <span className="rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px]">
+            scan: {ble.scanning ? "on" : "idle"}
+          </span>
+          <span className="rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px]">
+            found: {ble.devices.length} (ticks {discoveryTicks})
+          </span>
+          {ble.lastData && (
+            <span className="rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px]">
+              data: {ble.lastData.characteristic.slice(0, 8)}
+            </span>
+          )}
+        </div>
+        {ble.powerState !== "on" && ble.isNative && (
+          <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Bluetooth state is <span className="font-mono">{ble.powerState}</span>. Tap Scan to trigger the iOS Bluetooth permission prompt, then enable it in Settings → VYRO → Bluetooth if it was previously denied.
+          </div>
+        )}
         {ble.error && (
           <div className="mb-2 rounded-lg border border-rose-500/30 bg-rose-50 px-3 py-2 text-xs text-rose-700">
             {ble.error}
