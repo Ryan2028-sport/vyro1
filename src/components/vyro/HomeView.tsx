@@ -576,11 +576,39 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             hint={m.heartRateBpm != null ? "live from watch" : "awaiting HR characteristic"}
             live={m.heartRateBpm != null}
           />
-          <VitalTile label="Resting HR" value="—" unit="bpm" tone="mint" hint="needs 5+ min baseline" />
-          <VitalTile label="HRV (RMSSD)" value="—" unit="ms" tone="mint" hint="awaiting HR characteristic" />
-          <VitalTile label="Resp. Rate" value="—" unit="br/min" tone="mint" hint="awaiting PPG resp band" />
-          <VitalTile label="Stress" value="—" unit="/100" tone="mint" hint="needs HR · HRV · RR" />
-          <VitalTile label="SpO₂" value="—" unit="%" tone="mint" hint="awaiting PPG SpO₂" />
+          <VitalTile
+            label="Resting HR"
+            value={m.restingHrBpm != null ? String(m.restingHrBpm) : "—"}
+            unit="bpm"
+            tone="mint"
+            hint={m.restingHrBpm != null ? "5-min rolling baseline" : "needs 5+ min of HR"}
+            live={m.restingHrBpm != null}
+          />
+          <VitalTile
+            label="HRV (RMSSD)"
+            value={m.hrvMs != null ? String(m.hrvMs) : "—"}
+            unit="ms"
+            tone="mint"
+            hint={m.hrvMs != null ? "60-sec rolling RR-interval" : "needs 60s of HR"}
+            live={m.hrvMs != null}
+          />
+          <VitalTile
+            label="Resp. Rate"
+            value={m.respRateBrpm != null ? String(m.respRateBrpm) : "—"}
+            unit="br/min"
+            tone="mint"
+            hint={m.respRateBrpm != null ? "HR-derived estimate" : "needs 60s of HR"}
+            live={m.respRateBrpm != null}
+          />
+          <VitalTile
+            label="Stress"
+            value={m.stressScore != null ? String(m.stressScore) : "—"}
+            unit="/100"
+            tone="mint"
+            hint={m.stressScore != null ? "HR load · HRV" : "needs HR + HRV"}
+            live={m.stressScore != null}
+          />
+          <VitalTile label="SpO₂" value="—" unit="%" tone="mint" hint="not exposed by firmware" />
           <VitalTile
             label="Watch battery"
             value={m.batteryPct != null ? String(m.batteryPct) : "—"}
