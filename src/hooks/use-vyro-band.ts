@@ -137,9 +137,11 @@ export function useVyroBand() {
   // proprietary live-HR service if present.
   useEffect(() => {
     if (!connectedId) return;
+    let cancelled = false;
     let qcBandStarted = false;
     let qcBandService: { service: string; notify: string; write: string } | null = null;
     let holdTimer: number | null = null;
+    let restartTimer: number | null = null;
 
     async function writeQcBand(service: string, write: string, bytes: Uint8Array) {
       const hex = bytesToHex(bytes);
@@ -151,17 +153,35 @@ export function useVyroBand() {
     }
 
     async function startQcBandLiveHr(service: string, notify: string, write: string) {
-      if (qcBandStarted) return;
+      if (qcBandStarted || cancelled) return;
       qcBandStarted = true;
       qcBandService = { service, notify, write };
-      await bluetooth.subscribe(connectedId!, service, notify);
-      await writeQcBand(service, write, encodeQcBandBindingAlert()).catch(() => undefined);
-      await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start"));
+      try {
+        await bluetooth.subscribe(connectedId!, service, notify);
+      } catch (err) {
+        console.warn("[vyro] QCBand notify subscribe failed", err);
+      }
+      // Send start; retry once after a short delay if the watch ignores it.
+      await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(
+        (err) => console.warn("[vyro] QCBand HR start write failed", err),
+      );
+      window.setTimeout(() => {
+        void writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(
+          () => undefined,
+        );
+      }, 1500);
+      // Keep-alive: every 8s send a "hold" so the optical sensor doesn't shut off.
       holdTimer = window.setInterval(() => {
         void writeQcBand(service, write, encodeQcBandRealtimeHeartRate("hold")).catch(
           () => undefined,
         );
-      }, 20_000);
+      }, 8_000);
+      // Re-issue "start" every minute as a safety net (some firmwares time out).
+      restartTimer = window.setInterval(() => {
+        void writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(
+          () => undefined,
+        );
+      }, 60_000);
     }
 
     const off = bluetooth.on("discovered", (tree: BleDiscovered) => {
@@ -200,9 +220,27 @@ export function useVyroBand() {
       }
     });
     void bluetooth.discover(connectedId).catch(() => undefined);
+
+    // Defensive fallback: many bridges don't emit `discovered` reliably on iOS.
+    // After a short delay, attempt to start QCBand live HR using the canonical
+    // UUIDs directly. If the device doesn't have the service the writes will
+    // just fail silently — but if it does, the user gets live HR without
+    // depending on the discovery event.
+    const fallback = window.setTimeout(() => {
+      if (qcBandStarted || cancelled) return;
+      void startQcBandLiveHr(
+        QCBAND_SERVICE_UUID,
+        QCBAND_NOTIFY_CHAR_UUID,
+        QCBAND_WRITE_CHAR_UUID,
+      ).catch(() => undefined);
+    }, 2_000);
+
     return () => {
+      cancelled = true;
       off();
+      window.clearTimeout(fallback);
       if (holdTimer != null) window.clearInterval(holdTimer);
+      if (restartTimer != null) window.clearInterval(restartTimer);
       if (qcBandService) {
         void writeQcBand(
           qcBandService.service,
@@ -215,6 +253,7 @@ export function useVyroBand() {
       }
     };
   }, [connectedId]);
+
 
   // Decode incoming notifications. Routes by characteristic UUID.
   useEffect(() => {
