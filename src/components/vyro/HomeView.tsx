@@ -544,6 +544,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
       </div>
 
       {/* Full vitals — Goodix GH3026 + ST 6-axis IMU readout */}
+      <div id="section-vitals" className="scroll-mt-24">
       <Card
         eyebrow="Vitals · Goodix GH3026 + ST 6-axis IMU"
         title={<span className="inline-flex items-center gap-2"><HeartPulse className="h-4 w-4 text-vyro-rose" /> Live body signals</span>}
@@ -560,6 +561,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           <VitalTile label="Steps" value="13,645" unit="" delta="+1,803" tone="mint" hint="updates every second" live />
         </div>
       </Card>
+      </div>
 
       {/* Diet coach — daily kcal balance */}
       <Card
