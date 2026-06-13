@@ -8,8 +8,6 @@ import {
   ChevronRight,
   Footprints,
 
-
-  Footprints,
   HeartPulse,
   LineChart,
   Moon,
