@@ -6,8 +6,8 @@ import {
   Activity,
   Brain,
   ChevronRight,
-  Droplets,
-  Flame,
+  ChevronRight,
+
   Footprints,
   HeartPulse,
   LineChart,
