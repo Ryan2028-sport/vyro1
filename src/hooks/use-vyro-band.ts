@@ -204,6 +204,8 @@ export function useVyroBand() {
     let qcBandService: { service: string; notify: string; write: string } | null = null;
     let holdTimer: number | null = null;
     let restartTimer: number | null = null;
+    let batteryTimer: number | null = null;
+    let spo2Timer: number | null = null;
 
     async function writeQcBand(service: string, write: string, bytes: Uint8Array) {
       const hex = bytesToHex(bytes);
@@ -244,6 +246,27 @@ export function useVyroBand() {
           () => undefined,
         );
       }, 60_000);
+
+      // Battery: query immediately and every 60s. Response arrives on the
+      // same notify char (opcode 0x03).
+      const pollBattery = () =>
+        void writeQcBand(service, write, encodeQcBandBatteryRequest()).catch(
+          () => undefined,
+        );
+      window.setTimeout(pollBattery, 800);
+      batteryTimer = window.setInterval(pollBattery, 60_000);
+
+      // SpO2: cycle measurement every 5 min (vendor app pattern — sensor
+      // can't run continuously). Start one shot ~3s after HR comes up.
+      const runSpo2Cycle = () => {
+        void writeQcBand(service, write, encodeQcBandSpo2Start()).catch(() => undefined);
+        // Stop after 40s so the optical sensor can rest before the next cycle.
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandSpo2Stop()).catch(() => undefined);
+        }, 40_000);
+      };
+      window.setTimeout(runSpo2Cycle, 3_000);
+      spo2Timer = window.setInterval(runSpo2Cycle, 5 * 60_000);
     }
 
     const off = bluetooth.on("discovered", (tree: BleDiscovered) => {
