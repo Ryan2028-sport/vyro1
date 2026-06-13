@@ -24,6 +24,13 @@ type VyroBandCtx = ReturnType<typeof useVyroBand> & {
 
 const Ctx = createContext<VyroBandCtx | null>(null);
 
+function sameDeviceId(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const clean = (v: string) => v.toLowerCase().replace(/[^a-f0-9]/g, "");
+  return clean(a) !== "" && clean(a) === clean(b);
+}
+
 export function useVyroBandCtx() {
   const v = useContext(Ctx);
   if (!v) throw new Error("useVyroBandCtx must be used inside <VyroBandProvider />");
@@ -38,6 +45,18 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
 
   const vyro = useVyroBand();
   const { ble } = vyro;
+  const recentlyScannedRef = useRef(0);
+
+  useEffect(() => {
+    if (!pairedId) return;
+    if (ble.connectedId && sameDeviceId(ble.connectedId, pairedId)) return;
+    if (ble.scanning) return;
+    if (ble.devices.some((d) => sameDeviceId(d.id, pairedId))) return;
+    const now = Date.now();
+    if (now - recentlyScannedRef.current < 20_000) return;
+    recentlyScannedRef.current = now;
+    void ble.scan([], 10_000);
+  }, [pairedId, ble.connectedId, ble.devices, ble.scan, ble.scanning]);
 
   // Auto-reconnect loop. Tries to (re)connect to the paired band whenever it
   // is not currently live. Uses a 6s tick; the underlying connect call is
@@ -48,11 +67,13 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
     let stopped = false;
     async function attempt() {
       if (stopped || tryingRef.current) return;
-      if (ble.connectedId === pairedId) return;
+      if (sameDeviceId(ble.connectedId, pairedId)) return;
       if (ble.connectionState === "connecting") return;
+      const target = ble.devices.find((d) => sameDeviceId(d.id, pairedId));
+      if (!target) return;
       tryingRef.current = true;
       try {
-        await ble.connect(pairedId!);
+        await ble.connect(target.id);
       } catch {
         /* swallow, the tick will retry */
       } finally {
@@ -65,7 +86,7 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
       stopped = true;
       window.clearInterval(id);
     };
-  }, [pairedId, ble.connectedId, ble.connectionState, ble.connect]);
+  }, [pairedId, ble.connectedId, ble.connectionState, ble.connect, ble.devices]);
 
   // When the page becomes visible again after a tab/app suspend, kick a
   // reconnect immediately instead of waiting for the next tick. We DO NOT
@@ -73,13 +94,15 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
   // link survives the app being backgrounded.
   useEffect(() => {
     function onVis() {
-      if (document.visibilityState === "visible" && pairedId && ble.connectedId !== pairedId) {
-        void ble.connect(pairedId);
+      if (document.visibilityState === "visible" && pairedId && !sameDeviceId(ble.connectedId, pairedId)) {
+        const target = ble.devices.find((d) => sameDeviceId(d.id, pairedId));
+        if (target) void ble.connect(target.id);
+        else void ble.scan([], 10_000);
       }
     }
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [pairedId, ble.connectedId, ble.connect]);
+  }, [pairedId, ble.connectedId, ble.connect, ble.devices, ble.scan]);
 
   // Native: enable background location so iOS keeps the app alive long
   // enough for Core Bluetooth to deliver notifications while backgrounded.
