@@ -283,20 +283,6 @@ function VitalTile({
 }
 
 
-function PlanRow({ index, title, detail, tone }: { index: string; title: string; detail: string; tone: Tone }) {
-  return (
-    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-vyro-line bg-vyro-elev p-3">
-      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border font-mono text-[10px] font-black ${toneClasses(tone)}`}>
-        {index}
-      </div>
-      <div className="min-w-0">
-        <div className="truncate text-[13px] font-black text-vyro-text">{title}</div>
-        <div className="truncate text-[11px] text-vyro-mute">{detail}</div>
-      </div>
-      <ChevronRight className="h-4 w-4 shrink-0 text-vyro-mute" />
-    </div>
-  );
-}
 
 export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   const fetchProfile = useServerFn(getMyProfile);
