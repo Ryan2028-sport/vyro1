@@ -247,7 +247,19 @@ if (typeof window !== "undefined") {
 
 export const bluetooth = {
   /** Start scanning. `services` is an optional UUID allow-list. */
-  scan: (services: string[] = [], durationMs = 10000) => {
+  scan: async (services: string[] = [], durationMs = 10000) => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.requestLEScan(
+        {
+          ...(services.length ? { services } : {}),
+          optionalServices: services,
+          allowDuplicates: false,
+        },
+        (result) => emit("device", mapCapacitorScanResult(result)),
+      );
+      window.setTimeout(() => void bluetooth.stopScan(), durationMs);
+      return;
+    }
     const params = new URLSearchParams();
     // Only attach `services` when the caller actually passed UUIDs. Some
     // native BLE bridges interpret an empty `services=` param as "filter to
@@ -257,12 +269,47 @@ export const bluetooth = {
     console.log("[despia] bluetooth scan", { services, durationMs, isNative });
     return run(`bluetooth://scan?${params.toString()}`);
   },
-  stopScan: () => run("bluetooth://stopscan"),
-  state: () => run("bluetooth://state"),
-  connect: (
+  stopScan: async () => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.stopLEScan().catch((err) => console.warn("[capacitor-ble] stop scan failed", err));
+      emit("scanEnd", {});
+      return;
+    }
+    return run("bluetooth://stopscan");
+  },
+  state: async () => {
+    if (await ensureCapacitorBle()) return;
+    return run("bluetooth://state");
+  },
+  connect: async (
     id: string,
     opts: { timeout?: number; autoConnect?: boolean; server?: string } = {},
   ) => {
+    if (await ensureCapacitorBle()) {
+      try {
+        await BleClient.connect(id, (deviceId) => emit("connect", { id: deviceId, state: "disconnected" }), {
+          timeout: opts.timeout ?? 10000,
+        });
+        emit("connect", { id, state: "connected" });
+        const services = await BleClient.getServices(id);
+        emit("discovered", {
+          id,
+          services: services.map((service) => ({
+            uuid: service.uuid,
+            characteristics: service.characteristics.map((c) => ({
+              uuid: c.uuid,
+              properties: Object.entries(c.properties)
+                .filter(([, enabled]) => enabled)
+                .map(([key]) => key),
+            })),
+          })),
+        });
+      } catch (err) {
+        const message = (err as Error)?.message || String(err);
+        emit("connect", { id, state: "failed", error: message });
+      }
+      return;
+    }
     const params = new URLSearchParams({
       id,
       timeout: String(opts.timeout ?? 10000),
