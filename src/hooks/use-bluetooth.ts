@@ -8,12 +8,7 @@ import {
   type BleState,
 } from "@/lib/despia";
 
-export type BleConnectionState =
-  | "idle"
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "failed";
+export type BleConnectionState = "idle" | "connecting" | "connected" | "disconnected" | "failed";
 
 export type BlePowerState = BleState["state"] | "unknown";
 
@@ -45,8 +40,7 @@ const browserDevices = new Map<string, BrowserBluetoothDevice>();
 export function useBluetooth() {
   const [devices, setDevices] = useState<Record<string, BleDevice>>({});
   const [scanning, setScanning] = useState(false);
-  const [connectionState, setConnectionState] =
-    useState<BleConnectionState>("idle");
+  const [connectionState, setConnectionState] = useState<BleConnectionState>("idle");
   const [connectedId, setConnectedId] = useState<string | null>(null);
   const [lastData, setLastData] = useState<BleDataEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,8 +87,7 @@ export function useBluetooth() {
     };
   }, []);
 
-  const scan = useCallback(
-    async (services: string[] = [], durationMs = 10000) => {
+  const scan = useCallback(async (services: string[] = [], durationMs = 10000) => {
       setError(null);
       setDevices({});
 
@@ -152,9 +145,7 @@ export function useBluetooth() {
         setScanning(false);
         setError((err as Error)?.message || String(err));
       }
-    },
-    [],
-  );
+    }, []);
 
   const stopScan = useCallback(async () => {
     await bluetooth.stopScan();
