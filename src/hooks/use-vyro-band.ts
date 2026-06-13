@@ -12,7 +12,7 @@
 // battery level get pushed into context and rendered by the rest of the app
 // (HomeView pill, Recovery view, etc).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useBluetooth } from "./use-bluetooth";
 import { decodeMotionEventFromString, type VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import {
