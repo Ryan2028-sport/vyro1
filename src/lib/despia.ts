@@ -318,40 +318,89 @@ export const bluetooth = {
     if (opts.server) params.set("server", opts.server);
     return run(`bluetooth://connect?${params.toString()}`);
   },
-  disconnect: (id: string) =>
-    run(`bluetooth://disconnect?id=${encodeURIComponent(id)}`),
-  discover: (id: string) =>
-    run(`bluetooth://discover?id=${encodeURIComponent(id)}`),
-  read: (id: string, service: string, characteristic: string) =>
-    run(
-      `bluetooth://read?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`,
-    ),
-  write: (
+  disconnect: async (id: string) => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.disconnect(id).catch((err) => console.warn("[capacitor-ble] disconnect failed", err));
+      emit("connect", { id, state: "disconnected" });
+      return;
+    }
+    return run(`bluetooth://disconnect?id=${encodeURIComponent(id)}`);
+  },
+  discover: async (id: string) => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.discoverServices(id);
+      const services = await BleClient.getServices(id);
+      emit("discovered", {
+        id,
+        services: services.map((service) => ({
+          uuid: service.uuid,
+          characteristics: service.characteristics.map((c) => ({
+            uuid: c.uuid,
+            properties: Object.entries(c.properties)
+              .filter(([, enabled]) => enabled)
+              .map(([key]) => key),
+          })),
+        })),
+      });
+      return;
+    }
+    return run(`bluetooth://discover?id=${encodeURIComponent(id)}`);
+  },
+  read: async (id: string, service: string, characteristic: string) => {
+    if (await ensureCapacitorBle()) {
+      const value = await BleClient.read(id, service, characteristic);
+      emit("data", { id, service, characteristic, value: dataViewToHexString(value) });
+      return;
+    }
+    return run(`bluetooth://read?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`);
+  },
+  write: async (
     id: string,
     service: string,
     characteristic: string,
     text: string,
     withResponse = true,
-  ) =>
-    run(
-      `bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`,
-    ),
-  subscribe: (
+  ) => {
+    if (await ensureCapacitorBle()) {
+      const value = hexStringToDataView(text);
+      if (withResponse) await BleClient.write(id, service, characteristic, value);
+      else await BleClient.writeWithoutResponse(id, service, characteristic, value);
+      emit("writeComplete", { id, service, characteristic, success: true });
+      return;
+    }
+    return run(`bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`);
+  },
+  subscribe: async (
     id: string,
     service: string,
     characteristic: string,
     server?: string,
   ) => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.startNotifications(id, service, characteristic, (value) => {
+        emit("data", { id, service, characteristic, value: dataViewToHexString(value) });
+      });
+      return;
+    }
     let url = `bluetooth://subscribe?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`;
     if (server) url += `&server=${encodeURIComponent(server)}`;
     return run(url);
   },
-  unsubscribe: (id: string, service: string, characteristic: string) =>
-    run(
-      `bluetooth://unsubscribe?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`,
-    ),
-  rssi: (id: string) =>
-    run(`bluetooth://rssi?id=${encodeURIComponent(id)}`),
+  unsubscribe: async (id: string, service: string, characteristic: string) => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.stopNotifications(id, service, characteristic).catch((err) => console.warn("[capacitor-ble] unsubscribe failed", err));
+      return;
+    }
+    return run(`bluetooth://unsubscribe?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`);
+  },
+  rssi: async (id: string) => {
+    if (await ensureCapacitorBle()) {
+      const value = await BleClient.readRssi(id);
+      emit("event", { type: "rssi", id, value });
+      return;
+    }
+    return run(`bluetooth://rssi?id=${encodeURIComponent(id)}`);
+  },
   emitBrowserConnect: (event: BleConnectEvent) => emit("connect", event),
   emitBrowserDiscovered: (tree: BleDiscovered) => emit("discovered", tree),
   /** Subscribe to BLE events. Returns an unsubscribe fn. */
