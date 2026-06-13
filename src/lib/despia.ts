@@ -209,7 +209,10 @@ function emit<K extends keyof BleEventMap>(key: K, payload: BleEventMap[K]) {
 let capacitorBleReady = false;
 
 async function ensureCapacitorBle(): Promise<boolean> {
-  const w = typeof window !== "undefined" ? (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }) : undefined;
+  const w =
+    typeof window !== "undefined"
+      ? (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+      : undefined;
   if (!w?.Capacitor) return false;
   try {
     if (!capacitorBleReady) {
@@ -280,7 +283,9 @@ export const bluetooth = {
   },
   stopScan: async () => {
     if (await ensureCapacitorBle()) {
-      await BleClient.stopLEScan().catch((err) => console.warn("[capacitor-ble] stop scan failed", err));
+      await BleClient.stopLEScan().catch((err) =>
+        console.warn("[capacitor-ble] stop scan failed", err),
+      );
       emit("scanEnd", {});
       return;
     }
@@ -296,9 +301,11 @@ export const bluetooth = {
   ) => {
     if (await ensureCapacitorBle()) {
       try {
-        await BleClient.connect(id, (deviceId) => emit("connect", { id: deviceId, state: "disconnected" }), {
-          timeout: opts.timeout ?? 10000,
-        });
+        await BleClient.connect(
+          id,
+          (deviceId) => emit("connect", { id: deviceId, state: "disconnected" }),
+          { timeout: opts.timeout ?? 10000 },
+        );
         emit("connect", { id, state: "connected" });
         const services = await BleClient.getServices(id);
         emit("discovered", {
