@@ -106,6 +106,11 @@ export function useVyroBand() {
   const [heartRateBpm, setHeartRateBpm] = useState<number | null>(null);
   const [heartRateAt, setHeartRateAt] = useState<number | null>(null);
   const [batteryPct, setBatteryPct] = useState<number | null>(null);
+  const [restingHrBpm, setRestingHrBpm] = useState<number | null>(null);
+  const [hrvMs, setHrvMs] = useState<number | null>(null);
+  const [respRateBrpm, setRespRateBrpm] = useState<number | null>(null);
+  const [stressScore, setStressScore] = useState<number | null>(null);
+  const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
 
   // When connected, always subscribe to the VYRO motion event characteristic
   // (cheap if the remote watch doesn't expose it — the platform just errors
