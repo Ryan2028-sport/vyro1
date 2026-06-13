@@ -72,3 +72,14 @@ export function fmtNum(
   if (!connected || n == null) return "—";
   return `${n.toFixed(digits)}${unit}`;
 }
+
+// Recovery band classification. Until the band emits HRV/sleep, this stays at
+// "unknown" — UI shows it as a yellow caution chip rather than fake green.
+export type RecoveryBand = "green" | "yellow" | "red" | "unknown";
+
+export function recoveryBand(score: number | null): RecoveryBand {
+  if (score == null) return "unknown";
+  if (score >= 67) return "green";
+  if (score >= 34) return "yellow";
+  return "red";
+}

@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { PageHeader, Pill } from "./shared";
+import { PageHeader } from "./shared";
 import { FEATURE_SPECS } from "./featureSpecs";
 import type { ViewId } from "./Layout";
 
@@ -9,7 +9,7 @@ export function MoreView({ setView }: { setView: (v: ViewId) => void }) {
       <PageHeader
         eyebrow="Modules"
         title="More"
-        subtitle="Every Vyro feature in one place. Tap any tile to see what's coming next."
+        subtitle="Every VYRO domain. Tap any tile to open the full screen."
       />
 
       <div className="grid gap-2 sm:grid-cols-2">
@@ -25,10 +25,7 @@ export function MoreView({ setView }: { setView: (v: ViewId) => void }) {
                 <Icon className="h-5 w-5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-black">{spec.label}</span>
-                  <Pill tone="warn">soon</Pill>
-                </span>
+                <span className="block text-sm font-bold text-black">{spec.label}</span>
                 <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-black/55">
                   {spec.blurb}
                 </span>

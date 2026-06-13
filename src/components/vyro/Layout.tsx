@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, Home as HomeIcon, History, LayoutGrid, User } from "lucide-react";
+import { Activity, HeartPulse, Home as HomeIcon, LayoutGrid, Moon } from "lucide-react";
 
 export type ViewId =
   | "home"
@@ -7,6 +7,7 @@ export type ViewId =
   | "history"
   | "more"
   | "profile"
+  | "athlete"
   | "sleep"
   | "recovery"
   | "trends"
@@ -15,14 +16,33 @@ export type ViewId =
   | "video"
   | "social"
   | "sport"
-  | "activity";
+  | "activity"
+  | "court"
+  | "swing"
+  | "tendency";
 
 const navItems: { id: ViewId; label: string; icon: typeof HomeIcon }[] = [
   { id: "home", label: "Home", icon: HomeIcon },
   { id: "session", label: "Session", icon: Activity },
-  { id: "history", label: "History", icon: History },
+  { id: "recovery", label: "Recovery", icon: HeartPulse },
+  { id: "sleep", label: "Sleep", icon: Moon },
   { id: "more", label: "More", icon: LayoutGrid },
-  { id: "profile", label: "Profile", icon: User },
+];
+
+const MORE_IDS: ViewId[] = [
+  "athlete",
+  "trends",
+  "diet",
+  "coach",
+  "video",
+  "social",
+  "sport",
+  "activity",
+  "court",
+  "swing",
+  "tendency",
+  "history",
+  "profile",
 ];
 
 function Logo() {
@@ -66,11 +86,7 @@ export function Layout({
         <div className="mx-auto grid max-w-[640px] grid-cols-5">
           {navItems.map(({ id, label, icon: Icon }) => {
             const active =
-              activeView === id ||
-              (id === "more" &&
-                ["sleep", "recovery", "trends", "diet", "coach", "video", "social", "sport", "activity"].includes(
-                  activeView,
-                ));
+              activeView === id || (id === "more" && MORE_IDS.includes(activeView));
             return (
               <button
                 key={id}
