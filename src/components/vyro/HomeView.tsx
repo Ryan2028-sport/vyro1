@@ -12,6 +12,7 @@ import {
   Utensils,
 } from "lucide-react";
 import { getMyProfile } from "@/lib/profile.functions";
+import { getCoachInsight } from "@/lib/coach-insight.functions";
 import { Card, EmptyState, Pill, Ring, Stat } from "./shared";
 import { computeReadiness, recoveryBand, useLiveMetrics } from "./useLiveMetrics";
 import type { ViewId } from "./Layout";
