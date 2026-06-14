@@ -1,15 +1,26 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, PageHeader, Pill, Ring, Stat } from "./shared";
 import { computeReadiness, computeSubScores, recoveryBand, useLiveMetrics } from "./useLiveMetrics";
 
 // Athlete tab — mobile-first health hub tuned for squash players.
-// Live values stream from the band; everything else degrades gracefully
-// to "—" so the layout is always populated and readable on a phone.
+// Reorganized into a hero + segmented sub-tabs so the screen never
+// requires excessive scrolling. Live values stream from the band;
+// everything else degrades gracefully to "—".
+
+type Section = "overview" | "cardiac" | "body" | "load" | "risk";
+
+const SECTIONS: { id: Section; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "cardiac", label: "Cardiac" },
+  { id: "body", label: "Body" },
+  { id: "load", label: "Load" },
+  { id: "risk", label: "Risk" },
+];
+
 export function AthleteView() {
   const m = useLiveMetrics();
+  const [section, setSection] = useState<Section>("overview");
 
-  // Derived squash-specific metrics. These are computed from whatever the
-  // band currently exposes; missing inputs collapse to null.
   const subs = useMemo(
     () =>
       computeSubScores({
@@ -23,15 +34,10 @@ export function AthleteView() {
   );
 
   const readiness = useMemo(
-    () =>
-      computeReadiness({
-        connected: m.connected,
-        peakJerk: m.peakJerk,
-      }),
+    () => computeReadiness({ connected: m.connected, peakJerk: m.peakJerk }),
     [m.connected, m.peakJerk],
   );
 
-  // Session load proxy: events/min weighted by peak jerk. Capped 0-100.
   const sessionLoad = useMemo(() => {
     if (!m.connected) return null;
     const base = Math.min(100, m.eventsLastMin * 1.4);
@@ -43,8 +49,6 @@ export function AthleteView() {
   const bandTone = band === "green" ? "live" : band === "yellow" ? "warn" : band === "red" ? "off" : "neutral";
   const bandLabel = band === "green" ? "primed" : band === "yellow" ? "manage" : band === "red" ? "recover" : "calibrating";
 
-  // Court-readiness suggestion derived from the live numbers. Pure
-  // presentational logic — no network calls, no flicker.
   const guidance = useMemo(() => {
     if (!m.connected) return "Connect the band to unlock court-ready guidance.";
     if (band === "red") return "Recovery is low. Skip ghosting drills, choose mobility + light hitting.";
@@ -66,13 +70,13 @@ export function AthleteView() {
         }
       />
 
-      {/* Hero — readiness + court guidance, mobile-stacked */}
+      {/* Sticky hero — always visible no matter which section */}
       <Card eyebrow="Court readiness" title="Today's status" action={<Pill tone={bandTone}>{bandLabel}</Pill>}>
         <div className="flex items-center gap-4">
-          <Ring value={readiness.score} label="Ready" sub={m.connected ? "live" : "off"} />
+          <Ring value={readiness.score} label="Ready" sub={m.connected ? "live" : "off"} size={108} stroke={9} />
           <div className="min-w-0 flex-1">
             <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Coach read</div>
-            <p className="mt-1 text-[13px] leading-relaxed text-vyro-text">{guidance}</p>
+            <p className="mt-1 text-[13px] leading-snug text-vyro-text">{guidance}</p>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <MiniRing value={subs.recovery} label="Recovery" />
               <MiniRing value={subs.agility} label="Agility" />
@@ -82,91 +86,130 @@ export function AthleteView() {
         </div>
       </Card>
 
-      {/* Squash load — what most fitness apps miss */}
-      <Card
-        eyebrow="Squash load · live"
-        title="On-court intensity"
-        action={<Pill tone={(sessionLoad ?? 0) > 70 ? "warn" : "live"}>{sessionLoad == null ? "—" : `${sessionLoad}/100`}</Pill>}
-      >
-        <LoadBar value={sessionLoad} />
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat label="Events / min" value={m.connected ? m.eventsLastMin : "—"} hint="rolling 60 s" />
-          <Stat label="Peak accel" value={m.connected ? m.peakG.toFixed(2) : "—"} unit="g" />
-          <Stat label="Peak jerk" value={m.connected ? m.peakJerk.toFixed(0) : "—"} unit="g/s" hint="explosiveness" />
-          <Stat label="Reaction" value={m.connected && m.reactMin != null ? m.reactMin.toFixed(0) : "—"} unit="ms" hint="fastest cut" />
+      {/* Segmented nav — replaces the long scroll */}
+      <div className="sticky top-0 z-10 -mx-4 px-4 pb-1 pt-1 bg-gradient-to-b from-vyro-ink via-vyro-ink to-transparent">
+        <div className="flex gap-1.5 overflow-x-auto rounded-full border border-vyro-line bg-vyro-panel p-1 no-scrollbar">
+          {SECTIONS.map((s) => {
+            const active = s.id === section;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setSection(s.id)}
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                  active ? "bg-vyro-mint text-vyro-ink" : "text-vyro-mute hover:text-vyro-text"
+                }`}
+              >
+                {s.label}
+              </button>
+            );
+          })}
         </div>
-      </Card>
+      </div>
 
-      {/* Cardiac */}
-      <Card eyebrow="Heart · every 1 s" title="Cardiac">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat label="Current HR" value="—" unit="bpm" hint="live" />
-          <Stat label="Resting HR" value="—" unit="bpm" hint="nightly" />
-          <Stat label="HRV (RMSSD)" value="—" unit="ms" hint="every 5 min" />
-          <Stat label="Stress" value="—" hint="HR · HRV · RR" />
-        </div>
-      </Card>
+      {section === "overview" && (
+        <Card eyebrow="At a glance" title="Right now">
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label="Current HR" value="—" unit="bpm" />
+            <Stat label="HRV" value="—" unit="ms" />
+            <Stat label="Steps" value="—" />
+            <Stat label="Active kcal" value="—" />
+            <Stat label="Squash load" value={sessionLoad ?? "—"} hint="/100" />
+            <Stat label="Wear time" value="—" unit="h" />
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-vyro-mute">
+            Tap a tab above for cardiac, body composition, on-court load and injury risk detail.
+          </p>
+        </Card>
+      )}
 
-      {/* Hydration & fueling — squash-specific */}
-      <Card eyebrow="Court fueling" title="Hydration & energy">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat label="Sweat loss" value="—" unit="ml" hint="est. per hour" />
-          <Stat label="Water target" value="—" unit="ml" hint="next 60 min" />
-          <Stat label="Sodium" value="—" unit="mg" hint="est. loss" />
-          <Stat label="Carb need" value="—" unit="g" hint="match window" />
-        </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-vyro-mute">
-          Sip 150–250 ml every 15 minutes between games. Add 300–700 mg sodium per hour of high-tempo play.
-        </p>
-      </Card>
+      {section === "cardiac" && (
+        <Card eyebrow="Heart · every 1 s" title="Cardiac">
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label="Current HR" value="—" unit="bpm" hint="live" />
+            <Stat label="Resting HR" value="—" unit="bpm" hint="nightly" />
+            <Stat label="HRV (RMSSD)" value="—" unit="ms" hint="every 5 min" />
+            <Stat label="Stress" value="—" hint="HR · HRV · RR" />
+          </div>
+        </Card>
+      )}
 
-      {/* Physiology */}
-      <Card eyebrow="Respiration · O₂ · temp" title="Physiology">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Stat label="Resp rate" value="—" unit="br/min" hint="every 3 min" />
-          <Stat label="SpO₂" value="—" unit="%" hint="every 3 min" />
-          <Stat label="Skin temp" value="—" unit="°C" hint="every 3 min" />
-        </div>
-      </Card>
+      {section === "body" && (
+        <>
+          <Card eyebrow="Respiration · O₂ · temp" title="Physiology">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Stat label="Resp rate" value="—" unit="br/min" />
+              <Stat label="SpO₂" value="—" unit="%" />
+              <Stat label="Skin temp" value="—" unit="°C" />
+            </div>
+          </Card>
+          <Card eyebrow="Court fueling" title="Hydration & energy">
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Sweat loss" value="—" unit="ml" hint="per hour" />
+              <Stat label="Water target" value="—" unit="ml" hint="next 60 min" />
+              <Stat label="Sodium" value="—" unit="mg" />
+              <Stat label="Carb need" value="—" unit="g" />
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-vyro-mute">
+              Sip 150–250 ml every 15 min between games. Add 300–700 mg sodium per hour.
+            </p>
+          </Card>
+        </>
+      )}
 
-      {/* Movement */}
-      <Card eyebrow="Activity · all-day" title="Movement">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat label="Steps" value="—" hint="every 1 s" />
-          <Stat label="Active kcal" value="—" unit="kcal" hint="every 60 s" />
-          <Stat label="Resting kcal" value="—" unit="kcal" hint="BMR" />
-          <Stat label="Total kcal" value="—" unit="kcal" />
-        </div>
-      </Card>
+      {section === "load" && (
+        <>
+          <Card
+            eyebrow="Squash load · live"
+            title="On-court intensity"
+            action={<Pill tone={(sessionLoad ?? 0) > 70 ? "warn" : "live"}>{sessionLoad == null ? "—" : `${sessionLoad}/100`}</Pill>}
+          >
+            <LoadBar value={sessionLoad} />
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Stat label="Events / min" value={m.connected ? m.eventsLastMin : "—"} hint="rolling 60 s" />
+              <Stat label="Peak accel" value={m.connected ? m.peakG.toFixed(2) : "—"} unit="g" />
+              <Stat label="Peak jerk" value={m.connected ? m.peakJerk.toFixed(0) : "—"} unit="g/s" />
+              <Stat label="Reaction" value={m.connected && m.reactMin != null ? m.reactMin.toFixed(0) : "—"} unit="ms" />
+            </div>
+          </Card>
+          <Card eyebrow="Activity · all-day" title="Movement">
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Steps" value="—" />
+              <Stat label="Active kcal" value="—" unit="kcal" />
+              <Stat label="Resting kcal" value="—" unit="kcal" />
+              <Stat label="Total kcal" value="—" unit="kcal" />
+            </div>
+          </Card>
+        </>
+      )}
 
-      {/* Injury risk — squash hot spots */}
-      <Card eyebrow="Injury risk · squash" title="Hot spots">
-        <div className="space-y-2">
-          <RiskRow zone="Lunging knee" level={band === "red" ? "elevated" : "low"} note="Front-foot decel load" />
-          <RiskRow zone="Achilles / calf" level={(sessionLoad ?? 0) > 70 ? "elevated" : "low"} note="Repeated push-off" />
-          <RiskRow zone="Shoulder · drive" level="low" note="Swing volume nominal" />
-          <RiskRow zone="Lower back" level="low" note="Twist load nominal" />
-        </div>
-      </Card>
-
-      {/* Data integrity */}
-      <Card eyebrow="Data integrity" title="Confidence">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Stat label="Wear time" value="—" unit="h" hint="every 60 s" />
-          <Stat label="Signal" value="—" unit="%" hint="every 60 s" />
-          <Stat label="Battery" value="—" unit="%" hint="every 60 s" />
-        </div>
-      </Card>
+      {section === "risk" && (
+        <>
+          <Card eyebrow="Injury risk · squash" title="Hot spots">
+            <div className="space-y-2">
+              <RiskRow zone="Lunging knee" level={band === "red" ? "elevated" : "low"} note="Front-foot decel load" />
+              <RiskRow zone="Achilles / calf" level={(sessionLoad ?? 0) > 70 ? "elevated" : "low"} note="Repeated push-off" />
+              <RiskRow zone="Shoulder · drive" level="low" note="Swing volume nominal" />
+              <RiskRow zone="Lower back" level="low" note="Twist load nominal" />
+            </div>
+          </Card>
+          <Card eyebrow="Data integrity" title="Signal confidence">
+            <div className="grid grid-cols-3 gap-2">
+              <Stat label="Wear" value="—" unit="h" />
+              <Stat label="Signal" value="—" unit="%" />
+              <Stat label="Battery" value="—" unit="%" />
+            </div>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
 
 function MiniRing({ value, label, invert = false }: { value: number | null; label: string; invert?: boolean }) {
-  // Invert = higher value is worse (fatigue). Color the ring accordingly.
   const v = value ?? 0;
   const good = invert ? v < 50 : v >= 60;
   const stroke = good ? "var(--vyro-mint)" : v > 0 ? "var(--vyro-amber)" : "var(--vyro-line)";
-  const size = 56;
+  const size = 52;
   const sw = 6;
   const r = (size - sw) / 2;
   const c = 2 * Math.PI * r;
