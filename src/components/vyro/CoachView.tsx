@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
+import { SportView } from "./SportView";
 
-type Tab = "team" | "match" | "opponent" | "plan" | "heatmap";
+type Tab = "team" | "sport" | "match" | "opponent" | "plan" | "heatmap";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "team", label: "Team Status" },
+  { id: "sport", label: "Sport DB" },
   { id: "match", label: "Match DB" },
   { id: "opponent", label: "Opponent Model" },
   { id: "plan", label: "Plan" },
@@ -171,6 +173,8 @@ export function CoachView() {
         </>
       )}
 
+      {tab === "sport" && <CoachSportTab roster={ROSTER} />}
+
       {tab === "match" && (
         <>
           <Card eyebrow="Match DB · team view" title="Verified opponent history">
@@ -287,6 +291,100 @@ function Mini({ label, v }: { label: string; v: any }) {
     <div className="rounded-lg bg-vyro-text/[0.04] py-1">
       <div className="font-mono text-[8px] uppercase tracking-wider text-vyro-mute">{label}</div>
       <div className="text-xs font-bold tabular-nums text-vyro-text">{v}</div>
+    </div>
+  );
+}
+
+type RosterEntry = (typeof ROSTER)[number];
+
+function CoachSportTab({ roster }: { roster: RosterEntry[] }) {
+  const active = roster.filter((r) => r.status !== "unavailable");
+  const [mode, setMode] = useState<"aggregated" | "individual">("aggregated");
+  const [athleteName, setAthleteName] = useState<string>(active[0]?.name ?? "");
+  const athlete = active.find((a) => a.name === athleteName) ?? active[0];
+
+  const avg = (key: keyof RosterEntry) =>
+    Math.round(
+      active.reduce((s, r) => s + (typeof r[key] === "number" ? (r[key] as number) : 0), 0) / active.length,
+    );
+
+  return (
+    <div className="space-y-4">
+      <Card
+        eyebrow="Sport intelligence · Coach scope"
+        title="All sport modules, team-wide or per athlete."
+        action={
+          <div className="flex gap-1">
+            <button
+              onClick={() => setMode("aggregated")}
+              className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+                mode === "aggregated" ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
+              }`}
+            >
+              Aggregated
+            </button>
+            <button
+              onClick={() => setMode("individual")}
+              className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+                mode === "individual" ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
+              }`}
+            >
+              Per athlete
+            </button>
+          </div>
+        }
+      >
+        {mode === "aggregated" ? (
+          <>
+            <p className="text-[12px] text-vyro-mute">
+              Team-wide rollup across {active.length} active athletes. Open any sport below to see the full Morphos suite — database cards, tendency reads, agility components, and slow-motion motion tab — applied to the squad average.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Stat label="Team recovery" value={avg("recovery")} unit="%" />
+              <Stat label="Team T-Ctl" value={avg("tControl")} unit="%" />
+              <Stat label="Team swing" value={avg("swingConsistency")} unit="%" />
+              <Stat label="Team decel" value={avg("decel")} unit="%" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-vyro-mute">Athlete</span>
+              <select
+                value={athleteName}
+                onChange={(e) => setAthleteName(e.target.value)}
+                className="rounded-lg border border-vyro-line bg-vyro-panel px-2 py-1 text-[12px] font-semibold text-vyro-text"
+              >
+                {active.map((a) => (
+                  <option key={a.name} value={a.name}>{a.name}</option>
+                ))}
+              </select>
+              {athlete && <Pill tone="live">Live band linked</Pill>}
+            </div>
+            {athlete && (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <Stat label="Recovery" value={athlete.recovery} unit="%" />
+                <Stat label="T-Ctl" value={athlete.tControl} unit="%" />
+                <Stat label="Swing" value={athlete.swingConsistency} unit="%" />
+                <Stat label="Decel" value={athlete.decel} unit="%" />
+              </div>
+            )}
+            <p className="mt-3 text-[11px] text-vyro-mute">
+              Sport modules below now show <span className="text-vyro-text font-semibold">{athlete?.name}</span>'s session feed — same engine, single-athlete sample.
+            </p>
+          </>
+        )}
+      </Card>
+
+      <div className="rounded-2xl border border-vyro-line bg-vyro-panel/40 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-vyro-mute">Embedded · Sport selector</span>
+          <Pill tone={mode === "aggregated" ? "live" : "warn"}>
+            {mode === "aggregated" ? `Team avg · n=${active.length}` : `Solo · ${athlete?.name ?? "—"}`}
+          </Pill>
+        </div>
+        <SportView />
+      </div>
     </div>
   );
 }
