@@ -15,6 +15,7 @@ import { SwingView } from "@/components/vyro/SwingView";
 import { CoachView } from "@/components/vyro/CoachView";
 import { DietView } from "@/components/vyro/DietView";
 import { TendencyView } from "@/components/vyro/TendencyView";
+import { SocialView } from "@/components/vyro/SocialView";
 
 export const Route = createFileRoute("/_authenticated/app")({
   component: () => (
@@ -42,10 +43,10 @@ function AppShell() {
       case "coach": return <CoachView />;
       case "diet": return <DietView />;
       case "tendency": return <TendencyView />;
+      case "social": return <SocialView />;
       // Modules still on the roadmap fall back to the More grid.
       case "trends":
       case "video":
-      case "social":
       case "sport":
       case "activity":
       default:
