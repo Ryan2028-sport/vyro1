@@ -173,6 +173,40 @@ export function SessionView() {
   // Latest accel reading for the "movement intensity" tile.
   const latestG = accelSeries.length ? accelSeries[accelSeries.length - 1] : null;
 
+  // Heart-rate derived series for the live chart + zones.
+  // Default max HR = 190; once we wire profile age we can do 220-age.
+  const maxHr = 190;
+  const sessionHr = useMemo(() => {
+    if (startedAt == null) return hrSamples.slice(-60);
+    return hrSamples.filter((s) => s.ts >= startedAt);
+  }, [hrSamples, startedAt]);
+  const hrSpark = useMemo(() => sessionHr.slice(-60).map((s) => s.bpm), [sessionHr]);
+  const currentZone = useMemo(() => {
+    if (live.heartRateBpm == null) return null;
+    const pct = live.heartRateBpm / maxHr;
+    if (pct < 0.6) return 1;
+    if (pct < 0.7) return 2;
+    if (pct < 0.8) return 3;
+    if (pct < 0.9) return 4;
+    return 5;
+  }, [live.heartRateBpm]);
+  const zoneDist = useMemo(() => {
+    const buckets = [0, 0, 0, 0, 0];
+    if (sessionHr.length < 2) return { buckets, total: 0 };
+    let total = 0;
+    for (let i = 1; i < sessionHr.length; i++) {
+      const dt = Math.max(0, sessionHr[i].ts - sessionHr[i - 1].ts);
+      if (dt > 60_000) continue; // skip large gaps
+      const bpm = sessionHr[i].bpm;
+      const pct = bpm / maxHr;
+      const z = pct < 0.6 ? 0 : pct < 0.7 ? 1 : pct < 0.8 ? 2 : pct < 0.9 ? 3 : 4;
+      buckets[z] += dt;
+      total += dt;
+    }
+    return { buckets, total };
+  }, [sessionHr]);
+
+
   return (
     <div className="space-y-4">
       <PageHeader
