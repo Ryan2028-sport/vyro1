@@ -389,20 +389,36 @@ export function SessionView() {
             </div>
           </Card>
 
-          <Card eyebrow="HR Zone distribution (live)" title="Awaiting HR stream">
+          <Card
+            eyebrow="HR Zone distribution (live)"
+            title={zoneDist.total > 0 ? `${Math.round(zoneDist.total / 1000)}s recorded` : "Awaiting HR stream"}
+          >
             <ul className="space-y-1.5">
-              {["Z1", "Z2", "Z3", "Z4", "Z5"].map((z) => (
-                <li key={z} className="flex items-center gap-2">
-                  <span className="w-8 font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">{z}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-vyro-elev">
-                    <div className="h-full bg-vyro-line" style={{ width: "0%" }} />
-                  </div>
-                  <span className="w-10 text-right font-mono text-[10px] text-vyro-mute">—</span>
-                </li>
-              ))}
+              {["Z1", "Z2", "Z3", "Z4", "Z5"].map((z, i) => {
+                const ms = zoneDist.buckets[i];
+                const pct = zoneDist.total > 0 ? (ms / zoneDist.total) * 100 : 0;
+                const colors = [
+                  "bg-vyro-mint/60",
+                  "bg-vyro-mint",
+                  "bg-vyro-amber",
+                  "bg-vyro-rose/80",
+                  "bg-vyro-rose",
+                ];
+                return (
+                  <li key={z} className="flex items-center gap-2">
+                    <span className="w-8 font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">{z}</span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-vyro-elev">
+                      <div className={`h-full ${colors[i]} transition-[width] duration-500`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="w-10 text-right font-mono text-[10px] text-vyro-mute">
+                      {zoneDist.total > 0 ? `${Math.round(pct)}%` : "—"}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
             <p className="mt-2 text-[10px] text-vyro-mute">
-              Zones will populate when the band exposes a heart-rate characteristic. IMU-derived load is already live above.
+              Zones computed against max HR {maxHr} bpm · Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4 80–90% · Z5 90%+.
             </p>
           </Card>
 
