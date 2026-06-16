@@ -239,8 +239,17 @@ export function SessionView() {
             <Watch className="h-3 w-3" />
             {live.connected ? "Connected" : "Disconnected"}
           </span>
+          {live.batteryPct != null && (
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-text">
+              {live.batteryPct}%{live.batteryCharging ? " · charging" : ""}
+            </span>
+          )}
           <span className="text-vyro-mute">
-            {isLive ? "Streaming IMU · HR awaiting firmware" : live.connected ? "Idle · ready to record" : "Pair from Profile to begin"}
+            {isLive
+              ? `Streaming HR · IMU${live.spo2Pct != null ? " · SpO₂" : ""}`
+              : live.connected
+                ? "Idle · ready to record"
+                : "Pair from Profile to begin"}
           </span>
         </div>
       </Card>
