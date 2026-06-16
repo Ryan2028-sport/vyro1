@@ -1,31 +1,37 @@
 import { useState } from "react";
 import { Moon, Sunrise } from "lucide-react";
-import { Card, PageHeader, Pill, Ring, Stat } from "./shared";
+import { Card, EmptyState, PageHeader, Pill, Ring, Stat } from "./shared";
+import { useLiveMetrics } from "./useLiveMetrics";
 
 type Tab = "overall" | "zones" | "wakeups" | "performance";
 
-// Sleep view. Until the firmware streams a nightly sleep packet, the
-// numbers below mirror the VYRO product spec so the layout and coach
-// language are review-ready. Each value will swap to live data on the
-// same key when the band publishes its overnight summary.
-const NIGHT = {
-  score: 87,
-  asleepLabel: "6h 46m",
-  inBedLabel: "7h 04m",
-  bedtime: "11:14 PM",
-  wake: "6:18 AM",
-  wakeups: 4,
-  debtLabel: "1h 24m",
-  targetLabel: "8h 10m",
-  debtTrendFrom: "2h 00m",
-  debtTrendTo: "1h 24m",
-  recBedtime: "10:25 PM",
-  recWake: "6:15 AM",
-  zones: { deep: 1.4, rem: 1.6, light: 3.5, awake: 0.5 }, // hours
+// Sleep view. We only render the nightly architecture when the band has
+// actually streamed a sleep summary. Until the firmware exposes a sleep
+// packet, we treat sleep as "not yet synced" and refuse to fabricate
+// scores, debt, wakeup timestamps, or stage breakdowns.
+type NightSummary = {
+  score: number;
+  asleepLabel: string;
+  inBedLabel: string;
+  bedtime: string;
+  wake: string;
+  wakeups: number;
+  debtLabel: string;
+  targetLabel: string;
+  debtTrendFrom: string;
+  debtTrendTo: string;
+  recBedtime: string;
+  recWake: string;
+  zones: { deep: number; rem: number; light: number; awake: number };
 };
 
 export function SleepView() {
   const [tab, setTab] = useState<Tab>("overall");
+  const m = useLiveMetrics();
+  // Real nightly summary will plug in here when the band publishes it.
+  // For now: null when no data has arrived (which is always, today).
+  const NIGHT: NightSummary | null = null;
+
 
   return (
     <div className="space-y-4 pb-6">
