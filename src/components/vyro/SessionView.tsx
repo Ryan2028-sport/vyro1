@@ -111,15 +111,19 @@ export function SessionView() {
   async function onStart() {
     setStartedAt(Date.now());
     setNow(Date.now());
-    await band.startSession(band.sport);
+    try {
+      await band.startSession(band.sport);
+    } catch (e) {
+      console.warn("[vyro] startSession failed; continuing in offline mode", e);
+    }
   }
   async function onPause() {
-    await band.pauseSession();
+    try { await band.pauseSession(); } catch (e) { console.warn("[vyro] pauseSession failed", e); }
   }
   async function onEnd() {
     const ended = Date.now();
     const started = startedAt ?? ended;
-    await band.endSession();
+    try { await band.endSession(); } catch (e) { console.warn("[vyro] endSession failed", e); }
     try {
       await saveMut.mutateAsync({
         data: {
