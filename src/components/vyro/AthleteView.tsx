@@ -106,15 +106,26 @@ export function AthleteView() {
         </div>
       </div>
 
+      {/* Single shared "no watch" notice — never show fake numbers when disconnected */}
+      {!m.connected && (
+        <Card>
+          <p className="text-[12px] leading-relaxed text-vyro-mute">
+            <span className="text-vyro-text font-bold">Band offline.</span> Pair and wear your VYRO Band to stream
+            HR, HRV, SpO₂, skin temp, steps and IMU load in real time. Values below stay blank until live data arrives —
+            nothing is estimated.
+          </p>
+        </Card>
+      )}
+
       {section === "overview" && (
         <Card eyebrow="At a glance" title="Right now">
           <div className="grid grid-cols-2 gap-2">
-            <Stat label="Current HR" value="—" unit="bpm" />
-            <Stat label="HRV" value="—" unit="ms" />
-            <Stat label="Steps" value="—" />
-            <Stat label="Active kcal" value="—" />
+            <Stat label="Current HR" value={m.heartRateBpm ?? "—"} unit="bpm" />
+            <Stat label="HRV" value={m.hrvMs ?? "—"} unit="ms" />
+            <Stat label="Steps" value={m.stepsToday ?? "—"} />
+            <Stat label="Active kcal" value={m.caloriesKcal ?? "—"} />
             <Stat label="Squash load" value={sessionLoad ?? "—"} hint="/100" />
-            <Stat label="Wear time" value="—" unit="h" />
+            <Stat label="Battery" value={m.batteryPct ?? "—"} unit="%" hint={m.batteryCharging ? "charging" : undefined} />
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-vyro-mute">
             Tap a tab above for cardiac, body composition, on-court load and injury risk detail.
@@ -125,10 +136,10 @@ export function AthleteView() {
       {section === "cardiac" && (
         <Card eyebrow="Heart · every 1 s" title="Cardiac">
           <div className="grid grid-cols-2 gap-2">
-            <Stat label="Current HR" value="—" unit="bpm" hint="live" />
-            <Stat label="Resting HR" value="—" unit="bpm" hint="nightly" />
-            <Stat label="HRV (RMSSD)" value="—" unit="ms" hint="every 5 min" />
-            <Stat label="Stress" value="—" hint="HR · HRV · RR" />
+            <Stat label="Current HR" value={m.heartRateBpm ?? "—"} unit="bpm" hint="live" />
+            <Stat label="Resting HR" value={m.restingHrBpm ?? "—"} unit="bpm" hint="nightly" />
+            <Stat label="HRV (RMSSD)" value={m.hrvMs ?? "—"} unit="ms" hint="every 5 min" />
+            <Stat label="Stress" value={m.stressScore ?? "—"} hint="HR · HRV · RR" />
           </div>
         </Card>
       )}
@@ -137,20 +148,15 @@ export function AthleteView() {
         <>
           <Card eyebrow="Respiration · O₂ · temp" title="Physiology">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <Stat label="Resp rate" value="—" unit="br/min" />
-              <Stat label="SpO₂" value="—" unit="%" />
-              <Stat label="Skin temp" value="—" unit="°C" />
+              <Stat label="Resp rate" value={m.respRateBrpm ?? "—"} unit="br/min" />
+              <Stat label="SpO₂" value={m.spo2Pct ?? "—"} unit="%" />
+              <Stat label="Skin temp" value={m.skinTempC != null ? m.skinTempC.toFixed(1) : "—"} unit="°C" />
             </div>
           </Card>
           <Card eyebrow="Court fueling" title="Hydration & energy">
-            <div className="grid grid-cols-2 gap-2">
-              <Stat label="Sweat loss" value="—" unit="ml" hint="per hour" />
-              <Stat label="Water target" value="—" unit="ml" hint="next 60 min" />
-              <Stat label="Sodium" value="—" unit="mg" />
-              <Stat label="Carb need" value="—" unit="g" />
-            </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-vyro-mute">
-              Sip 150–250 ml every 15 min between games. Add 300–700 mg sodium per hour.
+            <p className="text-[11px] leading-relaxed text-vyro-mute">
+              Sweat, sodium and carb needs are derived from live HR, skin temp and session load. Estimates appear here
+              once the band has streamed at least 10 min of continuous wear data.
             </p>
           </Card>
         </>
@@ -173,10 +179,10 @@ export function AthleteView() {
           </Card>
           <Card eyebrow="Activity · all-day" title="Movement">
             <div className="grid grid-cols-2 gap-2">
-              <Stat label="Steps" value="—" />
-              <Stat label="Active kcal" value="—" unit="kcal" />
-              <Stat label="Resting kcal" value="—" unit="kcal" />
-              <Stat label="Total kcal" value="—" unit="kcal" />
+              <Stat label="Steps" value={m.stepsToday ?? "—"} />
+              <Stat label="Active kcal" value={m.caloriesKcal ?? "—"} unit="kcal" />
+              <Stat label="Distance" value={m.distanceM != null ? (m.distanceM / 1000).toFixed(2) : "—"} unit="km" />
+              <Stat label="Battery" value={m.batteryPct ?? "—"} unit="%" />
             </div>
           </Card>
         </>
@@ -185,18 +191,24 @@ export function AthleteView() {
       {section === "risk" && (
         <>
           <Card eyebrow="Injury risk · squash" title="Hot spots">
-            <div className="space-y-2">
-              <RiskRow zone="Lunging knee" level={band === "red" ? "elevated" : "low"} note="Front-foot decel load" />
-              <RiskRow zone="Achilles / calf" level={(sessionLoad ?? 0) > 70 ? "elevated" : "low"} note="Repeated push-off" />
-              <RiskRow zone="Shoulder · drive" level="low" note="Swing volume nominal" />
-              <RiskRow zone="Lower back" level="low" note="Twist load nominal" />
-            </div>
+            {m.connected ? (
+              <div className="space-y-2">
+                <RiskRow zone="Lunging knee" level={band === "red" ? "elevated" : "low"} note="Front-foot decel load" />
+                <RiskRow zone="Achilles / calf" level={(sessionLoad ?? 0) > 70 ? "elevated" : "low"} note="Repeated push-off" />
+                <RiskRow zone="Shoulder · drive" level="low" note="Swing volume nominal" />
+                <RiskRow zone="Lower back" level="low" note="Twist load nominal" />
+              </div>
+            ) : (
+              <p className="text-[11px] leading-relaxed text-vyro-mute">
+                Risk flags need live IMU + HR data. Pair the band to populate.
+              </p>
+            )}
           </Card>
           <Card eyebrow="Data integrity" title="Signal confidence">
             <div className="grid grid-cols-3 gap-2">
-              <Stat label="Wear" value="—" unit="h" />
-              <Stat label="Signal" value="—" unit="%" />
-              <Stat label="Battery" value="—" unit="%" />
+              <Stat label="HR" value={m.heartRateBpm != null ? "live" : "—"} />
+              <Stat label="IMU" value={m.connected ? "live" : "—"} />
+              <Stat label="Battery" value={m.batteryPct ?? "—"} unit="%" />
             </div>
           </Card>
         </>
