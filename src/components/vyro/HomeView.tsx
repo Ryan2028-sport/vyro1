@@ -376,7 +376,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   }, [readiness]);
 
   return (
-    <div className="min-w-0 space-y-5 overflow-x-hidden">
+    <div className="min-w-0 space-y-5">
       <section className="space-y-4">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="min-w-0">
