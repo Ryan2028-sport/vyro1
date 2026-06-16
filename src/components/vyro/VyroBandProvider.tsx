@@ -104,15 +104,28 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [pairedId, ble.connectedId, ble.connect, ble.devices, ble.scan]);
 
-  // Native: enable background location so iOS keeps the app alive long
-  // enough for Core Bluetooth to deliver notifications while backgrounded.
+  // Native: enable background location so iOS keeps the app + Core
+  // Bluetooth alive while backgrounded. We re-fire `backgroundOn` on every
+  // visibility change (and on connect) because iOS will silently drop the
+  // keep-alive if the app gets suspended without it being re-asserted.
   // Browser: request a Screen Wake Lock so the tab isn't aggressively
   // suspended while the user is on another tab with the screen on.
   useEffect(() => {
-    if (!pairedId) return;
+    const hasBand = !!pairedId || !!ble.connectedId;
+    if (!hasBand) return;
     if (isNative) {
       void despiaLocation.backgroundOn();
+      const onVis = () => {
+        // Re-assert on both hide AND show so iOS keeps the central alive.
+        void despiaLocation.backgroundOn();
+      };
+      document.addEventListener("visibilitychange", onVis);
+      window.addEventListener("pagehide", onVis);
+      window.addEventListener("pageshow", onVis);
       return () => {
+        document.removeEventListener("visibilitychange", onVis);
+        window.removeEventListener("pagehide", onVis);
+        window.removeEventListener("pageshow", onVis);
         void despiaLocation.backgroundOff();
       };
     }
@@ -138,7 +151,7 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", onVis);
       void wakeLock?.release().catch(() => undefined);
     };
-  }, [pairedId]);
+  }, [pairedId, ble.connectedId]);
 
   return (
     <Ctx.Provider value={{ ...vyro, pairedId, pairedName }}>{children}</Ctx.Provider>
