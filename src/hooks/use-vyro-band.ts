@@ -481,7 +481,7 @@ export function useVyroBand() {
           setDistanceM(sum.distanceM);
           setCaloriesKcal(sum.calories);
         }
-      } else if (op === QCBAND_CMD_START_MEASURE) {
+      } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame || frame.errorCode !== 0) return;
         if (frame.subType === QCBAND_MEASURE_SPO2) {
