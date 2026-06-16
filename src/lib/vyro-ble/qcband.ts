@@ -164,7 +164,7 @@ export type QcBandMeasureFrame = {
 
 export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame | null {
   if (bytes.length < 4) return null;
-  if (bytes[0] !== QCBAND_CMD_START_MEASURE) return null;
+  if (bytes[0] !== QCBAND_CMD_START_MEASURE && bytes[0] !== QCBAND_CMD_STOP_MEASURE) return null;
   return {
     subType: bytes[1],
     errorCode: bytes[2],
