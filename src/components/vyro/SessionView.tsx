@@ -78,6 +78,19 @@ export function SessionView() {
   const [now, setNow] = useState(Date.now());
   const tickRef = useRef<number | null>(null);
 
+  // Rolling HR samples for the live 60s chart and zone distribution.
+  const [hrSamples, setHrSamples] = useState<{ ts: number; bpm: number }[]>([]);
+  useEffect(() => {
+    if (live.heartRateBpm == null || live.heartRateAt == null) return;
+    setHrSamples((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.ts === live.heartRateAt) return prev;
+      const next = [...prev, { ts: live.heartRateAt!, bpm: live.heartRateBpm! }];
+      const cutoff = Date.now() - 60 * 60_000;
+      return next.filter((s) => s.ts >= cutoff).slice(-3600);
+    });
+  }, [live.heartRateBpm, live.heartRateAt]);
+
   useEffect(() => {
     if (band.sessionState !== "live") {
       if (tickRef.current) window.clearInterval(tickRef.current);
@@ -160,6 +173,40 @@ export function SessionView() {
   // Latest accel reading for the "movement intensity" tile.
   const latestG = accelSeries.length ? accelSeries[accelSeries.length - 1] : null;
 
+  // Heart-rate derived series for the live chart + zones.
+  // Default max HR = 190; once we wire profile age we can do 220-age.
+  const maxHr = 190;
+  const sessionHr = useMemo(() => {
+    if (startedAt == null) return hrSamples.slice(-60);
+    return hrSamples.filter((s) => s.ts >= startedAt);
+  }, [hrSamples, startedAt]);
+  const hrSpark = useMemo(() => sessionHr.slice(-60).map((s) => s.bpm), [sessionHr]);
+  const currentZone = useMemo(() => {
+    if (live.heartRateBpm == null) return null;
+    const pct = live.heartRateBpm / maxHr;
+    if (pct < 0.6) return 1;
+    if (pct < 0.7) return 2;
+    if (pct < 0.8) return 3;
+    if (pct < 0.9) return 4;
+    return 5;
+  }, [live.heartRateBpm]);
+  const zoneDist = useMemo(() => {
+    const buckets = [0, 0, 0, 0, 0];
+    if (sessionHr.length < 2) return { buckets, total: 0 };
+    let total = 0;
+    for (let i = 1; i < sessionHr.length; i++) {
+      const dt = Math.max(0, sessionHr[i].ts - sessionHr[i - 1].ts);
+      if (dt > 60_000) continue; // skip large gaps
+      const bpm = sessionHr[i].bpm;
+      const pct = bpm / maxHr;
+      const z = pct < 0.6 ? 0 : pct < 0.7 ? 1 : pct < 0.8 ? 2 : pct < 0.9 ? 3 : 4;
+      buckets[z] += dt;
+      total += dt;
+    }
+    return { buckets, total };
+  }, [sessionHr]);
+
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -192,8 +239,17 @@ export function SessionView() {
             <Watch className="h-3 w-3" />
             {live.connected ? "Connected" : "Disconnected"}
           </span>
+          {live.batteryPct != null && (
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-text">
+              {live.batteryPct}%{live.batteryCharging ? " · charging" : ""}
+            </span>
+          )}
           <span className="text-vyro-mute">
-            {isLive ? "Streaming IMU · HR awaiting firmware" : live.connected ? "Idle · ready to record" : "Pair from Profile to begin"}
+            {isLive
+              ? `Streaming HR · IMU${live.spo2Pct != null ? " · SpO₂" : ""}`
+              : live.connected
+                ? "Idle · ready to record"
+                : "Pair from Profile to begin"}
           </span>
         </div>
       </Card>
@@ -270,9 +326,9 @@ export function SessionView() {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Stat
                 label="Heart rate"
-                value="—"
+                value={live.heartRateBpm ?? "—"}
                 unit="bpm"
-                hint="awaiting firmware HR characteristic"
+                hint={currentZone ? `Z${currentZone}` : live.connected ? "waiting…" : undefined}
               />
               <Stat
                 label="Movement intensity"
@@ -293,13 +349,28 @@ export function SessionView() {
             </div>
           </Card>
 
-          <Card eyebrow="Heart rate · 60s" title="Live HR stream">
-            <div className="flex h-[88px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-vyro-line text-center">
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-vyro-mute">no HR characteristic</span>
-              <span className="text-[10px] text-vyro-mute">
-                firmware v0.4-alpha streams IMU only. HR / SpO₂ zones will populate automatically once the Goodix GH3026 service is enabled on the band.
-              </span>
-            </div>
+          <Card
+            eyebrow="Heart rate · 60s"
+            title={live.heartRateBpm != null ? `${live.heartRateBpm} bpm` : "Live HR stream"}
+            action={currentZone ? <Pill tone={currentZone >= 4 ? "warn" : "live"}>Z{currentZone}</Pill> : undefined}
+          >
+            {hrSpark.length >= 2 ? (
+              <Spark
+                points={hrSpark}
+                color="var(--vyro-rose)"
+                fill
+                height={88}
+                min={Math.max(40, Math.min(...hrSpark) - 5)}
+                max={Math.min(maxHr + 10, Math.max(...hrSpark) + 5)}
+              />
+            ) : (
+              <div className="flex h-[88px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-vyro-line text-center">
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-vyro-mute">waiting for HR</span>
+                <span className="text-[10px] text-vyro-mute">
+                  HR samples arrive every few seconds once the band's PPG sensor warms up.
+                </span>
+              </div>
+            )}
           </Card>
 
           <Card
@@ -318,20 +389,36 @@ export function SessionView() {
             </div>
           </Card>
 
-          <Card eyebrow="HR Zone distribution (live)" title="Awaiting HR stream">
+          <Card
+            eyebrow="HR Zone distribution (live)"
+            title={zoneDist.total > 0 ? `${Math.round(zoneDist.total / 1000)}s recorded` : "Awaiting HR stream"}
+          >
             <ul className="space-y-1.5">
-              {["Z1", "Z2", "Z3", "Z4", "Z5"].map((z) => (
-                <li key={z} className="flex items-center gap-2">
-                  <span className="w-8 font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">{z}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-vyro-elev">
-                    <div className="h-full bg-vyro-line" style={{ width: "0%" }} />
-                  </div>
-                  <span className="w-10 text-right font-mono text-[10px] text-vyro-mute">—</span>
-                </li>
-              ))}
+              {["Z1", "Z2", "Z3", "Z4", "Z5"].map((z, i) => {
+                const ms = zoneDist.buckets[i];
+                const pct = zoneDist.total > 0 ? (ms / zoneDist.total) * 100 : 0;
+                const colors = [
+                  "bg-vyro-mint/60",
+                  "bg-vyro-mint",
+                  "bg-vyro-amber",
+                  "bg-vyro-rose/80",
+                  "bg-vyro-rose",
+                ];
+                return (
+                  <li key={z} className="flex items-center gap-2">
+                    <span className="w-8 font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">{z}</span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-vyro-elev">
+                      <div className={`h-full ${colors[i]} transition-[width] duration-500`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="w-10 text-right font-mono text-[10px] text-vyro-mute">
+                      {zoneDist.total > 0 ? `${Math.round(pct)}%` : "—"}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
             <p className="mt-2 text-[10px] text-vyro-mute">
-              Zones will populate when the band exposes a heart-rate characteristic. IMU-derived load is already live above.
+              Zones computed against max HR {maxHr} bpm · Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4 80–90% · Z5 90%+.
             </p>
           </Card>
 
