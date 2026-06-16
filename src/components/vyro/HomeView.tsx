@@ -381,7 +381,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="min-w-0">
             <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-vyro-mute">{todayLabel}</div>
-            <h1 className="mt-1 truncate text-3xl font-black tracking-tight text-vyro-text">{greeting()}, {first}</h1>
+            <h1 className="mt-1 break-words text-3xl font-black tracking-tight text-vyro-text">{greeting()}, {first}</h1>
             <p className="mt-1.5 text-[12px] leading-relaxed text-vyro-mute">Squash readiness, strain, fuel and recovery in one command view.</p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
