@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
+import { SportView } from "./SportView";
 
-type Tab = "team" | "match" | "opponent" | "plan" | "heatmap";
+type Tab = "team" | "sport" | "match" | "opponent" | "plan" | "heatmap";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "team", label: "Team Status" },
+  { id: "sport", label: "Sport DB" },
   { id: "match", label: "Match DB" },
   { id: "opponent", label: "Opponent Model" },
   { id: "plan", label: "Plan" },
