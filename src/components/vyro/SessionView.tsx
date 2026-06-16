@@ -206,7 +206,7 @@ export function SessionView() {
       )}
 
       {/* IDLE: pre-session call-to-action */}
-      {idle && live.connected && (
+      {idle && (
         <Card eyebrow="Start session" title="Ready to track">
           <p className="text-xs leading-relaxed text-vyro-mute">
             Press start when you step on court. VYRO will detect every burst to a corner and recovery back to the T.
