@@ -1,31 +1,42 @@
 import { useState } from "react";
 import { Moon, Sunrise } from "lucide-react";
-import { Card, PageHeader, Pill, Ring, Stat } from "./shared";
+import { Card, EmptyState, PageHeader, Pill, Ring, Stat } from "./shared";
+import { useLiveMetrics } from "./useLiveMetrics";
 
 type Tab = "overall" | "zones" | "wakeups" | "performance";
 
-// Sleep view. Until the firmware streams a nightly sleep packet, the
-// numbers below mirror the VYRO product spec so the layout and coach
-// language are review-ready. Each value will swap to live data on the
-// same key when the band publishes its overnight summary.
-const NIGHT = {
-  score: 87,
-  asleepLabel: "6h 46m",
-  inBedLabel: "7h 04m",
-  bedtime: "11:14 PM",
-  wake: "6:18 AM",
-  wakeups: 4,
-  debtLabel: "1h 24m",
-  targetLabel: "8h 10m",
-  debtTrendFrom: "2h 00m",
-  debtTrendTo: "1h 24m",
-  recBedtime: "10:25 PM",
-  recWake: "6:15 AM",
-  zones: { deep: 1.4, rem: 1.6, light: 3.5, awake: 0.5 }, // hours
+// Sleep view. We only render the nightly architecture when the band has
+// actually streamed a sleep summary. Until the firmware exposes a sleep
+// packet, we treat sleep as "not yet synced" and refuse to fabricate
+// scores, debt, wakeup timestamps, or stage breakdowns.
+type NightSummary = {
+  score: number;
+  asleepLabel: string;
+  inBedLabel: string;
+  bedtime: string;
+  wake: string;
+  wakeups: number;
+  debtLabel: string;
+  targetLabel: string;
+  debtTrendFrom: string;
+  debtTrendTo: string;
+  recBedtime: string;
+  recWake: string;
+  zones: { deep: number; rem: number; light: number; awake: number };
 };
 
 export function SleepView() {
   const [tab, setTab] = useState<Tab>("overall");
+  const m = useLiveMetrics();
+  // Real nightly summary will plug in here when the band publishes it.
+  // Function-typed so TS can't narrow the constant to literal `null` and
+  // break the rendering branches below.
+  const getNightSummary = (): NightSummary | null => null;
+  const NIGHT = getNightSummary();
+
+
+  const syncedTone = NIGHT ? "live" : "off";
+  const syncedLabel = NIGHT ? "Last night" : m.connected ? "Awaiting sync" : "No watch";
 
   return (
     <div className="space-y-4 pb-6">
@@ -33,7 +44,7 @@ export function SleepView() {
         eyebrow="Sleep · Recovery Input"
         title="Sleep architecture"
         subtitle="WHOOP-style sleep breakdown for duration, zones, wakeups, and next-session readiness."
-        action={<Pill tone="live" pulse>Last night</Pill>}
+        action={<Pill tone={syncedTone} pulse={!!NIGHT}>{syncedLabel}</Pill>}
       />
 
       {/* Tabs */}
@@ -56,7 +67,18 @@ export function SleepView() {
         ))}
       </div>
 
-      {tab === "overall" && (
+      {!NIGHT && (
+        <EmptyState
+          title={m.connected ? "No nightly sleep summary yet" : "Pair your VYRO Band to sync sleep"}
+          hint={
+            m.connected
+              ? "Wear the band overnight. As soon as a sleep session is detected and processed, score, stages, wakeups and debt populate here automatically. Nothing is estimated until then."
+              : "Sleep architecture (stages, wakeups, debt, performance) comes from the band's overnight HR, HRV, SpO₂, skin-temp and IMU streams. Connect a band to unlock it."
+          }
+        />
+      )}
+
+      {NIGHT && tab === "overall" && (
         <>
           {/* HERO */}
           <Card>
@@ -145,7 +167,7 @@ export function SleepView() {
         </>
       )}
 
-      {tab === "zones" && (
+      {NIGHT && tab === "zones" && (
         <>
           <Card eyebrow="Stages · 30-s epochs" title="Sleep zones">
             <ZoneBar zones={NIGHT.zones} />
@@ -159,7 +181,7 @@ export function SleepView() {
         </>
       )}
 
-      {tab === "wakeups" && (
+      {NIGHT && tab === "wakeups" && (
         <Card eyebrow="Wake events" title={`${NIGHT.wakeups} wakeups overnight`}>
           <ul className="divide-y divide-vyro-line text-[12.5px]">
             {[
@@ -177,7 +199,7 @@ export function SleepView() {
         </Card>
       )}
 
-      {tab === "performance" && (
+      {NIGHT && tab === "performance" && (
         <Card eyebrow="Sleep performance" title="Next-session readiness">
           <div className="grid grid-cols-2 gap-2">
             <Stat label="Sleep performance" value="83" unit="%" hint="asleep ÷ need" />
@@ -190,6 +212,7 @@ export function SleepView() {
     </div>
   );
 }
+
 
 function fmtHrs(h: number) {
   const total = Math.round(h * 60);
