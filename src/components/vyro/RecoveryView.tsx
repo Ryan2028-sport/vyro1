@@ -236,17 +236,34 @@ export function RecoveryView() {
 
           {/* Quick stats */}
           <div className="grid grid-cols-3 gap-2">
-            <Stat label="Current HR · LIVE" value={m.heartRateBpm ?? "—"} unit="bpm" />
-            <Stat label="Muscle" value={muscle ?? "—"} unit="/100" />
-            <Stat label="Time-to-ready" value={timeToReady ?? "—"} unit="min" />
+            <Stat
+              label="Current HR · LIVE"
+              value={m.heartRateBpm ?? "—"}
+              unit="bpm"
+              hint={hrDelta != null ? fmtDelta(hrDelta, " vs RHR") : undefined}
+            />
+            <Stat
+              label="Muscle"
+              value={muscle ?? "—"}
+              unit="/100"
+              hint={muscleDelta != null ? fmtDelta(muscleDelta) : undefined}
+            />
+            <Stat
+              label="Time-to-ready"
+              value={timeToReady ?? "—"}
+              unit="min"
+              hint={ttrDelta != null ? fmtDelta(ttrDelta, " min") : undefined}
+            />
           </div>
 
           {/* Subscores */}
           <Card eyebrow="Why · Recovery" title={`Recovery Score · ${recovery ?? "—"}`}>
+            <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">AI summary</div>
             <p className="mb-3 text-[12px] leading-relaxed text-vyro-mute">
               Multimodal LIVE Recovery — not HR-only. {cardio != null && cardio >= 80 ? "Cardio is fully restored;" : "Cardio still recovering;"}{" "}
               {muscle != null && muscle < 70 ? "muscle readiness still trailing after long Z5 rallies." : "muscle readiness in range."}
             </p>
+            <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">How it's calculated · Subscores</div>
             <div className="space-y-2">
               <SubBar label="Cardio Recovery" value={cardio} weight="25%" />
               <SubBar label="Muscle Readiness" value={muscle} weight="25%" />
