@@ -291,19 +291,21 @@ export function useVyroBand() {
       window.setTimeout(runSpo2Cycle, 3_000);
       const spo2Timer = window.setInterval(runSpo2Cycle, 5 * 60_000);
 
-      // Skin temperature — sub-type 0x04. Same 5-min cycle as SpO₂.
+      // Skin temperature — sub-type 0x09. Fire ~3s after connect so the user
+      // sees a value within the first minute, then repeat every 5 min.
       const runTempCycle = () => {
+        console.log("[qcband] temp measure start");
         void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_TEMP)).catch(() => undefined);
         window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_TEMP)).catch(() => undefined);
-        }, 40_000);
+        }, 45_000);
       };
-      window.setTimeout(runTempCycle, 6_000);
+      window.setTimeout(runTempCycle, 3_000);
       tempTimer = window.setInterval(runTempCycle, 5 * 60_000);
 
       // One-Key Measure — sub-type 0x05. Returns HR + HRV + Stress + SpO₂ +
-      // Temp + BP in a single frame. Fire the first one ~30s after connect
-      // so the user sees data within ~1 minute of wearing the band, then
+      // Temp + BP in a single frame. Fire immediately (10s after connect)
+      // so the user sees HRV/Stress/Temp inside the first minute, then
       // repeat every 3 minutes.
       const runOneKey = () => {
         console.log("[qcband] one-key measure start");
@@ -312,29 +314,31 @@ export function useVyroBand() {
           void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_ONE_KEY)).catch(() => undefined);
         }, 50_000);
       };
-      window.setTimeout(runOneKey, 30_000);
+      window.setTimeout(runOneKey, 10_000);
       oneKeyTimer = window.setInterval(runOneKey, 3 * 60_000);
 
-      // Standalone HRV cycle (sub-type 0x0e) as a fallback for firmwares
-      // that ignore the One-Key composite. Slower cadence (10 min).
+      // Standalone HRV cycle (sub-type 0x0e) — fallback for firmwares that
+      // ignore the One-Key composite. Fire ~20s in so it overlaps with the
+      // first One-Key, then every 10 min.
       const runHrvCycle = () => {
+        console.log("[qcband] hrv measure start");
         void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_HRV)).catch(() => undefined);
         window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_HRV)).catch(() => undefined);
         }, 60_000);
       };
-      window.setTimeout(runHrvCycle, 2 * 60_000);
+      window.setTimeout(runHrvCycle, 20_000);
       const hrvTimer = window.setInterval(runHrvCycle, 10 * 60_000);
 
-      // Standalone Stress cycle (sub-type 0x0d). Some firmwares don't fill
-      // the stress slot in One-Key but do respond to a dedicated cycle.
+      // Standalone Stress cycle (sub-type 0x0d) — fallback. Fire ~30s in.
       const runStressCycle = () => {
+        console.log("[qcband] stress measure start");
         void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_STRESS)).catch(() => undefined);
         window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_STRESS)).catch(() => undefined);
         }, 60_000);
       };
-      window.setTimeout(runStressCycle, 90_000);
+      window.setTimeout(runStressCycle, 30_000);
       const stressTimer = window.setInterval(runStressCycle, 10 * 60_000);
 
       // Stash extra timers we created locally onto the outer refs via closure.
