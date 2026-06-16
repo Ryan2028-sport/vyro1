@@ -111,15 +111,19 @@ export function SessionView() {
   async function onStart() {
     setStartedAt(Date.now());
     setNow(Date.now());
-    await band.startSession(band.sport);
+    try {
+      await band.startSession(band.sport);
+    } catch (e) {
+      console.warn("[vyro] startSession failed; continuing in offline mode", e);
+    }
   }
   async function onPause() {
-    await band.pauseSession();
+    try { await band.pauseSession(); } catch (e) { console.warn("[vyro] pauseSession failed", e); }
   }
   async function onEnd() {
     const ended = Date.now();
     const started = startedAt ?? ended;
-    await band.endSession();
+    try { await band.endSession(); } catch (e) { console.warn("[vyro] endSession failed", e); }
     try {
       await saveMut.mutateAsync({
         data: {
@@ -202,7 +206,7 @@ export function SessionView() {
       )}
 
       {/* IDLE: pre-session call-to-action */}
-      {idle && live.connected && (
+      {idle && (
         <Card eyebrow="Start session" title="Ready to track">
           <p className="text-xs leading-relaxed text-vyro-mute">
             Press start when you step on court. VYRO will detect every burst to a corner and recovery back to the T.
