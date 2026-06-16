@@ -160,10 +160,15 @@ export function RecoveryView() {
           <Card>
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
               <div className="relative">
-                <Ring value={recovery} size={168} stroke={12} label="LIVE Recovery" sub={m.connected ? "every second" : "no watch"} />
+                <Ring value={recovery} size={168} stroke={12} label="LIVE Recovery" sub={recovery != null ? "/ 100" : "no watch"} />
               </div>
               <div className="min-w-0 flex-1 text-center sm:text-left">
                 <Pill tone={bandTone} pulse={band === "green"}>{bandLabel}</Pill>
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2 font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute sm:justify-start">
+                  <span>Updates every second</span>
+                  <span>·</span>
+                  <span className="text-vyro-text">{fmtDelta(recoveryDelta)} vs your baseline</span>
+                </div>
                 <h3 className="mt-3 text-xl font-black leading-tight text-vyro-text">{coachRead}</h3>
                 <p className="mt-2 text-[12px] leading-relaxed text-vyro-mute">
                   Live Recovery is streaming 24/7.{" "}
