@@ -349,13 +349,28 @@ export function SessionView() {
             </div>
           </Card>
 
-          <Card eyebrow="Heart rate · 60s" title="Live HR stream">
-            <div className="flex h-[88px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-vyro-line text-center">
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-vyro-mute">no HR characteristic</span>
-              <span className="text-[10px] text-vyro-mute">
-                firmware v0.4-alpha streams IMU only. HR / SpO₂ zones will populate automatically once the Goodix GH3026 service is enabled on the band.
-              </span>
-            </div>
+          <Card
+            eyebrow="Heart rate · 60s"
+            title={live.heartRateBpm != null ? `${live.heartRateBpm} bpm` : "Live HR stream"}
+            action={currentZone ? <Pill tone={currentZone >= 4 ? "warn" : "live"}>Z{currentZone}</Pill> : undefined}
+          >
+            {hrSpark.length >= 2 ? (
+              <Spark
+                points={hrSpark}
+                color="var(--vyro-rose)"
+                fill
+                height={88}
+                min={Math.max(40, Math.min(...hrSpark) - 5)}
+                max={Math.min(maxHr + 10, Math.max(...hrSpark) + 5)}
+              />
+            ) : (
+              <div className="flex h-[88px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-vyro-line text-center">
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-vyro-mute">waiting for HR</span>
+                <span className="text-[10px] text-vyro-mute">
+                  HR samples arrive every few seconds once the band's PPG sensor warms up.
+                </span>
+              </div>
+            )}
           </Card>
 
           <Card
