@@ -173,6 +173,8 @@ export function CoachView() {
         </>
       )}
 
+      {tab === "sport" && <CoachSportTab roster={ROSTER} />}
+
       {tab === "match" && (
         <>
           <Card eyebrow="Match DB · team view" title="Verified opponent history">
