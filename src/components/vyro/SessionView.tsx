@@ -78,6 +78,19 @@ export function SessionView() {
   const [now, setNow] = useState(Date.now());
   const tickRef = useRef<number | null>(null);
 
+  // Rolling HR samples for the live 60s chart and zone distribution.
+  const [hrSamples, setHrSamples] = useState<{ ts: number; bpm: number }[]>([]);
+  useEffect(() => {
+    if (live.heartRateBpm == null || live.heartRateAt == null) return;
+    setHrSamples((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.ts === live.heartRateAt) return prev;
+      const next = [...prev, { ts: live.heartRateAt!, bpm: live.heartRateBpm! }];
+      const cutoff = Date.now() - 60 * 60_000;
+      return next.filter((s) => s.ts >= cutoff).slice(-3600);
+    });
+  }, [live.heartRateBpm, live.heartRateAt]);
+
   useEffect(() => {
     if (band.sessionState !== "live") {
       if (tickRef.current) window.clearInterval(tickRef.current);
