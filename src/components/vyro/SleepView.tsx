@@ -29,8 +29,11 @@ export function SleepView() {
   const [tab, setTab] = useState<Tab>("overall");
   const m = useLiveMetrics();
   // Real nightly summary will plug in here when the band publishes it.
-  // For now: null when no data has arrived (which is always, today).
-  const NIGHT: NightSummary | null = null;
+  // Function-typed so TS can't narrow the constant to literal `null` and
+  // break the rendering branches below.
+  const getNightSummary = (): NightSummary | null => null;
+  const NIGHT = getNightSummary();
+
 
   const syncedTone = NIGHT ? "live" : "off";
   const syncedLabel = NIGHT ? "Last night" : m.connected ? "Awaiting sync" : "No watch";
