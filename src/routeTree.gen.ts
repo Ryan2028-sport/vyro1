@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as App2RouteImport } from './routes/app2'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -19,6 +20,11 @@ import { Route as ApiPublicAnalyzeClipRouteImport } from './routes/api/public/an
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const App2Route = App2RouteImport.update({
+  id: '/app2',
+  path: '/app2',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SplatRoute = SplatRouteImport.update({
@@ -49,6 +55,7 @@ const ApiPublicAnalyzeClipRoute = ApiPublicAnalyzeClipRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/app2': typeof App2Route
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
@@ -56,6 +63,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/app2': typeof App2Route
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
@@ -65,20 +73,28 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/$': typeof SplatRoute
+  '/app2': typeof App2Route
   '/auth': typeof AuthRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$' | '/auth' | '/app' | '/api/public/analyze-clip'
+  fullPaths:
+    | '/'
+    | '/$'
+    | '/app2'
+    | '/auth'
+    | '/app'
+    | '/api/public/analyze-clip'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$' | '/auth' | '/app' | '/api/public/analyze-clip'
+  to: '/' | '/$' | '/app2' | '/auth' | '/app' | '/api/public/analyze-clip'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/$'
+    | '/app2'
     | '/auth'
     | '/_authenticated/app'
     | '/api/public/analyze-clip'
@@ -88,6 +104,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   SplatRoute: typeof SplatRoute
+  App2Route: typeof App2Route
   AuthRoute: typeof AuthRoute
   ApiPublicAnalyzeClipRoute: typeof ApiPublicAnalyzeClipRoute
 }
@@ -99,6 +116,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app2': {
+      id: '/app2'
+      path: '/app2'
+      fullPath: '/app2'
+      preLoaderRoute: typeof App2RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$': {
@@ -154,6 +178,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   SplatRoute: SplatRoute,
+  App2Route: App2Route,
   AuthRoute: AuthRoute,
   ApiPublicAnalyzeClipRoute: ApiPublicAnalyzeClipRoute,
 }
