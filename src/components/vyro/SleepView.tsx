@@ -32,6 +32,8 @@ export function SleepView() {
   // For now: null when no data has arrived (which is always, today).
   const NIGHT: NightSummary | null = null;
 
+  const syncedTone = NIGHT ? "live" : "off";
+  const syncedLabel = NIGHT ? "Last night" : m.connected ? "Awaiting sync" : "No watch";
 
   return (
     <div className="space-y-4 pb-6">
@@ -39,7 +41,7 @@ export function SleepView() {
         eyebrow="Sleep · Recovery Input"
         title="Sleep architecture"
         subtitle="WHOOP-style sleep breakdown for duration, zones, wakeups, and next-session readiness."
-        action={<Pill tone="live" pulse>Last night</Pill>}
+        action={<Pill tone={syncedTone} pulse={!!NIGHT}>{syncedLabel}</Pill>}
       />
 
       {/* Tabs */}
@@ -62,7 +64,18 @@ export function SleepView() {
         ))}
       </div>
 
-      {tab === "overall" && (
+      {!NIGHT && (
+        <EmptyState
+          title={m.connected ? "No nightly sleep summary yet" : "Pair your VYRO Band to sync sleep"}
+          hint={
+            m.connected
+              ? "Wear the band overnight. As soon as a sleep session is detected and processed, score, stages, wakeups and debt populate here automatically. Nothing is estimated until then."
+              : "Sleep architecture (stages, wakeups, debt, performance) comes from the band's overnight HR, HRV, SpO₂, skin-temp and IMU streams. Connect a band to unlock it."
+          }
+        />
+      )}
+
+      {NIGHT && tab === "overall" && (
         <>
           {/* HERO */}
           <Card>
@@ -151,7 +164,7 @@ export function SleepView() {
         </>
       )}
 
-      {tab === "zones" && (
+      {NIGHT && tab === "zones" && (
         <>
           <Card eyebrow="Stages · 30-s epochs" title="Sleep zones">
             <ZoneBar zones={NIGHT.zones} />
@@ -165,7 +178,7 @@ export function SleepView() {
         </>
       )}
 
-      {tab === "wakeups" && (
+      {NIGHT && tab === "wakeups" && (
         <Card eyebrow="Wake events" title={`${NIGHT.wakeups} wakeups overnight`}>
           <ul className="divide-y divide-vyro-line text-[12.5px]">
             {[
@@ -183,7 +196,7 @@ export function SleepView() {
         </Card>
       )}
 
-      {tab === "performance" && (
+      {NIGHT && tab === "performance" && (
         <Card eyebrow="Sleep performance" title="Next-session readiness">
           <div className="grid grid-cols-2 gap-2">
             <Stat label="Sleep performance" value="83" unit="%" hint="asleep ÷ need" />
@@ -196,6 +209,7 @@ export function SleepView() {
     </div>
   );
 }
+
 
 function fmtHrs(h: number) {
   const total = Math.round(h * 60);
