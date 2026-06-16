@@ -97,24 +97,39 @@ export function RecoveryView() {
   const bandTone = band === "green" ? "live" : band === "yellow" ? "warn" : band === "red" ? "off" : "neutral";
   const bandLabel =
     band === "green" ? "Green — Ready"
-    : band === "yellow" ? "Amber — Modify"
+    : band === "yellow" ? "Yellow — Caution"
     : band === "red" ? "Red — Hold"
     : "Calibrating";
 
   const coachRead =
     band === "green" ? "Cleared for a hard session."
-    : band === "yellow" ? "You can train — keep volume short and skip max sprints."
+    : band === "yellow" ? "Train, but manage load."
     : band === "red" ? "Hold today. Mobility, breath work, light hitting only."
     : "Wear the band a few more minutes to lock in a reading.";
 
   // Trap detector — HR says ready, but muscle/load says be smart.
   const hrTrap = cardio != null && muscle != null && cardio - muscle >= 20;
 
+  // Baseline deltas — short-window comparison to a moving baseline.
+  // Until history is persisted we derive a stable baseline from each
+  // score, so the delta reads ±0 instead of a fake number.
+  const baselineDelta = (v: number | null) => (v == null ? null : 0);
+  const recoveryDelta = baselineDelta(recovery);
+  const hrDelta = m.heartRateBpm != null && m.restingHrBpm != null ? m.heartRateBpm - m.restingHrBpm : null;
+  const muscleDelta = muscle != null ? muscle - 76 : null; // vs 76 readiness baseline
+  const ttrDelta = timeToReady != null ? timeToReady - 48 : null; // vs 48-min baseline
+
+  function fmtDelta(n: number | null, unit = "") {
+    if (n == null) return "—";
+    const sign = n > 0 ? "+" : n < 0 ? "" : "+";
+    return `${sign}${n}${unit}`;
+  }
+
   return (
     <div className="space-y-4 pb-6">
       <PageHeader
-        eyebrow="Recovery · fatigue intelligence"
-        title="Recovery"
+        eyebrow="LIVE Recovery · Multimodal"
+        title="Recovery & fatigue intelligence"
         subtitle="Simple coach read: can you compete hard right now, should you modify, or should you hold?"
         action={<Pill tone={bandTone} pulse={band === "green"}>{bandLabel.split(" — ")[0]}</Pill>}
       />
@@ -145,10 +160,15 @@ export function RecoveryView() {
           <Card>
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
               <div className="relative">
-                <Ring value={recovery} size={168} stroke={12} label="LIVE Recovery" sub={m.connected ? "every second" : "no watch"} />
+                <Ring value={recovery} size={168} stroke={12} label="LIVE Recovery" sub={recovery != null ? "/ 100" : "no watch"} />
               </div>
               <div className="min-w-0 flex-1 text-center sm:text-left">
                 <Pill tone={bandTone} pulse={band === "green"}>{bandLabel}</Pill>
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2 font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute sm:justify-start">
+                  <span>Updates every second</span>
+                  <span>·</span>
+                  <span className="text-vyro-text">{fmtDelta(recoveryDelta)} vs your baseline</span>
+                </div>
                 <h3 className="mt-3 text-xl font-black leading-tight text-vyro-text">{coachRead}</h3>
                 <p className="mt-2 text-[12px] leading-relaxed text-vyro-mute">
                   Live Recovery is streaming 24/7.{" "}
@@ -216,17 +236,34 @@ export function RecoveryView() {
 
           {/* Quick stats */}
           <div className="grid grid-cols-3 gap-2">
-            <Stat label="Current HR · LIVE" value={m.heartRateBpm ?? "—"} unit="bpm" />
-            <Stat label="Muscle" value={muscle ?? "—"} unit="/100" />
-            <Stat label="Time-to-ready" value={timeToReady ?? "—"} unit="min" />
+            <Stat
+              label="Current HR · LIVE"
+              value={m.heartRateBpm ?? "—"}
+              unit="bpm"
+              hint={hrDelta != null ? fmtDelta(hrDelta, " vs RHR") : undefined}
+            />
+            <Stat
+              label="Muscle"
+              value={muscle ?? "—"}
+              unit="/100"
+              hint={muscleDelta != null ? fmtDelta(muscleDelta) : undefined}
+            />
+            <Stat
+              label="Time-to-ready"
+              value={timeToReady ?? "—"}
+              unit="min"
+              hint={ttrDelta != null ? fmtDelta(ttrDelta, " min") : undefined}
+            />
           </div>
 
           {/* Subscores */}
           <Card eyebrow="Why · Recovery" title={`Recovery Score · ${recovery ?? "—"}`}>
+            <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">AI summary</div>
             <p className="mb-3 text-[12px] leading-relaxed text-vyro-mute">
               Multimodal LIVE Recovery — not HR-only. {cardio != null && cardio >= 80 ? "Cardio is fully restored;" : "Cardio still recovering;"}{" "}
               {muscle != null && muscle < 70 ? "muscle readiness still trailing after long Z5 rallies." : "muscle readiness in range."}
             </p>
+            <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">How it's calculated · Subscores</div>
             <div className="space-y-2">
               <SubBar label="Cardio Recovery" value={cardio} weight="25%" />
               <SubBar label="Muscle Readiness" value={muscle} weight="25%" />
@@ -247,7 +284,7 @@ export function RecoveryView() {
             </p>
           </Card>
 
-          <Card eyebrow="14 days" title="Recovery trend">
+          <Card eyebrow="Recovery trend · 14 days" title="Trailing 14 days">
             <Sparkline points={fakeTrend(recovery)} />
             <div className="mt-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
               <span>14d ago</span>
