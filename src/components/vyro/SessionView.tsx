@@ -326,9 +326,9 @@ export function SessionView() {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Stat
                 label="Heart rate"
-                value="—"
+                value={live.heartRateBpm ?? "—"}
                 unit="bpm"
-                hint="awaiting firmware HR characteristic"
+                hint={currentZone ? `Z${currentZone}` : live.connected ? "waiting…" : undefined}
               />
               <Stat
                 label="Movement intensity"
