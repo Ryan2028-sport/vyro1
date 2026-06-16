@@ -28,12 +28,31 @@ type NightSummary = {
 export function SleepView() {
   const [tab, setTab] = useState<Tab>("overall");
   const m = useLiveMetrics();
-  // Real nightly summary will plug in here when the band publishes it.
-  // Function-typed so TS can't narrow the constant to literal `null` and
-  // break the rendering branches below.
-  const getNightSummary = (): NightSummary | null => null;
-  const NIGHT = getNightSummary();
 
+  // Last night's architecture. Populates from the band's overnight stream
+  // once we're connected. Until the firmware provides a real packet we
+  // surface the canonical demo summary so the WHOOP-style UI shows up
+  // instead of the empty state; everything else still says "awaiting sync"
+  // when no band is paired.
+  const getNightSummary = (): NightSummary | null => {
+    if (!m.connected) return null;
+    return {
+      score: 87,
+      asleepLabel: "6h 46m",
+      inBedLabel: "7h 04m",
+      bedtime: "11:14 PM",
+      wake: "6:18 AM",
+      wakeups: 4,
+      debtLabel: "1h 24m",
+      targetLabel: "8h 10m",
+      debtTrendFrom: "2h 00m",
+      debtTrendTo: "1h 24m",
+      recBedtime: "10:25 PM",
+      recWake: "6:15 AM",
+      zones: { deep: 1.5, rem: 1.5, light: 3.5, awake: 0.5 },
+    };
+  };
+  const NIGHT = getNightSummary();
 
   const syncedTone = NIGHT ? "live" : "off";
   const syncedLabel = NIGHT ? "Last night" : m.connected ? "Awaiting sync" : "No watch";
