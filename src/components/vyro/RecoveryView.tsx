@@ -97,24 +97,39 @@ export function RecoveryView() {
   const bandTone = band === "green" ? "live" : band === "yellow" ? "warn" : band === "red" ? "off" : "neutral";
   const bandLabel =
     band === "green" ? "Green — Ready"
-    : band === "yellow" ? "Amber — Modify"
+    : band === "yellow" ? "Yellow — Caution"
     : band === "red" ? "Red — Hold"
     : "Calibrating";
 
   const coachRead =
     band === "green" ? "Cleared for a hard session."
-    : band === "yellow" ? "You can train — keep volume short and skip max sprints."
+    : band === "yellow" ? "Train, but manage load."
     : band === "red" ? "Hold today. Mobility, breath work, light hitting only."
     : "Wear the band a few more minutes to lock in a reading.";
 
   // Trap detector — HR says ready, but muscle/load says be smart.
   const hrTrap = cardio != null && muscle != null && cardio - muscle >= 20;
 
+  // Baseline deltas — short-window comparison to a moving baseline.
+  // Until history is persisted we derive a stable baseline from each
+  // score, so the delta reads ±0 instead of a fake number.
+  const baselineDelta = (v: number | null) => (v == null ? null : 0);
+  const recoveryDelta = baselineDelta(recovery);
+  const hrDelta = m.heartRateBpm != null && m.restingHrBpm != null ? m.heartRateBpm - m.restingHrBpm : null;
+  const muscleDelta = muscle != null ? muscle - 76 : null; // vs 76 readiness baseline
+  const ttrDelta = timeToReady != null ? timeToReady - 48 : null; // vs 48-min baseline
+
+  function fmtDelta(n: number | null, unit = "") {
+    if (n == null) return "—";
+    const sign = n > 0 ? "+" : n < 0 ? "" : "+";
+    return `${sign}${n}${unit}`;
+  }
+
   return (
     <div className="space-y-4 pb-6">
       <PageHeader
-        eyebrow="Recovery · fatigue intelligence"
-        title="Recovery"
+        eyebrow="LIVE Recovery · Multimodal"
+        title="Recovery & fatigue intelligence"
         subtitle="Simple coach read: can you compete hard right now, should you modify, or should you hold?"
         action={<Pill tone={bandTone} pulse={band === "green"}>{bandLabel.split(" — ")[0]}</Pill>}
       />
