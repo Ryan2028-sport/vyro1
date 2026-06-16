@@ -58,30 +58,90 @@ const POSTS: Post[] = [
 ];
 
 const GROUPS = [
-  { id: "g1", name: "Yale Squash · 2026", members: 18, verified: true, posts: 142 },
-  { id: "g2", name: "DC Pro Squash Crew", members: 26, verified: true, posts: 318 },
-  { id: "g3", name: "Northeast Tennis Open", members: 64, verified: false, posts: 71 },
+  { id: "g1", name: "Yale Squash · 2026", sport: "Squash", members: 14, online: 3, joined: true },
+  { id: "g2", name: "DC Pro Squash Crew", sport: "Squash", members: 22, online: 5, joined: true },
+  { id: "g3", name: "Northeast Tennis Open", sport: "Tennis", members: 38, online: 0, joined: false },
+  { id: "g4", name: "Mid-Atlantic Baseball Lab", sport: "Baseball", members: 41, online: 6, joined: false },
 ];
 
+const GROUP_MEMBERS = [
+  { name: "Ryan Chen", role: "ACTIVE" },
+  { name: "Alex K.", role: "ACTIVE" },
+  { name: "Diego R.", role: "ACTIVE" },
+  { name: "Shiv Patel", role: "COACH" },
+  { name: "Coach M.", role: "COACH" },
+];
+
+const GROUP_RANKED = [
+  { rank: 1, name: "Alex K.", metric: "Agility", v: 92 },
+  { rank: 2, name: "Ryan Chen", metric: "T-control", v: 78 },
+  { rank: 3, name: "Diego R.", metric: "Ghosting reps", v: 4280 },
+];
+
+const GROUP_CHAT = [
+  { who: "Coach M.", text: "Practice 4pm. Bring watches charged." },
+  { who: "Alex K.", text: "Recovery 88 today. Locked in." },
+  { who: "Ryan C.", text: "I'm pushing back-left coverage first." },
+];
+
+const SCOUT_SPORTS = ["Squash", "Tennis", "Baseball", "Basketball", "Football", "Golf", "Hockey", "Soccer"];
+const SCOUT_METRICS = [
+  "Overall avg", "Sleep", "Recovery", "Sub-25% → 80%", "T-control", "Agility",
+  "Cardio fitness", "Court distance", "Heat-map speed", "Overnight recovery", "Readiness / sleep",
+];
 const SCOUT_RANKINGS = [
-  { rank: 1, name: "Alex K.", sport: "Squash", region: "Princeton", grade: "A+", percentile: 96 },
-  { rank: 2, name: "Kira J.", sport: "Tennis", region: "Florida", grade: "A", percentile: 92 },
-  { rank: 3, name: "Ryan Chen", sport: "Squash", region: "Yale 2026", grade: "A−", percentile: 87 },
-  { rank: 4, name: "Diego R.", sport: "Squash", region: "Yale 2026", grade: "B+", percentile: 82 },
-  { rank: 5, name: "Shiv Patel", sport: "Squash", region: "Imperial", grade: "B+", percentile: 79 },
+  { rank: 1, name: "Ryan Chen", org: "Columbia / VYRO", region: "Northeast", sessions: 28, avg: 94 },
+  { rank: 2, name: "Alex K.", org: "Yale Squash · 2026", region: "Northeast", sessions: 26, avg: 91 },
+  { rank: 3, name: "Diego R.", org: "DC Pro Squash Crew", region: "Mid-Atlantic", sessions: 19, avg: 88 },
+  { rank: 4, name: "Shiv Patel", org: "VYRO", region: "Northeast", sessions: 24, avg: 84 },
+  { rank: 5, name: "Marcus W.", org: "Princeton", region: "Northeast", sessions: 22, avg: 81 },
+];
+const SCOUT_PROFILE_AXES = [
+  { label: "Sleep reliability", tag: "off-court" },
+  { label: "Live recovery", tag: "body care" },
+  { label: "Heat-map load", tag: "court work" },
+  { label: "T-control", tag: "sport skill" },
+];
+const SCOUT_RELIABILITY = [
+  "Verified sessions", "Same sport only", "Sleep discipline", "Overnight recovery", "Readiness consistency",
 ];
 
 const COMPETE_CATEGORIES = ["School vs School", "Club vs Club", "Group vs Group", "Squash Global", "Tennis Global"];
-const LEADERS_SLEEP = [
-  { rank: 1, name: "Alex K.", v: 92 },
-  { rank: 2, name: "Kira J.", v: 89 },
-  { rank: 3, name: "Ryan Chen", v: 87 },
+const CHALLENGES = [
+  {
+    cadence: "WEEKLY", prize: "$20",
+    title: "Best % average T-control",
+    rule: "Minimum 3 logged sessions",
+    rows: [{ r: 1, n: "Ryan Chen", v: "78%" }, { r: 2, n: "Alex K.", v: "76%" }, { r: 3, n: "Diego R.", v: "73%" }],
+  },
+  {
+    cadence: "MONTHLY", prize: "$100",
+    title: "Best avg Agility score",
+    rule: "Verified sessions only",
+    rows: [{ r: 1, n: "Alex K.", v: "92" }, { r: 2, n: "Ryan Chen", v: "90" }, { r: 3, n: "Kira J.", v: "88" }],
+  },
+  {
+    cadence: "SEASON", prize: "$1K",
+    title: "Most aggregated court distance covered",
+    rule: "Season-long verified match + training load",
+    rows: [{ r: 1, n: "Diego R.", v: "128 km" }, { r: 2, n: "Ryan Chen", v: "121 km" }, { r: 3, n: "Shiv Patel", v: "109 km" }],
+  },
+  {
+    cadence: "YEAR", prize: "$5K",
+    title: "Best avg time to recover to 80% after dropping below 25%",
+    rule: "Requires post-session live recovery dip below 25%",
+    rows: [{ r: 1, n: "Ryan Chen", v: "11m" }, { r: 2, n: "Alex K.", v: "13m" }, { r: 3, n: "Kira J.", v: "15m" }],
+  },
 ];
-const LEADERS_SESSIONS = [
-  { rank: 1, name: "Ryan Chen", v: 28 },
-  { rank: 2, name: "Alex K.", v: 26 },
-  { rank: 3, name: "Shiv Patel", v: 24 },
+
+const PROFILE_POSTS = [
+  { title: "Back-left pressure rally", meta: "T-control 78%" },
+  { title: "Recovery day receipt", meta: "Recovery 82" },
+  { title: "Swing path overlay", meta: "Racket speed +7%" },
+  { title: "League match win", meta: "W 3-1" },
+  { title: "Ghosting block", meta: "1.38s return" },
 ];
+
 
 export function SocialView() {
   const [tab, setTab] = useState<Tab>("feed");
