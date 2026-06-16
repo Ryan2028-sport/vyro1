@@ -42,10 +42,10 @@ function AppShell() {
       case "coach": return <CoachView />;
       case "diet": return <DietView />;
       case "tendency": return <TendencyView />;
+      case "social": return <SocialView />;
       // Modules still on the roadmap fall back to the More grid.
       case "trends":
       case "video":
-      case "social":
       case "sport":
       case "activity":
       default:
