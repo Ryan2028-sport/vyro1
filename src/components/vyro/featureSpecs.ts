@@ -10,6 +10,7 @@ import {
   LineChart,
   Map,
   Moon,
+  Trophy,
   Users,
   Zap,
   type LucideIcon,
@@ -25,6 +26,13 @@ export interface NavSpec {
 }
 
 export const FEATURE_SPECS: NavSpec[] = [
+  {
+    id: "sport",
+    label: "Sport selector",
+    eyebrow: "Pick a sport",
+    icon: Trophy,
+    blurb: "Open the Morphos suite for Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, or Tennis.",
+  },
   {
     id: "athlete",
     label: "Athlete health",
