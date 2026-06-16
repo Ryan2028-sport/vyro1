@@ -284,7 +284,7 @@ export function RecoveryView() {
             </p>
           </Card>
 
-          <Card eyebrow="14 days" title="Recovery trend">
+          <Card eyebrow="Recovery trend · 14 days" title="Trailing 14 days">
             <Sparkline points={fakeTrend(recovery)} />
             <div className="mt-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
               <span>14d ago</span>
