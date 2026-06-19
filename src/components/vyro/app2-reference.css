@@ -414,9 +414,31 @@
 }
 .app2-pulse { animation: app2-pulse 1.3s ease-in-out infinite; }
 
-@media (max-width: 374px) {
-  .app2-readiness { gap: 10px; padding: 13px; }
-  .app2-ring-box { width: 104px; }
-  .app2-card-title { font-size: 16px; }
-  .app2-sync { padding: 0 12px; }
+/* prevent iOS zoom on input focus */
+.app2-input, .app2-select { font-size: 16px; }
+
+@media (max-width: 480px) {
+  .app2-topbar { padding: 10px 12px 8px; gap: 8px; }
+  .app2-actions { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .app2-sync { width: auto; padding: 0 12px; height: 40px; }
+  .app2-icon-btn { width: 40px; height: 40px; }
+  .app2-avatar { width: 40px; height: 40px; margin-top: 8px; }
+  .app2-main { padding: 20px 14px calc(env(safe-area-inset-bottom, 0px) + 96px); }
+  .app2-heading { font-size: 22px; }
+  .app2-readiness { flex-direction: column; align-items: stretch; gap: 14px; }
+  .app2-ring-box { width: 100%; height: auto; padding: 14px; }
+  .app2-metric-value { font-size: 20px; }
 }
+
+@media (max-width: 360px) {
+  .app2-topbar { grid-template-columns: 1fr; }
+  .app2-actions { justify-content: flex-start; }
+  .app2-avatar { margin-left: 0; margin-top: 0; }
+  .app2-chip { padding: 0 13px; font-size: 11px; }
+  .app2-card-title { font-size: 16px; }
+  .app2-form-grid { grid-template-columns: 1fr; }
+}
+
+/* embedded views fit phone width */
+.app2-scroll-embed > * { max-width: 100%; }
+.app2-scroll-embed img, .app2-scroll-embed canvas, .app2-scroll-embed svg { max-width: 100%; height: auto; }
