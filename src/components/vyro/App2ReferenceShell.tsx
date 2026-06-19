@@ -359,15 +359,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         live: m.connected,
       },
     ],
-    [
-      m.connected,
-      m.heartRateBpm,
-      m.hrvMs,
-      m.restingHrBpm,
-      m.skinTempC,
-      m.spo2Pct,
-      m.stepsToday,
-    ],
+    [m.connected, m.heartRateBpm, m.hrvMs, m.restingHrBpm, m.skinTempC, m.spo2Pct, m.stepsToday],
   );
 
   const addPlan = () => {
@@ -412,8 +404,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </div>
           <h2 className="app2-card-title">You're ready to train.</h2>
           <p className="app2-card-copy">
-            Recovery is green and agility is sharp. Train hard, but protect the
-            back-left corner.
+            Recovery is green and agility is sharp. Train hard, but protect the back-left corner.
           </p>
           <div className="app2-change-stack">
             <span className="app2-eyebrow">What changed</span>
@@ -427,8 +418,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
       <div className="app2-grid">
         <InfoCard eyebrow="Top opportunity">
           <p className="app2-card-copy">
-            Agility is peaking (+10.5% over 12 sessions) — a good day to push
-            interval ghosting.
+            Agility is peaking (+10.5% over 12 sessions) — a good day to push interval ghosting.
           </p>
         </InfoCard>
 
@@ -451,8 +441,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
         <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone="amber">
           <p className="app2-card-copy">
-            Clearance is on hold until wearable power and AI video symmetry
-            return inside the 5% baseline.
+            Clearance is on hold until wearable power and AI video symmetry return inside the 5% baseline.
           </p>
           <div className="app2-metric-grid">
             <MiniMetric label="Video symmetry" value="93" unit="/100" />
