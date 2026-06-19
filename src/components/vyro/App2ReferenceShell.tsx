@@ -441,7 +441,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
         <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone="amber">
           <p className="app2-card-copy">
-            Clearance is on hold until wearable power and AI video symmetry return inside the 5% baseline.
+            Clearance is on hold until wearable power and AI video symmetry
+            return inside the 5% baseline.
           </p>
           <div className="app2-metric-grid">
             <MiniMetric label="Video symmetry" value="93" unit="/100" />
