@@ -366,7 +366,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
       </p>
       <button className="app2-live-pill" onClick={() => setView("band")}>
         <span className={m.connected ? "app2-dot app2-pulse" : "app2-dot"} />
-        {status} · {battery}%
+        {status}
+        {m.connected && battery != null ? ` · ${battery}%` : ""}
       </button>
 
       <section className="app2-card app2-readiness">
