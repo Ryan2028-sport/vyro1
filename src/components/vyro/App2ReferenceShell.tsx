@@ -23,11 +23,7 @@ import { SessionView } from "./SessionView";
 import { SleepView } from "./SleepView";
 import { SocialView } from "./SocialView";
 import { SportView } from "./SportView";
-import {
-  computeReadiness,
-  computeSubScores,
-  useLiveMetrics,
-} from "./useLiveMetrics";
+import { computeReadiness, computeSubScores, useLiveMetrics } from "./useLiveMetrics";
 import "./app2-reference.css";
 
 type App2View =
@@ -64,14 +60,7 @@ function Logo() {
         strokeLinejoin="round"
         strokeLinecap="round"
       />
-      <text
-        x="0"
-        y="58"
-        fill="currentColor"
-        fontSize="19"
-        fontWeight="900"
-        letterSpacing="13"
-      >
+      <text x="0" y="58" fill="currentColor" fontSize="19" fontWeight="900" letterSpacing="13">
         VYRO
       </text>
       <text
@@ -97,11 +86,7 @@ function Ring({ value }: { value: number }) {
   return (
     <div>
       <div className="app2-ring-wrap">
-        <svg
-          viewBox="0 0 104 104"
-          role="img"
-          aria-label={`Readiness ${value} out of 100`}
-        >
+        <svg viewBox="0 0 104 104" role="img" aria-label={`Readiness ${value} out of 100`}>
           <circle
             cx="52"
             cy="52"
