@@ -88,17 +88,21 @@
 .app2-sync {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  width: 92px;
   height: 44px;
-  padding: 0 17px;
+  padding: 0 13px;
   border: 1px solid hsl(0 0% 100% / 0.28);
   border-radius: 999px;
   background: hsl(0 0% 100% / 0.06);
   color: hsl(var(--app2-fg));
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .app2-dot {
@@ -198,23 +202,25 @@
   margin-top: 9px;
   color: hsl(var(--app2-muted));
   font-size: 12.5px;
-  line-height: 1.55;
+  line-height: 1.43;
 }
 
 .app2-live-pill {
-  margin-top: 14px;
+  margin-top: 11px;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   border-radius: 7px;
   border: 1px solid hsl(var(--app2-ready) / 0.42);
   background: hsl(var(--app2-ready) / 0.12);
   color: hsl(var(--app2-ready));
-  padding: 9px 12px;
+  min-height: 35px;
+  padding: 7px 12px;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 
 .app2-card {
@@ -227,7 +233,7 @@
 }
 
 .app2-readiness {
-  margin-top: 14px;
+  margin-top: 13px;
   padding: 15px;
   display: flex;
   gap: 14px;
