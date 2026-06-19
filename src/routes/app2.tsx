@@ -7,6 +7,14 @@ import { App2ReferenceShell } from "@/components/vyro/App2ReferenceShell";
 // background session run identically here.
 export const Route = createFileRoute("/app2")({
   ssr: false,
+  head: () => ({
+    links: [
+      {
+        rel: "stylesheet",
+        href: "https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&f[]=jetbrains-mono@500,700&display=swap",
+      },
+    ],
+  }),
   component: () => (
     <VyroBandProvider>
       <App2ReferenceShell />
