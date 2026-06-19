@@ -58,10 +58,25 @@
   padding: 12px 12px 10px;
 }
 
-.app2-logo-mark {
-  width: 98px;
-  height: 54px;
+.app2-logo {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
   color: hsl(var(--app2-fg));
+  line-height: 1;
+}
+.app2-logo-word {
+  font-family: "Satoshi", system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: 0.32em;
+}
+.app2-logo-tag {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.38em;
+  color: hsl(var(--app2-muted));
 }
 
 .app2-kicker {
