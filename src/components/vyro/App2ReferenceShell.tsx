@@ -553,10 +553,7 @@ export function App2ReferenceShell() {
   return (
     <div className="app2-ref">
       <div className="app2-phone">
-        <div className="app2-status">
-          <span>9:41</span>
-          <span>LTE · {m.batteryPct ?? 94}%</span>
-        </div>
+        {/* Real iOS status bar shows through via safe-area inset; no fake status bar */}
         <header>
           <div className="app2-topbar">
             <div>
