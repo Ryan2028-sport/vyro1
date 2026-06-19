@@ -268,15 +268,15 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
     restingHrBpm: m.restingHrBpm,
     stress: m.stressScore,
     spo2: m.spo2Pct,
-    peakJerk: m.peakJerk || null,
+    peakJerk: m.peakJerk ?? null,
   });
   const subs = computeSubScores({
     connected: m.connected,
     hrvMs: m.hrvMs,
     restingHrBpm: m.restingHrBpm,
     stress: m.stressScore,
-    peakJerk: m.peakJerk || null,
-    peakG: m.peakG || null,
+    peakJerk: m.peakJerk ?? null,
+    peakG: m.peakG ?? null,
     eventsLastMin: m.eventsLastMin,
     reactMin: m.reactMin,
   });
