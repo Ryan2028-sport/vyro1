@@ -146,7 +146,7 @@ export function RecoveryView() {
             key={t.id}
             onClick={() => setTab(t.id as Tab)}
             className={`whitespace-nowrap rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] transition ${
-              tab === t.id ? "bg-vyro-text text-vyro-bg" : "text-vyro-mute hover:text-vyro-text"
+              tab === t.id ? "bg-vyro-mint/15 text-vyro-mint border border-vyro-mint/40" : "text-vyro-mute hover:text-vyro-text border border-transparent"
             }`}
           >
             {t.label}
