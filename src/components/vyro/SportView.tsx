@@ -35,7 +35,19 @@ const TENNIS_ROUTES = [
   { route: "Center → Back Right", score: 76, stepsIn: 5, stepsOut: 5, timeIn: 1.22, timeOut: 1.51, decel: 3.4, accel: 3.1, leadIn: "Right", leadOut: "Left", zone: "Back right" },
 ];
 
-type RouteRead = (typeof SQUASH_ROUTES)[number];
+type RouteRead = {
+  route: string;
+  score: number;
+  stepsIn: number;
+  stepsOut: number;
+  timeIn: number;
+  timeOut: number;
+  decel: number;
+  accel: number;
+  leadIn: string;
+  leadOut: string;
+  zone: string;
+};
 
 export function SportView() {
   const [activeId, setActiveId] = useState<string | null>(null);
