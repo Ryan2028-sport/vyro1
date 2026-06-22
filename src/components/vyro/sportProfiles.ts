@@ -398,6 +398,7 @@ export const SPORT_PROFILES: SportProfile[] = [
       { label: "Deceleration", detail: "Brake into corner without over-running", value: 82 },
       { label: "Change of direction", detail: "Corner exit angle back to T", value: 84 },
       { label: "Return control", detail: "Return-to-T time + body balance", value: 79 },
+      { label: "Repeatability", detail: "Burst quality across long rallies", value: 81 },
     ],
     movementTitle: "T movement map",
     movementItems: [
