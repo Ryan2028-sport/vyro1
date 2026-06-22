@@ -481,3 +481,324 @@ function DetailMetric({ label, value, unit = "", max }: { label: string; value: 
     </div>
   );
 }
+
+// ===================== Tendency Module (Squash / Tennis) =====================
+
+type ZoneKey = "BL" | "BR" | "LMV" | "RMV" | "LF" | "RF";
+
+type OpponentProfile = {
+  id: string;
+  initials: string;
+  name: string;
+  record: string;
+  matches: number;
+  hand: "Right-handed" | "Left-handed";
+  rating: number;
+  style: string;
+  tags: string[]; // filter tags
+  scout: {
+    title: string;
+    updated: string;
+    favorite: string;
+    target: string;
+    tell: string;
+    insight: string;
+    // mix per zone, per critical/non-critical
+    mix: Record<ZoneKey, {
+      label: string;
+      critical: { straight: number; drop: number; boast: number };
+      nonCritical: { straight: number; drop: number; boast: number };
+    }>;
+  };
+};
+
+const ZONES: { key: ZoneKey; code: string; label: string }[] = [
+  { key: "BL", code: "BL", label: "Back left" },
+  { key: "BR", code: "BR", label: "Back right" },
+  { key: "LMV", code: "LMV", label: "Left middle volley" },
+  { key: "RMV", code: "RMV", label: "Right middle volley" },
+  { key: "LF", code: "LF", label: "Left front" },
+  { key: "RF", code: "RF", label: "Right front" },
+];
+
+const FILTERS = ["All", "front pressure", "retriever", "power", "critical straight", "boast"];
+
+function makeMix(s: number, d: number, b: number) { return { straight: s, drop: d, boast: b }; }
+
+const OPPONENTS: OpponentProfile[] = [
+  {
+    id: "alex", initials: "AK", name: "Alex K.", record: "12-4", matches: 4, hand: "Right-handed", rating: 86,
+    style: "Attacking · Front-Court Pressure",
+    tags: ["front pressure", "critical straight"],
+    scout: {
+      title: "Shot choice by court position",
+      updated: "Last 3 days ago",
+      favorite: "Volley kill after loose rail",
+      target: "Deep backhand recovery under long rallies",
+      tell: "Shortens follow-through before critical straight drive",
+      insight: "Alex K.: from Back left on critical points, the most likely shot is Straight drive at 72%. Build the scout around position plus pressure, not just overall shot frequency.",
+      mix: {
+        BL: { label: "Back left", critical: makeMix(72, 18, 10), nonCritical: makeMix(51, 14, 35) },
+        BR: { label: "Back right", critical: makeMix(58, 24, 18), nonCritical: makeMix(46, 19, 35) },
+        LMV: { label: "Left middle volley", critical: makeMix(64, 26, 10), nonCritical: makeMix(48, 32, 20) },
+        RMV: { label: "Right middle volley", critical: makeMix(61, 28, 11), nonCritical: makeMix(44, 33, 23) },
+        LF: { label: "Left front", critical: makeMix(38, 52, 10), nonCritical: makeMix(30, 56, 14) },
+        RF: { label: "Right front", critical: makeMix(41, 49, 10), nonCritical: makeMix(33, 53, 14) },
+      },
+    },
+  },
+  {
+    id: "marcus", initials: "MW", name: "Marcus W.", record: "8-3", matches: 3, hand: "Right-handed", rating: 74,
+    style: "Retriever · T-Dominant",
+    tags: ["retriever"],
+    scout: {
+      title: "Shot choice by court position",
+      updated: "Last week",
+      favorite: "Length rail to reset the T",
+      target: "Cross-court width when forced wide",
+      tell: "Hangs on the T — drives only after two retrieves",
+      insight: "Marcus W.: defensive bias. From Back right on critical points, expect Straight drive 64% — punish loose length with a volley kill.",
+      mix: {
+        BL: { label: "Back left", critical: makeMix(60, 22, 18), nonCritical: makeMix(55, 18, 27) },
+        BR: { label: "Back right", critical: makeMix(64, 20, 16), nonCritical: makeMix(58, 17, 25) },
+        LMV: { label: "Left middle volley", critical: makeMix(48, 36, 16), nonCritical: makeMix(42, 38, 20) },
+        RMV: { label: "Right middle volley", critical: makeMix(50, 34, 16), nonCritical: makeMix(44, 36, 20) },
+        LF: { label: "Left front", critical: makeMix(32, 58, 10), nonCritical: makeMix(28, 60, 12) },
+        RF: { label: "Right front", critical: makeMix(35, 55, 10), nonCritical: makeMix(30, 58, 12) },
+      },
+    },
+  },
+  {
+    id: "diego", initials: "DR", name: "Diego R.", record: "15-7", matches: 2, hand: "Left-handed", rating: 81,
+    style: "Power · Big Hitter",
+    tags: ["power", "boast"],
+    scout: {
+      title: "Shot choice by court position",
+      updated: "Last 2 weeks",
+      favorite: "Reverse boast from deep backhand",
+      target: "Recovery to T after forced cross",
+      tell: "Drops racket head before boast attempt",
+      insight: "Diego R.: from Left middle volley on critical points, boast jumps to 34%. Hold T centre-left and read the racket-head drop.",
+      mix: {
+        BL: { label: "Back left", critical: makeMix(48, 22, 30), nonCritical: makeMix(42, 22, 36) },
+        BR: { label: "Back right", critical: makeMix(46, 20, 34), nonCritical: makeMix(40, 22, 38) },
+        LMV: { label: "Left middle volley", critical: makeMix(46, 20, 34), nonCritical: makeMix(40, 24, 36) },
+        RMV: { label: "Right middle volley", critical: makeMix(50, 22, 28), nonCritical: makeMix(44, 24, 32) },
+        LF: { label: "Left front", critical: makeMix(36, 44, 20), nonCritical: makeMix(32, 48, 20) },
+        RF: { label: "Right front", critical: makeMix(40, 42, 18), nonCritical: makeMix(36, 46, 18) },
+      },
+    },
+  },
+];
+
+function TendencyModule({ sport }: { sport: SportProfile }) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<string>("All");
+  const [selectedId, setSelectedId] = useState<string>(OPPONENTS[0].id);
+  const [zone, setZone] = useState<ZoneKey>("BL");
+  const [critical, setCritical] = useState<boolean>(true);
+
+  const filtered = OPPONENTS.filter((o) => {
+    const q = query.trim().toLowerCase();
+    const matchesQ = !q || o.name.toLowerCase().includes(q) || o.style.toLowerCase().includes(q) || o.tags.some((t) => t.includes(q));
+    const matchesF = filter === "All" || o.tags.includes(filter);
+    return matchesQ && matchesF;
+  });
+
+  const selected = OPPONENTS.find((o) => o.id === selectedId) ?? OPPONENTS[0];
+  const zoneData = selected.scout.mix[zone];
+  const mix = critical ? zoneData.critical : zoneData.nonCritical;
+  const otherMix = critical ? zoneData.nonCritical : zoneData.critical;
+  const topShot = (Object.entries(mix) as [keyof typeof mix, number][])
+    .sort((a, b) => b[1] - a[1])[0];
+  const topLabel = topShot[0] === "straight" ? "Straight drive" : topShot[0] === "drop" ? "Drop" : "Boast";
+
+  return (
+    <div className="space-y-4">
+      {/* Search + filters */}
+      <Card
+        eyebrow="Player tendency database"
+        title={
+          <div className="flex items-start justify-between gap-2">
+            <span>Search opponent scouting</span>
+            <span className="shrink-0 rounded-full border border-vyro-line bg-vyro-elev px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-vyro-mute">
+              {OPPONENTS.length} profiles
+            </span>
+          </div>
+        }
+      >
+        <div className="mt-1 flex items-center gap-2 rounded-full border border-vyro-line bg-vyro-elev px-3 py-2">
+          <CircleHelp className="h-3.5 w-3.5 text-vyro-mute" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search style, name, pattern…"
+            className="w-full bg-transparent text-[12px] text-vyro-text placeholder:text-vyro-mute focus:outline-none"
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {FILTERS.map((f) => {
+            const active = filter === f;
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                  active ? "border-vyro-mint bg-vyro-mint/15 text-vyro-mint" : "border-vyro-line bg-vyro-panel text-vyro-mute"
+                }`}
+              >
+                {f}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Players list */}
+      <div className="space-y-2">
+        {filtered.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-vyro-line p-4 text-center text-[12px] text-vyro-mute">
+            No opponents match that filter.
+          </div>
+        )}
+        {filtered.map((o) => {
+          const selectedRow = o.id === selectedId;
+          return (
+            <button
+              key={o.id}
+              onClick={() => setSelectedId(o.id)}
+              className={`w-full rounded-2xl border px-3 py-3 text-left transition-colors ${
+                selectedRow ? "border-vyro-mint bg-vyro-mint/5" : "border-vyro-line bg-vyro-panel hover:border-vyro-mint/40"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-vyro-line bg-vyro-elev font-mono text-[11px] font-bold text-vyro-text">
+                  {o.initials}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-sm font-bold text-vyro-text">{o.name}</span>
+                    <span className="shrink-0 text-sm font-black tabular-nums text-vyro-text">{o.rating}</span>
+                  </div>
+                  <div className="truncate text-[11px] text-vyro-mute">{o.record} · {o.matches} matches · {o.hand}</div>
+                  <div className="mt-0.5 truncate text-[11px] text-vyro-mute">{o.style}</div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+        <button className="w-full rounded-2xl border border-dashed border-vyro-line px-3 py-3 text-center text-[12px] font-semibold text-vyro-mute hover:border-vyro-mint/50 hover:text-vyro-text">
+          + Add player
+        </button>
+      </div>
+
+      {/* Scouting card */}
+      <Card
+        eyebrow={`Scouting card · ${selected.name}`}
+        title={
+          <div className="flex items-start justify-between gap-2">
+            <span>{selected.scout.title}</span>
+            <span className="shrink-0 rounded-full border border-vyro-line bg-vyro-elev px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-vyro-mute">
+              {selected.scout.updated}
+            </span>
+          </div>
+        }
+      >
+        <div className="space-y-2">
+          {[
+            { k: "Favorite", v: selected.scout.favorite },
+            { k: "Target", v: selected.scout.target },
+            { k: "Tell", v: selected.scout.tell },
+          ].map((row) => (
+            <div key={row.k} className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">{row.k}</div>
+              <div className="mt-0.5 text-sm font-bold text-vyro-text">{row.v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Zone grid */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {ZONES.map((z) => {
+            const active = zone === z.key;
+            return (
+              <button
+                key={z.key}
+                onClick={() => setZone(z.key)}
+                className={`rounded-xl border px-3 py-2 text-left ${
+                  active ? "border-vyro-mint bg-vyro-mint/10" : "border-vyro-line bg-vyro-elev"
+                }`}
+              >
+                <div className={`font-mono text-[10px] font-bold uppercase tracking-wider ${active ? "text-vyro-mint" : "text-vyro-mute"}`}>{z.code}</div>
+                <div className="text-sm font-bold text-vyro-text">{z.label}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Critical toggle */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setCritical(false)}
+            className={`rounded-full border px-3 py-2 text-[12px] font-semibold ${
+              !critical ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
+            }`}
+          >
+            Non-critical
+          </button>
+          <button
+            onClick={() => setCritical(true)}
+            className={`rounded-full border px-3 py-2 text-[12px] font-semibold ${
+              critical ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
+            }`}
+          >
+            Critical point
+          </button>
+        </div>
+
+        {/* Shot mix */}
+        <div className="mt-3 rounded-2xl border border-vyro-line bg-vyro-elev p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">{zoneData.label}</div>
+              <div className="text-sm font-bold text-vyro-text">{critical ? "Critical" : "Non-critical"}-point shot mix</div>
+            </div>
+            <span className="shrink-0 rounded-full border border-vyro-amber/50 bg-vyro-amber/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-vyro-amber">
+              {topLabel} {topShot[1]}%
+            </span>
+          </div>
+          <div className="mt-3 space-y-3">
+            {([
+              ["Straight drive", mix.straight, otherMix.straight],
+              ["Drop", mix.drop, otherMix.drop],
+              ["Boast", mix.boast, otherMix.boast],
+            ] as [string, number, number][]).map(([label, val, other]) => {
+              const diff = val - other;
+              return (
+                <div key={label}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-bold text-vyro-text">{label}</span>
+                    <span className="text-sm font-black tabular-nums text-vyro-text">{val}%</span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-vyro-line">
+                    <div className="h-full bg-vyro-text" style={{ width: `${val}%` }} />
+                  </div>
+                  <div className={`mt-0.5 text-right text-[10px] font-semibold tabular-nums ${diff >= 0 ? "text-vyro-amber" : "text-vyro-mute"}`}>
+                    {diff > 0 ? "+" : ""}{diff} vs {critical ? "non-critical" : "critical"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-start gap-2 rounded-2xl border border-vyro-line bg-vyro-panel p-3">
+          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-vyro-mint" />
+          <p className="text-[12px] leading-relaxed text-vyro-mute">
+            {selected.scout.insight}
+          </p>
+        </div>
+      </Card>
+    </div>
+  );
+}
