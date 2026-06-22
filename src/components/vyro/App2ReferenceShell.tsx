@@ -163,6 +163,59 @@ function InfoCard({
   );
 }
 
+function CognitiveFatigueCard({ m }: { m: ReturnType<typeof useLiveMetrics> }) {
+  const delay =
+    m.connected && m.reactMin != null ? `+${Math.round(m.reactMin)}ms` : "+214ms";
+  const hrStatus = useMemo(() => {
+    if (!m.connected || m.heartRateBpm == null) return "Normal";
+    if (m.heartRateBpm < 60) return "Low";
+    if (m.heartRateBpm > 100) return "Elevated";
+    return "Normal";
+  }, [m.connected, m.heartRateBpm]);
+  const vyroRead = useMemo(() => {
+    if (!m.connected || m.reactMin == null) return "Cognitively fried";
+    return m.reactMin > 200 ? "Cognitively fried" : "Sharp";
+  }, [m.connected, m.reactMin]);
+
+  return (
+    <section className="app2-card app2-info-card app2-cog-card">
+      <div className="app2-cog-header">
+        <div className="app2-cog-eyebrow">
+          <Brain size={14} />
+          <span>Cognitive load</span>
+        </div>
+        <span className="app2-cog-badge">WATCH</span>
+      </div>
+      <h2 className="app2-card-title">Cognitive Fatigue Divergence</h2>
+      <p className="app2-card-copy">
+        Detects when your brain is tired before your body is by comparing video reaction cues
+        against first wearable burst.
+      </p>
+      <div className="app2-cog-rows">
+        <div className="app2-cog-row">
+          <span className="app2-cog-row-label">Decision-to-movement delay</span>
+          <span className="app2-cog-row-value">{delay}</span>
+        </div>
+        <div className="app2-cog-row">
+          <span className="app2-cog-row-label">Heart rate status</span>
+          <span className="app2-cog-row-value">{hrStatus}</span>
+        </div>
+        <div className="app2-cog-row">
+          <span className="app2-cog-row-label">VYRO read</span>
+          <span className="app2-cog-row-value">{vyroRead}</span>
+        </div>
+      </div>
+      <div className="app2-cog-insight">
+        <Activity size={18} />
+        <span>
+          Heart looks ready, but reaction timing has slowed past the 200ms alert line. Best use
+          case: goalies, batters, returners, and late-game decision makers.
+        </span>
+      </div>
+    </section>
+  );
+}
+
 function EmbeddedView({
   view,
   profileSport,
