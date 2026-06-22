@@ -24,11 +24,13 @@ import { SessionView } from "./SessionView";
 import { SleepView } from "./SleepView";
 import { SocialView } from "./SocialView";
 import { SportView } from "./SportView";
+import { TrendsView } from "./TrendsView";
 import { computeReadiness, computeSubScores, useLiveMetrics } from "./useLiveMetrics";
 import "./app2-reference.css";
 
 type App2View =
   | "athlete"
+  | "trends"
   | "sport"
   | "recovery"
   | "sleep"
@@ -223,6 +225,13 @@ function EmbeddedView({
   view: App2View;
   profileSport: "squash" | "tennis";
 }) {
+  if (view === "trends") {
+    return (
+      <div className="app2-scroll-embed">
+        <TrendsView />
+      </div>
+    );
+  }
   if (view === "session") {
     return (
       <div className="app2-scroll-embed">
@@ -601,9 +610,9 @@ export function App2ReferenceShell() {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("") || "RC";
-  const title = view === "athlete" ? "Athlete" : view[0].toUpperCase() + view.slice(1);
+  const title = view === "trends" ? "Player Dashboard" : view === "athlete" ? "Athlete" : view[0].toUpperCase() + view.slice(1);
   const topButtons = [
-    { id: "athlete" as App2View, label: "Trends", icon: LineChart },
+    { id: "trends" as App2View, label: "Trends", icon: LineChart },
     { id: "session" as App2View, label: "Session", icon: Radio },
     { id: "coach" as App2View, label: "Coach", icon: UserRound },
     { id: "social" as App2View, label: "Social", icon: MessageCircle },
@@ -651,7 +660,7 @@ export function App2ReferenceShell() {
           </div>
           <nav className="app2-module-nav" aria-label="VYRO modules">
             {topButtons.map(({ id, label, icon: Icon }) => (
-              <button key={label} className="app2-chip" onClick={() => setView(id)}>
+              <button key={label} className={`app2-chip ${view === id ? "active" : ""}`} onClick={() => setView(id)}>
                 <Icon size={14} />
                 {label}
               </button>
