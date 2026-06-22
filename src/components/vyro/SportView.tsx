@@ -92,10 +92,10 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
   function handleTab(next: SubTab) {
     if (next === "database" && isCourtSport) {
       setCourtDbOpen(true);
-      setTab("heatmap");
+      setTab("database");
       return;
     }
-    setCourtDbOpen(next === "heatmap" || next === "tendency");
+    setCourtDbOpen(next === "database" || next === "heatmap" || next === "tendency");
     setTab(next);
   }
 
@@ -165,26 +165,28 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
       )}
 
       {tab === "database" && (
-        <>
-          <Card eyebrow={sport.databaseLabel} title={sport.databaseTitle}>
-            <p className="text-[12px] text-vyro-mute">{sport.databaseSubtitle}</p>
-          </Card>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {sport.databaseCards.map((c) => (
-              <Card key={c.title} eyebrow={c.metric} title={
-                <div className="flex items-baseline justify-between gap-2">
-                  <span>{c.title}</span>
-                  <span className="text-base font-black tabular-nums text-vyro-text">{c.value}</span>
-                </div>
-              }>
-                <p className="text-[12px] text-vyro-mute">{c.detail}</p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-vyro-line">
-                  <div className="h-full bg-vyro-mint" style={{ width: `${c.value}%` }} />
-                </div>
-              </Card>
-            ))}
-          </div>
-        </>
+        isCourtSport ? <CourtDatabaseModule sport={sport} /> : (
+          <>
+            <Card eyebrow={sport.databaseLabel} title={sport.databaseTitle}>
+              <p className="text-[12px] text-vyro-mute">{sport.databaseSubtitle}</p>
+            </Card>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {sport.databaseCards.map((c) => (
+                <Card key={c.title} eyebrow={c.metric} title={
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span>{c.title}</span>
+                    <span className="text-base font-black tabular-nums text-vyro-text">{c.value}</span>
+                  </div>
+                }>
+                  <p className="text-[12px] text-vyro-mute">{c.detail}</p>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-vyro-line">
+                    <div className="h-full bg-vyro-mint" style={{ width: `${c.value}%` }} />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </>
+        )
       )}
 
       {tab === "heatmap" && (
