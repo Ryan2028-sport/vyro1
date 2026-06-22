@@ -206,7 +206,7 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
       )}
 
       {tab === "tendency" && (
-        <>
+        isCourtSport ? <TendencyModule sport={sport} /> : (
           <Card eyebrow="Tendency profile" title="Situation-aware scouting reads">
             <p className="text-[12px] text-vyro-mute mb-3">
               The profile combines video events with wearable strain so VYRO can show what tactical choices change by inning, quarter, period, outs, score state, field zone, fatigue, or critical moment.
@@ -223,7 +223,7 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
               ))}
             </ul>
           </Card>
-        </>
+        )
       )}
 
       {tab === "agility" && (
