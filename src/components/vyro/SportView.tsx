@@ -273,16 +273,46 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
   );
 }
 
-function ProgressTile({ label, value }: { label: string; value: number }) {
-  const tone = value >= 80 ? "bg-vyro-mint" : value >= 65 ? "bg-vyro-amber" : "bg-vyro-rose";
+function PerformanceGroupTile({ group }: { group: PerformanceGroup }) {
+  const icons = {
+    Movement: Activity,
+    "Shot quality": Crosshair,
+    "Court positioning": Gauge,
+    Fatigue: Zap,
+    "Tactical patterns": Grid2X2,
+    Readiness: Sparkles,
+  } as const;
+  const Icon = icons[group.label as keyof typeof icons] ?? Activity;
   return (
-    <div className="rounded-xl border border-vyro-line bg-vyro-elev p-2.5">
-      <div className="flex items-baseline justify-between gap-1">
-        <span className="text-[11px] font-semibold text-vyro-text">{label}</span>
-        <span className="text-sm font-black tabular-nums text-vyro-text">{value}</span>
+    <div className="min-h-[154px] rounded-2xl border border-vyro-line bg-vyro-elev p-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-vyro-text/10 text-vyro-text">
+            <Icon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 text-[15px] font-black leading-tight text-vyro-text">{group.label}</div>
+          <CircleHelp className="h-3.5 w-3.5 shrink-0 text-vyro-mute" />
+        </div>
+        <span className="shrink-0 text-[22px] font-black leading-none tabular-nums text-vyro-text">{group.value}</span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-vyro-line">
-        <div className={`h-full ${tone}`} style={{ width: `${value}%` }} />
+
+      <div className="mt-7 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-vyro-mint">
+        <span className="h-2 w-2 rounded-full bg-vyro-mint" />
+        {group.status}
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {group.metrics.map((metric) => (
+          <div key={metric.label}>
+            <div className="mb-1 flex items-baseline justify-between gap-2 text-[13px] leading-none">
+              <span className="min-w-0 text-vyro-mute">{metric.label}</span>
+              <span className="shrink-0 font-black tabular-nums text-vyro-text">{metric.value}</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-vyro-line">
+              <div className={`h-full ${metric.warn ? "bg-vyro-amber" : "bg-vyro-mint"}`} style={{ width: `${metric.value}%` }} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
