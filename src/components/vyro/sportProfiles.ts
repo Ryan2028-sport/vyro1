@@ -402,6 +402,14 @@ export const SPORT_PROFILES: SportProfile[] = [
       { label: "Return control", detail: "Return-to-T time + body balance", value: 79 },
       { label: "Repeatability", detail: "Burst quality across long rallies", value: 81 },
     ],
+    performanceGroups: [
+      { label: "Movement", status: "Elite band", value: 87, metrics: [{ label: "First-step burst", value: 88 }, { label: "Acceleration", value: 86 }] },
+      { label: "Shot quality", status: "Elite band", value: 87, metrics: [{ label: "Racket head speed", value: 82 }, { label: "Ball force", value: 91 }] },
+      { label: "Court positioning", status: "On target", value: 82, metrics: [{ label: "Change of direction", value: 84 }, { label: "Return control", value: 79 }] },
+      { label: "Fatigue", status: "On target", value: 77, metrics: [{ label: "Session load", value: 71, warn: true }, { label: "Decay resistance", value: 82 }] },
+      { label: "Tactical patterns", status: "On target", value: 78, metrics: [{ label: "Pattern read confidence", value: 80 }, { label: "Pressure adaptation", value: 76 }] },
+      { label: "Readiness", status: "On target", value: 80, metrics: [{ label: "Live recovery", value: 78 }, { label: "Sport readiness", value: 82 }] },
+    ],
     movementTitle: "T movement map",
     movementItems: [
       { name: "T → Back left", detail: "4 steps · 1.42s · decel 0.62g", value: "78" },
