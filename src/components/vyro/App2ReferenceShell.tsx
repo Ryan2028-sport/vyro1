@@ -454,6 +454,46 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </div>
         </InfoCard>
 
+        <InfoCard
+          eyebrow="Cognitive vs physical"
+          title="Cognitive fatigue divergence"
+          tone="amber"
+        >
+          <p className="app2-card-copy">
+            Reaction speed is fading faster than physical output — a classic early sign of cognitive
+            fatigue. Drop one decision-heavy drill before the next hard block.
+          </p>
+          <div className="app2-metric-grid">
+            <MiniMetric
+              label="Cognitive load"
+              value={Math.min(100, Math.round((fatigue + 12)))}
+              unit="/100"
+              trend="↗ rising"
+              live={m.connected}
+            />
+            <MiniMetric
+              label="Physical load"
+              value={fatigue}
+              unit="/100"
+              trend="controlled"
+              live={m.connected}
+            />
+            <MiniMetric
+              label="Reaction"
+              value={m.reactMin != null ? Math.round(m.reactMin) : "—"}
+              unit="ms"
+              trend={m.reactMin != null ? "slowing" : undefined}
+              live={m.connected}
+            />
+            <MiniMetric
+              label="Divergence"
+              value={Math.max(0, Math.min(100, 12))}
+              unit="Δ"
+              trend="watch"
+            />
+          </div>
+        </InfoCard>
+
         <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone="amber">
           <p className="app2-card-copy">
             Clearance is on hold until wearable power and AI video symmetry return inside the 5%
