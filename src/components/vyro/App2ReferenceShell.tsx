@@ -52,8 +52,20 @@ const dateLabel = new Date().toLocaleDateString([], {
 function Logo() {
   return (
     <div className="app2-logo">
-      <span className="app2-logo-word">VYRO</span>
-      <span className="app2-logo-tag">OWN THE EDGE</span>
+      <svg viewBox="0 0 32 32" className="app2-logo-mark" aria-hidden="true">
+        <path
+          d="M3 6 L16 26 L29 6"
+          stroke="currentColor"
+          strokeWidth="3"
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="app2-logo-text">
+        <span className="app2-logo-word">VYRO</span>
+        <span className="app2-logo-tag">OWN THE EDGE</span>
+      </div>
     </div>
   );
 }
