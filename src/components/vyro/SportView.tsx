@@ -246,17 +246,42 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
             </div>
           </Card>
           <Card eyebrow={`${sport.label} technique`} title={sport.movementTitle}>
-            <ul className="divide-y divide-vyro-line/60">
-              {sport.movementItems.map((m) => (
-                <li key={m.name} className="flex items-center justify-between gap-3 py-2">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-vyro-text">{m.name}</div>
-                    <div className="text-[11px] text-vyro-mute">{m.detail}</div>
+            {sport.routeMap ? (
+              <>
+                <div className="space-y-2.5">
+                  {sport.routeMap.map((r) => (
+                    <div key={r.name} className="flex items-center gap-3 rounded-2xl border border-vyro-line bg-vyro-elev p-3">
+                      <RouteMini start={r.start} end={r.end} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-bold text-vyro-text">{r.name}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-vyro-mute">
+                          {r.firstStep} first step · {r.steps} steps · RtT {r.rtT}
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-base font-black tabular-nums text-vyro-text">{r.score}</span>
+                    </div>
+                  ))}
+                </div>
+                {sport.routeMapFooter && (
+                  <div className="mt-3 flex items-start gap-2 rounded-2xl border border-vyro-line bg-vyro-panel p-3">
+                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-vyro-mint" />
+                    <p className="text-[12px] leading-relaxed text-vyro-mute">{sport.routeMapFooter}</p>
                   </div>
-                  <span className="text-sm font-black tabular-nums text-vyro-text">{m.value}</span>
-                </li>
-              ))}
-            </ul>
+                )}
+              </>
+            ) : (
+              <ul className="divide-y divide-vyro-line/60">
+                {sport.movementItems.map((m) => (
+                  <li key={m.name} className="flex items-center justify-between gap-3 py-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-vyro-text">{m.name}</div>
+                      <div className="text-[11px] text-vyro-mute">{m.detail}</div>
+                    </div>
+                    <span className="text-sm font-black tabular-nums text-vyro-text">{m.value}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
         </>
       )}
