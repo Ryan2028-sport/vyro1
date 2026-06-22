@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   Activity,
   Bell,
+  Brain,
   CalendarDays,
   Heart,
   LineChart,
