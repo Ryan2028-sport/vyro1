@@ -94,7 +94,7 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
 
       <div className="grid grid-cols-2 gap-2 pb-1">
         {visibleTabs.map((t) => {
-          const selected = tab === t.id || (t.id === "database" && courtDbOpen);
+          const selected = tab === t.id;
           const label = t.id === "database" ? sport.databaseLabel : t.label;
           return (
           <button
