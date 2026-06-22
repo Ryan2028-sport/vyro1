@@ -60,22 +60,33 @@
 
 .app2-logo {
   display: inline-flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
   color: hsl(var(--app2-fg));
   line-height: 1;
+}
+.app2-logo-mark {
+  width: 22px;
+  height: 22px;
+  color: hsl(var(--app2-ready));
+  flex: 0 0 auto;
+}
+.app2-logo-text {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
 }
 .app2-logo-word {
   font-family: "Satoshi", system-ui, sans-serif;
   font-weight: 900;
-  font-size: 22px;
-  letter-spacing: 0.32em;
+  font-size: 18px;
+  letter-spacing: 0.28em;
 }
 .app2-logo-tag {
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 700;
-  letter-spacing: 0.38em;
+  letter-spacing: 0.32em;
   color: hsl(var(--app2-muted));
 }
 
