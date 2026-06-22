@@ -3,13 +3,18 @@ import { ChevronLeft } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
 import { SPORT_PROFILES, type SportProfile } from "./sportProfiles";
 
-type SubTab = "overview" | "database" | "tendency" | "agility" | "motion";
-const SUB_TABS: { id: SubTab; label: string }[] = [
+type SubTab = "overview" | "database" | "heatmap" | "tendency" | "agility" | "motion";
+const PRIMARY_TABS: { id: SubTab; label: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "database", label: "Database" },
-  { id: "tendency", label: "Tendencies" },
-  { id: "agility", label: "Agility" },
+  { id: "database", label: "Court DB" },
+  { id: "agility", label: "Movement" },
   { id: "motion", label: "Motion" },
+];
+
+const COURT_DB_TABS: { id: SubTab; label: string }[] = [
+  ...PRIMARY_TABS,
+  { id: "heatmap", label: "Heat map" },
+  { id: "tendency", label: "Tendencies" },
 ];
 
 export function SportView() {
@@ -60,6 +65,19 @@ function SportPicker({ onPick }: { onPick: (id: string) => void }) {
 
 function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => void }) {
   const [tab, setTab] = useState<SubTab>("overview");
+  const [courtDbOpen, setCourtDbOpen] = useState(false);
+  const isCourtSport = sport.id === "squash" || sport.id === "tennis";
+  const visibleTabs = isCourtSport && courtDbOpen ? COURT_DB_TABS : PRIMARY_TABS;
+
+  function handleTab(next: SubTab) {
+    if (next === "database" && isCourtSport) {
+      setCourtDbOpen(true);
+      setTab("heatmap");
+      return;
+    }
+    setCourtDbOpen(next === "heatmap" || next === "tendency");
+    setTab(next);
+  }
 
   return (
     <div className="space-y-4">
@@ -74,19 +92,23 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
         action={<Pill tone="live" pulse>{sport.emoji} {sport.label}</Pill>}
       />
 
-      <div className="grid grid-cols-5 gap-1 pb-1">
-        {SUB_TABS.map((t) => (
+      <div className="grid grid-cols-2 gap-2 pb-1">
+        {visibleTabs.map((t) => {
+          const selected = tab === t.id || (t.id === "database" && courtDbOpen);
+          const label = t.id === "database" ? sport.databaseLabel : t.label;
+          return (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`rounded-full border px-1 py-2 text-center text-[10px] font-semibold leading-tight min-[380px]:text-[11px] ${
-              tab === t.id ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
+            onClick={() => handleTab(t.id)}
+            className={`min-h-[46px] rounded-full border px-3 py-2 text-center text-[12px] font-semibold leading-tight ${
+              selected ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
             }`}
-            title={t.label}
+            title={label}
           >
-            {t.label}
+            {label}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {tab === "overview" && (
@@ -137,6 +159,10 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
             ))}
           </div>
         </>
+      )}
+
+      {tab === "heatmap" && (
+        <CourtHeatMap sport={sport} />
       )}
 
       {tab === "tendency" && (
@@ -253,5 +279,41 @@ function ProgressTile({ label, value }: { label: string; value: number }) {
         <div className={`h-full ${tone}`} style={{ width: `${value}%` }} />
       </div>
     </div>
+  );
+}
+
+function CourtHeatMap({ sport }: { sport: SportProfile }) {
+  const zones = sport.movementItems.slice(0, 6);
+  return (
+    <Card eyebrow="Live court heat map" title="Movement density" action={<Pill>Front wall ↑</Pill>}>
+      <div className="mb-3 grid grid-cols-3 gap-2">
+        {[
+          "Movement density",
+          "Fatigue cost",
+          "Attack conversion",
+        ].map((label, index) => (
+          <div
+            key={label}
+            className={`rounded-full border px-2 py-2 text-center text-[10px] font-bold leading-tight ${
+              index === 0 ? "border-vyro-mint bg-vyro-mint/10 text-vyro-text" : "border-vyro-line bg-vyro-elev text-vyro-mute"
+            }`}
+          >
+            {label}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {zones.map((zone, index) => (
+          <div key={zone.name} className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
+            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">Zone {index + 1}</div>
+            <div className="mt-1 text-sm font-bold text-vyro-text">{zone.name}</div>
+            <div className="mt-0.5 text-[11px] text-vyro-mute">{zone.detail}</div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-vyro-line">
+              <div className="h-full bg-vyro-mint" style={{ width: `${zone.value}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
