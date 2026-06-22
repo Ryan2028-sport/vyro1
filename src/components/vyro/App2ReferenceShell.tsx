@@ -52,8 +52,20 @@ const dateLabel = new Date().toLocaleDateString([], {
 function Logo() {
   return (
     <div className="app2-logo">
-      <span className="app2-logo-word">VYRO</span>
-      <span className="app2-logo-tag">OWN THE EDGE</span>
+      <svg viewBox="0 0 32 32" className="app2-logo-mark" aria-hidden="true">
+        <path
+          d="M3 6 L16 26 L29 6"
+          stroke="currentColor"
+          strokeWidth="3"
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="app2-logo-text">
+        <span className="app2-logo-word">VYRO</span>
+        <span className="app2-logo-tag">OWN THE EDGE</span>
+      </div>
     </div>
   );
 }
@@ -336,8 +348,32 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         trend: m.stepsToday ? "+18%" : undefined,
         live: m.connected,
       },
+      {
+        label: "Resp Rate",
+        value: m.respRateBrpm?.toFixed(1) ?? "—",
+        unit: "brpm",
+        trend: m.respRateBrpm ? "steady" : undefined,
+        live: m.connected,
+      },
+      {
+        label: "Stress",
+        value: m.stressScore ?? "—",
+        unit: "/100",
+        trend: m.stressScore != null ? "calm" : undefined,
+        live: m.connected,
+      },
     ],
-    [m.connected, m.heartRateBpm, m.hrvMs, m.restingHrBpm, m.skinTempC, m.spo2Pct, m.stepsToday],
+    [
+      m.connected,
+      m.heartRateBpm,
+      m.hrvMs,
+      m.restingHrBpm,
+      m.skinTempC,
+      m.spo2Pct,
+      m.stepsToday,
+      m.respRateBrpm,
+      m.stressScore,
+    ],
   );
 
   const addPlan = () => {
@@ -415,6 +451,46 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             {vitals.map((vital) => (
               <MiniMetric key={vital.label} {...vital} />
             ))}
+          </div>
+        </InfoCard>
+
+        <InfoCard
+          eyebrow="Cognitive vs physical"
+          title="Cognitive fatigue divergence"
+          tone="amber"
+        >
+          <p className="app2-card-copy">
+            Reaction speed is fading faster than physical output — a classic early sign of cognitive
+            fatigue. Drop one decision-heavy drill before the next hard block.
+          </p>
+          <div className="app2-metric-grid">
+            <MiniMetric
+              label="Cognitive load"
+              value={Math.min(100, Math.round((fatigue + 12)))}
+              unit="/100"
+              trend="↗ rising"
+              live={m.connected}
+            />
+            <MiniMetric
+              label="Physical load"
+              value={fatigue}
+              unit="/100"
+              trend="controlled"
+              live={m.connected}
+            />
+            <MiniMetric
+              label="Reaction"
+              value={m.reactMin != null ? Math.round(m.reactMin) : "—"}
+              unit="ms"
+              trend={m.reactMin != null ? "slowing" : undefined}
+              live={m.connected}
+            />
+            <MiniMetric
+              label="Divergence"
+              value={Math.max(0, Math.min(100, 12))}
+              unit="Δ"
+              trend="watch"
+            />
           </div>
         </InfoCard>
 

@@ -60,22 +60,33 @@
 
 .app2-logo {
   display: inline-flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
   color: hsl(var(--app2-fg));
   line-height: 1;
+}
+.app2-logo-mark {
+  width: 22px;
+  height: 22px;
+  color: hsl(var(--app2-ready));
+  flex: 0 0 auto;
+}
+.app2-logo-text {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
 }
 .app2-logo-word {
   font-family: "Satoshi", system-ui, sans-serif;
   font-weight: 900;
-  font-size: 22px;
-  letter-spacing: 0.32em;
+  font-size: 18px;
+  letter-spacing: 0.28em;
 }
 .app2-logo-tag {
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 700;
-  letter-spacing: 0.38em;
+  letter-spacing: 0.32em;
   color: hsl(var(--app2-muted));
 }
 
@@ -167,9 +178,10 @@
 }
 
 .app2-module-nav {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  overflow: hidden;
   padding: 0 12px 20px;
   border-bottom: 1px solid hsl(var(--app2-border));
   scrollbar-width: none;
@@ -179,17 +191,19 @@
 
 .app2-chip {
   display: inline-flex;
-  flex: 0 0 auto;
+  min-width: 0;
   align-items: center;
-  gap: 8px;
-  min-height: 43px;
+  justify-content: center;
+  gap: 5px;
+  min-height: 40px;
   border-radius: 999px;
   border: 1px solid hsl(var(--app2-border));
   background: hsl(0 0% 100% / 0.035);
-  padding: 0 17px;
+  padding: 0 8px;
   color: hsl(var(--app2-fg) / 0.76);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .app2-main {
@@ -450,7 +464,7 @@
   .app2-topbar { grid-template-columns: 1fr; }
   .app2-actions { justify-content: flex-start; }
   .app2-avatar { margin-left: 0; margin-top: 0; }
-  .app2-chip { padding: 0 13px; font-size: 11px; }
+  .app2-chip { padding: 0 6px; font-size: 10px; gap: 4px; min-height: 36px; }
   .app2-card-title { font-size: 16px; }
   .app2-form-grid { grid-template-columns: 1fr; }
 }
