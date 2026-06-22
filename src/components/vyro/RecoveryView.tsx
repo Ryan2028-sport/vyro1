@@ -407,3 +407,248 @@ function Sparkline({ points }: { points: number[] }) {
     </svg>
   );
 }
+
+// ============================================================================
+// In-Game tab
+// ============================================================================
+
+const HR_DROPS = [42, 40, 38, 39, 37, 36, 35, 34, 33, 32, 31, 28];
+const Z5_TREND = [55, 38, 22, 68, 58, 46, 50, 48, 60, 42, 25, 70];
+const RECOV_SPEED = [40, 28, 44, 32, 50, 35, 46, 28, 30, 44, 42];
+
+function InGameTab({ heartRateBpm: _hr }: { heartRateBpm: number | null }) {
+  const avgDrop = Math.round(HR_DROPS.reduce((a, b) => a + b, 0) / HR_DROPS.length);
+  return (
+    <>
+      <Card>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">
+              Between-point HR drop · Current match
+            </div>
+            <h3 className="mt-1 text-base font-black text-vyro-text">Recovery speed under fatigue</h3>
+          </div>
+          <div className="shrink-0 rounded-lg border border-vyro-line bg-vyro-elev px-2 py-1 text-right">
+            <div className="font-mono text-[8.5px] uppercase tracking-[0.18em] text-vyro-mute">avg drop</div>
+            <div className="font-mono text-[11px] font-bold tabular-nums text-vyro-text">{avgDrop} bpm</div>
+          </div>
+        </div>
+        <BarChart points={HR_DROPS} labels={HR_DROPS.map((_, i) => `P${i + 1}`)} color="var(--vyro-mint)" max={50} />
+      </Card>
+
+      <Card eyebrow="Zone 5 exposure">
+        <div className="text-3xl font-black tabular-nums text-vyro-text">3:42</div>
+        <div className="mt-0.5 text-[12px] text-vyro-mute">total time at 180+ bpm</div>
+        <AreaSpark points={Z5_TREND} color="#ef5a6f" />
+      </Card>
+
+      <Card eyebrow="Recovery speed (HR drop / 30s rest)">
+        <div className="flex items-baseline gap-1.5">
+          <div className="text-3xl font-black tabular-nums text-vyro-text">38</div>
+          <div className="font-mono text-[11px] text-vyro-mute">bpm</div>
+        </div>
+        <div className="mt-0.5 text-[12px] text-vyro-mute">elite range: 30–45 bpm</div>
+        <AreaSpark points={RECOV_SPEED} color="var(--vyro-text)" />
+      </Card>
+
+      <InsightCard>
+        HR drop between points held above 30 bpm through point 11. The dip on P12 (drop 40 bpm)
+        is the first sign cardio reserve is bleeding — pace the next game.
+      </InsightCard>
+    </>
+  );
+}
+
+function BarChart({ points, labels, color, max }: { points: number[]; labels: string[]; color: string; max: number }) {
+  const W = 320, H = 120, pad = 18;
+  const bw = (W - pad * 2) / points.length;
+  return (
+    <div className="mt-3">
+      <svg viewBox={`0 0 ${W} ${H + 20}`} className="block w-full">
+        {points.map((p, i) => {
+          const h = (p / max) * (H - pad);
+          const x = pad + i * bw + bw * 0.18;
+          const y = H - h;
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={bw * 0.64} height={h} rx={2} fill={color} opacity={0.85} />
+              <text x={x + bw * 0.32} y={H + 12} textAnchor="middle" fontSize="8" fill="var(--vyro-mute)" fontFamily="monospace">
+                {labels[i]}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function AreaSpark({ points, color }: { points: number[]; color: string }) {
+  const w = 320, h = 90, pad = 4;
+  const min = Math.min(...points) - 4;
+  const max = Math.max(...points) + 4;
+  const range = Math.max(1, max - min);
+  const step = (w - pad * 2) / (points.length - 1);
+  const coords = points.map((p, i) => {
+    const x = pad + i * step;
+    const y = pad + (1 - (p - min) / range) * (h - pad * 2);
+    return [x, y] as const;
+  });
+  const path = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const area = `${path} L${coords[coords.length - 1][0].toFixed(1)},${h} L${coords[0][0].toFixed(1)},${h} Z`;
+  const gid = `spk-${color.replace(/[^a-z0-9]/gi, "")}`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="mt-3 block h-24 w-full">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gid})`} />
+      <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function InsightCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-vyro-line bg-vyro-elev p-3">
+      <div className="flex items-start gap-2.5">
+        <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-vyro-line bg-vyro-panel">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-vyro-mint">
+            <path d="M12 2l1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7L12 2z" />
+          </svg>
+        </div>
+        <p className="text-[12.5px] leading-relaxed text-vyro-text">{children}</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Overnight tab
+// ============================================================================
+
+const DRIVERS = [
+  { label: "HRV rebound", sub: "+8 ms vs 14-day baseline", value: 92, tone: "good" as const },
+  { label: "Resting HR reset", sub: "48 bpm asleep, trending down", value: 84, tone: "good" as const },
+  { label: "Muscle readiness", sub: "Calves still carrying match load", value: 72, tone: "warn" as const },
+  { label: "Sleep debt impact", sub: "1h 24m debt reduces ceiling", value: 66, tone: "warn" as const },
+  { label: "Inflammation proxy", sub: "Skin temp stable, no red flag", value: 88, tone: "good" as const },
+];
+
+const PLAN = [
+  { tag: "AM", title: "Green warm-up", body: "8 min dynamic mobility, then progressive ghosting." },
+  { tag: "MID", title: "Hard block allowed", body: "Push intensity if live recovery holds above 70% after first block." },
+  { tag: "PM", title: "Downshift", body: "Keep evening work below Z3 and prioritize carbs + fluids." },
+];
+
+function OvernightTab() {
+  const readiness = 86;
+  const risk = 34;
+  return (
+    <>
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-vyro-line bg-vyro-elev">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-vyro-text">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Overnight readiness</div>
+            <h3 className="mt-1 text-lg font-black leading-tight text-vyro-text">
+              {readiness}% · cleared for hard session
+            </h3>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-vyro-mute">
+              Recovery tab now only explains tomorrow's training clearance. Sleep-stage architecture lives inside Sleep.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 h-2 w-full overflow-hidden rounded-full border border-vyro-line bg-vyro-elev">
+          <div className="h-full rounded-full bg-vyro-text" style={{ width: `${readiness}%` }} />
+        </div>
+        <div className="mt-3">
+          <InsightCard>
+            Best next-day use: one high-intensity block, then let live recovery decide whether to add volume.
+          </InsightCard>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div>
+            <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Readiness</div>
+            <div className="mt-1 flex items-baseline gap-1">
+              <div className="text-3xl font-black tabular-nums text-vyro-text">{readiness}</div>
+              <div className="font-mono text-[11px] text-vyro-mute">%</div>
+            </div>
+            <div className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] text-vyro-mint">
+              <span>↗</span><span>+6</span>
+            </div>
+          </div>
+          <div>
+            <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Risk load</div>
+            <div className="mt-1 flex items-baseline gap-1">
+              <div className="text-3xl font-black tabular-nums text-vyro-text">{risk}</div>
+              <div className="font-mono text-[11px] text-vyro-mute">/100</div>
+            </div>
+            <div className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] text-vyro-amber">
+              <span>↘</span><span>−8</span>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card eyebrow="Next-day readiness drivers">
+        <div className="space-y-3.5">
+          {DRIVERS.map((d) => (
+            <div key={d.label}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[13px] font-bold text-vyro-text">{d.label}</div>
+                  <div className="mt-0.5 font-mono text-[10.5px] text-vyro-mute">{d.sub}</div>
+                </div>
+                <div className="shrink-0 font-mono text-[14px] font-bold tabular-nums text-vyro-text">{d.value}</div>
+              </div>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-vyro-elev">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${d.value}%`,
+                    background: d.tone === "warn" ? "var(--vyro-amber)" : "var(--vyro-text)",
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-vyro-line bg-vyro-elev">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-vyro-text">
+              <path d="M3 12h4l2-7 4 14 2-7h6" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Tomorrow's operating plan</div>
+            <h3 className="mt-1 text-base font-black leading-tight text-vyro-text">
+              Train hard, but let live recovery gate the second push.
+            </h3>
+          </div>
+        </div>
+        <div className="mt-3 space-y-2">
+          {PLAN.map((p) => (
+            <div key={p.tag} className="rounded-xl border border-vyro-line bg-vyro-panel p-3">
+              <div className="inline-flex items-center rounded-md border border-vyro-line bg-vyro-elev px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-vyro-text">
+                {p.tag}
+              </div>
+              <div className="mt-2 text-[14px] font-black text-vyro-text">{p.title}</div>
+              <div className="mt-1 text-[12px] leading-relaxed text-vyro-mute">{p.body}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </>
+  );
+}
