@@ -35,6 +35,8 @@ export interface SportProfile {
   performanceGroups?: PerformanceGroup[];
   movementTitle: string;
   movementItems: MovementItem[];
+  routeMap?: RouteMapItem[];
+  routeMapFooter?: string;
   motionTitle: string;
   motionSubtitle: string;
   framePill: string;
