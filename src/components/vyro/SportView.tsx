@@ -79,7 +79,7 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`min-w-0 truncate rounded-full border px-1 py-1.5 text-[9px] font-semibold leading-none min-[380px]:text-[10px] ${
+            className={`rounded-full border px-1 py-2 text-center text-[10px] font-semibold leading-tight min-[380px]:text-[11px] ${
               tab === t.id ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
             }`}
             title={t.label}
