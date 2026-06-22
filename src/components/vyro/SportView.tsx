@@ -246,17 +246,42 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
             </div>
           </Card>
           <Card eyebrow={`${sport.label} technique`} title={sport.movementTitle}>
-            <ul className="divide-y divide-vyro-line/60">
-              {sport.movementItems.map((m) => (
-                <li key={m.name} className="flex items-center justify-between gap-3 py-2">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-vyro-text">{m.name}</div>
-                    <div className="text-[11px] text-vyro-mute">{m.detail}</div>
+            {sport.routeMap ? (
+              <>
+                <div className="space-y-2.5">
+                  {sport.routeMap.map((r) => (
+                    <div key={r.name} className="flex items-center gap-3 rounded-2xl border border-vyro-line bg-vyro-elev p-3">
+                      <RouteMini start={r.start} end={r.end} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-bold text-vyro-text">{r.name}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-vyro-mute">
+                          {r.firstStep} first step · {r.steps} steps · RtT {r.rtT}
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-base font-black tabular-nums text-vyro-text">{r.score}</span>
+                    </div>
+                  ))}
+                </div>
+                {sport.routeMapFooter && (
+                  <div className="mt-3 flex items-start gap-2 rounded-2xl border border-vyro-line bg-vyro-panel p-3">
+                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-vyro-mint" />
+                    <p className="text-[12px] leading-relaxed text-vyro-mute">{sport.routeMapFooter}</p>
                   </div>
-                  <span className="text-sm font-black tabular-nums text-vyro-text">{m.value}</span>
-                </li>
-              ))}
-            </ul>
+                )}
+              </>
+            ) : (
+              <ul className="divide-y divide-vyro-line/60">
+                {sport.movementItems.map((m) => (
+                  <li key={m.name} className="flex items-center justify-between gap-3 py-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-vyro-text">{m.name}</div>
+                      <div className="text-[11px] text-vyro-mute">{m.detail}</div>
+                    </div>
+                    <span className="text-sm font-black tabular-nums text-vyro-text">{m.value}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
         </>
       )}
@@ -800,5 +825,30 @@ function TendencyModule({ sport }: { sport: SportProfile }) {
         </div>
       </Card>
     </div>
+  );
+}
+
+function RouteMini({ start, end }: { start: { x: number; y: number }; end: { x: number; y: number } }) {
+  const sx = start.x * 64, sy = start.y * 64;
+  const ex = end.x * 64, ey = end.y * 64;
+  return (
+    <svg viewBox="0 0 64 64" className="h-14 w-14 shrink-0 rounded-lg border border-vyro-line bg-vyro-panel" aria-hidden>
+      {/* grid */}
+      <g stroke="currentColor" className="text-vyro-line" strokeWidth="0.5" opacity="0.5">
+        <line x1="0" y1="21" x2="64" y2="21" />
+        <line x1="0" y1="43" x2="64" y2="43" />
+        <line x1="21" y1="0" x2="21" y2="64" />
+        <line x1="43" y1="0" x2="43" y2="64" />
+      </g>
+      {/* diagonal sheen */}
+      <line x1="0" y1="64" x2="64" y2="0" stroke="currentColor" className="text-vyro-line" strokeWidth="0.5" opacity="0.4" />
+      {/* route line */}
+      <line x1={sx} y1={sy} x2={ex} y2={ey} stroke="currentColor" className="text-vyro-mint" strokeWidth="1.2" opacity="0.6" />
+      {/* start (filled small) */}
+      <circle cx={sx} cy={sy} r="3" fill="currentColor" className="text-vyro-text" opacity="0.9" />
+      {/* end (ring) */}
+      <circle cx={ex} cy={ey} r="2.5" fill="currentColor" className="text-vyro-text" opacity="0.7" />
+      <circle cx={ex} cy={ey} r="4.5" fill="none" stroke="currentColor" className="text-vyro-text" strokeWidth="0.6" opacity="0.5" />
+    </svg>
   );
 }

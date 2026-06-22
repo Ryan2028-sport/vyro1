@@ -8,6 +8,15 @@ export interface TendencyRow { zone: string; read: string; pressure: "Baseline" 
 export interface AgilityComponent { label: string; detail: string; value: number; }
 export interface PerformanceGroup { label: string; status: string; value: number; metrics: { label: string; value: number; warn?: boolean }[]; }
 export interface MovementItem { name: string; detail: string; value: string; }
+export interface RouteMapItem {
+  name: string;
+  firstStep: string; // e.g. "2.1ft"
+  steps: number;
+  rtT: string;       // e.g. "1.32s"
+  score: number;
+  start: { x: number; y: number }; // 0-1 within mini court
+  end: { x: number; y: number };
+}
 export interface SportVariant { label: string; detail: string; }
 export interface ContactCell { label: string; value: string; }
 
@@ -26,6 +35,8 @@ export interface SportProfile {
   performanceGroups?: PerformanceGroup[];
   movementTitle: string;
   movementItems: MovementItem[];
+  routeMap?: RouteMapItem[];
+  routeMapFooter?: string;
   motionTitle: string;
   motionSubtitle: string;
   framePill: string;
@@ -419,6 +430,15 @@ export const SPORT_PROFILES: SportProfile[] = [
       { name: "Crossover", detail: "Wide-to-wide recovery", value: "81" },
       { name: "Wide recovery", detail: "Wide → T return", value: "69" },
     ],
+    routeMap: [
+      { name: "T → Front Left",   firstStep: "2.1ft", steps: 3, rtT: "1.32s", score: 84, start: { x: 0.5, y: 0.55 }, end: { x: 0.25, y: 0.22 } },
+      { name: "T → Back Right",   firstStep: "2.3ft", steps: 5, rtT: "1.58s", score: 83, start: { x: 0.5, y: 0.55 }, end: { x: 0.78, y: 0.85 } },
+      { name: "T → Back Left",    firstStep: "2.4ft", steps: 4, rtT: "1.41s", score: 82, start: { x: 0.5, y: 0.55 }, end: { x: 0.22, y: 0.85 } },
+      { name: "T → Front Right",  firstStep: "2.6ft", steps: 4, rtT: "1.21s", score: 81, start: { x: 0.5, y: 0.55 }, end: { x: 0.75, y: 0.22 } },
+      { name: "Corner ↔ Corner",  firstStep: "2.7ft", steps: 2, rtT: "1.92s", score: 80, start: { x: 0.22, y: 0.82 }, end: { x: 0.78, y: 0.22 } },
+      { name: "Lunge + Recovery", firstStep: "2.9ft", steps: 3, rtT: "1.18s", score: 79, start: { x: 0.5, y: 0.55 }, end: { x: 0.32, y: 0.32 } },
+    ],
+    routeMapFooter: "Technique layer separates raw athleticism from usable sport movement by tracking sequence timing, directional force, fatigue drift, and execution quality.",
     motionTitle: "Slow-motion shot view · racket focus",
     motionSubtitle: "Racket face, contact side, head speed, force, backswing, and follow-through.",
     framePill: "Frame 42 / Match",
@@ -475,6 +495,15 @@ export const SPORT_PROFILES: SportProfile[] = [
       { name: "Diagonal forward-left", detail: "4 steps · 1.32s · decel 0.61g", value: "81" },
       { name: "Short ball", detail: "2 steps · 0.74s · decel 0.42g", value: "88" },
     ],
+    routeMap: [
+      { name: "Center → Wide Left",     firstStep: "2.2ft", steps: 5, rtT: "1.65s", score: 84, start: { x: 0.5, y: 0.5 }, end: { x: 0.15, y: 0.5 } },
+      { name: "Center → Wide Right",    firstStep: "2.3ft", steps: 5, rtT: "1.58s", score: 82, start: { x: 0.5, y: 0.5 }, end: { x: 0.85, y: 0.5 } },
+      { name: "Center → Deep Backhand", firstStep: "2.5ft", steps: 5, rtT: "1.72s", score: 79, start: { x: 0.5, y: 0.5 }, end: { x: 0.22, y: 0.85 } },
+      { name: "Center → Short Ball",    firstStep: "2.0ft", steps: 2, rtT: "0.94s", score: 88, start: { x: 0.5, y: 0.5 }, end: { x: 0.48, y: 0.22 } },
+      { name: "Corner ↔ Corner",        firstStep: "2.7ft", steps: 5, rtT: "1.92s", score: 80, start: { x: 0.18, y: 0.82 }, end: { x: 0.82, y: 0.82 } },
+      { name: "Approach + Recovery",    firstStep: "2.6ft", steps: 3, rtT: "1.34s", score: 81, start: { x: 0.5, y: 0.5 }, end: { x: 0.55, y: 0.25 } },
+    ],
+    routeMapFooter: "Technique layer separates raw athleticism from usable sport movement by tracking sequence timing, directional force, fatigue drift, and execution quality.",
     motionTitle: "Slow-motion stroke view · racket focus",
     motionSubtitle: "Racket face, contact side, head speed, force, backswing, and follow-through.",
     framePill: "Frame 42 / Rally",
