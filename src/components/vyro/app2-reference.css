@@ -184,6 +184,12 @@
   white-space: nowrap;
 }
 
+.app2-chip.active {
+  border-color: hsl(0 0% 100% / 0.55);
+  background: hsl(0 0% 100% / 0.18);
+  color: hsl(var(--app2-fg));
+}
+
 .app2-main {
   padding: 26px 12px calc(env(safe-area-inset-bottom, 0px) + 88px);
 }
