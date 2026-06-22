@@ -302,44 +302,26 @@ export function RecoveryView() {
         </>
       )}
 
-      {tab === "game" && (
-        <Card eyebrow="In-game" title="During the match">
-          <div className="grid grid-cols-2 gap-2">
-            <Stat label="Current HR" value={m.heartRateBpm ?? "—"} unit="bpm" hint="streaming" />
-            <Stat label="Peak G" value={m.connected ? m.peakG.toFixed(2) : "—"} unit="g" />
-            <Stat label="Peak jerk" value={m.connected ? m.peakJerk.toFixed(0) : "—"} unit="g/s" />
-            <Stat label="Events / min" value={m.connected ? m.eventsLastMin : "—"} />
-          </div>
-          <p className="mt-3 text-[12px] leading-relaxed text-vyro-mute">
-            In-Game Recovery tracks how fast HR drops between points and how much explosive load you're banking each rally.
-          </p>
-        </Card>
-      )}
+      {tab === "game" && <InGameTab heartRateBpm={m.heartRateBpm} />}
 
       {tab === "fatigue" && (
-        <Card eyebrow="Total fatigue" title="Composite load">
-          <div className="grid grid-cols-2 gap-2">
-            <Stat label="Cardio load" value={cardio != null ? 100 - cardio : "—"} unit="/100" />
-            <Stat label="Muscle load" value={muscle != null ? 100 - muscle : "—"} unit="/100" />
-            <Stat label="Load debt" value={loadDebt != null ? 100 - loadDebt : "—"} unit="/100" />
-            <Stat label="Stress" value={m.stressScore ?? "—"} unit="/100" />
-          </div>
-        </Card>
+        <>
+          <Card eyebrow="Total fatigue · Session" title="Composite training load">
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Cardio load" value={cardio != null ? 100 - cardio : "—"} unit="/100" />
+              <Stat label="Muscle load" value={muscle != null ? 100 - muscle : "—"} unit="/100" />
+              <Stat label="Load debt" value={loadDebt != null ? 100 - loadDebt : "—"} unit="/100" />
+              <Stat label="Stress" value={m.stressScore ?? "—"} unit="/100" />
+            </div>
+            <p className="mt-3 text-[12px] leading-relaxed text-vyro-mute">
+              Total fatigue blends cardio strain, local muscle load, and accumulated load debt from the last 72h.
+            </p>
+          </Card>
+        </>
       )}
 
-      {tab === "overnight" && (
-        <Card eyebrow="Overnight" title="Recovery during sleep">
-          <div className="grid grid-cols-2 gap-2">
-            <Stat label="Resting HR" value={m.restingHrBpm ?? "—"} unit="bpm" hint="nightly" />
-            <Stat label="HRV (RMSSD)" value={m.hrvMs ?? "—"} unit="ms" />
-            <Stat label="SpO₂" value={m.spo2Pct ?? "—"} unit="%" />
-            <Stat label="Skin temp" value={m.skinTempC != null ? m.skinTempC.toFixed(1) : "—"} unit="°C" />
-          </div>
-          <p className="mt-3 text-[12px] leading-relaxed text-vyro-mute">
-            Wear the band overnight to unlock sleep-stage recovery and morning readiness deltas.
-          </p>
-        </Card>
-      )}
+      {tab === "overnight" && <OvernightTab />}
+
     </div>
   );
 }
