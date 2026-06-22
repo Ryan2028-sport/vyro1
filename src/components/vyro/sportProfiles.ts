@@ -454,6 +454,7 @@ export const SPORT_PROFILES: SportProfile[] = [
       { label: "Deceleration", detail: "Brake into open/closed stance", value: 82 },
       { label: "Change of direction", detail: "Recovery crossover back to center", value: 84 },
       { label: "Return control", detail: "Recovery to center mark + ready position", value: 79 },
+      { label: "Repeatability", detail: "Burst quality across long rallies", value: 81 },
     ],
     movementTitle: "Center-mark movement map",
     movementItems: [
