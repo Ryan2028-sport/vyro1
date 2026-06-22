@@ -8,6 +8,15 @@ export interface TendencyRow { zone: string; read: string; pressure: "Baseline" 
 export interface AgilityComponent { label: string; detail: string; value: number; }
 export interface PerformanceGroup { label: string; status: string; value: number; metrics: { label: string; value: number; warn?: boolean }[]; }
 export interface MovementItem { name: string; detail: string; value: string; }
+export interface RouteMapItem {
+  name: string;
+  firstStep: string; // e.g. "2.1ft"
+  steps: number;
+  rtT: string;       // e.g. "1.32s"
+  score: number;
+  start: { x: number; y: number }; // 0-1 within mini court
+  end: { x: number; y: number };
+}
 export interface SportVariant { label: string; detail: string; }
 export interface ContactCell { label: string; value: string; }
 
