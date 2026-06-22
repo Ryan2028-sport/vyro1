@@ -6,6 +6,7 @@ export interface SportMetric { label: string; value: number; unit: string; insig
 export interface SportCard { title: string; metric: string; detail: string; value: number; }
 export interface TendencyRow { zone: string; read: string; pressure: "Baseline" | "Adjustment" | "Critical" | "Fatigue" | "Scout" | "Technique risk"; }
 export interface AgilityComponent { label: string; detail: string; value: number; }
+export interface PerformanceGroup { label: string; status: string; value: number; metrics: { label: string; value: number; warn?: boolean }[]; }
 export interface MovementItem { name: string; detail: string; value: string; }
 export interface SportVariant { label: string; detail: string; }
 export interface ContactCell { label: string; value: string; }
@@ -22,6 +23,7 @@ export interface SportProfile {
   agilityTitle: string;
   agilitySummary: string;
   agilityComponents: AgilityComponent[];
+  performanceGroups?: PerformanceGroup[];
   movementTitle: string;
   movementItems: MovementItem[];
   motionTitle: string;
