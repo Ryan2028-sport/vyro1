@@ -74,14 +74,15 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
         action={<Pill tone="live" pulse>{sport.emoji} {sport.label}</Pill>}
       />
 
-      <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+      <div className="grid grid-cols-5 gap-1 pb-1">
         {SUB_TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
+            className={`min-w-0 truncate rounded-full border px-1 py-1.5 text-[9px] font-semibold leading-none min-[380px]:text-[10px] ${
               tab === t.id ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
             }`}
+            title={t.label}
           >
             {t.label}
           </button>
