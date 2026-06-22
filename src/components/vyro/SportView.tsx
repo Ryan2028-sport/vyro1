@@ -827,3 +827,28 @@ function TendencyModule({ sport }: { sport: SportProfile }) {
     </div>
   );
 }
+
+function RouteMini({ start, end }: { start: { x: number; y: number }; end: { x: number; y: number } }) {
+  const sx = start.x * 64, sy = start.y * 64;
+  const ex = end.x * 64, ey = end.y * 64;
+  return (
+    <svg viewBox="0 0 64 64" className="h-14 w-14 shrink-0 rounded-lg border border-vyro-line bg-vyro-panel" aria-hidden>
+      {/* grid */}
+      <g stroke="currentColor" className="text-vyro-line" strokeWidth="0.5" opacity="0.5">
+        <line x1="0" y1="21" x2="64" y2="21" />
+        <line x1="0" y1="43" x2="64" y2="43" />
+        <line x1="21" y1="0" x2="21" y2="64" />
+        <line x1="43" y1="0" x2="43" y2="64" />
+      </g>
+      {/* diagonal sheen */}
+      <line x1="0" y1="64" x2="64" y2="0" stroke="currentColor" className="text-vyro-line" strokeWidth="0.5" opacity="0.4" />
+      {/* route line */}
+      <line x1={sx} y1={sy} x2={ex} y2={ey} stroke="currentColor" className="text-vyro-mint" strokeWidth="1.2" opacity="0.6" />
+      {/* start (filled small) */}
+      <circle cx={sx} cy={sy} r="3" fill="currentColor" className="text-vyro-text" opacity="0.9" />
+      {/* end (ring) */}
+      <circle cx={ex} cy={ey} r="2.5" fill="currentColor" className="text-vyro-text" opacity="0.7" />
+      <circle cx={ex} cy={ey} r="4.5" fill="none" stroke="currentColor" className="text-vyro-text" strokeWidth="0.6" opacity="0.5" />
+    </svg>
+  );
+}
