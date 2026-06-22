@@ -348,8 +348,32 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         trend: m.stepsToday ? "+18%" : undefined,
         live: m.connected,
       },
+      {
+        label: "Resp Rate",
+        value: m.respRateBrpm?.toFixed(1) ?? "—",
+        unit: "brpm",
+        trend: m.respRateBrpm ? "steady" : undefined,
+        live: m.connected,
+      },
+      {
+        label: "Stress",
+        value: m.stressScore ?? "—",
+        unit: "/100",
+        trend: m.stressScore != null ? "calm" : undefined,
+        live: m.connected,
+      },
     ],
-    [m.connected, m.heartRateBpm, m.hrvMs, m.restingHrBpm, m.skinTempC, m.spo2Pct, m.stepsToday],
+    [
+      m.connected,
+      m.heartRateBpm,
+      m.hrvMs,
+      m.restingHrBpm,
+      m.skinTempC,
+      m.spo2Pct,
+      m.stepsToday,
+      m.respRateBrpm,
+      m.stressScore,
+    ],
   );
 
   const addPlan = () => {
