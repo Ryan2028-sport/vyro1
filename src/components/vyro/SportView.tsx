@@ -17,6 +17,38 @@ const COURT_DB_TABS: { id: SubTab; label: string }[] = [
   { id: "tendency", label: "Tendencies" },
 ];
 
+const SQUASH_ROUTES = [
+  { route: "T → Front Left", score: 88, stepsIn: 3, stepsOut: 4, timeIn: 0.94, timeOut: 1.32, decel: 3.1, accel: 3.6, leadIn: "Right", leadOut: "Left", zone: "Front left" },
+  { route: "T → Front Right", score: 91, stepsIn: 3, stepsOut: 3, timeIn: 0.88, timeOut: 1.21, decel: 2.8, accel: 3.9, leadIn: "Left", leadOut: "Right", zone: "Front right" },
+  { route: "T → Middle Left", score: 86, stepsIn: 2, stepsOut: 2, timeIn: 0.78, timeOut: 1.02, decel: 2.7, accel: 3.4, leadIn: "Left", leadOut: "Right", zone: "Middle left" },
+  { route: "T → Middle Right", score: 84, stepsIn: 2, stepsOut: 2, timeIn: 0.81, timeOut: 1.05, decel: 2.9, accel: 3.3, leadIn: "Right", leadOut: "Left", zone: "Middle right" },
+  { route: "T → Back Left", score: 79, stepsIn: 5, stepsOut: 5, timeIn: 1.13, timeOut: 1.41, decel: 3.3, accel: 3.4, leadIn: "Left", leadOut: "Right", zone: "Back left" },
+  { route: "T → Back Right", score: 74, stepsIn: 5, stepsOut: 5, timeIn: 1.18, timeOut: 1.58, decel: 3.6, accel: 3.2, leadIn: "Right", leadOut: "Left", zone: "Back right" },
+];
+
+const TENNIS_ROUTES = [
+  { route: "Center → Front Left", score: 86, stepsIn: 4, stepsOut: 4, timeIn: 1.02, timeOut: 1.28, decel: 2.9, accel: 3.7, leadIn: "Right", leadOut: "Left", zone: "Front left" },
+  { route: "Center → Front Right", score: 88, stepsIn: 4, stepsOut: 4, timeIn: 0.98, timeOut: 1.25, decel: 2.7, accel: 3.8, leadIn: "Left", leadOut: "Right", zone: "Front right" },
+  { route: "Center → Wide Left", score: 84, stepsIn: 5, stepsOut: 5, timeIn: 1.10, timeOut: 1.34, decel: 3.0, accel: 3.5, leadIn: "Left", leadOut: "Right", zone: "Wide left" },
+  { route: "Center → Wide Right", score: 82, stepsIn: 5, stepsOut: 5, timeIn: 1.12, timeOut: 1.36, decel: 3.1, accel: 3.4, leadIn: "Right", leadOut: "Left", zone: "Wide right" },
+  { route: "Center → Back Left", score: 79, stepsIn: 5, stepsOut: 5, timeIn: 1.18, timeOut: 1.45, decel: 3.2, accel: 3.2, leadIn: "Left", leadOut: "Right", zone: "Back left" },
+  { route: "Center → Back Right", score: 76, stepsIn: 5, stepsOut: 5, timeIn: 1.22, timeOut: 1.51, decel: 3.4, accel: 3.1, leadIn: "Right", leadOut: "Left", zone: "Back right" },
+];
+
+type RouteRead = {
+  route: string;
+  score: number;
+  stepsIn: number;
+  stepsOut: number;
+  timeIn: number;
+  timeOut: number;
+  decel: number;
+  accel: number;
+  leadIn: string;
+  leadOut: string;
+  zone: string;
+};
+
 export function SportView() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = activeId ? SPORT_PROFILES.find((s) => s.id === activeId) : null;
@@ -72,10 +104,10 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
   function handleTab(next: SubTab) {
     if (next === "database" && isCourtSport) {
       setCourtDbOpen(true);
-      setTab("heatmap");
+      setTab("database");
       return;
     }
-    setCourtDbOpen(next === "heatmap" || next === "tendency");
+    setCourtDbOpen(next === "database" || next === "heatmap" || next === "tendency");
     setTab(next);
   }
 
@@ -94,7 +126,7 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
 
       <div className="grid grid-cols-2 gap-2 pb-1">
         {visibleTabs.map((t) => {
-          const selected = tab === t.id || (t.id === "database" && courtDbOpen);
+          const selected = tab === t.id;
           const label = t.id === "database" ? sport.databaseLabel : t.label;
           return (
           <button
@@ -145,26 +177,28 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
       )}
 
       {tab === "database" && (
-        <>
-          <Card eyebrow={sport.databaseLabel} title={sport.databaseTitle}>
-            <p className="text-[12px] text-vyro-mute">{sport.databaseSubtitle}</p>
-          </Card>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {sport.databaseCards.map((c) => (
-              <Card key={c.title} eyebrow={c.metric} title={
-                <div className="flex items-baseline justify-between gap-2">
-                  <span>{c.title}</span>
-                  <span className="text-base font-black tabular-nums text-vyro-text">{c.value}</span>
-                </div>
-              }>
-                <p className="text-[12px] text-vyro-mute">{c.detail}</p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-vyro-line">
-                  <div className="h-full bg-vyro-mint" style={{ width: `${c.value}%` }} />
-                </div>
-              </Card>
-            ))}
-          </div>
-        </>
+        isCourtSport ? <CourtDatabaseModule sport={sport} /> : (
+          <>
+            <Card eyebrow={sport.databaseLabel} title={sport.databaseTitle}>
+              <p className="text-[12px] text-vyro-mute">{sport.databaseSubtitle}</p>
+            </Card>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {sport.databaseCards.map((c) => (
+                <Card key={c.title} eyebrow={c.metric} title={
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span>{c.title}</span>
+                    <span className="text-base font-black tabular-nums text-vyro-text">{c.value}</span>
+                  </div>
+                }>
+                  <p className="text-[12px] text-vyro-mute">{c.detail}</p>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-vyro-line">
+                    <div className="h-full bg-vyro-mint" style={{ width: `${c.value}%` }} />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </>
+        )
       )}
 
       {tab === "heatmap" && (
@@ -318,38 +352,132 @@ function PerformanceGroupTile({ group }: { group: PerformanceGroup }) {
   );
 }
 
-function CourtHeatMap({ sport }: { sport: SportProfile }) {
-  const zones = sport.movementItems.slice(0, 6);
+function CourtDatabaseModule({ sport }: { sport: SportProfile }) {
   return (
-    <Card eyebrow="Live court heat map" title="Movement density" action={<Pill>Front wall ↑</Pill>}>
-      <div className="mb-3 grid grid-cols-3 gap-2">
-        {[
-          "Movement density",
-          "Fatigue cost",
-          "Attack conversion",
-        ].map((label, index) => (
+    <>
+      <CourtHeatMap sport={sport} />
+      <CourtMovementTable sport={sport} />
+    </>
+  );
+}
+
+function CourtHeatMap({ sport }: { sport: SportProfile }) {
+  const isTennis = sport.id === "tennis";
+  return (
+    <Card eyebrow="Live court heat map" title="Movement density" action={<Pill>Front wall ↑</Pill>} className="rounded-[28px]">
+      <div className="mb-4 grid grid-cols-3 gap-2">
+        {["Movement density", "Fatigue cost", "Attack conversion"].map((label, index) => (
           <div
             key={label}
-            className={`rounded-full border px-2 py-2 text-center text-[10px] font-bold leading-tight ${
-              index === 0 ? "border-vyro-mint bg-vyro-mint/10 text-vyro-text" : "border-vyro-line bg-vyro-elev text-vyro-mute"
+            className={`flex min-h-[46px] items-center justify-center rounded-full border px-2 text-center text-[11px] font-black leading-tight ${
+              index === 0 ? "border-vyro-mute bg-vyro-text/10 text-vyro-text" : "border-vyro-line bg-vyro-elev text-vyro-mute"
             }`}
           >
             {label}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {zones.map((zone, index) => (
-          <div key={zone.name} className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
-            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">Zone {index + 1}</div>
-            <div className="mt-1 text-sm font-bold text-vyro-text">{zone.name}</div>
-            <div className="mt-0.5 text-[11px] text-vyro-mute">{zone.detail}</div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-vyro-line">
-              <div className="h-full bg-vyro-mint" style={{ width: `${zone.value}%` }} />
-            </div>
-          </div>
-        ))}
+      <div className="mx-auto max-w-[360px]">
+        <svg viewBox="0 0 320 430" className="block w-full" role="img" aria-label={`${sport.label} movement density heat map`}>
+          <rect x="12" y="8" width="296" height="384" rx="8" fill="var(--vyro-ink)" stroke="var(--vyro-text)" strokeOpacity="0.72" strokeWidth="3" />
+          <rect x="22" y="18" width="276" height="364" fill="var(--vyro-rose)" opacity="0.13" />
+          <rect x="30" y="30" width="72" height="112" fill="var(--vyro-ink)" opacity="0.58" />
+          <rect x="218" y="30" width="72" height="112" fill="var(--vyro-ink)" opacity="0.58" />
+          <rect x="38" y="270" width="70" height="86" fill="var(--vyro-ink)" opacity="0.5" />
+          <rect x="212" y="270" width="70" height="86" fill="var(--vyro-ink)" opacity="0.5" />
+          <rect x="116" y="38" width="88" height="328" fill="var(--vyro-rose)" opacity="0.14" />
+          <rect x="92" y="170" width="136" height="170" fill="var(--vyro-rose)" opacity="0.24" />
+          <rect x="130" y="235" width="80" height="145" fill="var(--vyro-rose)" opacity="0.5" />
+          <rect x="110" y="235" width="118" height="145" fill="var(--vyro-rose)" opacity="0.22" />
+          <circle cx="160" cy="260" r="58" fill="var(--vyro-rose)" opacity="0.42" />
+          <line x1="12" y1="260" x2="308" y2="260" stroke="var(--vyro-text)" strokeWidth="2.5" />
+          <line x1="160" y1="260" x2="160" y2="392" stroke="var(--vyro-text)" strokeWidth="2.5" />
+          <line x1="86" y1="260" x2="86" y2="338" stroke="var(--vyro-text)" strokeWidth="2" />
+          <line x1="234" y1="260" x2="234" y2="338" stroke="var(--vyro-text)" strokeWidth="2" />
+          <line x1="12" y1="338" x2="86" y2="338" stroke="var(--vyro-text)" strokeWidth="2" />
+          <line x1="234" y1="338" x2="308" y2="338" stroke="var(--vyro-text)" strokeWidth="2" />
+          <line x1="84" y1="78" x2="256" y2="356" stroke="var(--vyro-text)" strokeOpacity="0.7" strokeWidth="1.8" strokeDasharray="7 6" />
+          <line x1="92" y1="68" x2="264" y2="346" stroke="var(--vyro-text)" strokeOpacity="0.7" strokeWidth="1.8" strokeDasharray="7 6" />
+          <circle cx="160" cy="260" r="8" fill="var(--vyro-text)" />
+          <text x="22" y="34" fill="var(--vyro-mute)" fontSize="11" fontFamily="monospace" letterSpacing="2">{isTennis ? "BASELINE" : "FRONT WALL"}</text>
+          <text x="22" y="374" fill="var(--vyro-mute)" fontSize="11" fontFamily="monospace" letterSpacing="2">{isTennis ? "NET" : "BACK WALL"}</text>
+          <text x="288" y="230" fill="var(--vyro-text)" fontSize="11" fontFamily="monospace" letterSpacing="2" transform="rotate(90 288 230)">{isTennis ? "CENTER" : "T LINE"}</text>
+        </svg>
+        <div className="mt-3 flex items-center gap-2 font-mono text-[12px] text-vyro-mute">
+          <span>Low</span>
+          {["bg-vyro-rose/20", "bg-vyro-rose/35", "bg-vyro-rose/50", "bg-vyro-rose/65", "bg-vyro-rose/80", "bg-vyro-rose"].map((cls, i) => (
+            <span key={i} className={`h-3 flex-1 ${cls}`} />
+          ))}
+          <span>High</span>
+        </div>
+      </div>
+      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-vyro-mute/60 bg-vyro-text/10 p-4 text-[13px] leading-relaxed text-vyro-text">
+        <Sparkles className="mt-0.5 h-5 w-5 shrink-0" />
+        Highest occupancy is still T-zone and deep-right. That is your live court-control baseline.
       </div>
     </Card>
+  );
+}
+
+function CourtMovementTable({ sport }: { sport: SportProfile }) {
+  const routes: RouteRead[] = sport.id === "tennis" ? TENNIS_ROUTES : SQUASH_ROUTES;
+  const [selected, setSelected] = useState<RouteRead>(routes[0]);
+  return (
+    <>
+      <Card eyebrow="Movement database" title={sport.id === "tennis" ? "Center movement by zone" : "T movement by zone"} action={<Pill>T Recovery</Pill>} className="rounded-[28px]">
+        <div className="mt-4 grid grid-cols-[1.5fr_.62fr_.58fr_.82fr_.88fr_.55fr] gap-2 px-2 font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
+          <span>Route</span><span>Score</span><span>Steps</span><span>Time</span><span>Decel / Accel</span><span>Lead</span>
+        </div>
+        <div className="mt-3 space-y-2">
+          {routes.map((route) => {
+            const active = selected.route === route.route;
+            return (
+              <button key={route.route} onClick={() => setSelected(route)} className={`grid w-full grid-cols-[1.5fr_.62fr_.58fr_.82fr_.88fr_.55fr] items-center gap-2 rounded-2xl border px-2 py-4 text-left transition-colors ${active ? "border-vyro-mute bg-vyro-text/10" : "border-vyro-line bg-vyro-elev"}`}>
+                <span className="text-[12px] font-black leading-tight text-vyro-text">{route.route}</span>
+                <span className="rounded-full bg-vyro-text/10 px-2 py-1 text-center text-[12px] font-black tabular-nums text-vyro-text">{route.score}</span>
+                <span className="font-mono text-[11px] text-vyro-mute">{route.stepsIn} → {route.stepsOut}</span>
+                <span className="font-mono text-[10px] leading-tight text-vyro-mute">{route.timeIn.toFixed(2)}s →<br />{route.timeOut.toFixed(2)}s</span>
+                <span className="font-mono text-[10px] text-vyro-mute">{route.decel.toFixed(1)} / {route.accel.toFixed(1)}</span>
+                <span className="font-mono text-[10px] text-vyro-mute">{route.leadIn[0]} → {route.leadOut[0]}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-4 font-mono text-[12px] leading-relaxed text-vyro-mute">Tap any route for full steps, foot lead, acceleration, deceleration, return timing, and sport-specific technique detail.</p>
+      </Card>
+      <MovementDetail route={selected} />
+    </>
+  );
+}
+
+function MovementDetail({ route }: { route: RouteRead }) {
+  return (
+    <Card eyebrow="Movement detail" title={route.route} action={<Pill>Score {route.score}</Pill>} className="rounded-[28px]">
+      <p className="mb-5 font-mono text-[12px] leading-relaxed text-vyro-mute">{route.zone} · return target: T · 44 tracked reps</p>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+        <DetailMetric label="Steps to position" value={route.stepsIn} max={6} />
+        <DetailMetric label="Steps back to T" value={route.stepsOut} max={6} />
+        <DetailMetric label="Time to position" value={route.timeIn} unit="s" max={1.8} />
+        <DetailMetric label="Time back to T" value={route.timeOut} unit="s" max={1.8} />
+        <DetailMetric label="Decel into position" value={route.decel} unit="m/s²" max={4} />
+        <DetailMetric label="Accel back to T" value={route.accel} unit="m/s²" max={4} />
+        <DetailMetric label="Leading foot in" value={route.leadIn} max={1} />
+        <DetailMetric label="Leading foot out" value={route.leadOut} max={1} />
+      </div>
+    </Card>
+  );
+}
+
+function DetailMetric({ label, value, unit = "", max }: { label: string; value: string | number; unit?: string; max: number }) {
+  const numeric = typeof value === "number" ? value : 0.64;
+  const width = Math.max(34, Math.min(92, (numeric / max) * 100));
+  return (
+    <div className="min-w-0">
+      <div className="font-mono text-[11px] leading-tight text-vyro-mute">{label}</div>
+      <div className="mt-2 text-[26px] font-black leading-none tabular-nums text-vyro-text">{typeof value === "number" ? value : value}<span className="ml-1 text-[11px] text-vyro-mute">{unit}</span></div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-vyro-line">
+        <div className="h-full rounded-full bg-vyro-text" style={{ width: `${width}%` }} />
+      </div>
+    </div>
   );
 }
