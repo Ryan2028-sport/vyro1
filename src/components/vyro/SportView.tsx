@@ -17,6 +17,26 @@ const COURT_DB_TABS: { id: SubTab; label: string }[] = [
   { id: "tendency", label: "Tendencies" },
 ];
 
+const SQUASH_ROUTES = [
+  { route: "T → Front Left", score: 88, stepsIn: 3, stepsOut: 4, timeIn: 0.94, timeOut: 1.32, decel: 3.1, accel: 3.6, leadIn: "Right", leadOut: "Left", zone: "Front left" },
+  { route: "T → Front Right", score: 91, stepsIn: 3, stepsOut: 3, timeIn: 0.88, timeOut: 1.21, decel: 2.8, accel: 3.9, leadIn: "Left", leadOut: "Right", zone: "Front right" },
+  { route: "T → Middle Left", score: 86, stepsIn: 2, stepsOut: 2, timeIn: 0.78, timeOut: 1.02, decel: 2.7, accel: 3.4, leadIn: "Left", leadOut: "Right", zone: "Middle left" },
+  { route: "T → Middle Right", score: 84, stepsIn: 2, stepsOut: 2, timeIn: 0.81, timeOut: 1.05, decel: 2.9, accel: 3.3, leadIn: "Right", leadOut: "Left", zone: "Middle right" },
+  { route: "T → Back Left", score: 79, stepsIn: 5, stepsOut: 5, timeIn: 1.13, timeOut: 1.41, decel: 3.3, accel: 3.4, leadIn: "Left", leadOut: "Right", zone: "Back left" },
+  { route: "T → Back Right", score: 74, stepsIn: 5, stepsOut: 5, timeIn: 1.18, timeOut: 1.58, decel: 3.6, accel: 3.2, leadIn: "Right", leadOut: "Left", zone: "Back right" },
+];
+
+const TENNIS_ROUTES = [
+  { route: "Center → Front Left", score: 86, stepsIn: 4, stepsOut: 4, timeIn: 1.02, timeOut: 1.28, decel: 2.9, accel: 3.7, leadIn: "Right", leadOut: "Left", zone: "Front left" },
+  { route: "Center → Front Right", score: 88, stepsIn: 4, stepsOut: 4, timeIn: 0.98, timeOut: 1.25, decel: 2.7, accel: 3.8, leadIn: "Left", leadOut: "Right", zone: "Front right" },
+  { route: "Center → Wide Left", score: 84, stepsIn: 5, stepsOut: 5, timeIn: 1.10, timeOut: 1.34, decel: 3.0, accel: 3.5, leadIn: "Left", leadOut: "Right", zone: "Wide left" },
+  { route: "Center → Wide Right", score: 82, stepsIn: 5, stepsOut: 5, timeIn: 1.12, timeOut: 1.36, decel: 3.1, accel: 3.4, leadIn: "Right", leadOut: "Left", zone: "Wide right" },
+  { route: "Center → Back Left", score: 79, stepsIn: 5, stepsOut: 5, timeIn: 1.18, timeOut: 1.45, decel: 3.2, accel: 3.2, leadIn: "Left", leadOut: "Right", zone: "Back left" },
+  { route: "Center → Back Right", score: 76, stepsIn: 5, stepsOut: 5, timeIn: 1.22, timeOut: 1.51, decel: 3.4, accel: 3.1, leadIn: "Right", leadOut: "Left", zone: "Back right" },
+];
+
+type RouteRead = (typeof SQUASH_ROUTES)[number];
+
 export function SportView() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = activeId ? SPORT_PROFILES.find((s) => s.id === activeId) : null;
