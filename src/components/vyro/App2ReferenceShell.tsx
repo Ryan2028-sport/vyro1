@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   Activity,
   Bell,
+  Brain,
   CalendarDays,
   Heart,
   LineChart,
@@ -52,20 +53,14 @@ const dateLabel = new Date().toLocaleDateString([], {
 function Logo() {
   return (
     <div className="app2-logo">
-      <svg viewBox="0 0 32 32" className="app2-logo-mark" aria-hidden="true">
-        <path
-          d="M3 6 L16 26 L29 6"
-          stroke="currentColor"
-          strokeWidth="3"
-          fill="none"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      </svg>
-      <div className="app2-logo-text">
-        <span className="app2-logo-word">VYRO</span>
-        <span className="app2-logo-tag">OWN THE EDGE</span>
-      </div>
+      <img
+        src="/vyro-logo.png"
+        alt="VYRO"
+        className="app2-logo-img"
+        width={96}
+        height={28}
+        loading="eager"
+      />
     </div>
   );
 }
@@ -164,6 +159,59 @@ function InfoCard({
       </div>
       {title && <h2 className="app2-card-title">{title}</h2>}
       <div>{children}</div>
+    </section>
+  );
+}
+
+function CognitiveFatigueCard({ m }: { m: ReturnType<typeof useLiveMetrics> }) {
+  const delay =
+    m.connected && m.reactMin != null ? `+${Math.round(m.reactMin)}ms` : "+214ms";
+  const hrStatus = useMemo(() => {
+    if (!m.connected || m.heartRateBpm == null) return "Normal";
+    if (m.heartRateBpm < 60) return "Low";
+    if (m.heartRateBpm > 100) return "Elevated";
+    return "Normal";
+  }, [m.connected, m.heartRateBpm]);
+  const vyroRead = useMemo(() => {
+    if (!m.connected || m.reactMin == null) return "Cognitively fried";
+    return m.reactMin > 200 ? "Cognitively fried" : "Sharp";
+  }, [m.connected, m.reactMin]);
+
+  return (
+    <section className="app2-card app2-info-card app2-cog-card">
+      <div className="app2-cog-header">
+        <div className="app2-cog-eyebrow">
+          <Brain size={14} />
+          <span>Cognitive load</span>
+        </div>
+        <span className="app2-cog-badge">WATCH</span>
+      </div>
+      <h2 className="app2-card-title">Cognitive Fatigue Divergence</h2>
+      <p className="app2-card-copy">
+        Detects when your brain is tired before your body is by comparing video reaction cues
+        against first wearable burst.
+      </p>
+      <div className="app2-cog-rows">
+        <div className="app2-cog-row">
+          <span className="app2-cog-row-label">Decision-to-movement delay</span>
+          <span className="app2-cog-row-value">{delay}</span>
+        </div>
+        <div className="app2-cog-row">
+          <span className="app2-cog-row-label">Heart rate status</span>
+          <span className="app2-cog-row-value">{hrStatus}</span>
+        </div>
+        <div className="app2-cog-row">
+          <span className="app2-cog-row-label">VYRO read</span>
+          <span className="app2-cog-row-value">{vyroRead}</span>
+        </div>
+      </div>
+      <div className="app2-cog-insight">
+        <Activity size={18} />
+        <span>
+          Heart looks ready, but reaction timing has slowed past the 200ms alert line. Best use
+          case: goalies, batters, returners, and late-game decision makers.
+        </span>
+      </div>
     </section>
   );
 }
@@ -454,45 +502,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </div>
         </InfoCard>
 
-        <InfoCard
-          eyebrow="Cognitive vs physical"
-          title="Cognitive fatigue divergence"
-          tone="amber"
-        >
-          <p className="app2-card-copy">
-            Reaction speed is fading faster than physical output — a classic early sign of cognitive
-            fatigue. Drop one decision-heavy drill before the next hard block.
-          </p>
-          <div className="app2-metric-grid">
-            <MiniMetric
-              label="Cognitive load"
-              value={Math.min(100, Math.round((fatigue + 12)))}
-              unit="/100"
-              trend="↗ rising"
-              live={m.connected}
-            />
-            <MiniMetric
-              label="Physical load"
-              value={fatigue}
-              unit="/100"
-              trend="controlled"
-              live={m.connected}
-            />
-            <MiniMetric
-              label="Reaction"
-              value={m.reactMin != null ? Math.round(m.reactMin) : "—"}
-              unit="ms"
-              trend={m.reactMin != null ? "slowing" : undefined}
-              live={m.connected}
-            />
-            <MiniMetric
-              label="Divergence"
-              value={Math.max(0, Math.min(100, 12))}
-              unit="Δ"
-              trend="watch"
-            />
-          </div>
-        </InfoCard>
+        <CognitiveFatigueCard m={m} />
 
         <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone="amber">
           <p className="app2-card-copy">
