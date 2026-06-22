@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ChevronLeft } from "lucide-react";
+import { Activity, CircleHelp, Crosshair, Gauge, Grid2X2, Sparkles, Zap, ChevronLeft } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
-import { SPORT_PROFILES, type SportProfile } from "./sportProfiles";
+import { SPORT_PROFILES, type PerformanceGroup, type SportProfile } from "./sportProfiles";
 
 type SubTab = "overview" | "database" | "heatmap" | "tendency" | "agility" | "motion";
 const PRIMARY_TABS: { id: SubTab; label: string }[] = [
@@ -121,13 +121,19 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
               ))}
             </div>
           </Card>
-          <Card eyebrow="Performance groups" title={`Six lenses on ${sport.label.toLowerCase()}.`}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {sport.agilityComponents.map((a) => (
-                <ProgressTile key={a.label} label={a.label} value={a.value} />
+          <Card eyebrow="Performance groups">
+            <h3 className="mb-4 text-[22px] font-black leading-tight text-vyro-text">Six lenses on {sport.label.toLowerCase()}.</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {(sport.performanceGroups ?? sport.agilityComponents.map((a) => ({
+                label: a.label,
+                status: a.value >= 80 ? "Elite band" : "On target",
+                value: a.value,
+                metrics: [{ label: a.detail, value: a.value }],
+              }))).map((group) => (
+                <PerformanceGroupTile key={group.label} group={group} />
               ))}
             </div>
-            <p className="mt-3 text-[11px] text-vyro-mute">Performance groups update from verified sessions. Each lens has its own coach note inside the Agility tab.</p>
+            <p className="mt-4 text-[13px] leading-relaxed text-vyro-mute">Court positioning is backed by full heat maps and opponent scouting in the Court DB tab.</p>
           </Card>
           <Card eyebrow="Past sessions" title="0 logged">
             <EmptyState
