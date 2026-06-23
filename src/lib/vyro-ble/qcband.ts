@@ -438,8 +438,11 @@ export function decodeQcBandSpo2History(bytes: Uint8Array): number | null {
 //   Temp  (0x04): [op, st, err, temp_int, temp_frac]   (°C = int + frac/100)
 //   HRV   (0x05): [op, st, err, rmssd_ms]
 //   1-Key (0x06): [op, st, err, hr, sbp, dbp, spo2, temp_int, temp_frac, hrv, stress]
-export function encodeQcBandMeasureStart(subType: number, duration = 0x25): Uint8Array {
-  return sdkCommand([QCBAND_CMD_START_MEASURE, subType, duration]);
+export function encodeQcBandMeasureStart(subType: number, action = 0x01): Uint8Array {
+  // Command 0x69 is a DataRequest. Byte 2 is an action enum (Start=1), not a
+  // duration. Sending 0x25 here makes newer QCBand/Colmi firmware ignore the
+  // request, so manual skin-temp/HRV/stress reads never complete.
+  return sdkCommand([QCBAND_CMD_START_MEASURE, subType, action]);
 }
 export function encodeQcBandMeasureStop(subType: number): Uint8Array {
   return sdkCommand([QCBAND_CMD_STOP_MEASURE, subType, 0x00, 0x00]);
