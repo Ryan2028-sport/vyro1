@@ -165,6 +165,10 @@ export function encodeQcBandActivityRequest(daysAgo = 0): Uint8Array {
   return sdkCommand([QCBAND_CMD_SYNC_ACTIVITY, daysAgo & 0xff, 0x0f, 0x00, 0x5f, 0x01]);
 }
 
+export function encodeQcBandTodaySportsRequest(): Uint8Array {
+  return sdkCommand([QCBAND_CMD_TODAY_SPORTS]);
+}
+
 export function encodeQcBandStressRequest(): Uint8Array {
   return sdkCommand([QCBAND_CMD_SYNC_STRESS]);
 }
