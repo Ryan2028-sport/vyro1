@@ -470,6 +470,8 @@ export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame 
     QCBAND_MEASURE_ONE_KEY_SDK,
     QCBAND_MEASURE_STRESS_SDK,
     QCBAND_MEASURE_HRV_SDK,
+    QCBAND_MEASURE_HRV_DATA_REQUEST,
+    QCBAND_MEASURE_PRESSURE_SDK,
     QCBAND_MEASURE_TEMP_SDK,
     QCBAND_MEASURE_ONE_KEY_HR,
   ] as readonly number[]).includes(bytes[1]);
@@ -556,11 +558,19 @@ export function decodeQcBandOneKeyPayload(data: Uint8Array): {
  *  `[frac, int]` byte orders seen across QCBand firmwares, and also a
  *  little-endian fixed-point 16-bit value (×100). */
 export function decodeQcBandTempPayload(data: Uint8Array): number | null {
-  if (data.length < 2) return null;
+  if (data.length < 1) return null;
+  const u16le = data.length >= 2 ? data[0] | (data[1] << 8) : NaN;
+  const u16be = data.length >= 2 ? (data[0] << 8) | data[1] : NaN;
   const candidates = [
-    data[0] + data[1] / 100,
-    data[1] + data[0] / 100,
-    (data[0] | (data[1] << 8)) / 100,
+    data[0],
+    data[0] / 10,
+    data[0] / 10 + 20,
+    data.length >= 2 ? data[0] + data[1] / 100 : NaN,
+    data.length >= 2 ? data[1] + data[0] / 100 : NaN,
+    u16le / 10,
+    u16le / 100,
+    u16be / 10,
+    u16be / 100,
   ];
   for (const t of candidates) {
     if (t >= 30 && t <= 42) return t;
