@@ -141,11 +141,13 @@ export function decodeQcBandBattery(
 // Different Oudmon/QCBand firmwares respond on different opcodes:
 //   0x09 — newest QCBand SDK ("today summary")
 //   0x07 — older Oudmon devices ("step counter")
-//   0x15 — Colmi R02 family ("activity totals")
+//   0x43 — Colmi/Yawell activity history (handled below)
 // Request format is always [opcode | 0x00 ...], with the day index optionally
 // at byte 1 (0 = today). We send all three on each poll; only the supported
 // one will respond.
 export const QCBAND_CMD_STEPS_ALT1 = 0x07;
+// 0x15 is heart-rate history on Colmi/Yawell firmwares, not steps. Do not
+// decode it as activity or it can turn HR-history bytes into bogus step counts.
 export const QCBAND_CMD_STEPS_ALT2 = 0x15;
 
 export function encodeQcBandStepsRequest(): Uint8Array {
@@ -196,8 +198,7 @@ export function decodeQcBandTodaySummary(
   const op = bytes[0];
   if (
     op !== QCBAND_CMD_TODAY_SUMMARY &&
-    op !== QCBAND_CMD_STEPS_ALT1 &&
-    op !== QCBAND_CMD_STEPS_ALT2
+    op !== QCBAND_CMD_STEPS_ALT1
   )
     return null;
   const u16 = (i: number) => bytes[i] | (bytes[i + 1] << 8);
