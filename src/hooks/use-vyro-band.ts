@@ -29,27 +29,50 @@ import {
 } from "@/lib/vyro-ble/session-control";
 import {
   decodeQcBandBattery,
+  decodeQcBandHistoricalActivity,
+  decodeQcBandHrvHistory,
+  decodeQcBandLiveActivityNotification,
   decodeQcBandMeasureFrame,
   decodeQcBandOneKeyPayload,
+  decodeQcBandSpo2History,
+  decodeQcBandStressHistory,
   decodeQcBandRealtimeHeartRate,
   decodeQcBandTempPayload,
+  decodeQcBandTemperatureHistory,
+  decodeQcBandTodaySports,
   decodeQcBandTodaySummary,
+  encodeQcBandActivityRequest,
+  encodeQcBandAutoHrv,
+  encodeQcBandAutoSpo2,
+  encodeQcBandAutoStress,
+  encodeQcBandAutoTemp,
   encodeQcBandBatteryRequest,
+  encodeQcBandHrvRequest,
   encodeQcBandMeasureStart,
   encodeQcBandMeasureStop,
   encodeQcBandRealtimeHeartRate,
+  encodeQcBandSpo2HistoryRequest,
   encodeQcBandSpo2Start,
   encodeQcBandSpo2Stop,
+  encodeQcBandStressRequest,
   encodeQcBandStepsRequest,
   encodeQcBandStepsRequestAlt1,
   encodeQcBandStepsRequestAlt2,
+  encodeQcBandTemperatureHistoryRequest,
+  encodeQcBandTodaySportsRequest,
   QCBAND_CMD_BATTERY,
+  QCBAND_CMD_BIG_DATA_V2,
+  QCBAND_CMD_NOTIFICATION,
   QCBAND_CMD_REALTIME_HR,
+  QCBAND_CMD_SYNC_ACTIVITY,
+  QCBAND_CMD_SYNC_HRV,
+  QCBAND_CMD_SYNC_STRESS,
   QCBAND_CMD_START_MEASURE,
   QCBAND_CMD_STOP_MEASURE,
   QCBAND_CMD_STEPS_ALT1,
   QCBAND_CMD_STEPS_ALT2,
   QCBAND_CMD_TODAY_SUMMARY,
+  QCBAND_CMD_TODAY_SPORTS,
   QCBAND_MEASURE_HR,
   QCBAND_MEASURE_HR_TYPES,
   QCBAND_MEASURE_HRV,
@@ -63,8 +86,12 @@ import {
   QCBAND_MEASURE_TEMP,
   QCBAND_MEASURE_TEMP_TYPES,
   QCBAND_NOTIFY_CHAR_UUID,
+  QCBAND_COMMAND_V2_CHAR_UUID,
   QCBAND_SERVICE_UUID,
+  QCBAND_SERVICE_V2_UUID,
   QCBAND_WRITE_CHAR_UUID,
+  QCBAND_NOTIFY_V2_CHAR_UUID,
+  todayActivityKeyPrefix,
 } from "@/lib/vyro-ble/qcband";
 
 import { bluetooth, type BleDiscovered } from "@/lib/despia";
@@ -150,6 +177,8 @@ export function useVyroBand() {
   const [stressScore, setStressScore] = useState<number | null>(null);
   const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(null);
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
+  const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
+  const bigDataV2Ref = useRef<{ expected: number; chunks: number[] } | null>(null);
 
   // When connected, always subscribe to the VYRO motion event characteristic
   // (cheap if the remote watch doesn't expose it — the platform just errors
@@ -184,6 +213,8 @@ export function useVyroBand() {
       setStressScore(null);
       setBloodPressure(null);
       hrSamplesRef.current = [];
+      activityBucketsRef.current.clear();
+      bigDataV2Ref.current = null;
     }
   }, [connectedId]);
 
@@ -216,12 +247,14 @@ export function useVyroBand() {
     let cancelled = false;
     let qcBandStarted = false;
     let qcBandService: { service: string; notify: string; write: string } | null = null;
+    let qcBandV2Service: { service: string; notify: string; write: string } | null = null;
     let holdTimer: number | null = null;
     let restartTimer: number | null = null;
     let batteryTimer: number | null = null;
     let stepsTimer: number | null = null;
     let oneKeyTimer: number | null = null;
     let tempTimer: number | null = null;
+    let historyTimer: number | null = null;
 
     async function writeQcBand(service: string, write: string, bytes: Uint8Array) {
       const hex = bytesToHex(bytes);
@@ -229,6 +262,16 @@ export function useVyroBand() {
         await bluetooth.write(connectedId!, service, write, hex, true);
       } catch {
         await bluetooth.write(connectedId!, service, write, hex, false);
+      }
+    }
+
+    async function writeQcBandV2(bytes: Uint8Array) {
+      if (!qcBandV2Service) return;
+      const hex = bytesToHex(bytes);
+      try {
+        await bluetooth.write(connectedId!, qcBandV2Service.service, qcBandV2Service.write, hex, true);
+      } catch {
+        await bluetooth.write(connectedId!, qcBandV2Service.service, qcBandV2Service.write, hex, false);
       }
     }
 
@@ -245,6 +288,13 @@ export function useVyroBand() {
       await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(
         (err) => console.warn("[vyro] QCBand HR start write failed", err),
       );
+      // Make sure the firmware's automatic health collectors are enabled.
+      // Without these preferences, HR may stream but HRV/RMSSD, stress, SpO₂
+      // and skin temperature can legitimately stay blank forever.
+      await writeQcBand(service, write, encodeQcBandAutoSpo2(true)).catch(() => undefined);
+      await writeQcBand(service, write, encodeQcBandAutoStress(true)).catch(() => undefined);
+      await writeQcBand(service, write, encodeQcBandAutoHrv(true)).catch(() => undefined);
+      await writeQcBand(service, write, encodeQcBandAutoTemp(true)).catch(() => undefined);
       window.setTimeout(() => {
         void writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(
           () => undefined,
@@ -272,20 +322,46 @@ export function useVyroBand() {
       window.setTimeout(pollBattery, 800);
       batteryTimer = window.setInterval(pollBattery, 60_000);
 
-      // Steps / distance / calories — poll every second. We send all three known
-      // opcodes (0x09 / 0x07 / 0x15) since different firmwares respond on
-      // different ones. The notify handler accepts any of them.
+      // Steps / distance / calories. Poll the summary/current-activity
+      // commands plus the Colmi/Yawell hourly activity sync. Do not use 0x15
+      // here — on these firmwares it is HR history, not steps.
       const pollSteps = () => {
         void writeQcBand(service, write, encodeQcBandStepsRequest()).catch(() => undefined);
         window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandStepsRequestAlt1()).catch(() => undefined);
         }, 400);
         window.setTimeout(() => {
-          void writeQcBand(service, write, encodeQcBandStepsRequestAlt2()).catch(() => undefined);
+          void writeQcBand(service, write, encodeQcBandActivityRequest(0)).catch(() => undefined);
         }, 800);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandTodaySportsRequest()).catch(() => undefined);
+        }, 1_200);
       };
       window.setTimeout(pollSteps, 1_200);
-      stepsTimer = window.setInterval(pollSteps, 1_000);
+      stepsTimer = window.setInterval(pollSteps, 2_000);
+
+      // Buffered/native history sync. These are the commands used by the
+      // QRing/Gadgetbridge stack for the exact missing metrics: HRV/RMSSD
+      // (0x39), stress (0x37), activity/steps (0x43), plus V2 temperature
+      // and SpO₂ when that service is present. Fire fast after connect, then
+      // repeat so values survive app background/minimize/reconnect.
+      const pollHistory = () => {
+        void writeQcBand(service, write, encodeQcBandStressRequest()).catch(() => undefined);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandHrvRequest(0)).catch(() => undefined);
+        }, 700);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandActivityRequest(0)).catch(() => undefined);
+        }, 1_400);
+        window.setTimeout(() => {
+          void writeQcBandV2(encodeQcBandSpo2HistoryRequest()).catch(() => undefined);
+        }, 2_100);
+        window.setTimeout(() => {
+          void writeQcBandV2(encodeQcBandTemperatureHistoryRequest()).catch(() => undefined);
+        }, 2_800);
+      };
+      window.setTimeout(pollHistory, 4_000);
+      historyTimer = window.setInterval(pollHistory, 60_000);
 
       const runMeasureCycle = (label: string, subTypes: readonly number[], durationMs: number) => {
         subTypes.forEach((subType, index) => {
@@ -368,6 +444,20 @@ export function useVyroBand() {
             );
           }
         }
+        if (uuidMatches(svc.uuid, QCBAND_SERVICE_V2_UUID)) {
+          const notify = svc.characteristics.find((c) =>
+            uuidMatches(c.uuid, QCBAND_NOTIFY_V2_CHAR_UUID),
+          );
+          const write = svc.characteristics.find((c) =>
+            uuidMatches(c.uuid, QCBAND_COMMAND_V2_CHAR_UUID),
+          );
+          if (notify && write) {
+            qcBandV2Service = { service: svc.uuid, notify: notify.uuid, write: write.uuid };
+            void bluetooth.subscribe(connectedId, svc.uuid, notify.uuid).catch((err) =>
+              console.warn("[vyro] QCBand V2 notify subscribe failed", err),
+            );
+          }
+        }
         if (uuidMatches(svc.uuid, HR_SERVICE)) {
           const ch = svc.characteristics.find((c) => uuidMatches(c.uuid, HR_MEAS_CHAR));
           if (ch) {
@@ -396,6 +486,14 @@ export function useVyroBand() {
     // depending on the discovery event.
     const fallback = window.setTimeout(() => {
       if (qcBandStarted || cancelled) return;
+      qcBandV2Service = {
+        service: QCBAND_SERVICE_V2_UUID,
+        notify: QCBAND_NOTIFY_V2_CHAR_UUID,
+        write: QCBAND_COMMAND_V2_CHAR_UUID,
+      };
+      void bluetooth
+        .subscribe(connectedId, QCBAND_SERVICE_V2_UUID, QCBAND_NOTIFY_V2_CHAR_UUID)
+        .catch(() => undefined);
       void startQcBandLiveHr(
         QCBAND_SERVICE_UUID,
         QCBAND_NOTIFY_CHAR_UUID,
@@ -411,6 +509,7 @@ export function useVyroBand() {
       if (restartTimer != null) window.clearInterval(restartTimer);
       if (batteryTimer != null) window.clearInterval(batteryTimer);
       if (stepsTimer != null) window.clearInterval(stepsTimer);
+      if (historyTimer != null) window.clearInterval(historyTimer);
       if (oneKeyTimer != null) window.clearInterval(oneKeyTimer);
       if (tempTimer != null) window.clearInterval(tempTimer);
       cleanupExtras?.();
@@ -435,6 +534,11 @@ export function useVyroBand() {
         }
         void bluetooth
           .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
+          .catch(() => undefined);
+      }
+      if (qcBandV2Service) {
+        void bluetooth
+          .unsubscribe(connectedId, qcBandV2Service.service, qcBandV2Service.notify)
           .catch(() => undefined);
       }
     };
@@ -483,8 +587,7 @@ export function useVyroBand() {
         }
       } else if (
         op === QCBAND_CMD_TODAY_SUMMARY ||
-        op === QCBAND_CMD_STEPS_ALT1 ||
-        op === QCBAND_CMD_STEPS_ALT2
+        op === QCBAND_CMD_STEPS_ALT1
       ) {
         const sum = decodeQcBandTodaySummary(bytes);
         if (sum) {
@@ -492,6 +595,46 @@ export function useVyroBand() {
           setDistanceM(sum.distanceM);
           setCaloriesKcal(sum.calories);
         }
+      } else if (op === QCBAND_CMD_TODAY_SPORTS) {
+        const sum = decodeQcBandTodaySports(bytes);
+        if (sum) {
+          setStepsToday(sum.steps);
+          setDistanceM(sum.distanceM);
+          setCaloriesKcal(sum.calories);
+        }
+      } else if (op === QCBAND_CMD_NOTIFICATION) {
+        const live = decodeQcBandLiveActivityNotification(bytes);
+        if (live) {
+          setStepsToday(live.steps);
+          setDistanceM(live.distanceM);
+          setCaloriesKcal(live.calories);
+        }
+      } else if (op === QCBAND_CMD_SYNC_ACTIVITY) {
+        const sample = decodeQcBandHistoricalActivity(bytes);
+        if (sample && sample.key.startsWith(todayActivityKeyPrefix())) {
+          activityBucketsRef.current.set(sample.key, {
+            steps: sample.steps,
+            distanceM: sample.distanceM,
+            calories: sample.calories,
+          });
+          let steps = 0;
+          let distanceM = 0;
+          let calories = 0;
+          for (const v of activityBucketsRef.current.values()) {
+            steps += v.steps;
+            distanceM += v.distanceM;
+            calories += v.calories;
+          }
+          setStepsToday(steps);
+          setDistanceM(distanceM);
+          setCaloriesKcal(calories);
+        }
+      } else if (op === QCBAND_CMD_SYNC_HRV) {
+        const hrv = decodeQcBandHrvHistory(bytes);
+        if (hrv != null) setHrvMs(hrv);
+      } else if (op === QCBAND_CMD_SYNC_STRESS) {
+        const stress = decodeQcBandStressHistory(bytes);
+        if (stress != null) setStressScore(stress);
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame || frame.errorCode !== 0) return;
@@ -550,6 +693,29 @@ export function useVyroBand() {
           if (t != null) setSkinTempC(t);
         }
       }
+      return;
+    }
+    if (uuidMatches(cuuid, QCBAND_NOTIFY_V2_CHAR_UUID)) {
+      const chunk = payloadToBytes(lastData.value);
+      if (chunk.length === 0) return;
+      let bytes = chunk;
+      if (chunk[0] === QCBAND_CMD_BIG_DATA_V2 && chunk.length >= 4) {
+        const expected = (chunk[2] | (chunk[3] << 8)) + 6;
+        if (chunk.length < expected) {
+          bigDataV2Ref.current = { expected, chunks: Array.from(chunk) };
+          return;
+        }
+      } else if (bigDataV2Ref.current) {
+        bigDataV2Ref.current.chunks.push(...Array.from(chunk));
+        if (bigDataV2Ref.current.chunks.length < bigDataV2Ref.current.expected) return;
+        bytes = Uint8Array.from(bigDataV2Ref.current.chunks);
+        bigDataV2Ref.current = null;
+      }
+      console.log("[qcband] notify-v2 op=0x" + bytes[0].toString(16).padStart(2, "0"), bytesToHex(bytes));
+      const spo2 = decodeQcBandSpo2History(bytes);
+      if (spo2 != null) setSpo2Pct(spo2);
+      const temp = decodeQcBandTemperatureHistory(bytes);
+      if (temp != null) setSkinTempC(temp);
       return;
     }
     if (uuidMatches(cuuid, BAT_LVL_CHAR)) {

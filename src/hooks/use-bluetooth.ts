@@ -7,6 +7,7 @@ import {
   type BleDevice,
   type BleState,
 } from "@/lib/despia";
+import { QCBAND_SERVICE_UUID, QCBAND_SERVICE_V2_UUID } from "@/lib/vyro-ble/qcband";
 
 export type BleConnectionState = "idle" | "connecting" | "connected" | "disconnected" | "failed";
 
@@ -123,6 +124,8 @@ export function useBluetooth() {
                 "battery_service",
                 "device_information",
                 "heart_rate",
+                QCBAND_SERVICE_UUID,
+                QCBAND_SERVICE_V2_UUID,
                 0xfee7,
                 0xfee0,
                 0xfff0,

@@ -9,12 +9,38 @@ export const QCBAND_SERVICE_UUID = "6e40fff0-b5a3-f393-e0a9-e50e24dcca9e";
 export const QCBAND_WRITE_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 export const QCBAND_NOTIFY_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
+// Newer Colmi/Yawell/QCBand firmwares expose a second "big data" service for
+// buffered SpO₂ / skin-temperature history. It must be subscribed separately;
+// otherwise temperature can be present on the watch but never reach the app.
+export const QCBAND_SERVICE_V2_UUID = "de5bf728-d711-4e47-af26-65e3012a5dc7";
+export const QCBAND_COMMAND_V2_CHAR_UUID = "de5bf72a-d711-4e47-af26-65e3012a5dc7";
+export const QCBAND_NOTIFY_V2_CHAR_UUID = "de5bf729-d711-4e47-af26-65e3012a5dc7";
+
 // Opcodes (selected — see Oudmon protocol).
 export const QCBAND_CMD_BATTERY = 0x03;          // 3
 export const QCBAND_CMD_TODAY_SUMMARY = 0x09;    // 9 — steps/distance/calories
+export const QCBAND_CMD_SYNC_STRESS = 0x37;      // 55 — 30-min stress history
+export const QCBAND_CMD_SYNC_HRV = 0x39;         // 57 — 30-min HRV/RMSSD history
+export const QCBAND_CMD_SYNC_ACTIVITY = 0x43;    // 67 — hourly steps/activity history
+export const QCBAND_CMD_TODAY_SPORTS = 0x48;     // 72 — total steps/running/cal/distance
 export const QCBAND_CMD_REALTIME_HR = 0x1e;      // 30 — start/end/hold poll
 export const QCBAND_CMD_START_MEASURE = 0x69;    // 105 — start HR/SpO2/temp/one-key
 export const QCBAND_CMD_STOP_MEASURE = 0x6a;     // 106 — stop measurement
+export const QCBAND_CMD_NOTIFICATION = 0x73;      // 115 — live activity/battery notifications
+export const QCBAND_CMD_BIG_DATA_V2 = 0xbc;       // 188 — V2 history payloads
+
+export const QCBAND_CMD_AUTO_SPO2_PREF = 0x2c;
+export const QCBAND_CMD_AUTO_STRESS_PREF = 0x36;
+export const QCBAND_CMD_AUTO_HRV_PREF = 0x38;
+export const QCBAND_CMD_AUTO_TEMP_PREF = 0x3a;
+export const QCBAND_PREF_READ = 0x01;
+export const QCBAND_PREF_WRITE = 0x02;
+
+export const QCBAND_NOTIFICATION_BATTERY = 0x0c;
+export const QCBAND_NOTIFICATION_LIVE_ACTIVITY = 0x12;
+
+export const QCBAND_BIG_DATA_TYPE_TEMPERATURE = 0x25;
+export const QCBAND_BIG_DATA_TYPE_SPO2 = 0x2a;
 
 // Measurement sub-types under 0x69 / 0x6A. QCBand/Oudmon ships more than one
 // firmware line. The old protocol uses 0x01/0x03/0x05/0x09/0x0d/0x0e; the newer
@@ -84,6 +110,23 @@ export function encodeQcBandBatteryRequest(): Uint8Array {
   return sdkCommand([QCBAND_CMD_BATTERY]);
 }
 
+export function encodeQcBandAutoSpo2(enabled = true): Uint8Array {
+  return sdkCommand([QCBAND_CMD_AUTO_SPO2_PREF, QCBAND_PREF_WRITE, enabled ? 0x01 : 0x00]);
+}
+
+export function encodeQcBandAutoStress(enabled = true): Uint8Array {
+  return sdkCommand([QCBAND_CMD_AUTO_STRESS_PREF, QCBAND_PREF_WRITE, enabled ? 0x01 : 0x00]);
+}
+
+export function encodeQcBandAutoHrv(enabled = true): Uint8Array {
+  return sdkCommand([QCBAND_CMD_AUTO_HRV_PREF, QCBAND_PREF_WRITE, enabled ? 0x01 : 0x00]);
+}
+
+export function encodeQcBandAutoTemp(enabled = true): Uint8Array {
+  // Temperature settings use an extra channel byte (0x03) on this firmware line.
+  return sdkCommand([QCBAND_CMD_AUTO_TEMP_PREF, 0x03, QCBAND_PREF_WRITE, enabled ? 0x01 : 0x00]);
+}
+
 export function decodeQcBandBattery(
   bytes: Uint8Array,
 ): { level: number; charging: boolean } | null {
@@ -98,11 +141,13 @@ export function decodeQcBandBattery(
 // Different Oudmon/QCBand firmwares respond on different opcodes:
 //   0x09 — newest QCBand SDK ("today summary")
 //   0x07 — older Oudmon devices ("step counter")
-//   0x15 — Colmi R02 family ("activity totals")
+//   0x43 — Colmi/Yawell activity history (handled below)
 // Request format is always [opcode | 0x00 ...], with the day index optionally
 // at byte 1 (0 = today). We send all three on each poll; only the supported
 // one will respond.
 export const QCBAND_CMD_STEPS_ALT1 = 0x07;
+// 0x15 is heart-rate history on Colmi/Yawell firmwares, not steps. Do not
+// decode it as activity or it can turn HR-history bytes into bogus step counts.
 export const QCBAND_CMD_STEPS_ALT2 = 0x15;
 
 export function encodeQcBandStepsRequest(): Uint8Array {
@@ -115,6 +160,41 @@ export function encodeQcBandStepsRequestAlt2(): Uint8Array {
   return sdkCommand([QCBAND_CMD_STEPS_ALT2, 0x00]);
 }
 
+export function encodeQcBandActivityRequest(daysAgo = 0): Uint8Array {
+  // Gadgetbridge/QRing request: [0x43, daysAgo, 0x0f, 0x00, 0x5f, 0x01].
+  return sdkCommand([QCBAND_CMD_SYNC_ACTIVITY, daysAgo & 0xff, 0x0f, 0x00, 0x5f, 0x01]);
+}
+
+export function encodeQcBandTodaySportsRequest(): Uint8Array {
+  return sdkCommand([QCBAND_CMD_TODAY_SPORTS]);
+}
+
+export function encodeQcBandStressRequest(): Uint8Array {
+  return sdkCommand([QCBAND_CMD_SYNC_STRESS]);
+}
+
+export function encodeQcBandHrvRequest(daysAgo = 0): Uint8Array {
+  const out = new Uint8Array(5);
+  out[0] = QCBAND_CMD_SYNC_HRV;
+  out[1] = daysAgo & 0xff;
+  out[2] = (daysAgo >> 8) & 0xff;
+  out[3] = (daysAgo >> 16) & 0xff;
+  out[4] = (daysAgo >> 24) & 0xff;
+  return sdkCommand([...out]);
+}
+
+export function encodeQcBandSpo2HistoryRequest(): Uint8Array {
+  return new Uint8Array([QCBAND_CMD_BIG_DATA_V2, QCBAND_BIG_DATA_TYPE_SPO2, 0x01, 0x00, 0xff, 0x00, 0xff]);
+}
+
+export function encodeQcBandTemperatureHistoryRequest(): Uint8Array {
+  return new Uint8Array([QCBAND_CMD_BIG_DATA_V2, QCBAND_BIG_DATA_TYPE_TEMPERATURE, 0x01, 0x00, 0x3e, 0x81, 0x02]);
+}
+
+function bcdByte(v: number): number {
+  return ((v >> 4) & 0x0f) * 10 + (v & 0x0f);
+}
+
 export function decodeQcBandTodaySummary(
   bytes: Uint8Array,
 ): { steps: number; distanceM: number; calories: number } | null {
@@ -122,8 +202,7 @@ export function decodeQcBandTodaySummary(
   const op = bytes[0];
   if (
     op !== QCBAND_CMD_TODAY_SUMMARY &&
-    op !== QCBAND_CMD_STEPS_ALT1 &&
-    op !== QCBAND_CMD_STEPS_ALT2
+    op !== QCBAND_CMD_STEPS_ALT1
   )
     return null;
   const u16 = (i: number) => bytes[i] | (bytes[i + 1] << 8);
@@ -136,8 +215,9 @@ export function decodeQcBandTodaySummary(
     if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > 250_000) return;
     if (!Number.isFinite(calories) || calories < 0 || calories > 25_000) return;
     // A single 0xff status byte can otherwise decode as a bogus stuck 255
-    // steps value. Prefer richer layouts when they exist.
-    if (steps === 255 && bytes[1] === 0xff && bytes.slice(2).some((b) => b !== 0)) score -= 10;
+    // steps value. Reject it here; live/activity-history packets will provide
+    // the real total when the watch has data.
+    if (steps === 255 && bytes[1] === 0xff) return;
     candidates.push({ steps, distanceM, calories, score });
   };
 
@@ -155,6 +235,137 @@ export function decodeQcBandTodaySummary(
   candidates.sort((a, b) => b.score - a.score || b.steps - a.steps);
   const { steps, distanceM, calories } = candidates[0];
   return { steps, distanceM, calories };
+}
+
+export function decodeQcBandTodaySports(
+  bytes: Uint8Array,
+): { steps: number; runningSteps: number; distanceM: number; calories: number } | null {
+  if (bytes.length < 14 || bytes[0] !== QCBAND_CMD_TODAY_SPORTS) return null;
+  const u24 = (i: number) => bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16);
+  const steps = u24(1);
+  const runningSteps = u24(4);
+  const calories = u24(7);
+  const distanceM = u24(10);
+  if (steps < 0 || steps > 200_000 || distanceM < 0 || distanceM > 250_000 || calories > 25_000) return null;
+  return { steps, runningSteps, distanceM, calories };
+}
+
+export function decodeQcBandLiveActivityNotification(
+  bytes: Uint8Array,
+): { steps: number; distanceM: number; calories: number } | null {
+  if (bytes.length < 11) return null;
+  if (bytes[0] !== QCBAND_CMD_NOTIFICATION || bytes[1] !== QCBAND_NOTIFICATION_LIVE_ACTIVITY) return null;
+  // Live notification is cumulative for today. Gadgetbridge decodes the 24-bit
+  // fields as [high, mid, low] from bytes 2..4 / 5..7 / 8..10.
+  const u24be = (i: number) => ((bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]) >>> 0;
+  const steps = u24be(2);
+  const calories = Math.round(u24be(5) / 10);
+  const distanceM = u24be(8);
+  if (steps < 0 || steps > 200_000 || distanceM < 0 || distanceM > 250_000 || calories > 25_000) return null;
+  return { steps, distanceM, calories };
+}
+
+export function decodeQcBandHistoricalActivity(
+  bytes: Uint8Array,
+): { key: string; steps: number; distanceM: number; calories: number; hour: number } | null {
+  if (bytes.length < 13 || bytes[0] !== QCBAND_CMD_SYNC_ACTIVITY) return null;
+  const marker = bytes[1] & 0xff;
+  if (marker === 0xff || marker === 0xf0) return null;
+  const year = 2000 + bcdByte(bytes[1]);
+  const month = bcdByte(bytes[2]);
+  const day = bcdByte(bytes[3]);
+  const hour = Math.floor((bytes[4] & 0xff) / 4);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23) return null;
+  const u16 = (i: number) => bytes[i] | (bytes[i + 1] << 8);
+  const calories = u16(7);
+  const steps = u16(9);
+  const distanceM = u16(11);
+  if (steps > 100_000 || distanceM > 100_000 || calories > 10_000) return null;
+  const key = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}-${String(hour).padStart(2, "0")}`;
+  return { key, steps, distanceM, calories, hour };
+}
+
+export function todayActivityKeyPrefix(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}-`;
+}
+
+export function decodeQcBandHrvHistory(bytes: Uint8Array): number | null {
+  if (bytes.length < 4 || bytes[0] !== QCBAND_CMD_SYNC_HRV) return null;
+  const packetNr = bytes[1] & 0xff;
+  if (packetNr === 0xff || packetNr === 0) return null;
+  const start = packetNr === 1 ? 3 : 2;
+  let latest: number | null = null;
+  for (let i = start; i < bytes.length - 1; i++) {
+    const v = bytes[i] & 0xff;
+    if (v > 0 && v < 250) latest = v;
+  }
+  return latest;
+}
+
+export function decodeQcBandStressHistory(bytes: Uint8Array): number | null {
+  if (bytes.length < 4 || bytes[0] !== QCBAND_CMD_SYNC_STRESS) return null;
+  const packetNr = bytes[1] & 0xff;
+  if (packetNr === 0xff || packetNr === 0) return null;
+  const start = packetNr === 1 ? 3 : 2;
+  let latest: number | null = null;
+  for (let i = start; i < bytes.length - 1; i++) {
+    const v = bytes[i] & 0xff;
+    if (v > 0 && v <= 100) latest = v;
+  }
+  return latest;
+}
+
+export function decodeQcBandTemperatureHistory(bytes: Uint8Array): number | null {
+  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || bytes[1] !== QCBAND_BIG_DATA_TYPE_TEMPERATURE) return null;
+  const length = bytes[2] | (bytes[3] << 8);
+  if (length <= 0) return null;
+  let idx = 6;
+  let latestToday: number | null = null;
+  let latestAny: number | null = null;
+  while (idx - 6 < length && idx < bytes.length) {
+    const daysAgo = bytes[idx++] & 0xff;
+    if (idx >= bytes.length) break;
+    idx++; // observed constant 0x1e / interval marker
+    for (let hour = 0; hour < 24 && idx - 6 < length && idx < bytes.length; hour++) {
+      for (let half = 0; half < 2 && idx - 6 < length && idx < bytes.length; half++) {
+        const raw = bytes[idx++] & 0xff;
+        if (raw > 0) {
+          const temp = raw / 10 + 20;
+          if (temp >= 30 && temp <= 42) {
+            latestAny = temp;
+            if (daysAgo === 0) latestToday = temp;
+          }
+        }
+      }
+    }
+    if (daysAgo === 0) break;
+  }
+  return latestToday ?? latestAny;
+}
+
+export function decodeQcBandSpo2History(bytes: Uint8Array): number | null {
+  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || bytes[1] !== QCBAND_BIG_DATA_TYPE_SPO2) return null;
+  const length = bytes[2] | (bytes[3] << 8);
+  if (length <= 0) return null;
+  let idx = 6;
+  let latestToday: number | null = null;
+  let latestAny: number | null = null;
+  while (idx - 6 < length && idx < bytes.length) {
+    const daysAgo = bytes[idx++] & 0xff;
+    for (let hour = 0; hour < 24 && idx + 1 < bytes.length && idx - 6 < length; hour++) {
+      const min = bytes[idx++] & 0xff;
+      const max = bytes[idx++] & 0xff;
+      if (min > 0 && max > 0) {
+        const pct = Math.round((min + max) / 2);
+        if (pct >= 70 && pct <= 100) {
+          latestAny = pct;
+          if (daysAgo === 0) latestToday = pct;
+        }
+      }
+    }
+    if (daysAgo === 0) break;
+  }
+  return latestToday ?? latestAny;
 }
 
 // ---- Measurement channel (0x69 / 0x6A) -----------------------------------
