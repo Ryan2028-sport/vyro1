@@ -485,6 +485,14 @@ export function useVyroBand() {
     // depending on the discovery event.
     const fallback = window.setTimeout(() => {
       if (qcBandStarted || cancelled) return;
+      qcBandV2Service = {
+        service: QCBAND_SERVICE_V2_UUID,
+        notify: QCBAND_NOTIFY_V2_CHAR_UUID,
+        write: QCBAND_COMMAND_V2_CHAR_UUID,
+      };
+      void bluetooth
+        .subscribe(connectedId, QCBAND_SERVICE_V2_UUID, QCBAND_NOTIFY_V2_CHAR_UUID)
+        .catch(() => undefined);
       void startQcBandLiveHr(
         QCBAND_SERVICE_UUID,
         QCBAND_NOTIFY_CHAR_UUID,
