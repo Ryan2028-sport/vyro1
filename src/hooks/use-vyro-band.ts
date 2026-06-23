@@ -197,10 +197,15 @@ export function useVyroBand() {
     // without blocking normal increases from the watch.
     if (current && priority === current.priority && next.steps < current.steps) return;
     if (current && next.steps === 0 && current.steps > 0) return;
-    activityTotalRef.current = { day, ...next, priority };
-    setStepsToday(next.steps);
-    setDistanceM(next.distanceM);
-    setCaloriesKcal(next.calories);
+    const merged = {
+      steps: next.steps,
+      distanceM: next.distanceM > 0 ? next.distanceM : current?.distanceM ?? 0,
+      calories: next.calories > 0 ? next.calories : current?.calories ?? 0,
+    };
+    activityTotalRef.current = { day, ...merged, priority };
+    setStepsToday(merged.steps);
+    setDistanceM(merged.distanceM);
+    setCaloriesKcal(merged.calories);
   };
 
   // When connected, always subscribe to the VYRO motion event characteristic
