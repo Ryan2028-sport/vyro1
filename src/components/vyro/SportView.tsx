@@ -343,24 +343,22 @@ function PerformanceGroupTile({ group }: { group: PerformanceGroup }) {
   } as const;
   const Icon = icons[group.label as keyof typeof icons] ?? Activity;
   return (
-    <div className="min-h-[154px] rounded-2xl border border-vyro-line bg-vyro-elev p-3.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-vyro-text/10 text-vyro-text">
-            <Icon className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 text-[15px] font-black leading-tight text-vyro-text">{group.label}</div>
-          <CircleHelp className="h-3.5 w-3.5 shrink-0 text-vyro-mute" />
-        </div>
+    <div className="rounded-2xl border border-vyro-line bg-vyro-elev p-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-vyro-text/10 text-vyro-text">
+          <Icon className="h-4.5 w-4.5" />
+        </span>
         <span className="shrink-0 text-[22px] font-black leading-none tabular-nums text-vyro-text">{group.value}</span>
       </div>
 
-      <div className="mt-7 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-vyro-mint">
-        <span className="h-2 w-2 rounded-full bg-vyro-mint" />
+      <div className="mt-2.5 text-[14px] font-black leading-tight text-vyro-text">{group.label}</div>
+
+      <div className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-vyro-mint">
+        <span className="h-1.5 w-1.5 rounded-full bg-vyro-mint" />
         {group.status}
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-3 space-y-2.5">
         {group.metrics.map((metric) => (
           <div key={metric.label}>
             <div className="mb-1 flex items-baseline justify-between gap-2 text-[13px] leading-none">
