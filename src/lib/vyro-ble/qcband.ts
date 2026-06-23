@@ -357,7 +357,9 @@ export function decodeQcBandHrvHistory(bytes: Uint8Array): number | null {
   let latest: number | null = null;
   for (let i = start; i < bytes.length - 1; i++) {
     const v = bytes[i] & 0xff;
-    if (v > 0 && v < 250) latest = v;
+    // RMSSD values of 1–4 ms are not real HRV on these watches; they are
+    // usually packet indexes / action echoes leaking through the SDK frame.
+    if (v >= 5 && v < 250) latest = v;
   }
   return latest;
 }
@@ -473,7 +475,6 @@ export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame 
     QCBAND_MEASURE_ONE_KEY_SDK,
     QCBAND_MEASURE_STRESS_SDK,
     QCBAND_MEASURE_HRV_SDK,
-    QCBAND_MEASURE_HRV_DATA_REQUEST,
     QCBAND_MEASURE_PRESSURE_SDK,
     QCBAND_MEASURE_TEMP_SDK,
     QCBAND_MEASURE_ONE_KEY_HR,
@@ -509,7 +510,7 @@ export function decodeQcBandOneKeyPayload(data: Uint8Array): {
   if (data.length < 4) return null;
   const validHr = (v: number) => (v > 30 && v < 220 ? v : null);
   const validSpo2 = (v: number) => (v >= 70 && v <= 100 ? v : null);
-  const validHrv = (v: number) => (v > 0 && v < 250 ? v : null);
+  const validHrv = (v: number) => (v >= 5 && v < 250 ? v : null);
   const validStress = (v: number) => (v > 0 && v <= 100 ? v : null);
   const validSbp = (v: number) => (v > 60 && v < 220 ? v : null);
   const validDbp = (v: number) => (v > 30 && v < 160 ? v : null);
