@@ -194,6 +194,22 @@ export type QcBandMeasureFrame = {
 export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame | null {
   if (bytes.length < 3) return null;
   if (bytes[0] !== QCBAND_CMD_START_MEASURE && bytes[0] !== QCBAND_CMD_STOP_MEASURE) return null;
+  const newSdkNoErrorByte = [
+    QCBAND_MEASURE_HR_SDK,
+    QCBAND_MEASURE_ONE_KEY_SDK,
+    QCBAND_MEASURE_STRESS_SDK,
+    QCBAND_MEASURE_HRV_SDK,
+    QCBAND_MEASURE_TEMP_SDK,
+    QCBAND_MEASURE_ONE_KEY_HR,
+  ].includes(bytes[1]);
+  if (newSdkNoErrorByte && bytes[2] !== 0) {
+    return {
+      subType: bytes[1],
+      errorCode: 0,
+      value: bytes[2],
+      data: bytes.slice(2),
+    };
+  }
   return {
     subType: bytes[1],
     errorCode: bytes.length >= 4 ? bytes[2] : 0,
