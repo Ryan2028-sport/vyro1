@@ -246,18 +246,20 @@ export function decodeQcBandOneKeyPayload(data: Uint8Array): {
   // Legacy composite: [hr, sbp, dbp, spo2, temp_int, temp_frac, hrv, stress].
   if (data.length >= 8) {
     const legacyTemp = tempFrom(data[4] + data[5] / 100, u16(4) / 10, u16(4) / 100);
+    const legacySpo2 = validSpo2(data[3]);
+    const legacyHrv = validHrv(data[6]);
+    const legacyStress = validStress(data[7]);
     const legacy = {
       hr: validHr(data[0]),
       sbp: validSbp(data[1]),
       dbp: validDbp(data[2]),
-      spo2: validSpo2(data[3]),
+      spo2: legacySpo2,
       tempC: legacyTemp,
-      hrvMs: validHrv(data[6]),
-      stress: validStress(data[7]),
+      hrvMs: legacyHrv,
+      stress: legacyStress,
       rriMs: null as number | null,
     };
-    const populated = Object.values(legacy).filter((v) => v != null).length;
-    if (populated >= 3) return legacy;
+    if (legacySpo2 != null || (legacyTemp != null && legacyHrv != null && legacyStress != null)) return legacy;
   }
 
   // New SDK real one-key HR model:
