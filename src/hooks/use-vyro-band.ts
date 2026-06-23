@@ -59,6 +59,7 @@ import {
   encodeQcBandStepsRequestAlt1,
   encodeQcBandStepsRequestAlt2,
   encodeQcBandTemperatureHistoryRequest,
+  encodeQcBandTodaySportsRequest,
   QCBAND_CMD_BATTERY,
   QCBAND_CMD_BIG_DATA_V2,
   QCBAND_CMD_NOTIFICATION,
@@ -332,6 +333,9 @@ export function useVyroBand() {
         window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandActivityRequest(0)).catch(() => undefined);
         }, 800);
+        window.setTimeout(() => {
+          void writeQcBand(service, write, encodeQcBandTodaySportsRequest()).catch(() => undefined);
+        }, 1_200);
       };
       window.setTimeout(pollSteps, 1_200);
       stepsTimer = window.setInterval(pollSteps, 2_000);
