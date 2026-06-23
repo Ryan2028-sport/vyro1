@@ -192,9 +192,10 @@ export function useVyroBand() {
     const current = activityTotalRef.current?.day === day ? activityTotalRef.current : null;
     // 0x43 history is hourly/fallback and is often lower than the exact daily
     // total. Never let it overwrite a better live/today-sports number.
-    if (current && priority < current.priority && next.steps < current.steps) return;
+    if (current && priority < current.priority) return;
     // Same-day step totals should be monotonic. This rejects malformed decodes
     // without blocking normal increases from the watch.
+    if (current && priority === current.priority && next.steps < current.steps) return;
     if (current && next.steps === 0 && current.steps > 0) return;
     activityTotalRef.current = { day, ...next, priority };
     setStepsToday(next.steps);
