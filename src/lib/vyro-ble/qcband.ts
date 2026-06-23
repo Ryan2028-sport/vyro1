@@ -191,11 +191,14 @@ export function encodeQcBandHrvRequest(daysAgo = 0): Uint8Array {
 }
 
 export function encodeQcBandSpo2HistoryRequest(): Uint8Array {
-  return new Uint8Array([QCBAND_CMD_BIG_DATA_V2, QCBAND_BIG_DATA_TYPE_SPO2, 0x01, 0x00, 0xff, 0x00, 0xff]);
+  // Big Data requests have an empty payload: [0xbc, type, len=0, crc16=0xffff].
+  // A non-zero len is treated as malformed by many firmwares, leaving V2
+  // history (including skin temp) blank even while the watch is connected.
+  return new Uint8Array([QCBAND_CMD_BIG_DATA_V2, QCBAND_BIG_DATA_TYPE_SPO2, 0x00, 0x00, 0xff, 0xff]);
 }
 
 export function encodeQcBandTemperatureHistoryRequest(): Uint8Array {
-  return new Uint8Array([QCBAND_CMD_BIG_DATA_V2, QCBAND_BIG_DATA_TYPE_TEMPERATURE, 0x01, 0x00, 0x3e, 0x81, 0x02]);
+  return new Uint8Array([QCBAND_CMD_BIG_DATA_V2, QCBAND_BIG_DATA_TYPE_TEMPERATURE, 0x00, 0x00, 0xff, 0xff]);
 }
 
 function bcdByte(v: number): number {
