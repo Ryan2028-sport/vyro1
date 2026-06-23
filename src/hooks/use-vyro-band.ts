@@ -35,10 +35,12 @@ import {
   decodeQcBandMeasureFrame,
   decodeQcBandOneKeyPayload,
   decodeQcBandSpo2History,
+  decodeQcBandSpo2Notification,
   decodeQcBandStressHistory,
   decodeQcBandRealtimeHeartRate,
   decodeQcBandTempPayload,
   decodeQcBandTemperatureHistory,
+  decodeQcBandTemperatureNotification,
   decodeQcBandTodaySports,
   decodeQcBandTodaySummary,
   encodeQcBandActivityRequest,
@@ -178,7 +180,33 @@ export function useVyroBand() {
   const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(null);
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
+  const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(null);
   const bigDataV2Ref = useRef<{ expected: number; chunks: number[] } | null>(null);
+
+  const applyActivity = (
+    next: { steps: number; distanceM: number; calories: number },
+    source: "history" | "summary" | "todaySports" | "live",
+  ) => {
+    const day = todayActivityKeyPrefix();
+    const priority = source === "history" ? 1 : source === "summary" ? 2 : source === "todaySports" ? 4 : 5;
+    const current = activityTotalRef.current?.day === day ? activityTotalRef.current : null;
+    // 0x43 history is hourly/fallback and is often lower than the exact daily
+    // total. Never let it overwrite a better live/today-sports number.
+    if (current && priority < current.priority) return;
+    // Same-day step totals should be monotonic. This rejects malformed decodes
+    // without blocking normal increases from the watch.
+    if (current && priority === current.priority && next.steps < current.steps) return;
+    if (current && next.steps === 0 && current.steps > 0) return;
+    const merged = {
+      steps: next.steps,
+      distanceM: next.distanceM > 0 ? next.distanceM : current?.distanceM ?? 0,
+      calories: next.calories > 0 ? next.calories : current?.calories ?? 0,
+    };
+    activityTotalRef.current = { day, ...merged, priority };
+    setStepsToday(merged.steps);
+    setDistanceM(merged.distanceM);
+    setCaloriesKcal(merged.calories);
+  };
 
   // When connected, always subscribe to the VYRO motion event characteristic
   // (cheap if the remote watch doesn't expose it — the platform just errors
@@ -214,6 +242,7 @@ export function useVyroBand() {
       setBloodPressure(null);
       hrSamplesRef.current = [];
       activityBucketsRef.current.clear();
+      activityTotalRef.current = null;
       bigDataV2Ref.current = null;
     }
   }, [connectedId]);
@@ -591,23 +620,25 @@ export function useVyroBand() {
       ) {
         const sum = decodeQcBandTodaySummary(bytes);
         if (sum) {
-          setStepsToday(sum.steps);
-          setDistanceM(sum.distanceM);
-          setCaloriesKcal(sum.calories);
+          applyActivity(sum, "summary");
         }
       } else if (op === QCBAND_CMD_TODAY_SPORTS) {
         const sum = decodeQcBandTodaySports(bytes);
         if (sum) {
-          setStepsToday(sum.steps);
-          setDistanceM(sum.distanceM);
-          setCaloriesKcal(sum.calories);
+          applyActivity(sum, "todaySports");
         }
       } else if (op === QCBAND_CMD_NOTIFICATION) {
         const live = decodeQcBandLiveActivityNotification(bytes);
         if (live) {
-          setStepsToday(live.steps);
-          setDistanceM(live.distanceM);
-          setCaloriesKcal(live.calories);
+          applyActivity(live, "live");
+        }
+        const temp = decodeQcBandTemperatureNotification(bytes);
+        if (temp != null) setSkinTempC(temp);
+        const spo2 = decodeQcBandSpo2Notification(bytes);
+        if (spo2 != null) setSpo2Pct(spo2);
+        if (bytes[1] === 0x01 && bytes[2] > 30 && bytes[2] < 250) {
+          setHeartRateBpm(bytes[2]);
+          setHeartRateAt(Date.now());
         }
       } else if (op === QCBAND_CMD_SYNC_ACTIVITY) {
         const sample = decodeQcBandHistoricalActivity(bytes);
@@ -625,9 +656,7 @@ export function useVyroBand() {
             distanceM += v.distanceM;
             calories += v.calories;
           }
-          setStepsToday(steps);
-          setDistanceM(distanceM);
-          setCaloriesKcal(calories);
+          applyActivity({ steps, distanceM, calories }, "history");
         }
       } else if (op === QCBAND_CMD_SYNC_HRV) {
         const hrv = decodeQcBandHrvHistory(bytes);
