@@ -308,29 +308,51 @@ export function useVyroBand() {
     };
   }, [connectedId]);
 
-  // Reset metrics when the connected device changes.
+  // Keep the last real readings visible across app minimize/close/reconnect.
+  // The native wrapper can briefly report "disconnected" while iOS suspends or
+  // resumes the app; clearing here made every metric disappear and forced the
+  // watch measurement cycle to start from zero again.
   useEffect(() => {
     if (!connectedId) {
-      setHeartRateBpm(null);
-      setHeartRateAt(null);
-      setBatteryPct(null);
-      setBatteryCharging(false);
-      setSpo2Pct(null);
-      setSkinTempC(null);
-      setStepsToday(null);
-      setDistanceM(null);
-      setCaloriesKcal(null);
-      setRestingHrBpm(null);
-      setHrvMs(null);
-      setRespRateBrpm(null);
-      setStressScore(null);
-      setBloodPressure(null);
-      hrSamplesRef.current = [];
-      activityBucketsRef.current.clear();
-      activityTotalRef.current = null;
       bigDataV2Ref.current = null;
     }
   }, [connectedId]);
+
+  useEffect(() => {
+    persistBandMetrics({
+      savedAt: Date.now(),
+      day: todayActivityKeyPrefix(),
+      heartRateBpm,
+      heartRateAt,
+      batteryPct,
+      batteryCharging,
+      spo2Pct,
+      skinTempC,
+      stepsToday,
+      distanceM,
+      caloriesKcal,
+      restingHrBpm,
+      hrvMs,
+      respRateBrpm,
+      stressScore,
+      bloodPressure,
+    });
+  }, [
+    heartRateBpm,
+    heartRateAt,
+    batteryPct,
+    batteryCharging,
+    spo2Pct,
+    skinTempC,
+    stepsToday,
+    distanceM,
+    caloriesKcal,
+    restingHrBpm,
+    hrvMs,
+    respRateBrpm,
+    stressScore,
+    bloodPressure,
+  ]);
 
   // Resting HR — only a *real* derived metric. Computed as the 5th-percentile
   // of the rolling 5-minute live-HR buffer (same approach the vendor app uses
@@ -637,24 +659,6 @@ export function useVyroBand() {
       if (tempTimer != null) window.clearInterval(tempTimer);
       cleanupExtras?.();
       if (qcBandService) {
-        void writeQcBand(
-          qcBandService.service,
-          qcBandService.write,
-          encodeQcBandRealtimeHeartRate("end"),
-        ).catch(() => undefined);
-        for (const st of [
-          QCBAND_MEASURE_SPO2,
-          QCBAND_MEASURE_TEMP,
-          QCBAND_MEASURE_HRV,
-          QCBAND_MEASURE_ONE_KEY,
-          ...QCBAND_MEASURE_SPO2_TYPES,
-          ...QCBAND_MEASURE_TEMP_TYPES,
-          ...QCBAND_MEASURE_HRV_TYPES,
-          ...QCBAND_MEASURE_STRESS_TYPES,
-          ...QCBAND_MEASURE_ONE_KEY_TYPES,
-        ]) {
-          void writeQcBand(qcBandService.service, qcBandService.write, encodeQcBandMeasureStop(st)).catch(() => undefined);
-        }
         void bluetooth
           .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
           .catch(() => undefined);
