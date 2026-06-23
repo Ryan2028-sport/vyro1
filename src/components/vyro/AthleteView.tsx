@@ -25,17 +25,28 @@ export function AthleteView() {
     () =>
       computeSubScores({
         connected: m.connected,
+        hrvMs: m.hrvMs,
+        restingHrBpm: m.restingHrBpm,
+        stress: m.stressScore,
         peakJerk: m.peakJerk,
         peakG: m.peakG,
         eventsLastMin: m.eventsLastMin,
         reactMin: m.reactMin,
       }),
-    [m.connected, m.peakJerk, m.peakG, m.eventsLastMin, m.reactMin],
+    [m.connected, m.hrvMs, m.restingHrBpm, m.stressScore, m.peakJerk, m.peakG, m.eventsLastMin, m.reactMin],
   );
 
   const readiness = useMemo(
-    () => computeReadiness({ connected: m.connected, peakJerk: m.peakJerk }),
-    [m.connected, m.peakJerk],
+    () =>
+      computeReadiness({
+        connected: m.connected,
+        hrvMs: m.hrvMs,
+        restingHrBpm: m.restingHrBpm,
+        stress: m.stressScore,
+        spo2: m.spo2Pct,
+        peakJerk: m.peakJerk,
+      }),
+    [m.connected, m.hrvMs, m.restingHrBpm, m.stressScore, m.spo2Pct, m.peakJerk],
   );
 
   const sessionLoad = useMemo(() => {

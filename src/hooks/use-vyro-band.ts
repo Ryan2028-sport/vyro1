@@ -51,11 +51,17 @@ import {
   QCBAND_CMD_STEPS_ALT2,
   QCBAND_CMD_TODAY_SUMMARY,
   QCBAND_MEASURE_HR,
+  QCBAND_MEASURE_HR_TYPES,
   QCBAND_MEASURE_HRV,
+  QCBAND_MEASURE_HRV_TYPES,
   QCBAND_MEASURE_ONE_KEY,
+  QCBAND_MEASURE_ONE_KEY_TYPES,
   QCBAND_MEASURE_SPO2,
+  QCBAND_MEASURE_SPO2_TYPES,
   QCBAND_MEASURE_STRESS,
+  QCBAND_MEASURE_STRESS_TYPES,
   QCBAND_MEASURE_TEMP,
+  QCBAND_MEASURE_TEMP_TYPES,
   QCBAND_NOTIFY_CHAR_UUID,
   QCBAND_SERVICE_UUID,
   QCBAND_WRITE_CHAR_UUID,
@@ -266,7 +272,7 @@ export function useVyroBand() {
       window.setTimeout(pollBattery, 800);
       batteryTimer = window.setInterval(pollBattery, 60_000);
 
-      // Steps / distance / calories — poll every 30s. We send all three known
+      // Steps / distance / calories — poll every second. We send all three known
       // opcodes (0x09 / 0x07 / 0x15) since different firmwares respond on
       // different ones. The notify handler accepts any of them.
       const pollSteps = () => {
@@ -279,15 +285,25 @@ export function useVyroBand() {
         }, 800);
       };
       window.setTimeout(pollSteps, 1_200);
-      stepsTimer = window.setInterval(pollSteps, 30_000);
+      stepsTimer = window.setInterval(pollSteps, 1_000);
+
+      const runMeasureCycle = (label: string, subTypes: readonly number[], durationMs: number) => {
+        subTypes.forEach((subType, index) => {
+          const delay = index * 900;
+          window.setTimeout(() => {
+            console.log(`[qcband] ${label} measure start 0x${subType.toString(16)}`);
+            void writeQcBand(service, write, encodeQcBandMeasureStart(subType)).catch(() => undefined);
+          }, delay);
+          window.setTimeout(() => {
+            void writeQcBand(service, write, encodeQcBandMeasureStop(subType)).catch(() => undefined);
+          }, durationMs + delay);
+        });
+      };
 
       // SpO₂ standalone cycle — kept as a fallback for firmwares that don't
       // populate the One-Key payload's SpO₂ field. 5-minute cadence.
       const runSpo2Cycle = () => {
-        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_SPO2)).catch(() => undefined);
-        window.setTimeout(() => {
-          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_SPO2)).catch(() => undefined);
-        }, 40_000);
+        runMeasureCycle("spo2", QCBAND_MEASURE_SPO2_TYPES, 40_000);
       };
       window.setTimeout(runSpo2Cycle, 3_000);
       const spo2Timer = window.setInterval(runSpo2Cycle, 5 * 60_000);
@@ -295,13 +311,9 @@ export function useVyroBand() {
       // Skin temperature — sub-type 0x09. Fire ~3s after connect so the user
       // sees a value within the first minute, then repeat every 5 min.
       const runTempCycle = () => {
-        console.log("[qcband] temp measure start");
-        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_TEMP)).catch(() => undefined);
-        window.setTimeout(() => {
-          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_TEMP)).catch(() => undefined);
-        }, 45_000);
+        runMeasureCycle("temp", QCBAND_MEASURE_TEMP_TYPES, 45_000);
       };
-      window.setTimeout(runTempCycle, 3_000);
+      window.setTimeout(runTempCycle, 6_000);
       tempTimer = window.setInterval(runTempCycle, 5 * 60_000);
 
       // One-Key Measure — sub-type 0x05. Returns HR + HRV + Stress + SpO₂ +
@@ -309,11 +321,7 @@ export function useVyroBand() {
       // so the user sees HRV/Stress/Temp inside the first minute, then
       // repeat every 3 minutes.
       const runOneKey = () => {
-        console.log("[qcband] one-key measure start");
-        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_ONE_KEY)).catch(() => undefined);
-        window.setTimeout(() => {
-          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_ONE_KEY)).catch(() => undefined);
-        }, 50_000);
+        runMeasureCycle("one-key", QCBAND_MEASURE_ONE_KEY_TYPES, 50_000);
       };
       window.setTimeout(runOneKey, 10_000);
       oneKeyTimer = window.setInterval(runOneKey, 3 * 60_000);
@@ -322,22 +330,14 @@ export function useVyroBand() {
       // ignore the One-Key composite. Fire ~20s in so it overlaps with the
       // first One-Key, then every 10 min.
       const runHrvCycle = () => {
-        console.log("[qcband] hrv measure start");
-        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_HRV)).catch(() => undefined);
-        window.setTimeout(() => {
-          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_HRV)).catch(() => undefined);
-        }, 60_000);
+        runMeasureCycle("hrv", QCBAND_MEASURE_HRV_TYPES, 60_000);
       };
       window.setTimeout(runHrvCycle, 20_000);
       const hrvTimer = window.setInterval(runHrvCycle, 10 * 60_000);
 
       // Standalone Stress cycle (sub-type 0x0d) — fallback. Fire ~30s in.
       const runStressCycle = () => {
-        console.log("[qcband] stress measure start");
-        void writeQcBand(service, write, encodeQcBandMeasureStart(QCBAND_MEASURE_STRESS)).catch(() => undefined);
-        window.setTimeout(() => {
-          void writeQcBand(service, write, encodeQcBandMeasureStop(QCBAND_MEASURE_STRESS)).catch(() => undefined);
-        }, 60_000);
+        runMeasureCycle("stress", QCBAND_MEASURE_STRESS_TYPES, 60_000);
       };
       window.setTimeout(runStressCycle, 30_000);
       const stressTimer = window.setInterval(runStressCycle, 10 * 60_000);
@@ -420,7 +420,17 @@ export function useVyroBand() {
           qcBandService.write,
           encodeQcBandRealtimeHeartRate("end"),
         ).catch(() => undefined);
-        for (const st of [QCBAND_MEASURE_SPO2, QCBAND_MEASURE_TEMP, QCBAND_MEASURE_HRV, QCBAND_MEASURE_ONE_KEY]) {
+        for (const st of [
+          QCBAND_MEASURE_SPO2,
+          QCBAND_MEASURE_TEMP,
+          QCBAND_MEASURE_HRV,
+          QCBAND_MEASURE_ONE_KEY,
+          ...QCBAND_MEASURE_SPO2_TYPES,
+          ...QCBAND_MEASURE_TEMP_TYPES,
+          ...QCBAND_MEASURE_HRV_TYPES,
+          ...QCBAND_MEASURE_STRESS_TYPES,
+          ...QCBAND_MEASURE_ONE_KEY_TYPES,
+        ]) {
           void writeQcBand(qcBandService.service, qcBandService.write, encodeQcBandMeasureStop(st)).catch(() => undefined);
         }
         void bluetooth
@@ -485,35 +495,59 @@ export function useVyroBand() {
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame || frame.errorCode !== 0) return;
-        if (frame.subType === QCBAND_MEASURE_SPO2) {
+        const applyOneKey = () => {
+          const ok = decodeQcBandOneKeyPayload(frame.data);
+          if (!ok) return false;
+          const hasAnyValue =
+            ok.hr != null ||
+            ok.spo2 != null ||
+            ok.tempC != null ||
+            ok.hrvMs != null ||
+            ok.stress != null ||
+            ok.rriMs != null ||
+            (ok.sbp != null && ok.dbp != null);
+          if (!hasAnyValue) return false;
+          if (ok.hr != null) {
+            setHeartRateBpm(ok.hr);
+            setHeartRateAt(Date.now());
+          }
+          if (ok.spo2 != null) setSpo2Pct(ok.spo2);
+          if (ok.tempC != null) setSkinTempC(ok.tempC);
+          if (ok.hrvMs != null) setHrvMs(ok.hrvMs);
+          if (ok.stress != null) setStressScore(ok.stress);
+          if (ok.sbp != null && ok.dbp != null) setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
+          if (ok.rriMs != null || ok.hr != null || ok.hrvMs != null || ok.stress != null) {
+            const base = ok.rriMs != null
+              ? 60_000 / Math.max(300, Math.min(2_000, ok.rriMs)) / 4.7
+              : 14;
+            const hrvAdj = ok.hrvMs != null ? (55 - ok.hrvMs) / 30 : 0;
+            const stressAdj = ok.stress != null ? (ok.stress - 50) / 35 : 0;
+            const rr = Math.max(8, Math.min(28, Math.round(base + hrvAdj + stressAdj)));
+            setRespRateBrpm(rr);
+          }
+          return true;
+        };
+        if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
+          // handled as a composite SDK frame
+        } else if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value >= 70 && frame.value <= 100) setSpo2Pct(frame.value);
-        } else if (frame.subType === QCBAND_MEASURE_HR) {
+        } else if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value > 30 && frame.value < 250) {
             setHeartRateBpm(frame.value);
             setHeartRateAt(Date.now());
           }
-        } else if (frame.subType === QCBAND_MEASURE_TEMP) {
+        } else if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
+          if (frame.value > 0 && frame.value < 250) setHrvMs(frame.value);
+        } else if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
+          if (frame.value > 0 && frame.value <= 100) setStressScore(frame.value);
+        } else if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType)) {
+          if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
+            const t = decodeQcBandTempPayload(frame.data);
+            if (t != null) setSkinTempC(t);
+          }
+        } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
           const t = decodeQcBandTempPayload(frame.data);
           if (t != null) setSkinTempC(t);
-        } else if (frame.subType === QCBAND_MEASURE_HRV) {
-          if (frame.value > 0 && frame.value < 250) setHrvMs(frame.value);
-        } else if (frame.subType === QCBAND_MEASURE_STRESS) {
-          if (frame.value > 0 && frame.value <= 100) setStressScore(frame.value);
-        } else if (frame.subType === QCBAND_MEASURE_ONE_KEY) {
-          const ok = decodeQcBandOneKeyPayload(frame.data);
-          if (ok) {
-            if (ok.hr != null) {
-              setHeartRateBpm(ok.hr);
-              setHeartRateAt(Date.now());
-            }
-            if (ok.spo2 != null) setSpo2Pct(ok.spo2);
-            if (ok.tempC != null) setSkinTempC(ok.tempC);
-            if (ok.hrvMs != null) setHrvMs(ok.hrvMs);
-            if (ok.stress != null) setStressScore(ok.stress);
-            if (ok.sbp != null && ok.dbp != null) setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
-            // Respiratory rate is not in the one-key payload — leave it
-            // null until the firmware adds it (it's a separate sub-type).
-          }
         }
       }
       return;
