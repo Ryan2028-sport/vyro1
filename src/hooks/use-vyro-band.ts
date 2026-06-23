@@ -614,23 +614,25 @@ export function useVyroBand() {
       ) {
         const sum = decodeQcBandTodaySummary(bytes);
         if (sum) {
-          setStepsToday(sum.steps);
-          setDistanceM(sum.distanceM);
-          setCaloriesKcal(sum.calories);
+          applyActivity(sum, "summary");
         }
       } else if (op === QCBAND_CMD_TODAY_SPORTS) {
         const sum = decodeQcBandTodaySports(bytes);
         if (sum) {
-          setStepsToday(sum.steps);
-          setDistanceM(sum.distanceM);
-          setCaloriesKcal(sum.calories);
+          applyActivity(sum, "todaySports");
         }
       } else if (op === QCBAND_CMD_NOTIFICATION) {
         const live = decodeQcBandLiveActivityNotification(bytes);
         if (live) {
-          setStepsToday(live.steps);
-          setDistanceM(live.distanceM);
-          setCaloriesKcal(live.calories);
+          applyActivity(live, "live");
+        }
+        const temp = decodeQcBandTemperatureNotification(bytes);
+        if (temp != null) setSkinTempC(temp);
+        const spo2 = decodeQcBandSpo2Notification(bytes);
+        if (spo2 != null) setSpo2Pct(spo2);
+        if (bytes[1] === 0x01 && bytes[2] > 30 && bytes[2] < 250) {
+          setHeartRateBpm(bytes[2]);
+          setHeartRateAt(Date.now());
         }
       } else if (op === QCBAND_CMD_SYNC_ACTIVITY) {
         const sample = decodeQcBandHistoricalActivity(bytes);
@@ -648,9 +650,7 @@ export function useVyroBand() {
             distanceM += v.distanceM;
             calories += v.calories;
           }
-          setStepsToday(steps);
-          setDistanceM(distanceM);
-          setCaloriesKcal(calories);
+          applyActivity({ steps, distanceM, calories }, "history");
         }
       } else if (op === QCBAND_CMD_SYNC_HRV) {
         const hrv = decodeQcBandHrvHistory(bytes);
