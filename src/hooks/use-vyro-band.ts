@@ -272,7 +272,7 @@ export function useVyroBand() {
       window.setTimeout(pollBattery, 800);
       batteryTimer = window.setInterval(pollBattery, 60_000);
 
-      // Steps / distance / calories — poll every 30s. We send all three known
+      // Steps / distance / calories — poll every second. We send all three known
       // opcodes (0x09 / 0x07 / 0x15) since different firmwares respond on
       // different ones. The notify handler accepts any of them.
       const pollSteps = () => {
