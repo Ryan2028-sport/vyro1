@@ -4,6 +4,14 @@ import {
   decodeMotionEventFromString,
   hexToBytes,
 } from "./packets";
+import {
+  decodeQcBandTemperatureHistory,
+  decodeQcBandTodaySports,
+  decodeQcBandTodaySummary,
+  encodeQcBandTemperatureHistoryRequest,
+  QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL,
+  QCBAND_CMD_BIG_DATA_V2,
+} from "./qcband";
 
 describe("decodeMotionEvent — swing reference vector", () => {
   // From VYRO_BLE_Packet_Reference v1 "Worked Example":
@@ -69,5 +77,42 @@ describe("decodeMotionEvent — error cases", () => {
   });
   it("rejects truncated packets", () => {
     expect(() => decodeMotionEvent(hexToBytes("10 0D 59"))).toThrow();
+  });
+});
+
+describe("QCBand SDK metric decoders", () => {
+  it("decodes current sport/steps as SDK big-endian 24-bit counters", () => {
+    const packet = hexToBytes("48 00 04 D2 00 00 2A 00 01 2C 00 03 E8 00 00 00");
+    expect(decodeQcBandTodaySports(packet)).toMatchObject({
+      steps: 1234,
+      runningSteps: 42,
+      calories: 300,
+      distanceM: 1000,
+    });
+  });
+
+  it("decodes legacy day-total steps from the SDK 0x07 layout", () => {
+    const packet = hexToBytes("07 00 00 00 00 00 00 04 D2 00 00 2A 00 01 2C 00");
+    expect(decodeQcBandTodaySummary(packet)).toMatchObject({
+      steps: 1234,
+      calories: 300,
+    });
+  });
+
+  it("requests and decodes interval skin temperature using SDK opcode 0x74", () => {
+    expect(Array.from(encodeQcBandTemperatureHistoryRequest())).toEqual([
+      QCBAND_CMD_BIG_DATA_V2,
+      QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL,
+      2,
+      0,
+      255,
+      255,
+      0,
+      0,
+    ]);
+    // V2 wrapper + unpacked 0x74 payload header + one 6-byte record:
+    // temp1=36.5, temp2=36.6, temp3=36.7 in 0.1°C little-endian units.
+    const packet = hexToBytes("BC 74 0A 00 FF FF 74 01 01 00 6D 01 6E 01 6F 01");
+    expect(decodeQcBandTemperatureHistory(packet)).toBeCloseTo(36.7, 1);
   });
 });
