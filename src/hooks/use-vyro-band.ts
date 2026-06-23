@@ -502,9 +502,6 @@ export function useVyroBand() {
             setHeartRateBpm(frame.value);
             setHeartRateAt(Date.now());
           }
-        } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
-          const t = decodeQcBandTempPayload(frame.data);
-          if (t != null) setSkinTempC(t);
         } else if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value > 0 && frame.value < 250) setHrvMs(frame.value);
         } else if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
@@ -530,7 +527,13 @@ export function useVyroBand() {
               const rr = Math.max(8, Math.min(28, Math.round(base + hrvAdj + stressAdj)));
               setRespRateBrpm(rr);
             }
+          } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
+            const t = decodeQcBandTempPayload(frame.data);
+            if (t != null) setSkinTempC(t);
           }
+        } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
+          const t = decodeQcBandTempPayload(frame.data);
+          if (t != null) setSkinTempC(t);
         }
       }
       return;
