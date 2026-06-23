@@ -54,6 +54,7 @@ import {
   encodeQcBandMeasureStop,
   encodeQcBandRealtimeHeartRate,
   encodeQcBandSpo2HistoryRequest,
+  encodeQcBandSpo2IntervalHistoryRequest,
   encodeQcBandSpo2Start,
   encodeQcBandSpo2Stop,
   encodeQcBandStressRequest,
@@ -61,6 +62,8 @@ import {
   encodeQcBandStepsRequestAlt1,
   encodeQcBandStepsRequestAlt2,
   encodeQcBandTemperatureHistoryRequest,
+  encodeQcBandTemperatureLegacyHistoryRequest,
+  encodeQcBandTemperatureManualHistoryRequest,
   encodeQcBandTodaySportsRequest,
   QCBAND_CMD_BATTERY,
   QCBAND_CMD_BIG_DATA_V2,
@@ -188,7 +191,7 @@ export function useVyroBand() {
     source: "history" | "summary" | "todaySports" | "live",
   ) => {
     const day = todayActivityKeyPrefix();
-    const priority = source === "history" ? 1 : source === "summary" ? 2 : source === "todaySports" ? 4 : 5;
+    const priority = source === "history" ? 1 : source === "summary" ? 2 : source === "live" ? 5 : 6;
     const current = activityTotalRef.current?.day === day ? activityTotalRef.current : null;
     // 0x43 history is hourly/fallback and is often lower than the exact daily
     // total. Never let it overwrite a better live/today-sports number.
@@ -386,8 +389,17 @@ export function useVyroBand() {
           void writeQcBandV2(encodeQcBandSpo2HistoryRequest()).catch(() => undefined);
         }, 2_100);
         window.setTimeout(() => {
+          void writeQcBandV2(encodeQcBandSpo2IntervalHistoryRequest()).catch(() => undefined);
+        }, 2_450);
+        window.setTimeout(() => {
           void writeQcBandV2(encodeQcBandTemperatureHistoryRequest()).catch(() => undefined);
         }, 2_800);
+        window.setTimeout(() => {
+          void writeQcBandV2(encodeQcBandTemperatureLegacyHistoryRequest()).catch(() => undefined);
+        }, 3_150);
+        window.setTimeout(() => {
+          void writeQcBandV2(encodeQcBandTemperatureManualHistoryRequest()).catch(() => undefined);
+        }, 3_500);
       };
       window.setTimeout(pollHistory, 4_000);
       historyTimer = window.setInterval(pollHistory, 60_000);
