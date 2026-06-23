@@ -263,16 +263,53 @@ export function decodeQcBandTodaySports(
 export function decodeQcBandLiveActivityNotification(
   bytes: Uint8Array,
 ): { steps: number; distanceM: number; calories: number } | null {
-  if (bytes.length < 11) return null;
-  if (bytes[0] !== QCBAND_CMD_NOTIFICATION || bytes[1] !== QCBAND_NOTIFICATION_LIVE_ACTIVITY) return null;
+  if (bytes.length < 5) return null;
+  if (
+    bytes[0] !== QCBAND_CMD_NOTIFICATION ||
+    (bytes[1] !== QCBAND_NOTIFICATION_LIVE_ACTIVITY &&
+      bytes[1] !== QCBAND_NOTIFICATION_STEPS &&
+      bytes[1] !== QCBAND_NOTIFICATION_ACTIVITY)
+  ) return null;
   // Live notification is cumulative for today. Gadgetbridge decodes the 24-bit
   // fields as [high, mid, low] from bytes 2..4 / 5..7 / 8..10.
   const u24be = (i: number) => ((bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]) >>> 0;
-  const steps = u24be(2);
-  const calories = Math.round(u24be(5) / 10);
-  const distanceM = u24be(8);
-  if (steps < 0 || steps > 200_000 || distanceM < 0 || distanceM > 250_000 || calories > 25_000) return null;
+  const u24le = (i: number) => (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16)) >>> 0;
+  const u32le = (i: number) => (i + 3 < bytes.length ? (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0 : NaN);
+  const u32be = (i: number) => (i + 3 < bytes.length ? ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0 : NaN);
+  const candidates: Array<{ steps: number; distanceM: number; calories: number; score: number }> = [];
+  const push = (steps: number, distanceM = 0, calories = 0, score = 0) => {
+    if (!Number.isFinite(steps) || steps < 0 || steps > 200_000) return;
+    if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > 250_000) return;
+    if (!Number.isFinite(calories) || calories < 0 || calories > 25_000) return;
+    candidates.push({ steps, distanceM, calories, score });
+  };
+  if (bytes.length >= 11) {
+    push(u24be(2), u24be(8), Math.round(u24be(5) / 10), bytes[1] === QCBAND_NOTIFICATION_LIVE_ACTIVITY ? 8 : 6);
+    push(u24le(2), u24le(8), Math.round(u24le(5) / 10), 5);
+  }
+  if (bytes.length >= 6) {
+    push(u24le(2), 0, 0, 4);
+    push(u24be(2), 0, 0, 3);
+  }
+  if (bytes.length >= 7) {
+    push(u32le(2), 0, 0, 2);
+    push(u32be(2), 0, 0, 1);
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b.score - a.score || b.steps - a.steps);
+  const { steps, distanceM, calories } = candidates[0];
   return { steps, distanceM, calories };
+}
+
+export function decodeQcBandTemperatureNotification(bytes: Uint8Array): number | null {
+  if (bytes.length < 4 || bytes[0] !== QCBAND_CMD_NOTIFICATION || bytes[1] !== QCBAND_NOTIFICATION_TEMPERATURE) return null;
+  return decodeQcBandTempPayload(bytes.slice(2));
+}
+
+export function decodeQcBandSpo2Notification(bytes: Uint8Array): number | null {
+  if (bytes.length < 3 || bytes[0] !== QCBAND_CMD_NOTIFICATION || bytes[1] !== QCBAND_NOTIFICATION_BLOOD_OXYGEN) return null;
+  const v = bytes[2] & 0xff;
+  return v >= 70 && v <= 100 ? v : null;
 }
 
 export function decodeQcBandHistoricalActivity(
@@ -281,9 +318,22 @@ export function decodeQcBandHistoricalActivity(
   if (bytes.length < 13 || bytes[0] !== QCBAND_CMD_SYNC_ACTIVITY) return null;
   const marker = bytes[1] & 0xff;
   if (marker === 0xff || marker === 0xf0) return null;
-  const year = 2000 + bcdByte(bytes[1]);
-  const month = bcdByte(bytes[2]);
-  const day = bcdByte(bytes[3]);
+  const currentYear = new Date().getFullYear() - 2000;
+  const bestYear = (raw: number) => {
+    const bin = raw & 0xff;
+    const bcd = bcdByte(raw);
+    return Math.abs(bin - currentYear) <= Math.abs(bcd - currentYear) ? bin : bcd;
+  };
+  const bestDateByte = (raw: number, max: number) => {
+    const bin = raw & 0xff;
+    const bcd = bcdByte(raw);
+    if (bin >= 1 && bin <= max && !(bcd >= 1 && bcd <= max)) return bin;
+    if (bcd >= 1 && bcd <= max && !(bin >= 1 && bin <= max)) return bcd;
+    return bin;
+  };
+  const year = 2000 + bestYear(bytes[1]);
+  const month = bestDateByte(bytes[2], 12);
+  const day = bestDateByte(bytes[3], 31);
   const hour = Math.floor((bytes[4] & 0xff) / 4);
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23) return null;
   const u16 = (i: number) => bytes[i] | (bytes[i + 1] << 8);
