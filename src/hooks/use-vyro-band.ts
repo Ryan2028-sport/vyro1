@@ -149,6 +149,77 @@ function payloadToBytes(value: string): Uint8Array {
   }
 }
 
+const PERSISTED_METRICS_KEY = "vyro.band.liveMetrics.v1";
+const PERSISTED_METRICS_MAX_AGE_MS = 24 * 60 * 60_000;
+
+type PersistedBandMetrics = {
+  savedAt: number;
+  day: string;
+  heartRateBpm: number | null;
+  heartRateAt: number | null;
+  batteryPct: number | null;
+  batteryCharging: boolean;
+  spo2Pct: number | null;
+  skinTempC: number | null;
+  stepsToday: number | null;
+  distanceM: number | null;
+  caloriesKcal: number | null;
+  restingHrBpm: number | null;
+  hrvMs: number | null;
+  respRateBrpm: number | null;
+  stressScore: number | null;
+  bloodPressure: { sbp: number; dbp: number } | null;
+};
+
+function numericInRange(value: unknown, min: number, max: number): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (value < min || value > max) return null;
+  return value;
+}
+
+function loadPersistedBandMetrics(): Partial<PersistedBandMetrics> {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(PERSISTED_METRICS_KEY);
+    if (!raw) return {};
+    const saved = JSON.parse(raw) as Partial<PersistedBandMetrics>;
+    const savedAt = numericInRange(saved.savedAt, 1, Date.now() + 60_000);
+    if (!savedAt || Date.now() - savedAt > PERSISTED_METRICS_MAX_AGE_MS) return {};
+    const sameDay = saved.day === todayActivityKeyPrefix();
+    const sbp = numericInRange(saved.bloodPressure?.sbp, 70, 250);
+    const dbp = numericInRange(saved.bloodPressure?.dbp, 40, 160);
+    return {
+      savedAt,
+      day: sameDay ? todayActivityKeyPrefix() : saved.day,
+      heartRateBpm: numericInRange(saved.heartRateBpm, 30, 250),
+      heartRateAt: numericInRange(saved.heartRateAt, Date.now() - PERSISTED_METRICS_MAX_AGE_MS, Date.now() + 60_000),
+      batteryPct: numericInRange(saved.batteryPct, 0, 100),
+      batteryCharging: saved.batteryCharging === true,
+      spo2Pct: numericInRange(saved.spo2Pct, 70, 100),
+      skinTempC: numericInRange(saved.skinTempC, 20, 45),
+      stepsToday: sameDay ? numericInRange(saved.stepsToday, 0, 200_000) : null,
+      distanceM: sameDay ? numericInRange(saved.distanceM, 0, 250_000) : null,
+      caloriesKcal: sameDay ? numericInRange(saved.caloriesKcal, 0, 20_000) : null,
+      restingHrBpm: numericInRange(saved.restingHrBpm, 30, 120),
+      hrvMs: numericInRange(saved.hrvMs, 5, 250),
+      respRateBrpm: numericInRange(saved.respRateBrpm, 6, 40),
+      stressScore: numericInRange(saved.stressScore, 0, 100),
+      bloodPressure: sbp != null && dbp != null ? { sbp, dbp } : null,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function persistBandMetrics(metrics: PersistedBandMetrics) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(PERSISTED_METRICS_KEY, JSON.stringify(metrics));
+  } catch {
+    // Storage can be unavailable in private mode or during native app suspend.
+  }
+}
+
 /** Heart Rate Measurement (GATT 0x2A37) decoder. */
 function decodeHeartRate(bytes: Uint8Array): number | null {
   if (bytes.length < 2) return null;
@@ -164,26 +235,37 @@ function decodeHeartRate(bytes: Uint8Array): number | null {
 export function useVyroBand() {
   const ble = useBluetooth();
   const { connectedId, lastData } = ble;
+  const initialMetrics = useMemo(loadPersistedBandMetrics, []);
   const [events, setEvents] = useState<VyroEventEntry[]>([]);
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [sport, setSport] = useState<Sport>("squash");
-  const [heartRateBpm, setHeartRateBpm] = useState<number | null>(null);
-  const [heartRateAt, setHeartRateAt] = useState<number | null>(null);
-  const [batteryPct, setBatteryPct] = useState<number | null>(null);
-  const [batteryCharging, setBatteryCharging] = useState<boolean>(false);
-  const [spo2Pct, setSpo2Pct] = useState<number | null>(null);
-  const [skinTempC, setSkinTempC] = useState<number | null>(null);
-  const [stepsToday, setStepsToday] = useState<number | null>(null);
-  const [distanceM, setDistanceM] = useState<number | null>(null);
-  const [caloriesKcal, setCaloriesKcal] = useState<number | null>(null);
-  const [restingHrBpm, setRestingHrBpm] = useState<number | null>(null);
-  const [hrvMs, setHrvMs] = useState<number | null>(null);
-  const [respRateBrpm, setRespRateBrpm] = useState<number | null>(null);
-  const [stressScore, setStressScore] = useState<number | null>(null);
-  const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(null);
+  const [heartRateBpm, setHeartRateBpm] = useState<number | null>(initialMetrics.heartRateBpm ?? null);
+  const [heartRateAt, setHeartRateAt] = useState<number | null>(initialMetrics.heartRateAt ?? null);
+  const [batteryPct, setBatteryPct] = useState<number | null>(initialMetrics.batteryPct ?? null);
+  const [batteryCharging, setBatteryCharging] = useState<boolean>(initialMetrics.batteryCharging ?? false);
+  const [spo2Pct, setSpo2Pct] = useState<number | null>(initialMetrics.spo2Pct ?? null);
+  const [skinTempC, setSkinTempC] = useState<number | null>(initialMetrics.skinTempC ?? null);
+  const [stepsToday, setStepsToday] = useState<number | null>(initialMetrics.stepsToday ?? null);
+  const [distanceM, setDistanceM] = useState<number | null>(initialMetrics.distanceM ?? null);
+  const [caloriesKcal, setCaloriesKcal] = useState<number | null>(initialMetrics.caloriesKcal ?? null);
+  const [restingHrBpm, setRestingHrBpm] = useState<number | null>(initialMetrics.restingHrBpm ?? null);
+  const [hrvMs, setHrvMs] = useState<number | null>(initialMetrics.hrvMs ?? null);
+  const [respRateBrpm, setRespRateBrpm] = useState<number | null>(initialMetrics.respRateBrpm ?? null);
+  const [stressScore, setStressScore] = useState<number | null>(initialMetrics.stressScore ?? null);
+  const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(initialMetrics.bloodPressure ?? null);
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
-  const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(null);
+  const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(
+    initialMetrics.stepsToday != null
+      ? {
+          day: todayActivityKeyPrefix(),
+          steps: initialMetrics.stepsToday,
+          distanceM: initialMetrics.distanceM ?? 0,
+          calories: initialMetrics.caloriesKcal ?? 0,
+          priority: 0,
+        }
+      : null,
+  );
   const bigDataV2Ref = useRef<{ expected: number; chunks: number[] } | null>(null);
 
   const applyActivity = (
@@ -198,7 +280,7 @@ export function useVyroBand() {
     if (current && priority < current.priority) return;
     // Same-day step totals should be monotonic. This rejects malformed decodes
     // without blocking normal increases from the watch.
-    if (current && priority === current.priority && next.steps < current.steps) return;
+    if (current && next.steps < current.steps) return;
     if (current && next.steps === 0 && current.steps > 0) return;
     const merged = {
       steps: next.steps,
