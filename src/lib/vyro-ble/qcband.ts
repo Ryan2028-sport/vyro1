@@ -16,20 +16,32 @@ export const QCBAND_CMD_REALTIME_HR = 0x1e;      // 30 — start/end/hold poll
 export const QCBAND_CMD_START_MEASURE = 0x69;    // 105 — start HR/SpO2/temp/one-key
 export const QCBAND_CMD_STOP_MEASURE = 0x6a;     // 106 — stop measurement
 
-// Measurement sub-types under 0x69 / 0x6A. Values reverse-engineered from the
-// QCBandSDK iOS framework binary (OdmBandOpenHealthDetectionSwitch). The
-// switch passes a numeric `type` to openDetection:params: that the firmware
-// maps to a specific sensor cycle:
-//   0x01 HeartRate, 0x02 BloodPressure, 0x03 BloodOxygen,
-//   0x04 BloodGlucose, 0x05 OneKey (HR+HRV+SpO2+Temp+Stress+BP),
-//   0x09 Temperature, 0x0d Stress, 0x0e HRV.
+// Measurement sub-types under 0x69 / 0x6A. QCBand/Oudmon ships more than one
+// firmware line. The old protocol uses 0x01/0x03/0x05/0x09/0x0d/0x0e; the newer
+// SDK enum exposes HeartRate=0, BloodOxygen=2, OneKey=3, Stress=4, HRV=6,
+// BodyTemperature=7 and OneKeyMeasureHeartRate=9. We send/accept both families
+// so the live tiles do not stay blank on watches using the newer SDK mapping.
 export const QCBAND_MEASURE_HR = 0x01;
+export const QCBAND_MEASURE_HR_SDK = 0x00;
 export const QCBAND_MEASURE_BP = 0x02;
 export const QCBAND_MEASURE_SPO2 = 0x03;
-export const QCBAND_MEASURE_ONE_KEY = 0x05; // returns HR + HRV + SpO2 + Temp + Stress + BP
+export const QCBAND_MEASURE_SPO2_SDK = 0x02;
+export const QCBAND_MEASURE_ONE_KEY = 0x05; // legacy composite
+export const QCBAND_MEASURE_ONE_KEY_SDK = 0x03;
+export const QCBAND_MEASURE_STRESS_SDK = 0x04;
+export const QCBAND_MEASURE_HRV_SDK = 0x06;
+export const QCBAND_MEASURE_TEMP_SDK = 0x07;
 export const QCBAND_MEASURE_TEMP = 0x09;
+export const QCBAND_MEASURE_ONE_KEY_HR = 0x09; // SDK real one-key HR stream
 export const QCBAND_MEASURE_STRESS = 0x0d;
 export const QCBAND_MEASURE_HRV = 0x0e;
+
+export const QCBAND_MEASURE_HR_TYPES = [QCBAND_MEASURE_HR, QCBAND_MEASURE_HR_SDK] as const;
+export const QCBAND_MEASURE_SPO2_TYPES = [QCBAND_MEASURE_SPO2, QCBAND_MEASURE_SPO2_SDK] as const;
+export const QCBAND_MEASURE_ONE_KEY_TYPES = [QCBAND_MEASURE_ONE_KEY_HR, QCBAND_MEASURE_ONE_KEY, QCBAND_MEASURE_ONE_KEY_SDK] as const;
+export const QCBAND_MEASURE_TEMP_TYPES = [QCBAND_MEASURE_TEMP_SDK, QCBAND_MEASURE_TEMP] as const;
+export const QCBAND_MEASURE_STRESS_TYPES = [QCBAND_MEASURE_STRESS, QCBAND_MEASURE_STRESS_SDK] as const;
+export const QCBAND_MEASURE_HRV_TYPES = [QCBAND_MEASURE_HRV, QCBAND_MEASURE_HRV_SDK] as const;
 
 export type QcBandRealtimeHrCommand = "start" | "end" | "hold";
 
@@ -114,17 +126,34 @@ export function decodeQcBandTodaySummary(
     op !== QCBAND_CMD_STEPS_ALT2
   )
     return null;
-  // Try the canonical layout first: [op, steps(3), dist(2), cal(2)]
-  let steps = bytes[1] | (bytes[2] << 8) | (bytes[3] << 16);
-  let distanceM = bytes[4] | (bytes[5] << 8);
-  let calories = bytes[6] | (bytes[7] << 8);
-  // Some firmwares prefix with a day-index byte: [op, day, steps(3), dist(2), cal(2)]
-  if ((steps === 0 || steps > 200_000) && bytes.length >= 9) {
-    steps = bytes[2] | (bytes[3] << 8) | (bytes[4] << 16);
-    distanceM = bytes[5] | (bytes[6] << 8);
-    calories = bytes[7] | (bytes[8] << 8);
-  }
-  if (steps < 0 || steps > 200_000) return null;
+  const u16 = (i: number) => bytes[i] | (bytes[i + 1] << 8);
+  const u24 = (i: number) => bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16);
+  const u32 = (i: number) => (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0;
+  const candidates: Array<{ steps: number; distanceM: number; calories: number; score: number }> = [];
+
+  const push = (steps: number, distanceM: number, calories: number, score = 0) => {
+    if (!Number.isFinite(steps) || steps < 0 || steps > 200_000) return;
+    if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > 250_000) return;
+    if (!Number.isFinite(calories) || calories < 0 || calories > 25_000) return;
+    // A single 0xff status byte can otherwise decode as a bogus stuck 255
+    // steps value. Prefer richer layouts when they exist.
+    if (steps === 255 && bytes[1] === 0xff && bytes.slice(2).some((b) => b !== 0)) score -= 10;
+    candidates.push({ steps, distanceM, calories, score });
+  };
+
+  // Canonical layout: [op, steps(3), dist(2), cal(2)].
+  push(u24(1), u16(4), u16(6), 4);
+  // SDK/day-index layout: [op, day/status, steps(3), dist(2), cal(2)].
+  if (bytes.length >= 9) push(u24(2), u16(5), u16(7), 6);
+  // Several watches use 32-bit counters after one status/day byte.
+  if (bytes.length >= 11) push(u32(2), u16(6), u16(8), 8);
+  // Alternate current-sport layouts seen in QCSportModel dumps.
+  if (bytes.length >= 13) push(u32(1), u32(9), u32(5), 5);
+  if (bytes.length >= 13) push(u32(2), u32(10), u32(6), 7);
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b.score - a.score || b.steps - a.steps);
+  const { steps, distanceM, calories } = candidates[0];
   return { steps, distanceM, calories };
 }
 
@@ -163,13 +192,13 @@ export type QcBandMeasureFrame = {
 };
 
 export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame | null {
-  if (bytes.length < 4) return null;
+  if (bytes.length < 3) return null;
   if (bytes[0] !== QCBAND_CMD_START_MEASURE && bytes[0] !== QCBAND_CMD_STOP_MEASURE) return null;
   return {
     subType: bytes[1],
-    errorCode: bytes[2],
-    value: bytes[3],
-    data: bytes.slice(3),
+    errorCode: bytes.length >= 4 ? bytes[2] : 0,
+    value: bytes.length >= 4 ? bytes[3] : bytes[2],
+    data: bytes.length >= 4 ? bytes.slice(3) : bytes.slice(2),
   };
 }
 
@@ -183,25 +212,54 @@ export function decodeQcBandOneKeyPayload(data: Uint8Array): {
   tempC: number | null;
   hrvMs: number | null;
   stress: number | null;
+  rriMs: number | null;
 } | null {
-  if (data.length < 8) return null;
-  const hr = data[0];
-  const sbp = data[1];
-  const dbp = data[2];
-  const spo2 = data[3];
-  const tempInt = data[4];
-  const tempFrac = data[5];
-  const hrv = data[6];
-  const stress = data[7];
-  const tempC = tempInt > 0 ? tempInt + tempFrac / 100 : 0;
+  if (data.length < 4) return null;
+  const validHr = (v: number) => (v > 30 && v < 220 ? v : null);
+  const validSpo2 = (v: number) => (v >= 70 && v <= 100 ? v : null);
+  const validHrv = (v: number) => (v > 0 && v < 250 ? v : null);
+  const validStress = (v: number) => (v > 0 && v <= 100 ? v : null);
+  const validSbp = (v: number) => (v > 60 && v < 220 ? v : null);
+  const validDbp = (v: number) => (v > 30 && v < 160 ? v : null);
+  const u16 = (i: number) => (i + 1 < data.length ? data[i] | (data[i + 1] << 8) : 0);
+  const tempFrom = (...values: number[]) => {
+    for (const t of values) if (t >= 30 && t <= 42) return t;
+    return null;
+  };
+
+  // Legacy composite: [hr, sbp, dbp, spo2, temp_int, temp_frac, hrv, stress].
+  if (data.length >= 8) {
+    const legacyTemp = tempFrom(data[4] + data[5] / 100, u16(4) / 10, u16(4) / 100);
+    const legacy = {
+      hr: validHr(data[0]),
+      sbp: validSbp(data[1]),
+      dbp: validDbp(data[2]),
+      spo2: validSpo2(data[3]),
+      tempC: legacyTemp,
+      hrvMs: validHrv(data[6]),
+      stress: validStress(data[7]),
+      rriMs: null as number | null,
+    };
+    const populated = Object.values(legacy).filter((v) => v != null).length;
+    if (populated >= 3) return legacy;
+  }
+
+  // New SDK real one-key HR model:
+  // heartRateValue, heartRateHRV, stress, rri(ms), temp(0.1°C), sbp, dbp.
+  const rriA = u16(3);
+  const rriB = data[3] >= 300 && data[3] <= 2000 ? data[3] : null;
+  const tempU16A = u16(5);
+  const tempU16B = u16(4);
+  const sdkTemp = tempFrom(tempU16A / 10, tempU16A / 100, tempU16B / 10, tempU16B / 100, data[4] / 10, data[5] / 10);
   return {
-    hr: hr > 30 && hr < 220 ? hr : null,
-    sbp: sbp > 60 && sbp < 220 ? sbp : null,
-    dbp: dbp > 30 && dbp < 160 ? dbp : null,
-    spo2: spo2 >= 70 && spo2 <= 100 ? spo2 : null,
-    tempC: tempC >= 30 && tempC <= 42 ? tempC : null,
-    hrvMs: hrv > 0 && hrv < 250 ? hrv : null,
-    stress: stress > 0 && stress <= 100 ? stress : null,
+    hr: validHr(data[0]),
+    sbp: data.length >= 9 ? validSbp(data[7]) : data.length >= 7 ? validSbp(data[5]) : null,
+    dbp: data.length >= 9 ? validDbp(data[8]) : data.length >= 8 ? validDbp(data[6]) : null,
+    spo2: data.length >= 4 ? validSpo2(data[3]) : null,
+    tempC: sdkTemp,
+    hrvMs: validHrv(data[1]),
+    stress: validStress(data[2]),
+    rriMs: rriA >= 300 && rriA <= 2000 ? rriA : rriB,
   };
 }
 
