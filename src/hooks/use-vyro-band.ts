@@ -35,10 +35,12 @@ import {
   decodeQcBandMeasureFrame,
   decodeQcBandOneKeyPayload,
   decodeQcBandSpo2History,
+  decodeQcBandSpo2Notification,
   decodeQcBandStressHistory,
   decodeQcBandRealtimeHeartRate,
   decodeQcBandTempPayload,
   decodeQcBandTemperatureHistory,
+  decodeQcBandTemperatureNotification,
   decodeQcBandTodaySports,
   decodeQcBandTodaySummary,
   encodeQcBandActivityRequest,
@@ -178,7 +180,27 @@ export function useVyroBand() {
   const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(null);
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
+  const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(null);
   const bigDataV2Ref = useRef<{ expected: number; chunks: number[] } | null>(null);
+
+  const applyActivity = (
+    next: { steps: number; distanceM: number; calories: number },
+    source: "history" | "summary" | "todaySports" | "live",
+  ) => {
+    const day = todayActivityKeyPrefix();
+    const priority = source === "history" ? 1 : source === "summary" ? 2 : source === "todaySports" ? 4 : 5;
+    const current = activityTotalRef.current?.day === day ? activityTotalRef.current : null;
+    // 0x43 history is hourly/fallback and is often lower than the exact daily
+    // total. Never let it overwrite a better live/today-sports number.
+    if (current && priority < current.priority && next.steps < current.steps) return;
+    // Same-day step totals should be monotonic. This rejects malformed decodes
+    // without blocking normal increases from the watch.
+    if (current && next.steps === 0 && current.steps > 0) return;
+    activityTotalRef.current = { day, ...next, priority };
+    setStepsToday(next.steps);
+    setDistanceM(next.distanceM);
+    setCaloriesKcal(next.calories);
+  };
 
   // When connected, always subscribe to the VYRO motion event characteristic
   // (cheap if the remote watch doesn't expose it — the platform just errors
@@ -214,6 +236,7 @@ export function useVyroBand() {
       setBloodPressure(null);
       hrSamplesRef.current = [];
       activityBucketsRef.current.clear();
+      activityTotalRef.current = null;
       bigDataV2Ref.current = null;
     }
   }, [connectedId]);
