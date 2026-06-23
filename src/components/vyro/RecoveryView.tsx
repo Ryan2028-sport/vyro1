@@ -17,12 +17,12 @@ export function RecoveryView() {
   // Cardio Recovery — how close current HR is to resting HR (the lower
   // the live HR vs RHR, the more cardio is restored).
   const cardio = useMemo(() => {
-    if (!m.connected || m.heartRateBpm == null) return null;
+    if (m.heartRateBpm == null) return null;
     const rhr = m.restingHrBpm ?? 60;
     const headroom = Math.max(0, m.heartRateBpm - rhr);
     // 0 bpm above RHR = 100, 60 bpm above = 0
     return Math.round(Math.max(0, Math.min(100, 100 - (headroom / 60) * 100)));
-  }, [m.connected, m.heartRateBpm, m.restingHrBpm]);
+  }, [m.heartRateBpm, m.restingHrBpm]);
 
   // Muscle Readiness — inverse of recent IMU peak-jerk + rolling event load.
   const muscle = useMemo(() => {
@@ -42,7 +42,6 @@ export function RecoveryView() {
 
   // Recovery Environment — sleep + skin temp + spO2 (whichever are present).
   const environment = useMemo(() => {
-    if (!m.connected) return null;
     const parts: number[] = [];
     if (m.spo2Pct != null) parts.push(Math.max(0, Math.min(100, ((m.spo2Pct - 92) / 7) * 100)));
     if (m.skinTempC != null) {
@@ -57,7 +56,6 @@ export function RecoveryView() {
 
   // Signal Confidence — how many independent streams are live right now.
   const confidence = useMemo(() => {
-    if (!m.connected) return null;
     const streams = [
       m.heartRateBpm != null,
       m.hrvMs != null,
@@ -67,8 +65,9 @@ export function RecoveryView() {
       m.batteryPct != null,
     ];
     const live = streams.filter(Boolean).length;
+    if (live === 0) return null;
     return Math.round((live / streams.length) * 100);
-  }, [m.connected, m.heartRateBpm, m.hrvMs, m.spo2Pct, m.skinTempC, m.stepsToday, m.batteryPct]);
+  }, [m.heartRateBpm, m.hrvMs, m.spo2Pct, m.skinTempC, m.stepsToday, m.batteryPct]);
 
   // Composite LIVE Recovery — weighted blend matching the spec.
   const recovery = useMemo(() => {
@@ -88,10 +87,10 @@ export function RecoveryView() {
 
   // Time-to-ready (min): rough estimate from cardio + muscle deficit.
   const timeToReady = useMemo(() => {
-    if (!m.connected || cardio == null || muscle == null) return null;
+    if (cardio == null || muscle == null) return null;
     const deficit = (100 - cardio) * 0.4 + (100 - muscle) * 0.6;
     return Math.round(deficit * 0.6);
-  }, [m.connected, cardio, muscle]);
+  }, [cardio, muscle]);
 
   const band = recoveryBand(recovery);
   const bandTone = band === "green" ? "live" : band === "yellow" ? "warn" : band === "red" ? "off" : "neutral";
