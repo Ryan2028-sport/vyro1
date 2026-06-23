@@ -126,7 +126,10 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
         document.removeEventListener("visibilitychange", onVis);
         window.removeEventListener("pagehide", onVis);
         window.removeEventListener("pageshow", onVis);
-        void despiaLocation.backgroundOff();
+        // Do not disable the native background keep-alive during app minimize
+        // / pagehide. The BLE metric stream must resume from the same watch
+        // session instead of restarting measurements from scratch.
+        if (document.visibilityState !== "hidden") void despiaLocation.backgroundOff();
       };
     }
     let wakeLock: { release: () => Promise<void> } | null = null;
