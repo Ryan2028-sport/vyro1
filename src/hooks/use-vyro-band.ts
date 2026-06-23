@@ -321,20 +321,17 @@ export function useVyroBand() {
       window.setTimeout(pollBattery, 800);
       batteryTimer = window.setInterval(pollBattery, 60_000);
 
-      // Steps / distance / calories — poll every second. We send all three known
-      // opcodes (0x09 / 0x07 / 0x15) since different firmwares respond on
-      // different ones. The notify handler accepts any of them.
+      // Steps / distance / calories. Poll the summary/current-activity
+      // commands plus the Colmi/Yawell hourly activity sync. Do not use 0x15
+      // here — on these firmwares it is HR history, not steps.
       const pollSteps = () => {
         void writeQcBand(service, write, encodeQcBandStepsRequest()).catch(() => undefined);
         window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandStepsRequestAlt1()).catch(() => undefined);
         }, 400);
         window.setTimeout(() => {
-          void writeQcBand(service, write, encodeQcBandStepsRequestAlt2()).catch(() => undefined);
-        }, 800);
-        window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandActivityRequest(0)).catch(() => undefined);
-        }, 1_100);
+        }, 800);
       };
       window.setTimeout(pollSteps, 1_200);
       stepsTimer = window.setInterval(pollSteps, 2_000);
@@ -586,8 +583,7 @@ export function useVyroBand() {
         }
       } else if (
         op === QCBAND_CMD_TODAY_SUMMARY ||
-        op === QCBAND_CMD_STEPS_ALT1 ||
-        op === QCBAND_CMD_STEPS_ALT2
+        op === QCBAND_CMD_STEPS_ALT1
       ) {
         const sum = decodeQcBandTodaySummary(bytes);
         if (sum) {
