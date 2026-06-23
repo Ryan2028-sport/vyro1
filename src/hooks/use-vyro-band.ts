@@ -99,7 +99,7 @@ import {
   todayActivityKeyPrefix,
 } from "@/lib/vyro-ble/qcband";
 
-import { bluetooth, type BleDiscovered } from "@/lib/despia";
+import { bluetooth, isNative, type BleDiscovered } from "@/lib/despia";
 
 export type SessionState = "idle" | "live" | "paused";
 
@@ -220,6 +220,10 @@ function persistBandMetrics(metrics: PersistedBandMetrics) {
   }
 }
 
+function shouldKeepNativeBleAliveOnCleanup(): boolean {
+  return isNative && typeof document !== "undefined" && document.visibilityState === "hidden";
+}
+
 /** Heart Rate Measurement (GATT 0x2A37) decoder. */
 function decodeHeartRate(bytes: Uint8Array): number | null {
   if (bytes.length < 2) return null;
@@ -302,6 +306,7 @@ export function useVyroBand() {
       .subscribe(connectedId, VYRO_SERVICE_UUID, VYRO_EVENT_CHAR_UUID)
       .catch(() => undefined);
     return () => {
+      if (shouldKeepNativeBleAliveOnCleanup()) return;
       void bluetooth
         .unsubscribe(connectedId, VYRO_SERVICE_UUID, VYRO_EVENT_CHAR_UUID)
         .catch(() => undefined);
@@ -658,6 +663,7 @@ export function useVyroBand() {
       if (oneKeyTimer != null) window.clearInterval(oneKeyTimer);
       if (tempTimer != null) window.clearInterval(tempTimer);
       cleanupExtras?.();
+      if (shouldKeepNativeBleAliveOnCleanup()) return;
       if (qcBandService) {
         void bluetooth
           .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
