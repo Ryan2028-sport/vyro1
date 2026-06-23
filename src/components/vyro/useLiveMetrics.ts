@@ -115,7 +115,6 @@ export type ReadinessInputs = {
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 export function computeReadiness(i: ReadinessInputs): { score: number | null; parts: Record<string, number> } {
-  if (!i.connected) return { score: null, parts: {} };
   const parts: Record<string, number> = {};
   const w: Record<string, number> = {};
   if (i.hrvMs != null) { parts.hrv = clamp01((i.hrvMs - 20) / 70); w.hrv = 0.30; }
@@ -160,14 +159,19 @@ export type SubScoreInputs = {
 };
 
 export function computeSubScores(i: SubScoreInputs): SubScores {
-  if (!i.connected) return { fatigue: null, recovery: null, agility: null, sleep: null };
+  const hasCachedHealthSignal =
+    i.hrvMs != null ||
+    i.restingHrBpm != null ||
+    i.sleepScore != null ||
+    i.stress != null;
+  if (!i.connected && !hasCachedHealthSignal) return { fatigue: null, recovery: null, agility: null, sleep: null };
 
   // Fatigue — accumulated load + stress, capped so a single big spike
   // doesn't pin the bar.
   const loadParts: number[] = [];
-  if (i.peakJerk != null) loadParts.push(clamp01(i.peakJerk / 200));
-  if (i.eventsLastMin != null) loadParts.push(clamp01(i.eventsLastMin / 90));
-  if (i.recentSessionLoad != null) loadParts.push(clamp01(i.recentSessionLoad / 120));
+  if (i.connected && i.peakJerk != null) loadParts.push(clamp01(i.peakJerk / 200));
+  if (i.connected && i.eventsLastMin != null) loadParts.push(clamp01(i.eventsLastMin / 90));
+  if (i.connected && i.recentSessionLoad != null) loadParts.push(clamp01(i.recentSessionLoad / 120));
   if (i.stress != null) loadParts.push(clamp01(i.stress / 100));
   const fatigue = loadParts.length
     ? Math.round((loadParts.reduce((a, b) => a + b, 0) / loadParts.length) * 100)
@@ -186,8 +190,8 @@ export function computeSubScores(i: SubScoreInputs): SubScores {
 
   // Agility — IMU explosiveness (peak g) + reaction speed.
   const agParts: number[] = [];
-  if (i.peakG != null && i.peakG > 0) agParts.push(clamp01(i.peakG / 6));
-  if (i.reactMin != null) agParts.push(clamp01(1 - Math.min(i.reactMin, 400) / 400));
+  if (i.connected && i.peakG != null && i.peakG > 0) agParts.push(clamp01(i.peakG / 6));
+  if (i.connected && i.reactMin != null) agParts.push(clamp01(1 - Math.min(i.reactMin, 400) / 400));
   const agility = agParts.length
     ? Math.round((agParts.reduce((a, b) => a + b, 0) / agParts.length) * 100)
     : null;
