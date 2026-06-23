@@ -45,7 +45,10 @@ export const QCBAND_NOTIFICATION_TEMPERATURE = 0x05;
 export const QCBAND_NOTIFICATION_ACTIVITY = 0x07;
 
 export const QCBAND_BIG_DATA_TYPE_TEMPERATURE = 0x25;
+export const QCBAND_BIG_DATA_TYPE_TEMPERATURE_MANUAL = 0x26;
 export const QCBAND_BIG_DATA_TYPE_SPO2 = 0x2a;
+export const QCBAND_BIG_DATA_TYPE_SPO2_INTERVAL = 0x5f;
+export const QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL = 0x74;
 
 // Measurement sub-types under 0x69 / 0x6A. QCBand/Oudmon ships more than one
 // firmware line. The old protocol uses 0x01/0x03/0x05/0x09/0x0d/0x0e; the newer
@@ -190,15 +193,43 @@ export function encodeQcBandHrvRequest(daysAgo = 0): Uint8Array {
   return sdkCommand([...out]);
 }
 
+function bigDataV2Request(type: number, payload: number[] = []): Uint8Array {
+  // Big-data V2 frames are sent directly to the V2 command characteristic:
+  // [0xbc, type, payloadLenLE, crc16/unused=0xffff, ...payload]. The uploaded
+  // QCBand iOS SDK exposes interval temperature as request/response 0x74 with
+  // payload [dayIndex, pocketIndex], while older firmwares use 0x25/0x26.
+  return new Uint8Array([
+    QCBAND_CMD_BIG_DATA_V2,
+    type & 0xff,
+    payload.length & 0xff,
+    (payload.length >> 8) & 0xff,
+    0xff,
+    0xff,
+    ...payload.map((b) => b & 0xff),
+  ]);
+}
+
 export function encodeQcBandSpo2HistoryRequest(): Uint8Array {
-  // Big Data requests have an empty payload: [0xbc, type, len=0, crc16=0xffff].
-  // A non-zero len is treated as malformed by many firmwares, leaving V2
-  // history (including skin temp) blank even while the watch is connected.
-  return new Uint8Array([QCBAND_CMD_BIG_DATA_V2, QCBAND_BIG_DATA_TYPE_SPO2, 0x00, 0x00, 0xff, 0xff]);
+  // Manual SpO₂ history (SDK request/response 0x2a).
+  return bigDataV2Request(QCBAND_BIG_DATA_TYPE_SPO2);
 }
 
 export function encodeQcBandTemperatureHistoryRequest(): Uint8Array {
-  return new Uint8Array([QCBAND_CMD_BIG_DATA_V2, QCBAND_BIG_DATA_TYPE_TEMPERATURE, 0x00, 0x00, 0xff, 0xff]);
+  // Preferred by the uploaded SDK: interval temperature request 0x74 with
+  // [dayIndex=0, pocketIndex=0]. This returns exact sensor values in 0.1°C.
+  return bigDataV2Request(QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL, [0x00, 0x00]);
+}
+
+export function encodeQcBandTemperatureLegacyHistoryRequest(daysAgo = 0): Uint8Array {
+  return bigDataV2Request(QCBAND_BIG_DATA_TYPE_TEMPERATURE, [daysAgo & 0xff]);
+}
+
+export function encodeQcBandTemperatureManualHistoryRequest(daysAgo = 0): Uint8Array {
+  return bigDataV2Request(QCBAND_BIG_DATA_TYPE_TEMPERATURE_MANUAL, [daysAgo & 0xff]);
+}
+
+export function encodeQcBandSpo2IntervalHistoryRequest(daysAgo = 0, pocketIndex = 0): Uint8Array {
+  return bigDataV2Request(QCBAND_BIG_DATA_TYPE_SPO2_INTERVAL, [daysAgo & 0xff, pocketIndex & 0xff]);
 }
 
 function bcdByte(v: number): number {
@@ -215,8 +246,10 @@ export function decodeQcBandTodaySummary(
     op !== QCBAND_CMD_STEPS_ALT1
   )
     return null;
-  const u16 = (i: number) => bytes[i] | (bytes[i + 1] << 8);
-  const u24 = (i: number) => bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16);
+  const u16le = (i: number) => bytes[i] | (bytes[i + 1] << 8);
+  const u16be = (i: number) => (bytes[i] << 8) | bytes[i + 1];
+  const u24le = (i: number) => bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16);
+  const u24be = (i: number) => ((bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]) >>> 0;
   const u32 = (i: number) => (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0;
   const candidates: Array<{ steps: number; distanceM: number; calories: number; score: number }> = [];
 
@@ -231,12 +264,32 @@ export function decodeQcBandTodaySummary(
     candidates.push({ steps, distanceM, calories, score });
   };
 
+  if (op === QCBAND_CMD_STEPS_ALT1) {
+    // Uploaded QCBandSDK `OdmBandGetDayTotalSport` decoder, stage 0:
+    // [0x07, 0x00, ..., totalSteps(3 BE)@6, runSteps(3 BE)@9,
+    // calories(3 BE)@12]. This is the exact daily total; decoding it as LE is
+    // what made steps look stuck / inaccurate.
+    if (bytes[1] === 0x00 && bytes.length >= 15) {
+      push(u24be(6), 0, u24be(12), 12);
+    }
+    if (candidates.length === 0 && bytes.length >= 15) {
+      push(u24be(6), 0, u24be(12), 8);
+      push(u24le(6), 0, u24le(12), 2);
+    }
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.score - a.score || b.steps - a.steps);
+    const { steps, distanceM, calories } = candidates[0];
+    return { steps, distanceM, calories };
+  }
+
   // Canonical layout: [op, steps(3), dist(2), cal(2)].
-  push(u24(1), u16(4), u16(6), 4);
+  push(u24be(1), u16be(4), u16be(6), 6);
+  push(u24le(1), u16le(4), u16le(6), 4);
   // SDK/day-index layout: [op, day/status, steps(3), dist(2), cal(2)].
-  if (bytes.length >= 9) push(u24(2), u16(5), u16(7), 6);
+  if (bytes.length >= 9) push(u24be(2), u16be(5), u16be(7), 8);
+  if (bytes.length >= 9) push(u24le(2), u16le(5), u16le(7), 5);
   // Several watches use 32-bit counters after one status/day byte.
-  if (bytes.length >= 11) push(u32(2), u16(6), u16(8), 8);
+  if (bytes.length >= 11) push(u32(2), u16le(6), u16le(8), 3);
   // Alternate current-sport layouts seen in QCSportModel dumps.
   if (bytes.length >= 13) push(u32(1), u32(9), u32(5), 5);
   if (bytes.length >= 13) push(u32(2), u32(10), u32(6), 7);
@@ -251,11 +304,22 @@ export function decodeQcBandTodaySports(
   bytes: Uint8Array,
 ): { steps: number; runningSteps: number; distanceM: number; calories: number } | null {
   if (bytes.length < 14 || bytes[0] !== QCBAND_CMD_TODAY_SPORTS) return null;
-  const u24 = (i: number) => bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16);
-  const steps = u24(1);
-  const runningSteps = u24(4);
-  const calories = u24(7);
-  const distanceM = u24(10);
+  // Uploaded QCBandSDK `OdmBandGetCurrentSportInfo` decodes all counters as
+  // big-endian 24-bit integers: total steps @1, running steps @4, calories @7,
+  // distance @10, active time @13. Using little-endian here was the main source
+  // of wrong live step totals.
+  const u24be = (i: number) => ((bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]) >>> 0;
+  const u24le = (i: number) => (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16)) >>> 0;
+  let steps = u24be(1);
+  let runningSteps = u24be(4);
+  let calories = u24be(7);
+  let distanceM = u24be(10);
+  if (steps > 200_000 || distanceM > 250_000 || calories > 25_000) {
+    steps = u24le(1);
+    runningSteps = u24le(4);
+    calories = u24le(7);
+    distanceM = u24le(10);
+  }
   if (steps < 0 || steps > 200_000 || distanceM < 0 || distanceM > 250_000 || calories > 25_000) return null;
   return { steps, runningSteps, distanceM, calories };
 }
@@ -377,10 +441,43 @@ export function decodeQcBandStressHistory(bytes: Uint8Array): number | null {
   return latest;
 }
 
+function latestPlausibleTemperature(bytes: Uint8Array, start = 0): number | null {
+  let latest: number | null = null;
+  const accept = (t: number) => {
+    if (Number.isFinite(t) && t >= 30 && t <= 42) latest = Math.round(t * 10) / 10;
+  };
+  for (let i = Math.max(0, start); i < bytes.length; i++) {
+    const b = bytes[i] & 0xff;
+    if (b > 0) accept(b / 10 + 20);
+    if (i + 1 < bytes.length) {
+      const le = b | (bytes[i + 1] << 8);
+      const be = (b << 8) | bytes[i + 1];
+      accept(le / 10);
+      accept(le / 100);
+      accept(be / 10);
+      accept(be / 100);
+    }
+  }
+  return latest;
+}
+
 export function decodeQcBandTemperatureHistory(bytes: Uint8Array): number | null {
-  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || bytes[1] !== QCBAND_BIG_DATA_TYPE_TEMPERATURE) return null;
+  const tempTypes = [
+    QCBAND_BIG_DATA_TYPE_TEMPERATURE,
+    QCBAND_BIG_DATA_TYPE_TEMPERATURE_MANUAL,
+    QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL,
+  ];
+  if (bytes.length >= 5 && tempTypes.includes(bytes[0])) {
+    // Some bridges deliver the SDK-unpacked payload directly, e.g. 0x74
+    // interval temperature: [op, interval, pocketCount, pocketIndex, records...].
+    return latestPlausibleTemperature(bytes, bytes[0] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL ? 4 : 1);
+  }
+  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || !tempTypes.includes(bytes[1])) return null;
   const length = bytes[2] | (bytes[3] << 8);
   if (length <= 0) return null;
+  if (bytes[1] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL || bytes[1] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_MANUAL) {
+    return latestPlausibleTemperature(bytes.slice(6), bytes[1] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL ? 4 : 0);
+  }
   let idx = 6;
   let latestToday: number | null = null;
   let latestAny: number | null = null;
@@ -402,11 +499,28 @@ export function decodeQcBandTemperatureHistory(bytes: Uint8Array): number | null
     }
     if (daysAgo === 0) break;
   }
-  return latestToday ?? latestAny;
+  return latestToday ?? latestAny ?? latestPlausibleTemperature(bytes.slice(6));
 }
 
 export function decodeQcBandSpo2History(bytes: Uint8Array): number | null {
-  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || bytes[1] !== QCBAND_BIG_DATA_TYPE_SPO2) return null;
+  const spo2Types = [QCBAND_BIG_DATA_TYPE_SPO2, QCBAND_BIG_DATA_TYPE_SPO2_INTERVAL];
+  if (bytes.length >= 5 && spo2Types.includes(bytes[0])) {
+    let latest: number | null = null;
+    for (let i = bytes[0] === QCBAND_BIG_DATA_TYPE_SPO2_INTERVAL ? 4 : 1; i < bytes.length; i++) {
+      const v = bytes[i] & 0xff;
+      if (v >= 70 && v <= 100) latest = v;
+    }
+    return latest;
+  }
+  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || !spo2Types.includes(bytes[1])) return null;
+  if (bytes[1] === QCBAND_BIG_DATA_TYPE_SPO2_INTERVAL) {
+    let latest: number | null = null;
+    for (let i = 10; i < bytes.length; i++) {
+      const v = bytes[i] & 0xff;
+      if (v >= 70 && v <= 100) latest = v;
+    }
+    return latest;
+  }
   const length = bytes[2] | (bytes[3] << 8);
   if (length <= 0) return null;
   let idx = 6;
