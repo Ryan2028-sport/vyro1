@@ -685,7 +685,7 @@ export function useVyroBand() {
           }
           if (ok.spo2 != null) setSpo2Pct(ok.spo2);
           if (ok.tempC != null) setSkinTempC(ok.tempC);
-          if (ok.hrvMs != null) setHrvMs(ok.hrvMs);
+          if (ok.hrvMs != null && ok.hrvMs >= 5) setHrvMs(ok.hrvMs);
           if (ok.stress != null) setStressScore(ok.stress);
           if (ok.sbp != null && ok.dbp != null) setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
           if (ok.rriMs != null || ok.hr != null || ok.hrvMs != null || ok.stress != null) {
@@ -709,7 +709,7 @@ export function useVyroBand() {
             setHeartRateAt(Date.now());
           }
         } else if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
-          if (frame.value > 0 && frame.value < 250) setHrvMs(frame.value);
+          if (frame.value >= 5 && frame.value < 250) setHrvMs(frame.value);
         } else if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value > 0 && frame.value <= 100) setStressScore(frame.value);
         } else if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType)) {
