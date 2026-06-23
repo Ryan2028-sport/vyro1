@@ -211,8 +211,9 @@ export function decodeQcBandTodaySummary(
     if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > 250_000) return;
     if (!Number.isFinite(calories) || calories < 0 || calories > 25_000) return;
     // A single 0xff status byte can otherwise decode as a bogus stuck 255
-    // steps value. Prefer richer layouts when they exist.
-    if (steps === 255 && bytes[1] === 0xff && bytes.slice(2).some((b) => b !== 0)) score -= 10;
+    // steps value. Reject it here; live/activity-history packets will provide
+    // the real total when the watch has data.
+    if (steps === 255 && bytes[1] === 0xff) return;
     candidates.push({ steps, distanceM, calories, score });
   };
 
