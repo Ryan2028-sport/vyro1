@@ -495,7 +495,41 @@ export function useVyroBand() {
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame || frame.errorCode !== 0) return;
-        if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
+        const applyOneKey = () => {
+          const ok = decodeQcBandOneKeyPayload(frame.data);
+          if (!ok) return false;
+          const hasAnyValue =
+            ok.hr != null ||
+            ok.spo2 != null ||
+            ok.tempC != null ||
+            ok.hrvMs != null ||
+            ok.stress != null ||
+            ok.rriMs != null ||
+            (ok.sbp != null && ok.dbp != null);
+          if (!hasAnyValue) return false;
+          if (ok.hr != null) {
+            setHeartRateBpm(ok.hr);
+            setHeartRateAt(Date.now());
+          }
+          if (ok.spo2 != null) setSpo2Pct(ok.spo2);
+          if (ok.tempC != null) setSkinTempC(ok.tempC);
+          if (ok.hrvMs != null) setHrvMs(ok.hrvMs);
+          if (ok.stress != null) setStressScore(ok.stress);
+          if (ok.sbp != null && ok.dbp != null) setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
+          if (ok.rriMs != null || ok.hr != null || ok.hrvMs != null || ok.stress != null) {
+            const base = ok.rriMs != null
+              ? 60_000 / Math.max(300, Math.min(2_000, ok.rriMs)) / 4.7
+              : 14;
+            const hrvAdj = ok.hrvMs != null ? (55 - ok.hrvMs) / 30 : 0;
+            const stressAdj = ok.stress != null ? (ok.stress - 50) / 35 : 0;
+            const rr = Math.max(8, Math.min(28, Math.round(base + hrvAdj + stressAdj)));
+            setRespRateBrpm(rr);
+          }
+          return true;
+        };
+        if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
+          // handled as a composite SDK frame
+        } else if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value >= 70 && frame.value <= 100) setSpo2Pct(frame.value);
         } else if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value > 30 && frame.value < 250) {
@@ -507,27 +541,7 @@ export function useVyroBand() {
         } else if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value > 0 && frame.value <= 100) setStressScore(frame.value);
         } else if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType)) {
-          const ok = decodeQcBandOneKeyPayload(frame.data);
-          if (ok) {
-            if (ok.hr != null) {
-              setHeartRateBpm(ok.hr);
-              setHeartRateAt(Date.now());
-            }
-            if (ok.spo2 != null) setSpo2Pct(ok.spo2);
-            if (ok.tempC != null) setSkinTempC(ok.tempC);
-            if (ok.hrvMs != null) setHrvMs(ok.hrvMs);
-            if (ok.stress != null) setStressScore(ok.stress);
-            if (ok.sbp != null && ok.dbp != null) setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
-            if (ok.rriMs != null || ok.hr != null || ok.hrvMs != null || ok.stress != null) {
-              const base = ok.rriMs != null
-                ? 60_000 / Math.max(300, Math.min(2_000, ok.rriMs)) / 4.7
-                : 14;
-              const hrvAdj = ok.hrvMs != null ? (55 - ok.hrvMs) / 30 : 0;
-              const stressAdj = ok.stress != null ? (ok.stress - 50) / 35 : 0;
-              const rr = Math.max(8, Math.min(28, Math.round(base + hrvAdj + stressAdj)));
-              setRespRateBrpm(rr);
-            }
-          } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
+          if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
             const t = decodeQcBandTempPayload(frame.data);
             if (t != null) setSkinTempC(t);
           }
