@@ -358,7 +358,7 @@ function PerformanceGroupTile({ group }: { group: PerformanceGroup }) {
         {group.status}
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-3 space-y-2.5">
         {group.metrics.map((metric) => (
           <div key={metric.label}>
             <div className="mb-1 flex items-baseline justify-between gap-2 text-[13px] leading-none">
