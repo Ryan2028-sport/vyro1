@@ -660,7 +660,7 @@ function CourtMovementTable({ sport, live }: { sport: SportProfile; live: LiveMe
           {routes.map((route) => {
             const active = selected.route === route.route;
             return (
-              <button key={route.route} onClick={() => setSelected(route)} className={`grid w-full grid-cols-[1.5fr_.62fr_.58fr_.82fr_.88fr_.55fr] items-center gap-2 rounded-2xl border px-2 py-4 text-left transition-colors ${active ? "border-vyro-mute bg-vyro-text/10" : "border-vyro-line bg-vyro-elev"}`}>
+              <button key={route.route} onClick={() => setSelectedRoute(route.route)} className={`grid w-full grid-cols-[1.5fr_.62fr_.58fr_.82fr_.88fr_.55fr] items-center gap-2 rounded-2xl border px-2 py-4 text-left transition-colors ${active ? "border-vyro-mute bg-vyro-text/10" : "border-vyro-line bg-vyro-elev"}`}>
                 <span className="text-[12px] font-black leading-tight text-vyro-text">{route.route}</span>
                 <span className="rounded-full bg-vyro-text/10 px-2 py-1 text-center text-[12px] font-black tabular-nums text-vyro-text">{route.score}</span>
                 <span className="font-mono text-[11px] text-vyro-mute">{route.stepsIn} → {route.stepsOut}</span>
