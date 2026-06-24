@@ -656,27 +656,6 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               </div>
             ))}
           </div>
-
-
-        <InfoCard eyebrow="Today's plan editable" title="Training blocks">
-          <div style={{ marginTop: 10 }}>
-            {items.map((item, index) => (
-              <div className="app2-plan-row" key={`${item.time}-${index}`}>
-                <div className="app2-plan-time">{item.time}</div>
-                <div>
-                  <div className="app2-plan-title">{item.title}</div>
-                  <div className="app2-plan-sub">{item.load}</div>
-                </div>
-                <button
-                  aria-label="Remove plan item"
-                  onClick={() => setItems((prev) => prev.filter((_, i) => i !== index))}
-                  style={{ color: "hsl(var(--app2-muted))" }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
           <div className="app2-form-grid">
             <input
               className="app2-input"
