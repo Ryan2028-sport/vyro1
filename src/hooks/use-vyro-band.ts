@@ -265,7 +265,6 @@ function decodeHeartRate(bytes: Uint8Array): number | null {
 export function useVyroBand() {
   const ble = useBluetooth();
   const { connectedId, lastData } = ble;
-  const initialMetrics = useMemo(loadPersistedBandMetrics, []);
   const [events, setEvents] = useState<VyroEventEntry[]>([]);
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [sport, setSport] = useState<Sport>("squash");
@@ -290,17 +289,7 @@ export function useVyroBand() {
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
   const activeConnectionRef = useRef<string | null>(null);
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
-  const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(
-    initialMetrics.stepsToday != null
-      ? {
-          day: todayActivityKeyPrefix(),
-          steps: initialMetrics.stepsToday,
-          distanceM: initialMetrics.distanceM ?? 0,
-          calories: initialMetrics.caloriesKcal ?? 0,
-          priority: 0,
-        }
-      : null,
-  );
+  const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(null);
   const bigDataV2Ref = useRef<{ expected: number; chunks: number[] } | null>(null);
 
   const markSignal = (key: keyof VyroBandSignalTimestamps, at = Date.now()) => {
@@ -716,6 +705,7 @@ export function useVyroBand() {
     }, 2_000);
 
     return () => {
+      if (shouldKeepNativeBleAliveOnCleanup()) return;
       cancelled = true;
       off();
       window.clearTimeout(fallback);
@@ -727,7 +717,6 @@ export function useVyroBand() {
       if (oneKeyTimer != null) window.clearInterval(oneKeyTimer);
       if (tempTimer != null) window.clearInterval(tempTimer);
       cleanupExtras?.();
-      if (shouldKeepNativeBleAliveOnCleanup()) return;
       if (qcBandService) {
         void bluetooth
           .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
