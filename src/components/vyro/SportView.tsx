@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Activity, CircleHelp, Crosshair, Gauge, Grid2X2, Sparkles, Zap, ChevronLeft } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
 import { SPORT_PROFILES, type PerformanceGroup, type SportProfile } from "./sportProfiles";
-import { computeReadiness, computeSubScores, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
+import { computeLiveRecovery, computeReadiness, computeSubScores, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
 
 // ============================================================================
 // Live overlays — translate raw LSM6DSO + GH3026 streams into the squash/tennis
@@ -270,13 +270,23 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
 
   // Live overlays for court sports — compute once, share across tabs.
   const live = useLiveMetrics();
+  // Canonical live recovery — IDENTICAL formula to the Recovery view's hero
+  // ring. Falls back to null (not a guessed number) when the watch hasn't
+  // streamed enough signal to compute it.
   const recoverySub = useMemo(
-    () => computeSubScores({
-      connected: live.connected, hrvMs: live.hrvMs, restingHrBpm: live.restingHrBpm,
-      stress: live.stressScore, peakJerk: live.peakJerk ?? null, peakG: live.peakG ?? null,
-      eventsLastMin: live.eventsLastMin, reactMin: live.reactMin,
-    }).recovery,
-    [live.connected, live.hrvMs, live.restingHrBpm, live.stressScore, live.peakJerk, live.peakG, live.eventsLastMin, live.reactMin],
+    () => computeLiveRecovery({
+      connected: live.connected,
+      heartRateBpm: live.heartRateBpm,
+      restingHrBpm: live.restingHrBpm,
+      hrvMs: live.hrvMs,
+      spo2Pct: live.spo2Pct,
+      skinTempC: live.skinTempC,
+      stepsToday: live.stepsToday,
+      batteryPct: live.batteryPct,
+      peakJerk: live.peakJerk ?? null,
+      eventsLastMin: live.eventsLastMin,
+    }).score,
+    [live.connected, live.heartRateBpm, live.restingHrBpm, live.hrvMs, live.spo2Pct, live.skinTempC, live.stepsToday, live.batteryPct, live.peakJerk, live.eventsLastMin],
   );
   const readinessScore = useMemo(
     () => computeReadiness({
