@@ -63,14 +63,12 @@ export function RecoveryView() {
   // Trap detector — HR says ready, but muscle/load says be smart.
   const hrTrap = cardio != null && muscle != null && cardio - muscle >= 20;
 
-  // Baseline deltas — short-window comparison to a moving baseline.
-  // Until history is persisted we derive a stable baseline from each
-  // score, so the delta reads ±0 instead of a fake number.
-  const baselineDelta = (v: number | null) => (v == null ? null : 0);
-  const recoveryDelta = baselineDelta(recovery);
+  // Deltas vs personal baseline. We don't persist daily baselines yet, so
+  // any "vs baseline" delta would be fabricated — render nothing instead.
+  const recoveryDelta: number | null = null;
   const hrDelta = m.heartRateBpm != null && m.restingHrBpm != null ? m.heartRateBpm - m.restingHrBpm : null;
-  const muscleDelta = muscle != null ? muscle - 76 : null; // vs 76 readiness baseline
-  const ttrDelta = timeToReady != null ? timeToReady - 48 : null; // vs 48-min baseline
+  const muscleDelta: number | null = null;
+  const ttrDelta: number | null = null;
 
   function fmtDelta(n: number | null, unit = "") {
     if (n == null) return "—";
@@ -119,8 +117,6 @@ export function RecoveryView() {
                 <Pill tone={bandTone} pulse={band === "green"}>{bandLabel}</Pill>
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-2 font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute sm:justify-start">
                   <span>Updates every second</span>
-                  <span>·</span>
-                  <span className="text-vyro-text">{fmtDelta(recoveryDelta)} vs your baseline</span>
                 </div>
                 <h3 className="mt-3 text-xl font-black leading-tight text-vyro-text">{coachRead}</h3>
                 <p className="mt-2 text-[12px] leading-relaxed text-vyro-mute">
@@ -238,19 +234,9 @@ export function RecoveryView() {
           </Card>
 
           <Card eyebrow="Recovery trend · 14 days" title="Trailing 14 days">
-            {recovery == null ? (
-              <p className="text-[12px] leading-relaxed text-vyro-mute">
-                Trend builds once the band has logged a few days of recovery scores. Nothing is fabricated before then.
-              </p>
-            ) : (
-              <>
-                <Sparkline points={fakeTrend(recovery)} />
-                <div className="mt-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
-                  <span>14d ago</span>
-                  <span>today</span>
-                </div>
-              </>
-            )}
+            <p className="text-[12px] leading-relaxed text-vyro-mute">
+              Trend builds once the band has logged a few days of recovery scores. Nothing is fabricated before then.
+            </p>
           </Card>
         </>
       )}
@@ -311,48 +297,8 @@ function SubBar({ label, value, weight }: { label: string; value: number | null;
   );
 }
 
-// Sparkline — last 14 days. Uses live recovery score as the rightmost
-// point and synthesizes a stable trend around it so the chart isn't empty
-// before history is persisted server-side.
-function fakeTrend(latest: number | null): number[] {
-  const base = latest ?? 70;
-  const seed = base * 7.1;
-  return Array.from({ length: 14 }, (_, i) => {
-    const wave = Math.sin((i + seed) * 0.7) * 10;
-    const drift = (i - 7) * 0.6;
-    return Math.max(20, Math.min(100, Math.round(base + wave + drift)));
-  });
-}
 
-function Sparkline({ points }: { points: number[] }) {
-  const w = 320, h = 80, pad = 4;
-  const min = Math.min(...points) - 5;
-  const max = Math.max(...points) + 5;
-  const range = Math.max(1, max - min);
-  const step = (w - pad * 2) / (points.length - 1);
-  const coords = points.map((p, i) => {
-    const x = pad + i * step;
-    const y = pad + (1 - (p - min) / range) * (h - pad * 2);
-    return [x, y] as const;
-  });
-  const path = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const area = `${path} L${coords[coords.length - 1][0].toFixed(1)},${h - pad} L${coords[0][0].toFixed(1)},${h - pad} Z`;
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="block h-20 w-full">
-      <defs>
-        <linearGradient id="rec-spark" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--vyro-mint)" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="var(--vyro-mint)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#rec-spark)" />
-      <path d={path} fill="none" stroke="var(--vyro-mint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      {coords.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i === coords.length - 1 ? 3 : 1.5} fill="var(--vyro-mint)" />
-      ))}
-    </svg>
-  );
-}
+
 
 // ============================================================================
 // In-Game tab — recovery speed under fatigue

@@ -104,6 +104,8 @@ export type LiveRecoveryInputs = {
   batteryPct?: number | null;
   peakJerk?: number | null;
   eventsLastMin?: number | null;
+  sleepScore?: number | null;
+  wearTimeOk?: boolean | null;
 };
 
 export type LiveRecoveryParts = {
@@ -114,28 +116,42 @@ export type LiveRecoveryParts = {
   confidence: number | null;
 };
 
+// LIVE Recovery — weighted composite per spec:
+//   Cardio Recovery (25%)
+//   Muscle Readiness (25%)
+//   Load Debt (20%)
+//   Recovery Environment (15%)
+//   Signal Confidence (15%)
+// Signal Confidence is the trust layer (HR/HRV, IMU load, skin temp,
+// sleep, wear-time). It widens the caution band; it is NOT another
+// fatigue source. Weights renormalise over present subscores so a
+// missing channel doesn't unfairly drag the score.
 export function computeLiveRecovery(i: LiveRecoveryInputs): {
   score: number | null;
   parts: LiveRecoveryParts;
 } {
+  // Cardio Recovery — current HR vs resting headroom. Lower headroom = better.
   const cardio = i.heartRateBpm == null ? null : (() => {
     const rhr = i.restingHrBpm ?? 60;
     const headroom = Math.max(0, (i.heartRateBpm as number) - rhr);
     return Math.round(Math.max(0, Math.min(100, 100 - (headroom / 60) * 100)));
   })();
 
+  // Muscle Readiness — IMU jerk + recent event load.
   const muscle = !i.connected ? null : (() => {
     const jerkPenalty = Math.min(60, (i.peakJerk ?? 0) / 4);
     const eventPenalty = Math.min(40, (i.eventsLastMin ?? 0) * 0.6);
     return Math.round(Math.max(0, 100 - jerkPenalty - eventPenalty));
   })();
 
+  // Load Debt — accumulated session load. Higher load = lower readiness.
   const loadDebt = !i.connected ? null : (() => {
     const base = Math.min(100, (i.eventsLastMin ?? 0) * 1.5);
     const intensity = Math.min(30, (i.peakJerk ?? 0) / 6);
     return Math.round(Math.max(0, 100 - Math.min(100, base * 0.7 + intensity)));
   })();
 
+  // Recovery Environment — SpO₂, skin temp deviation, HRV.
   const envParts: number[] = [];
   if (i.spo2Pct != null) envParts.push(Math.max(0, Math.min(100, ((i.spo2Pct - 92) / 7) * 100)));
   if (i.skinTempC != null) {
@@ -147,19 +163,23 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
     ? null
     : Math.round(envParts.reduce((a, b) => a + b, 0) / envParts.length);
 
-  const streams = [
-    i.heartRateBpm != null,
-    i.hrvMs != null,
-    i.spo2Pct != null,
-    i.skinTempC != null,
-    i.stepsToday != null,
-    i.batteryPct != null,
+  // Signal Confidence — trust layer over the 5 named channels:
+  //   HR/HRV · IMU load · skin temp · sleep · wear-time.
+  // Each channel contributes equally (20%). Wear-time defaults to TRUE
+  // whenever the band is currently connected and streaming.
+  const channels = [
+    i.heartRateBpm != null || i.hrvMs != null,            // HR / HRV
+    i.connected && (i.peakJerk != null || (i.eventsLastMin ?? 0) > 0), // IMU load
+    i.skinTempC != null,                                   // skin temp
+    i.sleepScore != null,                                  // sleep
+    i.wearTimeOk ?? i.connected,                           // wear-time
   ];
-  const liveCount = streams.filter(Boolean).length;
-  const confidence = liveCount === 0 ? null : Math.round((liveCount / streams.length) * 100);
+  const present = channels.filter(Boolean).length;
+  const confidence = channels.length === 0 ? null : Math.round((present / channels.length) * 100);
 
   const parts: LiveRecoveryParts = { cardio, muscle, loadDebt, environment, confidence };
 
+  // Per-spec weights. Renormalised over present subscores.
   const weighted: { v: number | null; w: number }[] = [
     { v: cardio, w: 0.25 },
     { v: muscle, w: 0.25 },
@@ -167,10 +187,10 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
     { v: environment, w: 0.15 },
     { v: confidence, w: 0.15 },
   ];
-  const present = weighted.filter((p) => p.v != null);
-  if (present.length === 0) return { score: null, parts };
-  const totalW = present.reduce((a, b) => a + b.w, 0);
-  const sum = present.reduce((a, b) => a + (b.v as number) * b.w, 0);
+  const presentScores = weighted.filter((p) => p.v != null);
+  if (presentScores.length === 0) return { score: null, parts };
+  const totalW = presentScores.reduce((a, b) => a + b.w, 0);
+  const sum = presentScores.reduce((a, b) => a + (b.v as number) * b.w, 0);
   return { score: Math.round(sum / totalW), parts };
 }
 
