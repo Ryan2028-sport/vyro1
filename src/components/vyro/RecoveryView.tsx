@@ -301,25 +301,18 @@ export function RecoveryView() {
         </>
       )}
 
-      {tab === "game" && <InGameTab heartRateBpm={m.heartRateBpm} />}
+      {tab === "game" && <InGameTab m={m} />}
 
       {tab === "fatigue" && (
-        <>
-          <Card eyebrow="Total fatigue · Session" title="Composite training load">
-            <div className="grid grid-cols-2 gap-2">
-              <Stat label="Cardio load" value={cardio != null ? 100 - cardio : "—"} unit="/100" />
-              <Stat label="Muscle load" value={muscle != null ? 100 - muscle : "—"} unit="/100" />
-              <Stat label="Load debt" value={loadDebt != null ? 100 - loadDebt : "—"} unit="/100" />
-              <Stat label="Stress" value={m.stressScore ?? "—"} unit="/100" />
-            </div>
-            <p className="mt-3 text-[12px] leading-relaxed text-vyro-mute">
-              Total fatigue blends cardio strain, local muscle load, and accumulated load debt from the last 72h.
-            </p>
-          </Card>
-        </>
+        <FatigueTab
+          cardio={cardio}
+          muscle={muscle}
+          loadDebt={loadDebt}
+          stress={m.stressScore ?? null}
+        />
       )}
 
-      {tab === "overnight" && <OvernightTab />}
+      {tab === "overnight" && <OvernightTab m={m} />}
 
     </div>
   );
