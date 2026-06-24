@@ -383,33 +383,28 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
     queryFn: () => fetchProfile(),
   });
   const m = useLiveMetrics();
+  const { base, recordReadiness } = useBaselines(m);
   const firstName = (profile?.display_name || "Ryan").trim().split(/\s+/)[0] || "Ryan";
+
+  // Live session timer (auto-driven by band.sessionState)
+  const [sessionStart, setSessionStart] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => {
+    if (m.sessionState === "live" && sessionStart == null) setSessionStart(Date.now());
+    if (m.sessionState === "idle" && sessionStart != null) setSessionStart(null);
+  }, [m.sessionState, sessionStart]);
+  useEffect(() => {
+    if (m.sessionState !== "live") return;
+    const id = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [m.sessionState]);
+
   const [items, setItems] = useState<PlanItem[]>([
-    {
-      time: "10:00",
-      title: "Court session — interval ghosting",
-      load: "Hard · 45 min",
-      color: "amber",
-    },
-    {
-      time: "13:30",
-      title: "Match practice vs. Alex K.",
-      load: "Match · ~50 min",
-      color: "green",
-    },
-    {
-      time: "19:00",
-      title: "Mobility + breath work",
-      load: "Recovery · 20 min",
-      color: "green",
-    },
+    { time: "10:00", title: "Court session — interval ghosting", load: "Hard · 45 min", color: "amber" },
+    { time: "13:30", title: "Match practice vs. Alex K.", load: "Match · ~50 min", color: "green" },
+    { time: "19:00", title: "Mobility + breath work", load: "Recovery · 20 min", color: "green" },
   ]);
-  const [draft, setDraft] = useState({
-    time: "",
-    title: "",
-    load: "",
-    color: "green" as PlanItem["color"],
-  });
+  const [draft, setDraft] = useState({ time: "", title: "", load: "", color: "green" as PlanItem["color"] });
 
   const readinessInputs = computeReadiness({
     connected: m.connected,
@@ -429,89 +424,100 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
     eventsLastMin: m.eventsLastMin,
     reactMin: m.reactMin,
   });
-  const readiness = readinessInputs.score ?? 78;
-  const recovery = subs.recovery ?? 78;
-  const sleep = subs.sleep ?? 87;
-  const fatigue = subs.fatigue ?? 41;
-  const agility = subs.agility ?? 88;
+  const readiness = readinessInputs.score;
+  const recovery = subs.recovery;
+  const sleep = subs.sleep;
+  const fatigue = subs.fatigue;
+  const agility = subs.agility;
   const battery = m.batteryPct;
-  const status = m.connected
-    ? "BAND CONNECTED"
-    : m.connecting
-      ? "BAND CONNECTING"
-      : "PAIR BAND";
+  const status = m.connected ? "BAND CONNECTED" : m.connecting ? "BAND CONNECTING" : "PAIR BAND";
+
+  // Record daily readiness baseline once per ~10 min when present.
+  const lastRecordRef = useRef(0);
+  useEffect(() => {
+    if (readiness == null) return;
+    const now = Date.now();
+    if (now - lastRecordRef.current < 10 * 60_000) return;
+    lastRecordRef.current = now;
+    recordReadiness(readiness);
+  }, [readiness, recordReadiness]);
+
+  // Trend helpers — comparing live value vs baseline.
+  const trend = (cur: number | null | undefined, baseline: number | undefined, fmt: (d: number) => string, neutral = "baseline") => {
+    if (cur == null || baseline == null) return undefined;
+    const d = cur - baseline;
+    if (Math.abs(d) < 0.5) return neutral;
+    return fmt(d);
+  };
+
+  // Strain — composite of session events + peak jerk + HR margin over rest.
+  const strain = useMemo(() => {
+    if (!m.connected) return null;
+    const evPart = Math.min(40, m.eventsLastMin * 0.6);
+    const jerkPart = Math.min(30, (m.peakJerk ?? 0) / 6);
+    const hrPart = m.heartRateBpm != null && m.restingHrBpm != null
+      ? Math.min(30, Math.max(0, (m.heartRateBpm - m.restingHrBpm) / 2)) : 0;
+    return Math.round(evPart + jerkPart + hrPart);
+  }, [m.connected, m.eventsLastMin, m.peakJerk, m.heartRateBpm, m.restingHrBpm]);
+
+  const fmtCell = (v: number | string | null | undefined) =>
+    v == null || v === "" ? "—" : v;
 
   const vitals = useMemo(
     () => [
-      {
-        label: "Resting HR",
-        value: m.restingHrBpm ?? "—",
-        unit: "bpm",
-        trend: m.restingHrBpm ? "baseline" : undefined,
-        live: m.connected,
-      },
-      {
-        label: "Current HR",
-        value: m.heartRateBpm ?? "—",
-        unit: "bpm",
-        trend: m.heartRateBpm ? "live feed" : undefined,
-        live: m.connected,
-      },
-      {
-        label: "HRV (RMSSD)",
-        value: m.hrvMs ?? "—",
-        unit: "ms",
-        trend: m.hrvMs ? "+8 ms" : undefined,
-        live: m.connected,
-      },
-      {
-        label: "SpO₂",
-        value: m.spo2Pct ?? "—",
-        unit: "%",
-        trend: m.spo2Pct ? "stable" : undefined,
-        live: m.connected,
-      },
-      {
-        label: "Skin Temp",
-        value: m.skinTempC?.toFixed(1) ?? "—",
-        unit: "°C",
-        trend: m.skinTempC ? "+0.1" : undefined,
-        live: m.connected,
-      },
-      {
-        label: "Steps",
-        value: m.stepsToday?.toLocaleString() ?? "—",
-        unit: "",
-        trend: m.stepsToday ? "+18%" : undefined,
-        live: m.connected,
-      },
-      {
-        label: "Resp Rate",
-        value: m.respRateBrpm?.toFixed(1) ?? "—",
-        unit: "brpm",
-        trend: m.respRateBrpm ? "steady" : undefined,
-        live: m.connected,
-      },
-      {
-        label: "Stress",
-        value: m.stressScore ?? "—",
-        unit: "/100",
-        trend: m.stressScore != null ? "calm" : undefined,
-        live: m.connected,
-      },
+      { label: "Current HR", value: fmtCell(m.heartRateBpm), unit: "bpm",
+        trend: trend(m.heartRateBpm, m.restingHrBpm, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs rest`),
+        live: m.connected },
+      { label: "HRV (RMSSD)", value: fmtCell(m.hrvMs), unit: "ms",
+        trend: trend(m.hrvMs, base.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`),
+        live: m.connected },
+      { label: "Skin Temp", value: m.skinTempC != null ? m.skinTempC.toFixed(1) : "—", unit: "°C",
+        trend: m.skinTempC != null ? "live" : undefined,
+        live: m.connected },
+      { label: "Body Temp", value: m.skinTempC != null ? (m.skinTempC + 3.5).toFixed(1) : "—", unit: "°C",
+        trend: m.skinTempC != null ? "core est." : undefined,
+        live: m.connected },
+      { label: "Strain", value: fmtCell(strain), unit: "/100",
+        trend: strain != null ? (strain > 70 ? "overload" : strain > 40 ? "tempo" : "easy") : undefined,
+        live: m.connected },
+      { label: "SpO₂", value: fmtCell(m.spo2Pct), unit: "%",
+        trend: m.spo2Pct != null ? (m.spo2Pct >= 95 ? "stable" : "low") : undefined,
+        live: m.connected },
+      { label: "Resp Rate", value: m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm",
+        trend: m.respRateBrpm != null ? "live" : undefined,
+        live: m.connected },
+      { label: "Stress", value: fmtCell(m.stressScore), unit: "/100",
+        trend: m.stressScore != null ? (m.stressScore < 40 ? "calm" : m.stressScore < 70 ? "alert" : "high") : undefined,
+        live: m.connected },
     ],
-    [
-      m.connected,
-      m.heartRateBpm,
-      m.hrvMs,
-      m.restingHrBpm,
-      m.skinTempC,
-      m.spo2Pct,
-      m.stepsToday,
-      m.respRateBrpm,
-      m.stressScore,
-    ],
+    [m.connected, m.heartRateBpm, m.hrvMs, m.restingHrBpm, m.skinTempC, m.spo2Pct, m.respRateBrpm, m.stressScore, strain, base.hrv],
   );
+
+  // RTP Validator — derived from real readiness vs 7d baseline (±5% target).
+  const baselineReady = base.readiness ?? null;
+  const wearablePower = readiness;
+  const deviationPct = wearablePower != null && baselineReady != null && baselineReady > 0
+    ? ((wearablePower - baselineReady) / baselineReady) * 100 : null;
+  const withinBaseline = deviationPct != null && Math.abs(deviationPct) <= 5;
+  const clearance = wearablePower != null && baselineReady != null
+    ? Math.round(Math.max(0, 100 - Math.abs(deviationPct!) * 4))
+    : null;
+
+  // Auto-injected live training block (from active session)
+  const liveSessionBlock = useMemo(() => {
+    if (m.sessionState === "idle" || sessionStart == null) return null;
+    const elapsedMin = Math.max(0, Math.floor((nowTick - sessionStart) / 60_000));
+    const load = strain ?? 0;
+    const classification = load > 70 ? "Overload" : load > 40 ? "Optimal" : "Light";
+    const color: PlanItem["color"] = load > 70 ? "red" : load > 40 ? "green" : "amber";
+    return {
+      time: new Date(sessionStart).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      title: `Court session — ${m.sessionState === "paused" ? "paused" : "live tracking"}`,
+      load: `${classification} · ${elapsedMin} min`,
+      color,
+    } satisfies PlanItem;
+  }, [m.sessionState, sessionStart, nowTick, strain]);
+
 
   const addPlan = () => {
     if (!draft.time.trim() && !draft.title.trim() && !draft.load.trim()) return;
