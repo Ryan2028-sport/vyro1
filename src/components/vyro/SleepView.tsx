@@ -126,21 +126,24 @@ function SleepTabButton({ active, onClick, children }: { active: boolean; onClic
 }
 
 function OverallSleep() {
+  const { hasData, night: n } = useNightView();
   return (
     <div className="space-y-7">
       <VCard className="border-vyro-text/42">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep score</p>
-          <MiniBadge>Sleep synced</MiniBadge>
+          <MiniBadge>{hasData ? "Sleep synced" : "Preview"}</MiniBadge>
         </div>
-        <h3 className="mt-5 text-[24px] font-black leading-tight text-vyro-text">Recovered, not topped off.</h3>
+        <h3 className="mt-5 text-[24px] font-black leading-tight text-vyro-text">
+          {hasData ? interpretScore(n.score) : "Recovered, not topped off."}
+        </h3>
         <div className="mt-6 rounded-[20px] border border-vyro-text/25 bg-vyro-ink/35 p-5 text-center">
-          <SleepRing value={night.score} />
+          <SleepRing value={n.score} />
         </div>
         <div className="mt-5 space-y-4">
-          <MetricPanel icon={<Moon className="h-5 w-5" />} label="Asleep" value={night.asleepLabel} hint={`${night.bedtime} → ${night.wake}`} />
-          <MetricPanel icon={<AlarmClock className="h-5 w-5" />} label="Wakeups" value={night.wakeups} hint={`${night.inBedLabel} in bed`} />
-          <MetricPanel icon={<Zap className="h-5 w-5" />} label="Sleep debt" value={night.debtLabel} hint={`Target ${night.targetLabel}`} />
+          <MetricPanel icon={<Moon className="h-5 w-5" />} label="Asleep" value={n.asleepLabel} hint={`${n.bedtime} → ${n.wake}`} />
+          <MetricPanel icon={<AlarmClock className="h-5 w-5" />} label="Wakeups" value={n.wakeups} hint={`${n.inBedLabel} in bed`} />
+          <MetricPanel icon={<Zap className="h-5 w-5" />} label="Sleep debt" value={n.debtLabel} hint={`Target ${n.targetLabel}`} />
         </div>
       </VCard>
 
@@ -149,6 +152,13 @@ function OverallSleep() {
       <RecoveryInterpretation />
     </div>
   );
+}
+
+function interpretScore(score: number): string {
+  if (score >= 90) return "Fully topped off.";
+  if (score >= 80) return "Recovered, not topped off.";
+  if (score >= 65) return "Partial recovery — pace today.";
+  return "Under-recovered — cut intensity.";
 }
 
 function SleepDebtCard() {
