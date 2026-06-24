@@ -297,48 +297,8 @@ function SubBar({ label, value, weight }: { label: string; value: number | null;
   );
 }
 
-// Sparkline — last 14 days. Uses live recovery score as the rightmost
-// point and synthesizes a stable trend around it so the chart isn't empty
-// before history is persisted server-side.
-function fakeTrend(latest: number | null): number[] {
-  const base = latest ?? 70;
-  const seed = base * 7.1;
-  return Array.from({ length: 14 }, (_, i) => {
-    const wave = Math.sin((i + seed) * 0.7) * 10;
-    const drift = (i - 7) * 0.6;
-    return Math.max(20, Math.min(100, Math.round(base + wave + drift)));
-  });
-}
 
-function Sparkline({ points }: { points: number[] }) {
-  const w = 320, h = 80, pad = 4;
-  const min = Math.min(...points) - 5;
-  const max = Math.max(...points) + 5;
-  const range = Math.max(1, max - min);
-  const step = (w - pad * 2) / (points.length - 1);
-  const coords = points.map((p, i) => {
-    const x = pad + i * step;
-    const y = pad + (1 - (p - min) / range) * (h - pad * 2);
-    return [x, y] as const;
-  });
-  const path = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const area = `${path} L${coords[coords.length - 1][0].toFixed(1)},${h - pad} L${coords[0][0].toFixed(1)},${h - pad} Z`;
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="block h-20 w-full">
-      <defs>
-        <linearGradient id="rec-spark" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--vyro-mint)" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="var(--vyro-mint)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#rec-spark)" />
-      <path d={path} fill="none" stroke="var(--vyro-mint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      {coords.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i === coords.length - 1 ? 3 : 1.5} fill="var(--vyro-mint)" />
-      ))}
-    </svg>
-  );
-}
+
 
 // ============================================================================
 // In-Game tab — recovery speed under fatigue
