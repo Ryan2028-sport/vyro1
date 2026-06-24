@@ -151,6 +151,13 @@ export function AthleteView() {
             <Stat label="Resting HR" value={m.restingHrBpm ?? "—"} unit="bpm" hint="nightly" />
             <Stat label="HRV (RMSSD)" value={m.hrvMs ?? "—"} unit="ms" hint="every 5 min" />
             <Stat label="Stress" value={m.stressScore ?? "—"} hint="HR · HRV · RR" />
+            <Stat
+              label="Blood pressure"
+              value={m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—"}
+              unit="mmHg"
+              hint="one-key measure"
+            />
+            <Stat label="Resp rate" value={m.respRateBrpm ?? "—"} unit="br/min" hint="derived" />
           </div>
         </Card>
       )}
