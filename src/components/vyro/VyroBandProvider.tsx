@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyProfile } from "@/lib/profile.functions";
 import { useVyroBand } from "@/hooks/use-vyro-band";
-import { isNative, location as despiaLocation } from "@/lib/despia";
+import { isNative, location as despiaLocation, run as despiaRun } from "@/lib/despia";
 
 type VyroBandCtx = ReturnType<typeof useVyroBand> & {
   pairedId: string | null;
@@ -114,10 +114,14 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
     const hasBand = !!pairedId || !!ble.connectedId;
     if (!hasBand) return;
     if (isNative) {
-      void despiaLocation.backgroundOn();
+      const keepAlive = () => {
+        void despiaLocation.backgroundOn();
+        void despiaRun("scanningmode://on");
+      };
+      keepAlive();
       const onVis = () => {
         // Re-assert on both hide AND show so iOS keeps the central alive.
-        void despiaLocation.backgroundOn();
+        keepAlive();
       };
       document.addEventListener("visibilitychange", onVis);
       window.addEventListener("pagehide", onVis);
@@ -126,10 +130,9 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
         document.removeEventListener("visibilitychange", onVis);
         window.removeEventListener("pagehide", onVis);
         window.removeEventListener("pageshow", onVis);
-        // Do not disable the native background keep-alive during app minimize
-        // / pagehide. The BLE metric stream must resume from the same watch
-        // session instead of restarting measurements from scratch.
-        if (document.visibilityState !== "hidden") void despiaLocation.backgroundOff();
+        // Do not disable native keep-alive from React cleanup. iOS can tear
+        // down the WebView while minimized / on the home screen, and turning
+        // it off here is exactly what breaks always-on watch streaming.
       };
     }
     let wakeLock: { release: () => Promise<void> } | null = null;
