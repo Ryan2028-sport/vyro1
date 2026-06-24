@@ -268,6 +268,30 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
   const isCourtSport = sport.id === "squash" || sport.id === "tennis";
   const visibleTabs = isCourtSport && courtDbOpen ? COURT_DB_TABS : PRIMARY_TABS;
 
+  // Live overlays for court sports — compute once, share across tabs.
+  const live = useLiveMetrics();
+  const recoverySub = useMemo(
+    () => computeSubScores({
+      connected: live.connected, hrvMs: live.hrvMs, restingHrBpm: live.restingHrBpm,
+      stress: live.stressScore, peakJerk: live.peakJerk ?? null, peakG: live.peakG ?? null,
+      eventsLastMin: live.eventsLastMin, reactMin: live.reactMin,
+    }).recovery,
+    [live.connected, live.hrvMs, live.restingHrBpm, live.stressScore, live.peakJerk, live.peakG, live.eventsLastMin, live.reactMin],
+  );
+  const readinessScore = useMemo(
+    () => computeReadiness({
+      connected: live.connected, hrvMs: live.hrvMs, restingHrBpm: live.restingHrBpm,
+      stress: live.stressScore, spo2: live.spo2Pct, peakJerk: live.peakJerk ?? null,
+    }).score,
+    [live.connected, live.hrvMs, live.restingHrBpm, live.stressScore, live.spo2Pct, live.peakJerk],
+  );
+  const sixLenses = useMemo(
+    () => (isCourtSport ? computeSixLenses({ m: live, recovery: recoverySub, readiness: readinessScore }) : null),
+    [isCourtSport, live, recoverySub, readinessScore],
+  );
+  const contactGridLive = useMemo(() => liveContactGrid(live), [live]);
+
+
   function handleTab(next: SubTab) {
     if (next === "database" && isCourtSport) {
       setCourtDbOpen(true);
