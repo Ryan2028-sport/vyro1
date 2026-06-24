@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from "react";
 import { AlarmClock, Bed, Brain, CircleHelp, Moon, Sunrise, Waves, Zap } from "lucide-react";
+import { useSleepNights, fmtSleepDuration } from "@/lib/use-sleep-nights";
 
 type Tab = "overall" | "zones" | "wakeups" | "performance";
 
-const night = {
+// Demo placeholder — overridden by real values when a night is synced.
+const DEMO_NIGHT = {
   score: 87,
   asleepLabel: "6h 46m",
   inBedLabel: "7h 04m",
@@ -15,6 +17,35 @@ const night = {
   recBedtime: "10:25 PM",
   recWake: "6:15 AM",
 };
+
+function fmtTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  } catch {
+    return "—";
+  }
+}
+
+function useNightView() {
+  const { last } = useSleepNights();
+  if (!last) return { hasData: false as const, night: DEMO_NIGHT };
+  const bedtimeISO = new Date(new Date(last.endAt).getTime() - last.inBedMin * 60_000).toISOString();
+  return {
+    hasData: true as const,
+    night: {
+      score: last.score,
+      asleepLabel: fmtSleepDuration(last.asleepMin),
+      inBedLabel: fmtSleepDuration(last.inBedMin),
+      bedtime: fmtTime(bedtimeISO),
+      wake: fmtTime(last.endAt),
+      wakeups: last.wakeups,
+      debtLabel: last.debtMin != null ? fmtSleepDuration(Math.max(0, last.debtMin)) : "—",
+      targetLabel: "8h 10m",
+      recBedtime: DEMO_NIGHT.recBedtime,
+      recWake: DEMO_NIGHT.recWake,
+    },
+  };
+}
 
 const primaryTabs: { id: Tab; label: string }[] = [
   { id: "overall", label: "Overall Sleep" },
