@@ -243,20 +243,23 @@ export function useVyroBand() {
   const [events, setEvents] = useState<VyroEventEntry[]>([]);
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [sport, setSport] = useState<Sport>("squash");
-  const [heartRateBpm, setHeartRateBpm] = useState<number | null>(initialMetrics.heartRateBpm ?? null);
-  const [heartRateAt, setHeartRateAt] = useState<number | null>(initialMetrics.heartRateAt ?? null);
-  const [batteryPct, setBatteryPct] = useState<number | null>(initialMetrics.batteryPct ?? null);
-  const [batteryCharging, setBatteryCharging] = useState<boolean>(initialMetrics.batteryCharging ?? false);
-  const [spo2Pct, setSpo2Pct] = useState<number | null>(initialMetrics.spo2Pct ?? null);
-  const [skinTempC, setSkinTempC] = useState<number | null>(initialMetrics.skinTempC ?? null);
-  const [stepsToday, setStepsToday] = useState<number | null>(initialMetrics.stepsToday ?? null);
-  const [distanceM, setDistanceM] = useState<number | null>(initialMetrics.distanceM ?? null);
-  const [caloriesKcal, setCaloriesKcal] = useState<number | null>(initialMetrics.caloriesKcal ?? null);
-  const [restingHrBpm, setRestingHrBpm] = useState<number | null>(initialMetrics.restingHrBpm ?? null);
-  const [hrvMs, setHrvMs] = useState<number | null>(initialMetrics.hrvMs ?? null);
-  const [respRateBrpm, setRespRateBrpm] = useState<number | null>(initialMetrics.respRateBrpm ?? null);
-  const [stressScore, setStressScore] = useState<number | null>(initialMetrics.stressScore ?? null);
-  const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(initialMetrics.bloodPressure ?? null);
+  // Never hydrate UI-facing live body signals from localStorage. Persisted
+  // values are kept only as a debug/reconnect cache; tiles must repopulate
+  // from fresh watch frames after connect.
+  const [heartRateBpm, setHeartRateBpm] = useState<number | null>(null);
+  const [heartRateAt, setHeartRateAt] = useState<number | null>(null);
+  const [batteryPct, setBatteryPct] = useState<number | null>(null);
+  const [batteryCharging, setBatteryCharging] = useState<boolean>(false);
+  const [spo2Pct, setSpo2Pct] = useState<number | null>(null);
+  const [skinTempC, setSkinTempC] = useState<number | null>(null);
+  const [stepsToday, setStepsToday] = useState<number | null>(null);
+  const [distanceM, setDistanceM] = useState<number | null>(null);
+  const [caloriesKcal, setCaloriesKcal] = useState<number | null>(null);
+  const [restingHrBpm, setRestingHrBpm] = useState<number | null>(null);
+  const [hrvMs, setHrvMs] = useState<number | null>(null);
+  const [respRateBrpm, setRespRateBrpm] = useState<number | null>(null);
+  const [stressScore, setStressScore] = useState<number | null>(null);
+  const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(null);
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
   const activeConnectionRef = useRef<string | null>(null);
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
