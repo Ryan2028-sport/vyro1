@@ -15,8 +15,9 @@ export function useLiveMetrics() {
     return () => window.clearInterval(id);
   }, [connected]);
 
+  const currentTime = Math.max(now, Date.now());
   const isFresh = (at: number | null | undefined, maxAgeMs: number) =>
-    connected && at != null && now - at >= 0 && now - at <= maxAgeMs;
+    connected && at != null && currentTime - at >= 0 && currentTime - at <= maxAgeMs;
 
   const liveHeartRateBpm = isFresh(heartRateAt, 15_000) ? heartRateBpm : null;
   const liveHeartRateAt = liveHeartRateBpm == null ? null : heartRateAt;
