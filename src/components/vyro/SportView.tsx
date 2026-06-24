@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
 import { SPORT_PROFILES, type SportProfile } from "./sportProfiles";
-import { useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
+import { useLiveMetrics, type LiveMetrics, computeLiveRecovery } from "./useLiveMetrics";
 
 // ============================================================================
 // Sport view — STRICT real-telemetry-only mode.
@@ -73,6 +73,9 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
           </Pill>
         }
       />
+
+      <SquashSnapshotCard m={m} />
+      <PerformanceLensesCard m={m} />
 
       <EventCountsCard m={m} />
       <SwingCard m={m} />
@@ -187,6 +190,160 @@ function VitalsCard({ m }: { m: LiveMetrics }) {
         <Stat label="SpO₂" value={m.connected ? fmt(m.spo2Pct, 0) : "—"} unit="%" />
         <Stat label="Skin temp" value={m.connected ? fmt(m.skinTempC, 1) : "—"} unit="°C" />
       </div>
+    </Card>
+  );
+}
+
+// =============================================================================
+// Squash snapshot — the headline trio the user expects on the Sport tab.
+// All three values are derived from the SWING IMU event packet, so they
+// populate the instant the band starts emitting swings. Offline → "—".
+//   • Racket head speed (mph) ≈ wrist angular velocity (gyroPeakDps) × racket
+//     lever arm (~0.40 m wrist→head), converted m/s → mph.
+//   • Ball force (N) ≈ peak wrist acceleration × effective racket+ball mass.
+//     Uses 0.18 kg effective mass as a calibration constant.
+//   • Contact quality (0-100) ≈ rolling SWING intensity average; this is the
+//     firmware's own cleanness / repeatability proxy for a strike.
+// =============================================================================
+function SquashSnapshotCard({ m }: { m: LiveMetrics }) {
+  const hasSwing = m.connected && m.counts.swing > 0;
+  // dps → rad/s → m/s at 0.40 m lever → mph (× 2.23694)
+  const racketMph = hasSwing && m.peakDps > 0
+    ? (m.peakDps * (Math.PI / 180)) * 0.40 * 2.23694
+    : null;
+  // g → m/s² (× 9.81) × 0.18 kg effective racket+ball mass → Newtons
+  const ballForceN = hasSwing && m.peakG > 0 ? m.peakG * 9.81 * 0.18 : null;
+  const contactQ = hasSwing ? m.swingIntAvg : null;
+  return (
+    <Card
+      eyebrow="Squash snapshot"
+      title="Where you stand right now"
+      action={m.connected ? <Pill tone="live" pulse>LIVE</Pill> : <Pill tone="off">offline</Pill>}
+    >
+      <p className="mb-3 text-[11px] text-vyro-mute">
+        Derived from the SWING IMU event packet — racket head speed (wrist
+        angular velocity × lever arm), ball force (wrist accel × racket+ball
+        mass), and the firmware's contact-quality intensity score.
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        <Stat label="Racket head speed" value={racketMph != null ? fmt(racketMph, 0) : "—"} unit="mph" />
+        <Stat label="Ball force" value={ballForceN != null ? fmt(ballForceN, 0) : "—"} unit="N" />
+        <Stat label="Contact quality" value={contactQ != null ? fmt(contactQ, 0) : "—"} unit="/100" />
+      </div>
+    </Card>
+  );
+}
+
+// =============================================================================
+// Performance lenses — the six-lens breakdown. Every subscore is computed
+// from the four firmware IMU packets + live BLE characteristics + the canonical
+// LIVE Recovery composite. When the band is offline OR the source packet hasn't
+// been emitted yet, the lens row renders "—" and a neutral "no data" band.
+// =============================================================================
+type LensSub = { label: string; value: number | null };
+type Lens = { id: string; title: string; subs: LensSub[] };
+
+function bandLabel(score: number | null): { text: string; tone: "live" | "off" } {
+  if (score == null) return { text: "no data", tone: "off" };
+  if (score >= 80) return { text: "Elite band", tone: "live" };
+  if (score >= 60) return { text: "On target", tone: "live" };
+  if (score >= 40) return { text: "Developing", tone: "off" };
+  return { text: "Below band", tone: "off" };
+}
+
+function avgNonNull(vals: (number | null)[]): number | null {
+  const xs = vals.filter((v): v is number => v != null && Number.isFinite(v));
+  if (!xs.length) return null;
+  return Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
+}
+
+function PerformanceLensesCard({ m }: { m: LiveMetrics }) {
+  const lenses: Lens[] = useMemo(() => {
+    if (!m.connected) {
+      // Offline — keep card layout, all six lenses show "—".
+      return [
+        { id: "movement", title: "Movement", subs: [{ label: "First-step burst", value: null }, { label: "Acceleration", value: null }] },
+        { id: "shot", title: "Shot quality", subs: [{ label: "Racket head speed", value: null }, { label: "Ball force", value: null }] },
+        { id: "court", title: "Court positioning", subs: [{ label: "Change of direction", value: null }, { label: "Return control", value: null }] },
+        { id: "fatigue", title: "Fatigue", subs: [{ label: "Session load", value: null }, { label: "Decay resistance", value: null }] },
+        { id: "tactical", title: "Tactical patterns", subs: [{ label: "Pattern read confidence", value: null }, { label: "Pressure adaptation", value: null }] },
+        { id: "ready", title: "Readiness", subs: [{ label: "Live recovery", value: null }, { label: "Sport readiness", value: null }] },
+      ];
+    }
+    const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+    // ── Movement (BURST + RAPID_START packets) ────────────────────────────
+    const firstStep = m.peakJerk > 0 ? clamp(m.peakJerk / 2.5) : null;     // jerk g/s → 0-100
+    const accel = m.peakG > 0 ? clamp(m.peakG * 16) : null;                // g → 0-100
+    // ── Shot quality (SWING packet) ───────────────────────────────────────
+    const hasSwing = m.counts.swing > 0;
+    const rhsScore = hasSwing && m.peakDps > 0 ? clamp(m.peakDps / 10) : null; // 1000dps → 100
+    const forceScore = hasSwing && m.peakG > 0 ? clamp(m.peakG * 12) : null;
+    // ── Court positioning (DIR_CHANGE packet) ─────────────────────────────
+    const cod = m.counts.direction_change > 0 ? clamp(Math.min(100, m.counts.direction_change * 4)) : null;
+    const retCtrl = m.reactMin != null ? clamp(100 - Math.min(m.reactMin, 600) / 6) : null;
+    // ── Fatigue (event density + HR decay) ────────────────────────────────
+    const sessLoad = m.eventsLastMin > 0 ? clamp(100 - Math.min(m.eventsLastMin, 120) * 0.7) : null;
+    const decay = m.heartRateBpm != null && m.restingHrBpm != null
+      ? clamp(100 - Math.max(0, m.heartRateBpm - m.restingHrBpm) * 1.2)
+      : null;
+    // ── Tactical patterns — requires AI Video / shot tagging. Until those
+    // streams exist the firmware can't infer them, so they stay "—".
+    const tactical1: number | null = null;
+    const tactical2: number | null = null;
+    // ── Readiness (canonical LIVE Recovery composite) ─────────────────────
+    const rec = computeLiveRecovery({
+      connected: m.connected,
+      heartRateBpm: m.heartRateBpm,
+      restingHrBpm: m.restingHrBpm,
+      hrvMs: m.hrvMs,
+      spo2Pct: m.spo2Pct,
+      skinTempC: m.skinTempC,
+      peakJerk: m.peakJerk,
+      eventsLastMin: m.eventsLastMin,
+    });
+    return [
+      { id: "movement", title: "Movement", subs: [{ label: "First-step burst", value: firstStep }, { label: "Acceleration", value: accel }] },
+      { id: "shot", title: "Shot quality", subs: [{ label: "Racket head speed", value: rhsScore }, { label: "Ball force", value: forceScore }] },
+      { id: "court", title: "Court positioning", subs: [{ label: "Change of direction", value: cod }, { label: "Return control", value: retCtrl }] },
+      { id: "fatigue", title: "Fatigue", subs: [{ label: "Session load", value: sessLoad }, { label: "Decay resistance", value: decay }] },
+      { id: "tactical", title: "Tactical patterns", subs: [{ label: "Pattern read confidence", value: tactical1 }, { label: "Pressure adaptation", value: tactical2 }] },
+      { id: "ready", title: "Readiness", subs: [{ label: "Live recovery", value: rec.score }, { label: "Sport readiness", value: rec.parts.muscle }] },
+    ];
+  }, [m]);
+
+  return (
+    <Card eyebrow="Performance groups" title="Six lenses on squash">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {lenses.map((lens) => {
+          const headline = avgNonNull(lens.subs.map((s) => s.value));
+          const band = bandLabel(headline);
+          return (
+            <div key={lens.id} className="rounded-2xl border border-vyro-line bg-vyro-panel/60 p-3">
+              <div className="flex items-baseline justify-between">
+                <div className="font-mono text-[10px] uppercase tracking-wider text-vyro-mute">{lens.title}</div>
+                <Pill tone={band.tone}>{band.text}</Pill>
+              </div>
+              <div className="mt-1 text-2xl font-bold text-vyro-text">
+                {headline != null ? headline : "—"}
+              </div>
+              <div className="mt-2 space-y-1">
+                {lens.subs.map((s) => (
+                  <div key={s.label} className="flex items-center justify-between text-[11px]">
+                    <span className="text-vyro-mute">{s.label}</span>
+                    <span className="font-mono text-vyro-text">{s.value != null ? s.value : "—"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-[11px] text-vyro-mute">
+        Lenses populate as their source packet arrives: Movement from BURST/RAPID_START,
+        Shot quality from SWING, Court positioning from DIR_CHANGE, Fatigue from event
+        density + HR vs RHR, Readiness from the LIVE Recovery composite. Tactical patterns
+        require AI Video / shot tagging and stay "—" until those streams are wired in.
+      </p>
     </Card>
   );
 }
