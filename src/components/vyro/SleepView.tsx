@@ -16,7 +16,7 @@ const DEMO_NIGHT = {
   targetLabel: "8h 10m",
   recBedtime: "10:25 PM",
   recWake: "6:15 AM",
-};
+const night = DEMO_NIGHT;
 
 function fmtTime(iso: string) {
   try {
