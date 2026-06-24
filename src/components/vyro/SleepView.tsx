@@ -1,310 +1,243 @@
-import { useState, type ReactNode } from "react";
-import { AlarmClock, Bed, Brain, CircleHelp, Moon, Sunrise, Waves, Zap } from "lucide-react";
-import { useSleepNights, fmtSleepDuration } from "@/lib/use-sleep-nights";
+// Sleep view — STRICT real-data-only mode.
+// The firmware does NOT emit a sleep frame, so we cannot show staged
+// hypnograms, wakeup events or sleep-debt. Instead we derive a basic sleep
+// score from overnight HR / HRV / skin-temp samples streamed via BLE, using
+// a rolling localStorage buffer. Every value falls back to "—" when there
+// isn't a real source for it.
 
-type Tab = "overall" | "zones" | "wakeups" | "performance";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Heart, Moon, Thermometer, Activity } from "lucide-react";
+import { useLiveMetrics } from "./useLiveMetrics";
 
-// Demo placeholder — overridden by real values when a night is synced.
-const DEMO_NIGHT = {
-  score: 87,
-  asleepLabel: "6h 46m",
-  inBedLabel: "7h 04m",
-  bedtime: "11:14 PM",
-  wake: "6:18 AM",
-  wakeups: 4,
-  debtLabel: "1h 24m",
-  targetLabel: "8h 10m",
-  recBedtime: "10:25 PM",
-  recWake: "6:15 AM",
-};
-const night = DEMO_NIGHT;
+type Sample = { t: number; hr?: number; hrv?: number; tempC?: number };
+const BUF_KEY = "vyro.sleep.samples.v1";
+const BUF_MAX = 2880; // ~24h at one sample / 30s
+const WINDOW_MS = 12 * 60 * 60_000; // last 12h
+const NIGHT_HOURS = new Set([22, 23, 0, 1, 2, 3, 4, 5, 6, 7]);
 
-function fmtTime(iso: string) {
+function loadBuf(): Sample[] {
+  if (typeof window === "undefined") return [];
   try {
-    return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const raw = window.localStorage.getItem(BUF_KEY);
+    if (!raw) return [];
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
   } catch {
-    return "—";
+    return [];
   }
 }
-
-function useNightView() {
-  const { last } = useSleepNights();
-  if (!last) return { hasData: false as const, night: DEMO_NIGHT };
-  const bedtimeISO = new Date(new Date(last.endAt).getTime() - last.inBedMin * 60_000).toISOString();
-  return {
-    hasData: true as const,
-    night: {
-      score: last.score,
-      asleepLabel: fmtSleepDuration(last.asleepMin),
-      inBedLabel: fmtSleepDuration(last.inBedMin),
-      bedtime: fmtTime(bedtimeISO),
-      wake: fmtTime(last.endAt),
-      wakeups: last.wakeups,
-      debtLabel: last.debtMin != null ? fmtSleepDuration(Math.max(0, last.debtMin)) : "—",
-      targetLabel: "8h 10m",
-      recBedtime: DEMO_NIGHT.recBedtime,
-      recWake: DEMO_NIGHT.recWake,
-    },
-  };
+function saveBuf(b: Sample[]) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(BUF_KEY, JSON.stringify(b.slice(-BUF_MAX))); } catch { /* quota */ }
 }
 
-const primaryTabs: { id: Tab; label: string }[] = [
-  { id: "overall", label: "Overall Sleep" },
-  { id: "zones", label: "Sleep Zones" },
-  { id: "wakeups", label: "Wakeups" },
-];
+function avg(xs: number[]): number | null {
+  if (!xs.length) return null;
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
+}
+function min(xs: number[]): number | null { return xs.length ? Math.min(...xs) : null; }
+
+// Sleep score 0-100 derived from overnight vitals.
+//   Cardiac calm: lower min HR = better. 40 bpm → 100, 75 bpm → 0.
+//   Recovery:     higher avg HRV = better. 20 ms → 0, 80 ms → 100.
+//   Thermal:      lower temp variance = better. SD <0.3°C → 100, >2°C → 0.
+// Weights renormalised over present inputs so a missing channel doesn't
+// unfairly drag the score. Returns null when no overnight samples at all.
+function computeSleepScore(samples: Sample[]): { score: number | null; cardiac: number | null; recovery: number | null; thermal: number | null } {
+  const hrs = samples.map((s) => s.hr).filter((v): v is number => typeof v === "number");
+  const hrvs = samples.map((s) => s.hrv).filter((v): v is number => typeof v === "number");
+  const temps = samples.map((s) => s.tempC).filter((v): v is number => typeof v === "number");
+
+  const clamp = (x: number) => Math.max(0, Math.min(100, x));
+
+  const cardiac = hrs.length >= 3 && min(hrs) != null
+    ? Math.round(clamp(((75 - (min(hrs) as number)) / 35) * 100))
+    : null;
+  const recovery = hrvs.length >= 3 && avg(hrvs) != null
+    ? Math.round(clamp((((avg(hrvs) as number) - 20) / 60) * 100))
+    : null;
+  let thermal: number | null = null;
+  if (temps.length >= 3) {
+    const mean = (avg(temps) as number);
+    const sd = Math.sqrt(temps.reduce((a, b) => a + (b - mean) ** 2, 0) / temps.length);
+    thermal = Math.round(clamp((1 - Math.min(sd, 2) / 2) * 100));
+  }
+
+  const parts = [
+    { v: cardiac, w: 0.45 },
+    { v: recovery, w: 0.4 },
+    { v: thermal, w: 0.15 },
+  ].filter((p) => p.v != null) as { v: number; w: number }[];
+  if (!parts.length) return { score: null, cardiac, recovery, thermal };
+  const totalW = parts.reduce((a, b) => a + b.w, 0);
+  const score = Math.round(parts.reduce((a, b) => a + b.v * b.w, 0) / totalW);
+  return { score, cardiac, recovery, thermal };
+}
+
+function useOvernightSamples() {
+  const m = useLiveMetrics();
+  const [buf, setBuf] = useState<Sample[]>(() => loadBuf());
+  const lastWriteRef = useRef(0);
+
+  // Capture one sample per ~30s while connected. Throttled writes to LS.
+  useEffect(() => {
+    if (!m.connected) return;
+    const id = window.setInterval(() => {
+      const s: Sample = {
+        t: Date.now(),
+        hr: m.heartRateBpm ?? undefined,
+        hrv: m.hrvMs ?? undefined,
+        tempC: m.skinTempC ?? undefined,
+      };
+      if (s.hr == null && s.hrv == null && s.tempC == null) return;
+      setBuf((prev) => {
+        const next = [...prev, s].slice(-BUF_MAX);
+        const now = Date.now();
+        if (now - lastWriteRef.current > 10_000) {
+          lastWriteRef.current = now;
+          saveBuf(next);
+        }
+        return next;
+      });
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [m.connected, m.heartRateBpm, m.hrvMs, m.skinTempC]);
+
+  // Filter to overnight samples in the last 12h.
+  const overnight = useMemo(() => {
+    const cutoff = Date.now() - WINDOW_MS;
+    return buf.filter((s) => s.t >= cutoff && NIGHT_HOURS.has(new Date(s.t).getHours()));
+  }, [buf]);
+
+  return { samples: overnight, bufSize: buf.length, connected: m.connected };
+}
+
+function fmt(n: number | null | undefined, digits = 0, unit = ""): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return `${n.toFixed(digits)}${unit}`;
+}
 
 export function SleepView() {
-  const [tab, setTab] = useState<Tab>("overall");
-  const { hasData } = useNightView();
+  const { samples, bufSize, connected } = useOvernightSamples();
+  const { score, cardiac, recovery, thermal } = useMemo(() => computeSleepScore(samples), [samples]);
+
+  const hrs = samples.map((s) => s.hr).filter((v): v is number => typeof v === "number");
+  const hrvs = samples.map((s) => s.hrv).filter((v): v is number => typeof v === "number");
+  const temps = samples.map((s) => s.tempC).filter((v): v is number => typeof v === "number");
+
+  const minHr = hrs.length ? Math.min(...hrs) : null;
+  const avgHr = hrs.length ? hrs.reduce((a, b) => a + b, 0) / hrs.length : null;
+  const avgHrv = hrvs.length ? hrvs.reduce((a, b) => a + b, 0) / hrvs.length : null;
+  const avgTemp = temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null;
+
+  const firstT = samples.length ? samples[0].t : null;
+  const lastT = samples.length ? samples[samples.length - 1].t : null;
+  const windowLabel = firstT && lastT
+    ? `${new Date(firstT).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} → ${new Date(lastT).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    : "—";
 
   return (
-    <div className="mx-auto max-w-[430px] space-y-7 pb-8 text-vyro-text">
-      <header className="space-y-3">
-        <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep · Recovery Input</p>
-        <div className="space-y-2">
-          <h2 className="text-[28px] font-black leading-none text-vyro-text">Sleep architecture</h2>
-          <p className="max-w-[390px] text-[14px] leading-relaxed text-vyro-mute">
-            WHOOP-style sleep breakdown for duration, zones, wakeups, and next-session readiness.
-          </p>
-        </div>
+    <div className="mx-auto max-w-[430px] space-y-5 pb-8 text-vyro-text">
+      <header className="space-y-2">
+        <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep · Overnight vitals</p>
+        <h2 className="text-[26px] font-black leading-tight text-vyro-text">Live sleep score</h2>
+        <p className="max-w-[390px] text-[13px] leading-relaxed text-vyro-mute">
+          Derived only from BLE heart-rate, HRV and skin-temperature samples
+          collected between 10pm and 8am. The firmware does not emit sleep
+          stages, so no hypnogram, no wakeups, no debt curves are shown.
+        </p>
         <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-vyro-text/35 bg-vyro-text/5 px-3 font-mono text-[12px] uppercase tracking-[0.16em] text-vyro-text">
           <Moon className="h-4 w-4" />
-          {hasData ? "Last night" : "Preview · no synced nights"}
+          {connected ? "Band live · sampling" : samples.length ? "Last overnight window" : "Awaiting overnight data"}
         </span>
-        {!hasData && (
-          <div className="rounded-xl border border-dashed border-vyro-line bg-vyro-elev/70 p-3 text-[12px] leading-relaxed text-vyro-mute">
-            No sleep data has been synced from the band yet. The numbers below are a preview layout — once the firmware emits a sleep frame it will replace these values automatically.
-          </div>
-        )}
       </header>
 
+      <ScoreCard score={score} cardiac={cardiac} recovery={recovery} thermal={thermal} samples={samples.length} bufSize={bufSize} />
 
-      <div>
-        <div className="grid grid-cols-3 gap-3">
-          {primaryTabs.map((item) => (
-            <SleepTabButton key={item.id} active={tab === item.id} onClick={() => setTab(item.id)}>
-              {item.label}
-            </SleepTabButton>
-          ))}
+      <VCard>
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-[12px] uppercase tracking-[0.28em] text-vyro-mute">Overnight window</p>
+          <span className="font-mono text-[11px] text-vyro-mute">{windowLabel}</span>
         </div>
-        <div className="mt-7 border-b border-vyro-line">
-          <button
-            type="button"
-            onClick={() => setTab("performance")}
-            className={`relative pb-5 text-left text-[16px] font-black transition-colors ${
-              tab === "performance" ? "text-vyro-text" : "text-vyro-mute hover:text-vyro-text"
-            }`}
-          >
-            Performance
-            {tab === "performance" && <span className="absolute inset-x-0 -bottom-px h-[3px] bg-vyro-text" />}
-          </button>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Metric icon={<Heart className="h-4 w-4" />} label="Min HR" value={fmt(minHr, 0)} unit="bpm" />
+          <Metric icon={<Heart className="h-4 w-4" />} label="Avg HR" value={fmt(avgHr, 0)} unit="bpm" />
+          <Metric icon={<Activity className="h-4 w-4" />} label="Avg HRV" value={fmt(avgHrv, 0)} unit="ms" />
+          <Metric icon={<Thermometer className="h-4 w-4" />} label="Avg skin temp" value={fmt(avgTemp, 1)} unit="°C" />
         </div>
-      </div>
-
-      {tab === "overall" && <OverallSleep />}
-      {tab === "zones" && <SleepZones />}
-      {tab === "wakeups" && <Wakeups />}
-      {tab === "performance" && <SleepPerformance />}
-    </div>
-  );
-}
-
-function SleepTabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`relative min-h-12 pb-4 text-left text-[15px] font-black transition-colors ${
-        active ? "text-vyro-text" : "text-vyro-mute hover:text-vyro-text"
-      }`}
-    >
-      <span className="block truncate">{children}</span>
-      {active && <span className="absolute inset-x-0 bottom-0 h-[3px] bg-vyro-text" />}
-    </button>
-  );
-}
-
-function OverallSleep() {
-  const { hasData, night: n } = useNightView();
-  return (
-    <div className="space-y-7">
-      <VCard className="border-vyro-text/42">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-          <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep score</p>
-          <MiniBadge>{hasData ? "Sleep synced" : "Preview"}</MiniBadge>
-        </div>
-        <h3 className="mt-5 text-[24px] font-black leading-tight text-vyro-text">
-          {hasData ? interpretScore(n.score) : "Recovered, not topped off."}
-        </h3>
-        <div className="mt-6 rounded-[20px] border border-vyro-text/25 bg-vyro-ink/35 p-5 text-center">
-          <SleepRing value={n.score} />
-        </div>
-        <div className="mt-5 space-y-4">
-          <MetricPanel icon={<Moon className="h-5 w-5" />} label="Asleep" value={n.asleepLabel} hint={`${n.bedtime} → ${n.wake}`} />
-          <MetricPanel icon={<AlarmClock className="h-5 w-5" />} label="Wakeups" value={n.wakeups} hint={`${n.inBedLabel} in bed`} />
-          <MetricPanel icon={<Zap className="h-5 w-5" />} label="Sleep debt" value={n.debtLabel} hint={`Target ${n.targetLabel}`} />
-        </div>
+        <p className="mt-4 text-[11px] leading-relaxed text-vyro-mute">
+          Sample count in window: <span className="font-mono text-vyro-text">{samples.length}</span> · Rolling buffer: <span className="font-mono text-vyro-text">{bufSize}</span>
+        </p>
       </VCard>
 
-      <SleepDebtCard />
-      <SleepCoachCard />
-      <RecoveryInterpretation />
+      <VCard>
+        <p className="font-mono text-[12px] uppercase tracking-[0.28em] text-vyro-mute">How the score is computed</p>
+        <ul className="mt-3 space-y-2 text-[12px] leading-relaxed text-vyro-mute">
+          <li><span className="text-vyro-text">Cardiac calm (45%):</span> lower min HR overnight scores higher.</li>
+          <li><span className="text-vyro-text">Recovery (40%):</span> higher average HRV scores higher.</li>
+          <li><span className="text-vyro-text">Thermal stability (15%):</span> lower skin-temp variance scores higher.</li>
+          <li>Weights renormalise over whichever channels actually have data — missing channels are skipped, not invented.</li>
+        </ul>
+      </VCard>
     </div>
   );
 }
 
-function interpretScore(score: number): string {
-  if (score >= 90) return "Fully topped off.";
-  if (score >= 80) return "Recovered, not topped off.";
-  if (score >= 65) return "Partial recovery — pace today.";
-  return "Under-recovered — cut intensity.";
-}
-
-function SleepDebtCard() {
-  return (
-    <VCard className="bg-vyro-elev/80">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <p className="truncate font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep debt</p>
-          <CircleHelp className="h-4 w-4 shrink-0 text-vyro-mute" />
-        </div>
-        <MiniBadge>1h 24m owed</MiniBadge>
-      </div>
-      <div className="mt-9 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="text-[54px] font-black leading-none tracking-normal text-vyro-text">1h 24m</span>
-        <span className="font-mono text-[15px] tracking-[0.12em] text-vyro-mute">under a dynamic target of 8h 10m</span>
-      </div>
-      <p className="mt-6 text-[14px] text-vyro-mute">7-night debt trend</p>
-      <DebtTrendSpark />
-      <p className="mt-4 flex items-start gap-2 font-mono text-[13px] uppercase tracking-[0.12em] text-vyro-mint">
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-vyro-mint" />
-        Trending down — debt fell from 2h 00m to 1h 24m
-      </p>
-    </VCard>
-  );
-}
-
-function SleepCoachCard() {
-  return (
-    <VCard className="bg-vyro-elev/80">
-      <div className="flex min-w-0 items-center gap-4">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-vyro-spatial/45 bg-vyro-spatial/15 text-vyro-spatial">
-          <Bed className="h-6 w-6" />
-        </span>
-        <p className="min-w-0 font-mono text-[13px] uppercase tracking-[0.3em] text-vyro-mute">Sleep coach · tonight's plan</p>
-      </div>
-      <div className="mt-6 space-y-4">
-        <CoachPlan label="Recommended bedtime" value={night.recBedtime} hint="~50m earlier to clear debt" icon={<Moon className="h-4 w-4" />} />
-        <CoachPlan label="Recommended wake" value={night.recWake} hint="Keeps your schedule consistent" icon={<Sunrise className="h-4 w-4" />} />
-        <CoachPlan label="Tonight's target" value={night.targetLabel} hint="Adjusted for today's training load" icon={<Bed className="h-4 w-4" />} />
-      </div>
-    </VCard>
-  );
-}
-
-function RecoveryInterpretation() {
-  return (
-    <VCard className="bg-vyro-elev/80">
-      <p className="font-mono text-[13px] uppercase tracking-[0.32em] text-vyro-mute">VYRO recovery interpretation</p>
-      <div className="mt-5 space-y-4">
-        <Insight tone="good">Deep sleep carried early-night muscle repair, but total sleep need is still under target by 1h 24m.</Insight>
-        <Insight tone="good">REM was strong late-night, supporting reaction timing and shot selection for same-day training.</Insight>
-        <Insight tone="warn">Four wake events are acceptable, but the 2:27 AM HR spike is a recovery-quality flag after high Z5 rallies.</Insight>
-      </div>
-    </VCard>
-  );
-}
-
-function SleepZones() {
+function ScoreCard({ score, cardiac, recovery, thermal, samples, bufSize }: {
+  score: number | null; cardiac: number | null; recovery: number | null; thermal: number | null;
+  samples: number; bufSize: number;
+}) {
   return (
     <VCard className="border-vyro-text/42">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-        <div className="min-w-0">
-          <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep timeline</p>
-          <h3 className="mt-4 text-[23px] font-black leading-tight text-vyro-text">Zones across the night</h3>
-        </div>
-        <MiniBadge>96% efficiency</MiniBadge>
+        <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep score</p>
+        <MiniBadge>{score != null ? "Live" : "—"}</MiniBadge>
       </div>
-
-      <ZoneTimeline />
-      <div className="mt-5 flex items-center justify-between font-mono text-[12px] text-vyro-mute">
-        <span>11:14 PM</span>
-        <span>2 AM</span>
-        <span>4 AM</span>
-        <span>6:18 AM</span>
+      <div className="mt-6 rounded-[20px] border border-vyro-text/25 bg-vyro-ink/35 p-5 text-center">
+        <SleepRing value={score} />
       </div>
-      <div className="mt-5 h-px bg-vyro-line" />
-      <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 text-[14px] text-vyro-mute">
-        <Legend swatch="deep" label="Deep" detail="Physical repair" />
-        <Legend swatch="rem" label="REM" detail="Reaction + recall" />
-        <Legend swatch="light" label="Light" detail="Transition" />
-        <Legend swatch="awake" label="Awake" detail="Wake windows" />
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        <Sub label="Cardiac" value={cardiac} />
+        <Sub label="Recovery" value={recovery} />
+        <Sub label="Thermal" value={thermal} />
       </div>
-      <div className="mt-7 grid grid-cols-2 gap-4">
-        <ZoneMetric label="REM" value="1h 32m" target="Target 90–110m" tone="good" />
-        <ZoneMetric label="Deep" value="1h 18m" target="Target 75–95m" tone="good" />
-        <ZoneMetric label="Light" value="3h 38m" target="Target 200–240m" tone="good" />
-        <ZoneMetric label="Wakeups" value="4" target="Target ≤ 3" tone="warn" />
-        <ZoneMetric label="Duration" value="6h 46m" target="Target 7h 30m" tone="warn" />
-      </div>
+      {samples < 3 && (
+        <p className="mt-4 text-[11px] leading-relaxed text-vyro-mute">
+          Need at least 3 overnight samples (HR/HRV/temp) to compute a score. Currently have <span className="font-mono text-vyro-text">{samples}</span> in the overnight window
+          {bufSize > 0 ? <> (rolling buffer holds {bufSize}).</> : null}
+        </p>
+      )}
     </VCard>
   );
 }
 
-function Wakeups() {
-  const events = [
-    { time: "12:45 AM", note: "Short movement spike", duration: "4 min" },
-    { time: "2:27 AM", note: "HR +8 bpm above baseline", duration: "6 min" },
-    { time: "5:01 AM", note: "Restless turn cluster", duration: "3 min" },
-    { time: "6:04 AM", note: "Final wake window", duration: "5 min" },
-  ];
-
+function Sub({ label, value }: { label: string; value: number | null }) {
   return (
-    <VCard className="border-vyro-text/42">
-      <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Wake events</p>
-      <div className="mt-5 space-y-4">
-        {events.map((event) => (
-          <div key={event.time} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 rounded-[20px] border border-vyro-line bg-vyro-panel/70 p-4">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-vyro-line bg-vyro-text/5 text-vyro-mute">
-              <Sunrise className="h-6 w-6" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-[19px] font-black leading-tight text-vyro-text">{event.time}</p>
-              <p className="mt-1 truncate text-[14px] text-vyro-mute">{event.note}</p>
-            </div>
-            <span className="font-mono text-[13px] text-vyro-mute">{event.duration}</span>
-          </div>
-        ))}
-      </div>
-    </VCard>
+    <div className="rounded-[14px] border border-vyro-line bg-vyro-panel/70 p-3 text-center">
+      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-vyro-mute">{label}</div>
+      <div className="mt-1 text-[20px] font-black tabular-nums text-vyro-text">{value != null ? value : "—"}</div>
+    </div>
   );
 }
 
-function SleepPerformance() {
-  const rows = [
-    { icon: <Brain className="h-5 w-5" />, label: "Performance", detail: "Actual sleep vs sport-adjusted sleep need", value: 83, note: "Good — above your 80% baseline" },
-    { icon: <Waves className="h-5 w-5" />, label: "Sleep schedule consistency", detail: "Bed/wake timing vs 14-day baseline", value: 91, note: "Elite — within 18 min night-to-night" },
-    { icon: <Zap className="h-5 w-5" />, label: "Restorative sleep share", detail: "2h 50m REM + deep", value: 42, note: "On target — 42% restorative" },
-  ];
-
+function Metric({ icon, label, value, unit }: { icon: ReactNode; label: string; value: string; unit: string }) {
   return (
-    <VCard className="border-vyro-text/42">
-      <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep performance</p>
-      <div className="mt-7 space-y-8">
-        {rows.map((row) => (
-          <PerformanceRow key={row.label} {...row} />
-        ))}
+    <div className="rounded-[14px] border border-vyro-line bg-vyro-panel/70 p-3">
+      <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.22em] text-vyro-mute">
+        <span className="text-vyro-mute">{icon}</span>
+        {label}
       </div>
-    </VCard>
+      <div className="mt-2 flex items-baseline gap-1">
+        <span className="text-[20px] font-black tabular-nums text-vyro-text">{value}</span>
+        <span className="text-[11px] font-semibold text-vyro-mute">{unit}</span>
+      </div>
+    </div>
   );
 }
 
 function VCard({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-[26px] border border-vyro-line bg-vyro-panel p-4 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--vyro-text)_8%,transparent)] ${className}`}>
-      {children}
-    </section>
+    <section className={`rounded-[22px] border border-vyro-line bg-vyro-panel p-4 ${className}`}>{children}</section>
   );
 }
 
@@ -316,178 +249,26 @@ function MiniBadge({ children }: { children: ReactNode }) {
   );
 }
 
-function SleepRing({ value }: { value: number }) {
+function SleepRing({ value }: { value: number | null }) {
   const radius = 72;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - value / 100);
-
+  const pct = value == null ? 0 : Math.max(0, Math.min(100, value)) / 100;
   return (
     <div className="mx-auto w-full max-w-[250px]">
-      <svg viewBox="0 0 190 190" className="mx-auto h-[190px] w-[190px] -rotate-90 overflow-visible" aria-label={`Sleep score ${value} out of 100`}>
+      <svg viewBox="0 0 190 190" className="mx-auto h-[190px] w-[190px] -rotate-90 overflow-visible" aria-label={`Sleep score ${value ?? "unknown"} out of 100`}>
         <circle cx="95" cy="95" r={radius} fill="none" stroke="var(--vyro-line)" strokeWidth="12" />
         <circle
-          cx="95"
-          cy="95"
-          r={radius}
-          fill="none"
-          stroke="var(--vyro-text)"
-          strokeLinecap="round"
-          strokeWidth="12"
+          cx="95" cy="95" r={radius}
+          fill="none" stroke="var(--vyro-text)" strokeLinecap="round" strokeWidth="12"
           strokeDasharray={circumference}
-          strokeDashoffset={offset}
+          strokeDashoffset={circumference * (1 - pct)}
         />
       </svg>
       <div className="pointer-events-none -mt-[118px] flex h-[118px] flex-col items-center justify-start text-center">
-        <span className="text-[34px] font-black leading-none tabular-nums text-vyro-text">{value}</span>
+        <span className="text-[34px] font-black leading-none tabular-nums text-vyro-text">{value ?? "—"}</span>
         <span className="mt-3 font-mono text-[14px] text-vyro-mute">/ 100</span>
       </div>
       <p className="mt-2 text-center font-mono text-[12px] uppercase tracking-[0.34em] text-vyro-mute">Sleep</p>
-    </div>
-  );
-}
-
-function MetricPanel({ icon, label, value, hint }: { icon: ReactNode; label: string; value: ReactNode; hint: string }) {
-  return (
-    <div className="rounded-[18px] border border-vyro-line bg-vyro-panel/70 p-4">
-      <div className="flex items-center gap-3 font-mono text-[13px] uppercase tracking-[0.24em] text-vyro-mute">
-        <span className="text-vyro-mute">{icon}</span>
-        {label}
-      </div>
-      <p className="mt-3 text-[24px] font-black leading-none text-vyro-text">{value}</p>
-      <p className="mt-2 text-[13px] text-vyro-mute">{hint}</p>
-    </div>
-  );
-}
-
-function DebtTrendSpark() {
-  const coords = [
-    [2, 28],
-    [75, 46],
-    [150, 38],
-    [225, 64],
-    [298, 52],
-  ] as const;
-  const path = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ");
-
-  return (
-    <svg viewBox="0 0 300 82" className="mt-3 h-[82px] w-full overflow-visible" aria-label="7 night sleep debt trend">
-      <path d={`${path} L298 82 L2 82 Z`} fill="var(--vyro-amber)" opacity="0.13" />
-      <path d={path} fill="none" stroke="var(--vyro-amber)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-      {coords.map(([x, y]) => (
-        <circle key={`${x}-${y}`} cx={x} cy={y} r="3" fill="var(--vyro-amber)" />
-      ))}
-    </svg>
-  );
-}
-
-function CoachPlan({ icon, label, value, hint }: { icon: ReactNode; label: string; value: string; hint: string }) {
-  return (
-    <div className="rounded-[18px] border border-vyro-line bg-vyro-panel/70 p-4">
-      <div className="flex items-center gap-2 font-mono text-[13px] uppercase tracking-[0.2em] text-vyro-mute">
-        <span className="text-vyro-mute">{icon}</span>
-        {label}
-      </div>
-      <p className="mt-4 text-[32px] font-black leading-none text-vyro-text">{value}</p>
-      <p className="mt-3 text-[14px] text-vyro-mute">{hint}</p>
-    </div>
-  );
-}
-
-function Insight({ tone, children }: { tone: "good" | "warn"; children: ReactNode }) {
-  const good = tone === "good";
-  return (
-    <div className={`flex items-start gap-4 rounded-[14px] border p-4 text-[16px] leading-relaxed ${good ? "border-vyro-mint/40 bg-vyro-mint/10 text-vyro-text" : "border-vyro-amber/45 bg-vyro-amber/10 text-vyro-text"}`}>
-      <span className={`mt-2 h-2.5 w-2.5 shrink-0 rounded-full ${good ? "bg-vyro-mint" : "bg-vyro-amber"}`} />
-      <span>{children}</span>
-    </div>
-  );
-}
-
-function ZoneTimeline() {
-  const segments = [
-    { width: 11, color: "var(--vyro-mute)" },
-    { width: 10, color: "var(--vyro-text)" },
-    { width: 1, stripe: true },
-    { width: 17, color: "var(--vyro-mute)" },
-    { width: 8, color: "var(--vyro-spatial)" },
-    { width: 1.5, stripe: true },
-    { width: 10, color: "var(--vyro-text)" },
-    { width: 18, color: "var(--vyro-mute)" },
-    { width: 9, color: "var(--vyro-spatial)" },
-    { width: 1, stripe: true },
-    { width: 9, color: "var(--vyro-mute)" },
-    { width: 6.5, color: "var(--vyro-spatial)" },
-  ];
-
-  return (
-    <div className="mt-7 flex h-[42px] overflow-hidden rounded-full border border-vyro-line bg-vyro-elev">
-      {segments.map((segment, index) => (
-        <span
-          key={index}
-          className="h-full"
-          style={{
-            width: `${segment.width}%`,
-            background: segment.stripe
-              ? "repeating-linear-gradient(45deg, var(--vyro-amber) 0 7px, color-mix(in oklab, var(--vyro-amber) 30%, transparent) 7px 14px)"
-              : segment.color,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function Legend({ swatch, label, detail }: { swatch: "deep" | "rem" | "light" | "awake"; label: string; detail: string }) {
-  const style =
-    swatch === "deep"
-      ? { background: "var(--vyro-text)" }
-      : swatch === "rem"
-        ? { background: "var(--vyro-spatial)" }
-        : swatch === "light"
-          ? { background: "var(--vyro-mute)" }
-          : { background: "repeating-linear-gradient(45deg, var(--vyro-amber) 0 7px, color-mix(in oklab, var(--vyro-amber) 35%, transparent) 7px 14px)" };
-
-  return (
-    <div className="flex min-w-0 items-center gap-2">
-      <span className="h-4 w-4 shrink-0 rounded-md" style={style} />
-      <span className="min-w-0 truncate">
-        <span className="font-black text-vyro-text">{label}</span> <span>{detail}</span>
-      </span>
-    </div>
-  );
-}
-
-function ZoneMetric({ label, value, target, tone }: { label: string; value: string; target: string; tone: "good" | "warn" }) {
-  return (
-    <div className="min-h-[112px] rounded-[18px] border border-vyro-line bg-vyro-panel/70 p-4">
-      <p className="font-mono text-[13px] uppercase tracking-[0.14em] text-vyro-mute">{label}</p>
-      <p className="mt-3 text-[28px] font-black leading-none text-vyro-text">{value}</p>
-      <p className={`mt-5 flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.1em] ${tone === "good" ? "text-vyro-mint" : "text-vyro-amber"}`}>
-        <span className={`h-2 w-2 rounded-full ${tone === "good" ? "bg-vyro-mint" : "bg-vyro-amber"}`} />
-        {target}
-      </p>
-    </div>
-  );
-}
-
-function PerformanceRow({ icon, label, detail, value, note }: { icon: ReactNode; label: string; detail: string; value: number; note: string }) {
-  return (
-    <div>
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
-        <span className="mt-0.5 text-vyro-mute">{icon}</span>
-        <div className="min-w-0">
-          <p className="truncate text-[18px] font-black leading-tight text-vyro-text">{label}</p>
-          <p className="mt-1 text-[13px] leading-snug text-vyro-mute">{detail}</p>
-        </div>
-        <span className="text-[18px] font-black tabular-nums text-vyro-text">{value}</span>
-      </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-vyro-text/8">
-        <span className="block h-full rounded-full bg-vyro-text" style={{ width: `${value}%` }} />
-      </div>
-      <p className="mt-5 flex items-start gap-2 font-mono text-[13px] uppercase tracking-[0.12em] text-vyro-mint">
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-vyro-mint" />
-        {note}
-      </p>
     </div>
   );
 }
