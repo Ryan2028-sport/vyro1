@@ -13,6 +13,7 @@ import {
   Plus,
   Radio,
   Settings2,
+  Stethoscope,
   Trophy,
   UserRound,
 } from "lucide-react";
