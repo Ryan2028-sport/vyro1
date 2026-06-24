@@ -564,7 +564,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
       <section className="app2-card app2-readiness">
         <div className="app2-ring-box">
-          <Ring value={readiness ?? 0} />
+          <Ring value={readiness} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="app2-mini-row">
