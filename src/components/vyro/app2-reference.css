@@ -468,15 +468,19 @@
   transform: translateX(-50%);
   z-index: 50;
   width: min(430px, 100vw);
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
   border-top: 1px solid hsl(var(--app2-border));
   background: hsl(var(--app2-card) / 0.96);
   padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
   backdrop-filter: blur(14px);
+  scrollbar-width: none;
 }
+.app2-bottom-nav::-webkit-scrollbar { display: none; }
 .app2-tab {
+  flex: 0 0 auto;
+  min-width: 72px;
   min-height: 44px;
   display: grid;
   place-items: center;
