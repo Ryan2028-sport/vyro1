@@ -117,8 +117,6 @@ export function RecoveryView() {
                 <Pill tone={bandTone} pulse={band === "green"}>{bandLabel}</Pill>
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-2 font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute sm:justify-start">
                   <span>Updates every second</span>
-                  <span>·</span>
-                  <span className="text-vyro-text">{fmtDelta(recoveryDelta)} vs your baseline</span>
                 </div>
                 <h3 className="mt-3 text-xl font-black leading-tight text-vyro-text">{coachRead}</h3>
                 <p className="mt-2 text-[12px] leading-relaxed text-vyro-mute">
