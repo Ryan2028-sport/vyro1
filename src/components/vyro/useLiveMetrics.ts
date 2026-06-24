@@ -138,21 +138,23 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
   }
 
   // Cardio Recovery — current HR vs resting headroom. Lower headroom = better.
-  const cardio = i.heartRateBpm == null ? null : (() => {
-    const rhr = i.restingHrBpm ?? 60;
-    const headroom = Math.max(0, (i.heartRateBpm as number) - rhr);
+  // Require both HR and resting HR; a hardcoded fallback RHR creates nonsense
+  // scores for real athletes.
+  const cardio = i.heartRateBpm == null || i.restingHrBpm == null ? null : (() => {
+    const headroom = Math.max(0, (i.heartRateBpm as number) - i.restingHrBpm!);
     return Math.round(Math.max(0, Math.min(100, 100 - (headroom / 60) * 100)));
   })();
 
   // Muscle Readiness — IMU jerk + recent event load.
-  const muscle = !i.connected ? null : (() => {
+  const hasImuLoad = i.peakJerk != null || (i.eventsLastMin ?? 0) > 0;
+  const muscle = !hasImuLoad ? null : (() => {
     const jerkPenalty = Math.min(60, (i.peakJerk ?? 0) / 4);
     const eventPenalty = Math.min(40, (i.eventsLastMin ?? 0) * 0.6);
     return Math.round(Math.max(0, 100 - jerkPenalty - eventPenalty));
   })();
 
   // Load Debt — accumulated session load. Higher load = lower readiness.
-  const loadDebt = !i.connected ? null : (() => {
+  const loadDebt = !hasImuLoad ? null : (() => {
     const base = Math.min(100, (i.eventsLastMin ?? 0) * 1.5);
     const intensity = Math.min(30, (i.peakJerk ?? 0) / 6);
     return Math.round(Math.max(0, 100 - Math.min(100, base * 0.7 + intensity)));
@@ -265,7 +267,7 @@ export function computeReadiness(i: ReadinessInputs): { score: number | null; pa
   const parts: Record<string, number> = {};
   const w: Record<string, number> = {};
   if (i.hrvMs != null) { parts.hrv = clamp01((i.hrvMs - 20) / 70); w.hrv = 0.30; }
-  if (i.restingHrBpm != null) { parts.rhr = clamp01((70 - i.restingHrBpm) / 25); w.rhr = 0.15; }
+  if (i.hrvMs != null && i.restingHrBpm != null) { parts.rhr = clamp01((70 - i.restingHrBpm) / 25); w.rhr = 0.15; }
   if (i.sleepScore != null) { parts.sleep = clamp01(i.sleepScore / 100); w.sleep = 0.25; }
   if (i.recoveryScore != null) { parts.recovery = clamp01(i.recoveryScore / 100); w.recovery = 0.15; }
   if (i.stress != null) { parts.stress = clamp01(1 - i.stress / 100); w.stress = 0.08; }
