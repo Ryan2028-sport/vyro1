@@ -228,19 +228,34 @@ function InfoCard({
   );
 }
 
-function CognitiveFatigueCard({ m }: { m: ReturnType<typeof useLiveMetrics> }) {
-  const delay =
-    m.connected && m.reactMin != null ? `+${Math.round(m.reactMin)}ms` : "+214ms";
+function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: number }) {
+  // Divergence = current reaction latency − personal baseline (median of recent samples).
+  // If we have no baseline yet, show "calibrating".
+  const { delay, status, vyroRead } = useMemo(() => {
+    if (!m.connected || m.reactMin == null) {
+      return { delay: "—", status: "Offline", vyroRead: "Awaiting band" };
+    }
+    if (baselineMs == null) {
+      return { delay: `${Math.round(m.reactMin)}ms`, status: "Calibrating", vyroRead: "Building baseline" };
+    }
+    const diff = m.reactMin - baselineMs;
+    const sign = diff >= 0 ? "+" : "−";
+    const delay = `${sign}${Math.abs(Math.round(diff))}ms`;
+    let status: string;
+    let vyroRead: string;
+    if (diff < 60) { status = "Normal"; vyroRead = "Sharp"; }
+    else if (diff < 150) { status = "Slowing"; vyroRead = "Mild fatigue"; }
+    else if (diff < 250) { status = "Elevated"; vyroRead = "Watch decision speed"; }
+    else { status = "Diverged"; vyroRead = "Cognitively fried"; }
+    return { delay, status, vyroRead };
+  }, [m.connected, m.reactMin, baselineMs]);
+
   const hrStatus = useMemo(() => {
-    if (!m.connected || m.heartRateBpm == null) return "Normal";
+    if (!m.connected || m.heartRateBpm == null) return "—";
     if (m.heartRateBpm < 60) return "Low";
     if (m.heartRateBpm > 100) return "Elevated";
     return "Normal";
   }, [m.connected, m.heartRateBpm]);
-  const vyroRead = useMemo(() => {
-    if (!m.connected || m.reactMin == null) return "Cognitively fried";
-    return m.reactMin > 200 ? "Cognitively fried" : "Sharp";
-  }, [m.connected, m.reactMin]);
 
   return (
     <section className="app2-card app2-info-card app2-cog-card">
@@ -249,16 +264,16 @@ function CognitiveFatigueCard({ m }: { m: ReturnType<typeof useLiveMetrics> }) {
           <Brain size={14} />
           <span>Cognitive load</span>
         </div>
-        <span className="app2-cog-badge">WATCH</span>
+        <span className="app2-cog-badge">{status.toUpperCase()}</span>
       </div>
       <h2 className="app2-card-title">Cognitive Fatigue Divergence</h2>
       <p className="app2-card-copy">
-        Detects when your brain is tired before your body is by comparing video reaction cues
-        against first wearable burst.
+        Compares your live reaction latency against your personal baseline
+        {baselineMs != null ? ` (${Math.round(baselineMs)}ms)` : ""} to flag mental fatigue before physical signs.
       </p>
       <div className="app2-cog-rows">
         <div className="app2-cog-row">
-          <span className="app2-cog-row-label">Decision-to-movement delay</span>
+          <span className="app2-cog-row-label">Reaction divergence</span>
           <span className="app2-cog-row-value">{delay}</span>
         </div>
         <div className="app2-cog-row">
@@ -273,13 +288,15 @@ function CognitiveFatigueCard({ m }: { m: ReturnType<typeof useLiveMetrics> }) {
       <div className="app2-cog-insight">
         <Activity size={18} />
         <span>
-          Heart looks ready, but reaction timing has slowed past the 200ms alert line. Best use
-          case: goalies, batters, returners, and late-game decision makers.
+          {m.connected && baselineMs != null
+            ? "Divergence over 200ms = mental fatigue threshold. Best use case: returners, decision makers, late-game scenarios."
+            : "Wear the band through a few rallies to seed the cognitive baseline."}
         </span>
       </div>
     </section>
   );
 }
+
 
 function EmbeddedView({
   view,
