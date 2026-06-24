@@ -20,6 +20,7 @@ const SECTIONS: { id: Section; label: string }[] = [
 export function AthleteView() {
   const m = useLiveMetrics();
   const [section, setSection] = useState<Section>("overview");
+  const live = <T,>(v: T | null | undefined): T | null => (m.connected ? (v ?? null) : null);
 
   const subs = useMemo(
     () =>
@@ -131,12 +132,12 @@ export function AthleteView() {
       {section === "overview" && (
         <Card eyebrow="At a glance" title="Right now">
           <div className="grid grid-cols-2 gap-2">
-            <Stat label="Current HR" value={m.heartRateBpm ?? "—"} unit="bpm" />
-            <Stat label="HRV" value={m.hrvMs ?? "—"} unit="ms" />
-            <Stat label="Steps" value={m.stepsToday ?? "—"} />
-            <Stat label="Active kcal" value={m.caloriesKcal ?? "—"} />
+            <Stat label="Current HR" value={live(m.heartRateBpm) ?? "—"} unit="bpm" />
+            <Stat label="HRV" value={live(m.hrvMs) ?? "—"} unit="ms" />
+            <Stat label="Steps" value={live(m.stepsToday) ?? "—"} />
+            <Stat label="Active kcal" value={live(m.caloriesKcal) ?? "—"} />
             <Stat label="Squash load" value={sessionLoad ?? "—"} hint="/100" />
-            <Stat label="Battery" value={m.batteryPct ?? "—"} unit="%" hint={m.batteryCharging ? "charging" : undefined} />
+            <Stat label="Battery" value={live(m.batteryPct) ?? "—"} unit="%" hint={m.connected && m.batteryCharging ? "charging" : undefined} />
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-vyro-mute">
             Tap a tab above for cardiac, body composition, on-court load and injury risk detail.
@@ -147,17 +148,17 @@ export function AthleteView() {
       {section === "cardiac" && (
         <Card eyebrow="Heart · every 1 s" title="Cardiac">
           <div className="grid grid-cols-2 gap-2">
-            <Stat label="Current HR" value={m.heartRateBpm ?? "—"} unit="bpm" hint="live" />
-            <Stat label="Resting HR" value={m.restingHrBpm ?? "—"} unit="bpm" hint="nightly" />
-            <Stat label="HRV (RMSSD)" value={m.hrvMs ?? "—"} unit="ms" hint="every 5 min" />
-            <Stat label="Stress" value={m.stressScore ?? "—"} hint="HR · HRV · RR" />
+            <Stat label="Current HR" value={live(m.heartRateBpm) ?? "—"} unit="bpm" hint={live(m.heartRateBpm) != null ? "live" : undefined} />
+            <Stat label="Resting HR" value={live(m.restingHrBpm) ?? "—"} unit="bpm" hint={live(m.restingHrBpm) != null ? "rolling live HR" : undefined} />
+            <Stat label="HRV (RMSSD)" value={live(m.hrvMs) ?? "—"} unit="ms" hint={live(m.hrvMs) != null ? "watch frame" : undefined} />
+            <Stat label="Stress" value={live(m.stressScore) ?? "—"} hint={live(m.stressScore) != null ? "watch stress frame" : undefined} />
             <Stat
               label="Blood pressure"
-              value={m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—"}
+              value={live(m.bloodPressure) ? `${live(m.bloodPressure)!.sbp}/${live(m.bloodPressure)!.dbp}` : "—"}
               unit="mmHg"
-              hint="one-key measure"
+              hint={live(m.bloodPressure) ? "one-key measure" : undefined}
             />
-            <Stat label="Resp rate" value={m.respRateBrpm ?? "—"} unit="br/min" hint="derived" />
+            <Stat label="Resp rate" value={live(m.respRateBrpm) ?? "—"} unit="br/min" hint={live(m.respRateBrpm) != null ? "watch field" : undefined} />
           </div>
         </Card>
       )}
@@ -166,15 +167,15 @@ export function AthleteView() {
         <>
           <Card eyebrow="Respiration · O₂ · temp" title="Physiology">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <Stat label="Resp rate" value={m.respRateBrpm ?? "—"} unit="br/min" />
-              <Stat label="SpO₂" value={m.spo2Pct ?? "—"} unit="%" />
-              <Stat label="Skin temp" value={m.skinTempC != null ? m.skinTempC.toFixed(1) : "—"} unit="°C" />
+              <Stat label="Resp rate" value={live(m.respRateBrpm) ?? "—"} unit="br/min" />
+              <Stat label="SpO₂" value={live(m.spo2Pct) ?? "—"} unit="%" />
+              <Stat label="Skin temp" value={live(m.skinTempC) != null ? live(m.skinTempC)!.toFixed(1) : "—"} unit="°C" />
             </div>
           </Card>
           <Card eyebrow="Court fueling" title="Hydration & energy">
             <p className="text-[11px] leading-relaxed text-vyro-mute">
-              Sweat, sodium and carb needs are derived from live HR, skin temp and session load. Estimates appear here
-              once the band has streamed at least 10 min of continuous wear data.
+              Hydration and energy guidance unlock once live HR, skin temp and session-load frames stream continuously.
+              Nothing appears here from cached or estimated body signals.
             </p>
           </Card>
         </>
@@ -197,10 +198,10 @@ export function AthleteView() {
           </Card>
           <Card eyebrow="Activity · all-day" title="Movement">
             <div className="grid grid-cols-2 gap-2">
-              <Stat label="Steps" value={m.stepsToday ?? "—"} />
-              <Stat label="Active kcal" value={m.caloriesKcal ?? "—"} unit="kcal" />
-              <Stat label="Distance" value={m.distanceM != null ? (m.distanceM / 1000).toFixed(2) : "—"} unit="km" />
-              <Stat label="Battery" value={m.batteryPct ?? "—"} unit="%" />
+              <Stat label="Steps" value={live(m.stepsToday) ?? "—"} />
+              <Stat label="Active kcal" value={live(m.caloriesKcal) ?? "—"} unit="kcal" />
+              <Stat label="Distance" value={live(m.distanceM) != null ? (live(m.distanceM)! / 1000).toFixed(2) : "—"} unit="km" />
+              <Stat label="Battery" value={live(m.batteryPct) ?? "—"} unit="%" />
             </div>
           </Card>
         </>
@@ -224,9 +225,9 @@ export function AthleteView() {
           </Card>
           <Card eyebrow="Data integrity" title="Signal confidence">
             <div className="grid grid-cols-3 gap-2">
-              <Stat label="HR" value={m.heartRateBpm != null ? "live" : "—"} />
+              <Stat label="HR" value={live(m.heartRateBpm) != null ? "live" : "—"} />
               <Stat label="IMU" value={m.connected ? "live" : "—"} />
-              <Stat label="Battery" value={m.batteryPct ?? "—"} unit="%" />
+              <Stat label="Battery" value={live(m.batteryPct) ?? "—"} unit="%" />
             </div>
           </Card>
         </>

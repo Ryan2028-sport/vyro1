@@ -130,6 +130,13 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
   score: number | null;
   parts: LiveRecoveryParts;
 } {
+  if (!i.connected) {
+    return {
+      score: null,
+      parts: { cardio: null, muscle: null, loadDebt: null, environment: null, confidence: null },
+    };
+  }
+
   // Cardio Recovery — current HR vs resting headroom. Lower headroom = better.
   const cardio = i.heartRateBpm == null ? null : (() => {
     const rhr = i.restingHrBpm ?? 60;

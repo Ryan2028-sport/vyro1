@@ -256,6 +256,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   }, [readiness]);
 
   const fmt = (v: number | null | undefined) => (v == null ? "—" : String(v));
+  const live = <T,>(v: T | null | undefined): T | null => (m.connected ? (v ?? null) : null);
 
   return (
     <div className="min-w-0 space-y-5">
@@ -419,14 +420,14 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           action={<Pill tone={m.connected ? (m.heartRateBpm != null ? "live" : "warn") : "off"} pulse={m.heartRateBpm != null}>{m.connected ? (m.heartRateBpm != null ? "streaming" : "imu only") : "off"}</Pill>}
         >
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <VitalTile label="Current HR" value={fmt(m.heartRateBpm)} unit="bpm" tone="rose" hint={m.heartRateBpm != null ? "live from band" : "awaiting HR"} live={m.heartRateBpm != null} />
-            <VitalTile label="Resting HR" value={fmt(m.restingHrBpm)} unit="bpm" tone="mint" hint={m.restingHrBpm != null ? "rolling baseline" : "needs 5+ min of HR"} live={m.restingHrBpm != null} />
-            <VitalTile label="HRV (RMSSD)" value={fmt(m.hrvMs)} unit="ms" tone="mint" hint={m.hrvMs != null ? "from band" : "next cycle ≤ 5 min"} live={m.hrvMs != null} />
-            <VitalTile label="Stress" value={fmt(m.stressScore)} unit="/100" tone="mint" hint={m.stressScore != null ? "from one-key" : "next ≤ 5 min"} live={m.stressScore != null} />
-            <VitalTile label="SpO₂" value={fmt(m.spo2Pct)} unit="%" tone="mint" hint={m.spo2Pct != null ? "from band" : "measuring"} live={m.spo2Pct != null} />
-            <VitalTile label="Skin Temp" value={m.skinTempC != null ? m.skinTempC.toFixed(1) : "—"} unit="°C" tone="mint" hint={m.skinTempC != null ? "from band" : "next cycle ≤ 5 min"} live={m.skinTempC != null} />
-            <VitalTile label="Steps" value={m.stepsToday != null ? m.stepsToday.toLocaleString() : "—"} tone="mint" hint={m.stepsToday != null ? `${((m.distanceM ?? 0) / 1000).toFixed(2)} km · ${m.caloriesKcal ?? 0} kcal` : "polling 30 s"} live={m.stepsToday != null} />
-            <VitalTile label="Battery" value={fmt(m.batteryPct)} unit="%" tone="mint" hint={m.batteryPct != null ? (m.batteryCharging ? "charging" : "from band") : "awaiting"} live={m.batteryPct != null} />
+            <VitalTile label="Current HR" value={fmt(live(m.heartRateBpm))} unit="bpm" tone="rose" hint={live(m.heartRateBpm) != null ? "live from band" : "awaiting HR"} live={live(m.heartRateBpm) != null} />
+            <VitalTile label="Resting HR" value={fmt(live(m.restingHrBpm))} unit="bpm" tone="mint" hint={live(m.restingHrBpm) != null ? "rolling live HR" : "needs 5+ min of HR"} live={live(m.restingHrBpm) != null} />
+            <VitalTile label="HRV (RMSSD)" value={fmt(live(m.hrvMs))} unit="ms" tone="mint" hint={live(m.hrvMs) != null ? "watch frame" : "awaiting watch frame"} live={live(m.hrvMs) != null} />
+            <VitalTile label="Stress" value={fmt(live(m.stressScore))} unit="/100" tone="mint" hint={live(m.stressScore) != null ? "watch stress frame" : "awaiting watch frame"} live={live(m.stressScore) != null} />
+            <VitalTile label="SpO₂" value={fmt(live(m.spo2Pct))} unit="%" tone="mint" hint={live(m.spo2Pct) != null ? "watch frame" : "awaiting SpO₂"} live={live(m.spo2Pct) != null} />
+            <VitalTile label="Skin Temp" value={live(m.skinTempC) != null ? live(m.skinTempC)!.toFixed(1) : "—"} unit="°C" tone="mint" hint={live(m.skinTempC) != null ? "watch frame" : "awaiting temp"} live={live(m.skinTempC) != null} />
+            <VitalTile label="Steps" value={live(m.stepsToday) != null ? live(m.stepsToday)!.toLocaleString() : "—"} tone="mint" hint={live(m.stepsToday) != null ? `${((m.distanceM ?? 0) / 1000).toFixed(2)} km · ${m.caloriesKcal ?? 0} kcal` : "awaiting activity"} live={live(m.stepsToday) != null} />
+            <VitalTile label="Battery" value={fmt(live(m.batteryPct))} unit="%" tone="mint" hint={live(m.batteryPct) != null ? (m.batteryCharging ? "charging" : "watch frame") : "awaiting"} live={live(m.batteryPct) != null} />
           </div>
           <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
             {m.heartRateBpm != null

@@ -258,6 +258,7 @@ export function useVyroBand() {
   const [stressScore, setStressScore] = useState<number | null>(initialMetrics.stressScore ?? null);
   const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(initialMetrics.bloodPressure ?? null);
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
+  const activeConnectionRef = useRef<string | null>(null);
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
   const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(
     initialMetrics.stepsToday != null
@@ -313,14 +314,37 @@ export function useVyroBand() {
     };
   }, [connectedId]);
 
-  // Keep the last real readings visible across app minimize/close/reconnect.
-  // The native wrapper can briefly report "disconnected" while iOS suspends or
-  // resumes the app; clearing here made every metric disappear and forced the
-  // watch measurement cycle to start from zero again.
+  // Cached readings are useful for persistence, but they must never appear as
+  // fresh live body signals after a new BLE connection starts. Clear every
+  // metric on a fresh connection; each tile repopulates only from a new watch
+  // frame received during this session.
   useEffect(() => {
     if (!connectedId) {
       bigDataV2Ref.current = null;
+      activeConnectionRef.current = null;
+      return;
     }
+    if (activeConnectionRef.current === connectedId) return;
+    activeConnectionRef.current = connectedId;
+    bigDataV2Ref.current = null;
+    hrSamplesRef.current = [];
+    activityBucketsRef.current.clear();
+    activityTotalRef.current = null;
+    setEvents([]);
+    setHeartRateBpm(null);
+    setHeartRateAt(null);
+    setBatteryPct(null);
+    setBatteryCharging(false);
+    setSpo2Pct(null);
+    setSkinTempC(null);
+    setStepsToday(null);
+    setDistanceM(null);
+    setCaloriesKcal(null);
+    setRestingHrBpm(null);
+    setHrvMs(null);
+    setRespRateBrpm(null);
+    setStressScore(null);
+    setBloodPressure(null);
   }, [connectedId]);
 
   useEffect(() => {
