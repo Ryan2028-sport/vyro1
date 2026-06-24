@@ -443,7 +443,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   }, [readiness, recordReadiness]);
 
   // Trend helpers — comparing live value vs baseline.
-  const trend = (cur: number | null | undefined, baseline: number | undefined, fmt: (d: number) => string, neutral = "baseline") => {
+  const trend = (cur: number | null | undefined, baseline: number | null | undefined, fmt: (d: number) => string, neutral = "baseline") => {
     if (cur == null || baseline == null) return undefined;
     const d = cur - baseline;
     if (Math.abs(d) < 0.5) return neutral;
