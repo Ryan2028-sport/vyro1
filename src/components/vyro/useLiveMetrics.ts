@@ -277,7 +277,10 @@ export function computeReadiness(i: ReadinessInputs): { score: number | null; pa
     w.load = 0.03;
   }
   const total = Object.values(w).reduce((a, b) => a + b, 0);
-  if (total === 0) return { score: null, parts: {} };
+  // Do not publish a readiness score from a single isolated signal (for
+  // example HRV alone → ~32). That reads like a real coach score when it is
+  // only one body channel. Wait for at least two fresh watch-derived parts.
+  if (Object.keys(w).length < 2 || total === 0) return { score: null, parts };
   let sum = 0;
   for (const k in w) sum += parts[k] * w[k];
   return { score: Math.round((sum / total) * 100), parts };
