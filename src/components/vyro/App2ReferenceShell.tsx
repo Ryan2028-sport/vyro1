@@ -99,6 +99,7 @@ type App2View =
   | "sport"
   | "recovery"
   | "sleep"
+  | "debug"
   | "session"
   | "coach"
   | "social"
