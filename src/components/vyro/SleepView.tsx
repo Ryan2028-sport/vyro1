@@ -56,6 +56,7 @@ const primaryTabs: { id: Tab; label: string }[] = [
 
 export function SleepView() {
   const [tab, setTab] = useState<Tab>("overall");
+  const { hasData } = useNightView();
 
   return (
     <div className="mx-auto max-w-[430px] space-y-7 pb-8 text-vyro-text">
@@ -69,9 +70,15 @@ export function SleepView() {
         </div>
         <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-vyro-text/35 bg-vyro-text/5 px-3 font-mono text-[12px] uppercase tracking-[0.16em] text-vyro-text">
           <Moon className="h-4 w-4" />
-          Last night
+          {hasData ? "Last night" : "Preview · no synced nights"}
         </span>
+        {!hasData && (
+          <div className="rounded-xl border border-dashed border-vyro-line bg-vyro-elev/70 p-3 text-[12px] leading-relaxed text-vyro-mute">
+            No sleep data has been synced from the band yet. The numbers below are a preview layout — once the firmware emits a sleep frame it will replace these values automatically.
+          </div>
+        )}
       </header>
+
 
       <div>
         <div className="grid grid-cols-3 gap-3">
