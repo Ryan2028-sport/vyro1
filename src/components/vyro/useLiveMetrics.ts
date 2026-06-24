@@ -254,6 +254,7 @@ export type ReadinessInputs = {
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 export function computeReadiness(i: ReadinessInputs): { score: number | null; parts: Record<string, number> } {
+  if (!i.connected) return { score: null, parts: {} };
   const parts: Record<string, number> = {};
   const w: Record<string, number> = {};
   if (i.hrvMs != null) { parts.hrv = clamp01((i.hrvMs - 20) / 70); w.hrv = 0.30; }
@@ -273,10 +274,8 @@ export function computeReadiness(i: ReadinessInputs): { score: number | null; pa
   return { score: Math.round((sum / total) * 100), parts };
 }
 
-// Live "base readiness" subscores derived from whatever the band is
-// streaming right now. Each one is null until at least one underlying
-// signal is available; HomeView falls back to demo values when null so
-// the UI stays populated, then swaps to live as soon as data arrives.
+// Live "base readiness" subscores derived only from the current live band
+// connection. Cached/persisted readings must never publish a score.
 export type SubScores = {
   fatigue: number | null;   // 0-100, higher = MORE fatigued
   recovery: number | null;  // 0-100
@@ -298,12 +297,7 @@ export type SubScoreInputs = {
 };
 
 export function computeSubScores(i: SubScoreInputs): SubScores {
-  const hasCachedHealthSignal =
-    i.hrvMs != null ||
-    i.restingHrBpm != null ||
-    i.sleepScore != null ||
-    i.stress != null;
-  if (!i.connected && !hasCachedHealthSignal) return { fatigue: null, recovery: null, agility: null, sleep: null };
+  if (!i.connected) return { fatigue: null, recovery: null, agility: null, sleep: null };
 
   // Fatigue — accumulated load + stress, capped so a single big spike
   // doesn't pin the bar.
