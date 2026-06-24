@@ -343,6 +343,13 @@ function EmbeddedView({
       </div>
     );
   }
+  if (view === "debug") {
+    return (
+      <div className="app2-scroll-embed">
+        <DebugView />
+      </div>
+    );
+  }
   if (view === "coach") {
     return (
       <div className="app2-scroll-embed">
