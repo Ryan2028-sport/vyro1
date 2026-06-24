@@ -373,7 +373,7 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
       )}
 
       {tab === "database" && (
-        isCourtSport ? <CourtDatabaseModule sport={sport} /> : (
+        isCourtSport ? <CourtDatabaseModule sport={sport} live={live} /> : (
           <>
             <Card eyebrow={sport.databaseLabel} title={sport.databaseTitle}>
               <p className="text-[12px] text-vyro-mute">{sport.databaseSubtitle}</p>
