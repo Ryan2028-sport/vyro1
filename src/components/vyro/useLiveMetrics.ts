@@ -175,7 +175,9 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
     i.wearTimeOk ?? i.connected,                           // wear-time
   ];
   const present = channels.filter(Boolean).length;
-  const confidence = channels.length === 0 ? null : Math.round((present / channels.length) * 100);
+  // No channels → confidence is unknown, NOT zero. A "0" confidence reading
+  // would otherwise pollute the composite when the band is offline.
+  const confidence = present === 0 ? null : Math.round((present / channels.length) * 100);
 
   const parts: LiveRecoveryParts = { cardio, muscle, loadDebt, environment, confidence };
 
@@ -187,8 +189,12 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
     { v: environment, w: 0.15 },
     { v: confidence, w: 0.15 },
   ];
+  // Confidence is the trust layer — it must NOT drive the score on its own.
+  // Require at least one real fatigue subscore (cardio / muscle / loadDebt /
+  // environment) before publishing a number; otherwise the ring shows "—".
+  const fatigueScores = [cardio, muscle, loadDebt, environment].filter((v) => v != null);
+  if (fatigueScores.length === 0) return { score: null, parts };
   const presentScores = weighted.filter((p) => p.v != null);
-  if (presentScores.length === 0) return { score: null, parts };
   const totalW = presentScores.reduce((a, b) => a + b.w, 0);
   const sum = presentScores.reduce((a, b) => a + (b.v as number) * b.w, 0);
   return { score: Math.round(sum / totalW), parts };
