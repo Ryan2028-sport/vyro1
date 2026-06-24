@@ -576,11 +576,11 @@ function PerformanceGroupTile({ group }: { group: PerformanceGroup }) {
   );
 }
 
-function CourtDatabaseModule({ sport }: { sport: SportProfile }) {
+function CourtDatabaseModule({ sport, live }: { sport: SportProfile; live: LiveMetrics }) {
   return (
     <>
       <CourtHeatMap sport={sport} />
-      <CourtMovementTable sport={sport} />
+      <CourtMovementTable sport={sport} live={live} />
     </>
   );
 }
