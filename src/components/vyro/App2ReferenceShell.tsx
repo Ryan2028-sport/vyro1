@@ -23,6 +23,7 @@ import { CoachView } from "./CoachView";
 import { RecoveryView } from "./RecoveryView";
 import { SessionView } from "./SessionView";
 import { SleepView } from "./SleepView";
+import { DebugView } from "./DebugView";
 import { SocialView } from "./SocialView";
 import { SportView } from "./SportView";
 import { TrendsView } from "./TrendsView";
