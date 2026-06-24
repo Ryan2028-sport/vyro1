@@ -185,7 +185,7 @@ export function DebugView() {
     {
       label: "Session state",
       value: m.sessionState ?? "idle",
-      ok: m.sessionState === "active",
+      ok: m.sessionState === "live",
       source: "useVyroBand.sessionState",
     },
     {
