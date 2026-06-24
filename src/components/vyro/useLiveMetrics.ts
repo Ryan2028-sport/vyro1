@@ -15,8 +15,9 @@ export function useLiveMetrics() {
     return () => window.clearInterval(id);
   }, [connected]);
 
+  const currentTime = Math.max(now, Date.now());
   const isFresh = (at: number | null | undefined, maxAgeMs: number) =>
-    connected && at != null && now - at >= 0 && now - at <= maxAgeMs;
+    connected && at != null && currentTime - at >= 0 && currentTime - at <= maxAgeMs;
 
   const liveHeartRateBpm = isFresh(heartRateAt, 15_000) ? heartRateBpm : null;
   const liveHeartRateAt = liveHeartRateBpm == null ? null : heartRateAt;
@@ -287,26 +288,71 @@ export type ReadinessInputs = {
 };
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+const clamp100 = (x: number) => Math.max(0, Math.min(100, x));
+
+function hrvReadinessScore(hrvMs: number): number {
+  if (hrvMs < 20) return clamp100((hrvMs / 20) * 30);
+  if (hrvMs < 40) return clamp100(30 + (hrvMs - 20) * 1.75);
+  if (hrvMs < 80) return clamp100(65 + (hrvMs - 40) * 0.75);
+  return clamp100(95 + Math.min(5, (hrvMs - 80) * 0.1));
+}
+
+function restingHrReadinessScore(restingHrBpm: number): number {
+  if (restingHrBpm <= 45) return 95;
+  if (restingHrBpm <= 65) return clamp100(95 - (restingHrBpm - 45) * 1.25);
+  if (restingHrBpm <= 85) return clamp100(70 - (restingHrBpm - 65) * 1.8);
+  return clamp100(34 - (restingHrBpm - 85) * 2.2);
+}
+
+function stressReadinessScore(stress: number): number {
+  if (stress <= 30) return clamp100(95 - stress * 0.4);
+  if (stress <= 70) return clamp100(83 - (stress - 30) * 0.9);
+  return clamp100(47 - (stress - 70) * 1.25);
+}
+
+function spo2ReadinessScore(spo2: number): number {
+  if (spo2 >= 98) return 100;
+  if (spo2 >= 95) return clamp100(78 + (spo2 - 95) * 7);
+  if (spo2 >= 92) return clamp100(42 + (spo2 - 92) * 12);
+  return clamp100((spo2 - 85) * 6);
+}
+
+function heartLoadReadinessScore(heartRateBpm: number, restingHrBpm: number): number {
+  const headroom = Math.max(0, heartRateBpm - restingHrBpm);
+  if (headroom <= 15) return clamp100(96 - headroom * 1.2);
+  if (headroom <= 45) return clamp100(78 - (headroom - 15) * 1.55);
+  return clamp100(32 - (headroom - 45) * 1.1);
+}
 
 export function computeReadiness(i: ReadinessInputs): { score: number | null; parts: Record<string, number> } {
   if (!i.connected || i.heartRateBpm == null) return { score: null, parts: {} };
   const parts: Record<string, number> = {};
   const w: Record<string, number> = {};
-  if (i.hrvMs != null) { parts.hrv = clamp01((i.hrvMs - 20) / 70); w.hrv = 0.30; }
-  if (i.restingHrBpm != null) { parts.rhr = clamp01((70 - i.restingHrBpm) / 25); w.rhr = 0.15; }
-  if (i.sleepScore != null) { parts.sleep = clamp01(i.sleepScore / 100); w.sleep = 0.25; }
-  if (i.recoveryScore != null) { parts.recovery = clamp01(i.recoveryScore / 100); w.recovery = 0.15; }
-  if (i.stress != null) { parts.stress = clamp01(1 - i.stress / 100); w.stress = 0.08; }
-  if (i.spo2 != null) { parts.spo2 = clamp01((i.spo2 - 92) / 7); w.spo2 = 0.04; }
+  if (i.hrvMs != null) { parts.hrv = hrvReadinessScore(i.hrvMs) / 100; w.hrv = 0.24; }
+  if (i.restingHrBpm != null) { parts.rhr = restingHrReadinessScore(i.restingHrBpm) / 100; w.rhr = 0.14; }
+  if (i.heartRateBpm != null && i.restingHrBpm != null) { parts.hrLoad = heartLoadReadinessScore(i.heartRateBpm, i.restingHrBpm) / 100; w.hrLoad = 0.16; }
+  if (i.sleepScore != null) { parts.sleep = clamp01(i.sleepScore / 100); w.sleep = 0.18; }
+  if (i.recoveryScore != null) { parts.recovery = clamp01(i.recoveryScore / 100); w.recovery = 0.12; }
+  if (i.stress != null) { parts.stress = stressReadinessScore(i.stress) / 100; w.stress = 0.12; }
+  if (i.spo2 != null) { parts.spo2 = spo2ReadinessScore(i.spo2) / 100; w.spo2 = 0.06; }
   if (i.peakJerk != null && i.peakJerk > 0) {
     parts.load = clamp01(1 - Math.min(i.peakJerk, 200) / 200);
-    w.load = 0.03;
+    w.load = 0.08;
   }
   const total = Object.values(w).reduce((a, b) => a + b, 0);
   // Do not publish a readiness score from sparse / stale inputs (for example
-  // HRV + stress only → a convincing but meaningless ~37). A real readiness
-  // number needs live HR plus at least three fresh watch-derived factors.
-  if (Object.keys(w).length < 3 || total === 0) return { score: null, parts };
+  // HRV + stress only → a convincing but meaningless number). A real readiness
+  // number needs live HR plus multiple current hardware factors; HR-derived
+  // RHR and HR-load alone do not count as enough independent evidence.
+  const independentSignals = [
+    i.hrvMs != null,
+    i.stress != null,
+    i.spo2 != null,
+    i.sleepScore != null,
+    i.recoveryScore != null,
+    i.peakJerk != null && i.peakJerk > 0,
+  ].filter(Boolean).length;
+  if (Object.keys(w).length < 3 || independentSignals < 2 || total === 0) return { score: null, parts };
   let sum = 0;
   for (const k in w) sum += parts[k] * w[k];
   return { score: Math.round((sum / total) * 100), parts };
