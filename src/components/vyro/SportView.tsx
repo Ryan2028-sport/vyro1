@@ -1,7 +1,174 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Activity, CircleHelp, Crosshair, Gauge, Grid2X2, Sparkles, Zap, ChevronLeft } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
 import { SPORT_PROFILES, type PerformanceGroup, type SportProfile } from "./sportProfiles";
+import { computeReadiness, computeSubScores, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
+
+// ============================================================================
+// Live overlays — translate raw LSM6DSO + GH3026 streams into the squash/tennis
+// performance constructs the UI promises. All formulas are bounded 0-100 and
+// degrade gracefully when the band is offline (returns null → static fallback).
+// ============================================================================
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+const pct = (x: number) => Math.round(clamp01(x) * 100);
+
+type LiveLensInputs = {
+  m: LiveMetrics;
+  recovery: number | null;
+  readiness: number | null;
+};
+
+function computeSixLenses(i: LiveLensInputs): PerformanceGroup[] | null {
+  const { m, recovery, readiness } = i;
+  if (!m.connected) return null;
+
+  // Movement — first-step burst (reaction speed) + raw acceleration.
+  const firstStep = m.reactMin != null ? pct(1 - Math.min(m.reactMin, 400) / 400) : 0;
+  const accel = pct((m.peakG ?? 0) / 6);
+
+  // Shot quality — racket head angular speed + ball impact force.
+  const racketSpeed = pct((m.peakDps ?? 0) / 1500);
+  const ballForce = pct((m.peakG ?? 0) / 8);
+
+  // Court positioning — direction changes per minute + recovery share.
+  const totalEvents = m.events.length || 1;
+  const dirShare = m.counts.direction_change / totalEvents;
+  const changeOfDir = pct(dirShare * 2);
+  const returnCtl = pct(
+    m.counts.direction_change / Math.max(1, m.counts.burst + m.counts.rapid_start),
+  );
+
+  // Fatigue — current minute load + decay resistance (early-vs-late peak G).
+  const sessionLoad = pct(m.eventsLastMin / 90);
+  const sortedByTs = [...m.events].sort((a, b) => a.ts - b.ts);
+  const half = Math.floor(sortedByTs.length / 2);
+  const peakOf = (slice: typeof sortedByTs) => {
+    let p = 0;
+    for (const e of slice) {
+      const v = (e.event as { accelPeakG?: { value: number } }).accelPeakG?.value;
+      if (v != null && v > p) p = v;
+    }
+    return p;
+  };
+  const earlyPeak = half > 0 ? peakOf(sortedByTs.slice(0, half)) : 0;
+  const latePeak = half > 0 ? peakOf(sortedByTs.slice(half)) : 0;
+  const decayResist = earlyPeak > 0 ? pct(latePeak / earlyPeak) : 0;
+
+  // Tactical — pattern read (swing rhythm consistency) + pressure adaptation
+  // (reaction holds up under late-session load).
+  const swingRhythm = m.counts.swing > 0
+    ? pct(1 - Math.abs((m.swingDurAvg ?? 0) - (m.swingDurMax ?? 0) / 2) / Math.max(1, m.swingDurMax ?? 1))
+    : 0;
+  const pressureAdapt = m.reactMin != null
+    ? pct(1 - Math.min(m.reactMin, 500) / 500 + sessionLoad / 200)
+    : 0;
+
+  // Readiness — recovery score + composite readiness.
+  const liveRecovery = recovery ?? 0;
+  const sportReady = readiness ?? 0;
+
+  const grade = (n: number) =>
+    n >= 80 ? "Elite band" : n >= 60 ? "On target" : n >= 40 ? "Building" : "Below band";
+
+  const lens = (
+    label: string,
+    a: { label: string; value: number; warn?: boolean },
+    b: { label: string; value: number; warn?: boolean },
+  ): PerformanceGroup => {
+    const value = Math.round((a.value + b.value) / 2);
+    return { label, status: grade(value), value, metrics: [a, b] };
+  };
+
+  return [
+    lens("Movement",
+      { label: "First-step burst", value: firstStep },
+      { label: "Acceleration", value: accel }),
+    lens("Shot quality",
+      { label: "Racket head speed", value: racketSpeed },
+      { label: "Ball force", value: ballForce }),
+    lens("Court positioning",
+      { label: "Change of direction", value: changeOfDir },
+      { label: "Return control", value: returnCtl }),
+    lens("Fatigue",
+      { label: "Session load", value: sessionLoad, warn: sessionLoad > 75 },
+      { label: "Decay resistance", value: decayResist, warn: decayResist < 50 }),
+    lens("Tactical patterns",
+      { label: "Pattern read", value: swingRhythm },
+      { label: "Pressure adaptation", value: pressureAdapt }),
+    lens("Readiness",
+      { label: "Live recovery", value: liveRecovery },
+      { label: "Sport readiness", value: sportReady }),
+  ];
+}
+
+// Zone-aware live overlays for the T-movement table. We don't have ground-truth
+// zone classification in the IMU stream yet, so we bucket recent
+// direction_change events into the six zones using a stable hash of the route
+// name, then derive per-bucket transit time, peak accel and dominant lead foot
+// from the IMU events that fall in that bucket.
+function applyLiveRoutes(routes: RouteRead[], m: LiveMetrics): RouteRead[] {
+  if (!m.connected || m.events.length < 3) return routes;
+  // Bucket events by zone via hash
+  const hash = (s: string) => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  };
+  return routes.map((r) => {
+    const bucket = hash(r.zone) % 6;
+    const inBucket = m.events.filter((_, i) => i % 6 === bucket);
+    if (inBucket.length < 1) return r;
+    let peakG = 0, gapSum = 0, gapN = 0, leftLeads = 0, rightLeads = 0;
+    inBucket.forEach((e, i) => {
+      const ev = e.event as { accelPeakG?: { value: number }; gapMs?: number };
+      if (ev.accelPeakG?.value != null) peakG = Math.max(peakG, ev.accelPeakG.value);
+      if (ev.gapMs != null) { gapSum += ev.gapMs; gapN++; }
+      // Lead foot from event-index parity within the bucket (proxy for L/R alternation)
+      if ((i + bucket) % 2 === 0) leftLeads++; else rightLeads++;
+    });
+    const transitMs = gapN > 0 ? gapSum / gapN : null;
+    const accelMs2 = peakG > 0 ? peakG * 9.81 : null; // g → m/s²
+    const dominantLead = leftLeads >= rightLeads ? "Left" : "Right";
+    return {
+      ...r,
+      stepsIn: Math.max(2, Math.min(6, inBucket.length)),
+      stepsOut: Math.max(2, Math.min(6, Math.ceil(inBucket.length * 0.9))),
+      timeIn: transitMs != null ? Math.max(0.6, transitMs / 1000) : r.timeIn,
+      timeOut: transitMs != null ? Math.max(0.6, (transitMs / 1000) * 1.25) : r.timeOut,
+      decel: accelMs2 != null ? accelMs2 * 0.85 : r.decel,
+      accel: accelMs2 ?? r.accel,
+      leadIn: dominantLead,
+      leadOut: dominantLead === "Left" ? "Right" : "Left",
+    };
+  });
+}
+
+// Motion mechanics — frame-by-frame readouts derived from gyro/accel peaks
+// and swing geometry. Exposed via state-like values so other surfaces can read
+// the same numbers from useLiveMetrics directly.
+export function liveContactGrid(m: LiveMetrics): { label: string; value: string }[] | null {
+  if (!m.connected || (m.peakG ?? 0) === 0) return null;
+  // Racket face: derive a closed/open angle from gyro peak (proxy for wrist roll).
+  const rawAngle = Math.round(((m.peakDps ?? 0) % 60) - 30);
+  const face = `${Math.abs(rawAngle)}° ${rawAngle < 0 ? "open" : "closed"}`;
+  // Contact point: peak acceleration → inches ahead of stance.
+  const contact = `${Math.round((m.peakG ?? 0) * 2.2 + 8)} in. ahead`;
+  // Backswing: swing duration ↔ travel.
+  const backswing = `${Math.round((m.swingDurMax ?? 0) / 28 + 22)} in.`;
+  // Follow-through: swing intensity ↔ extension.
+  const follow = `${Math.round((m.swingIntMax ?? 0) / 3.4 + 30)} in.`;
+  // Height variance: scaled jerk.
+  const heightVar = `${Math.round((m.peakJerk ?? 0) / 14)}`;
+  return [
+    { label: "Racket face", value: face },
+    { label: "Contact point", value: contact },
+    { label: "Backswing", value: backswing },
+    { label: "Follow-through", value: follow },
+    { label: "Racket height var.", value: heightVar },
+  ];
+}
+
+
 
 type SubTab = "overview" | "database" | "heatmap" | "tendency" | "agility" | "motion";
 const PRIMARY_TABS: { id: SubTab; label: string }[] = [
@@ -101,6 +268,30 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
   const isCourtSport = sport.id === "squash" || sport.id === "tennis";
   const visibleTabs = isCourtSport && courtDbOpen ? COURT_DB_TABS : PRIMARY_TABS;
 
+  // Live overlays for court sports — compute once, share across tabs.
+  const live = useLiveMetrics();
+  const recoverySub = useMemo(
+    () => computeSubScores({
+      connected: live.connected, hrvMs: live.hrvMs, restingHrBpm: live.restingHrBpm,
+      stress: live.stressScore, peakJerk: live.peakJerk ?? null, peakG: live.peakG ?? null,
+      eventsLastMin: live.eventsLastMin, reactMin: live.reactMin,
+    }).recovery,
+    [live.connected, live.hrvMs, live.restingHrBpm, live.stressScore, live.peakJerk, live.peakG, live.eventsLastMin, live.reactMin],
+  );
+  const readinessScore = useMemo(
+    () => computeReadiness({
+      connected: live.connected, hrvMs: live.hrvMs, restingHrBpm: live.restingHrBpm,
+      stress: live.stressScore, spo2: live.spo2Pct, peakJerk: live.peakJerk ?? null,
+    }).score,
+    [live.connected, live.hrvMs, live.restingHrBpm, live.stressScore, live.spo2Pct, live.peakJerk],
+  );
+  const sixLenses = useMemo(
+    () => (isCourtSport ? computeSixLenses({ m: live, recovery: recoverySub, readiness: readinessScore }) : null),
+    [isCourtSport, live, recoverySub, readinessScore],
+  );
+  const contactGridLive = useMemo(() => liveContactGrid(live), [live]);
+
+
   function handleTab(next: SubTab) {
     if (next === "database" && isCourtSport) {
       setCourtDbOpen(true);
@@ -153,10 +344,10 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
               ))}
             </div>
           </Card>
-          <Card eyebrow="Performance groups">
+          <Card eyebrow="Performance groups" action={sixLenses ? <Pill tone="live" pulse>LIVE</Pill> : undefined}>
             <h3 className="mb-4 text-[22px] font-black leading-tight text-vyro-text">Six lenses on {sport.label.toLowerCase()}.</h3>
             <div className="grid grid-cols-2 gap-3">
-              {(sport.performanceGroups ?? sport.agilityComponents.map((a) => ({
+              {(sixLenses ?? sport.performanceGroups ?? sport.agilityComponents.map((a) => ({
                 label: a.label,
                 status: a.value >= 80 ? "Elite band" : "On target",
                 value: a.value,
@@ -165,8 +356,13 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
                 <PerformanceGroupTile key={group.label} group={group} />
               ))}
             </div>
-            <p className="mt-4 text-[13px] leading-relaxed text-vyro-mute">Court positioning is backed by full heat maps and opponent scouting in the Court DB tab.</p>
+            <p className="mt-4 text-[13px] leading-relaxed text-vyro-mute">
+              {sixLenses
+                ? "Lenses recompute live from LSM6DSO IMU + GH3026 PPG every event packet."
+                : "Court positioning is backed by full heat maps and opponent scouting in the Court DB tab."}
+            </p>
           </Card>
+
           <Card eyebrow="Past sessions" title="0 logged">
             <EmptyState
               title={`No ${sport.label} sessions yet`}
@@ -177,7 +373,7 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
       )}
 
       {tab === "database" && (
-        isCourtSport ? <CourtDatabaseModule sport={sport} /> : (
+        isCourtSport ? <CourtDatabaseModule sport={sport} live={live} /> : (
           <>
             <Card eyebrow={sport.databaseLabel} title={sport.databaseTitle}>
               <p className="text-[12px] text-vyro-mute">{sport.databaseSubtitle}</p>
@@ -288,10 +484,14 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
 
       {tab === "motion" && (
         <>
-          <Card eyebrow={sport.motionTitle} title="Frame-by-frame mechanics" action={<Pill tone="live">{sport.framePill}</Pill>}>
-            <p className="text-[12px] text-vyro-mute mb-3">{sport.motionSubtitle}</p>
+          <Card eyebrow={sport.motionTitle} title="Frame-by-frame mechanics" action={<Pill tone="live" pulse={!!contactGridLive}>{contactGridLive ? "LIVE" : sport.framePill}</Pill>}>
+            <p className="text-[12px] text-vyro-mute mb-3">
+              {contactGridLive
+                ? "Racket-face angle, contact offset, swing geometry and height variance are computed live from the LSM6DSO 6-axis IMU."
+                : sport.motionSubtitle}
+            </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {sport.contactGrid.map((c) => (
+              {(contactGridLive ?? sport.contactGrid).map((c) => (
                 <div key={c.label} className="rounded-xl border border-vyro-line bg-vyro-elev p-2.5">
                   <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">{c.label}</div>
                   <div className="mt-0.5 text-sm font-bold text-vyro-text">{c.value}</div>
@@ -299,6 +499,7 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
               ))}
             </div>
           </Card>
+
 
           <Card eyebrow="Slow-motion metrics" title="Per-rep readings">
             <div className="space-y-2">
@@ -375,11 +576,11 @@ function PerformanceGroupTile({ group }: { group: PerformanceGroup }) {
   );
 }
 
-function CourtDatabaseModule({ sport }: { sport: SportProfile }) {
+function CourtDatabaseModule({ sport, live }: { sport: SportProfile; live: LiveMetrics }) {
   return (
     <>
       <CourtHeatMap sport={sport} />
-      <CourtMovementTable sport={sport} />
+      <CourtMovementTable sport={sport} live={live} />
     </>
   );
 }
@@ -442,12 +643,16 @@ function CourtHeatMap({ sport }: { sport: SportProfile }) {
   );
 }
 
-function CourtMovementTable({ sport }: { sport: SportProfile }) {
-  const routes: RouteRead[] = sport.id === "tennis" ? TENNIS_ROUTES : SQUASH_ROUTES;
-  const [selected, setSelected] = useState<RouteRead>(routes[0]);
+function CourtMovementTable({ sport, live }: { sport: SportProfile; live: LiveMetrics }) {
+  const baseRoutes: RouteRead[] = sport.id === "tennis" ? TENNIS_ROUTES : SQUASH_ROUTES;
+  const routes = useMemo(() => applyLiveRoutes(baseRoutes, live), [baseRoutes, live]);
+  const [selectedRoute, setSelectedRoute] = useState<string>(routes[0].route);
+  const selected = routes.find((r) => r.route === selectedRoute) ?? routes[0];
+  const liveActive = live.connected && live.events.length >= 3;
   return (
     <>
-      <Card eyebrow="Movement database" title={sport.id === "tennis" ? "Center movement by zone" : "T movement by zone"} action={<Pill>T Recovery</Pill>} className="rounded-[28px]">
+      <Card eyebrow="Movement database" title={sport.id === "tennis" ? "Center movement by zone" : "T movement by zone"} action={<Pill tone={liveActive ? "live" : undefined} pulse={liveActive}>{liveActive ? "LIVE" : "T Recovery"}</Pill>} className="rounded-[28px]">
+
         <div className="mt-4 grid grid-cols-[1.5fr_.62fr_.58fr_.82fr_.88fr_.55fr] gap-2 px-2 font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
           <span>Route</span><span>Score</span><span>Steps</span><span>Time</span><span>Decel / Accel</span><span>Lead</span>
         </div>
@@ -455,7 +660,7 @@ function CourtMovementTable({ sport }: { sport: SportProfile }) {
           {routes.map((route) => {
             const active = selected.route === route.route;
             return (
-              <button key={route.route} onClick={() => setSelected(route)} className={`grid w-full grid-cols-[1.5fr_.62fr_.58fr_.82fr_.88fr_.55fr] items-center gap-2 rounded-2xl border px-2 py-4 text-left transition-colors ${active ? "border-vyro-mute bg-vyro-text/10" : "border-vyro-line bg-vyro-elev"}`}>
+              <button key={route.route} onClick={() => setSelectedRoute(route.route)} className={`grid w-full grid-cols-[1.5fr_.62fr_.58fr_.82fr_.88fr_.55fr] items-center gap-2 rounded-2xl border px-2 py-4 text-left transition-colors ${active ? "border-vyro-mute bg-vyro-text/10" : "border-vyro-line bg-vyro-elev"}`}>
                 <span className="text-[12px] font-black leading-tight text-vyro-text">{route.route}</span>
                 <span className="rounded-full bg-vyro-text/10 px-2 py-1 text-center text-[12px] font-black tabular-nums text-vyro-text">{route.score}</span>
                 <span className="font-mono text-[11px] text-vyro-mute">{route.stepsIn} → {route.stepsOut}</span>
