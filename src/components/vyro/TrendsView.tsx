@@ -1,110 +1,212 @@
-import type { ReactNode } from "react";
-import { Activity, CalendarDays, LineChart, Moon, Sparkles, Trophy, Zap } from "lucide-react";
+// Trend intelligence — all numbers are derived from real Supabase `sessions`
+// rows plus the rolling baselines persisted by AthleteView/RecoveryView and
+// the local sleep-nights store. When there are no sessions yet, every card
+// renders an empty state instead of showing demo numbers.
 
-const trendCards = [
-  { label: "Agility score", previous: "76/100", value: "84", unit: "/100", delta: "+10.5%", progress: 84, data: [18, 28, 24, 42, 54, 50, 64, 72, 78, 76, 86, 91] },
-  { label: "Resting HR", previous: "53bpm", value: "48", unit: "bpm", delta: "-9.4%", progress: 52, data: [82, 82, 72, 62, 70, 52, 52, 44, 44, 34, 24, 24] },
-  { label: "T-control", previous: "68%", value: "82", unit: "%", delta: "+20.6%", progress: 82, data: [20, 26, 32, 29, 40, 47, 56, 65, 74, 78, 85, 88] },
-  { label: "Swing force consistency", previous: "81%", value: "88", unit: "%", delta: "+8.6%", progress: 88, data: [28, 34, 45, 39, 52, 58, 70, 76, 84, 84, 90, 96] },
-  { label: "Sleep score", previous: "80/100", value: "87", unit: "/100", delta: "+8.8%", progress: 87, data: [20, 48, 60, 32, 66, 82, 74, 90, 78, 86, 96, 88] },
-];
+import { useMemo, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Activity, CalendarDays, Moon, Sparkles, Zap } from "lucide-react";
+import { getMySessions } from "@/lib/sessions.functions";
+import {
+  buildTrendCards,
+  trainingLoad7d,
+  agilityScore,
+  durationMin,
+  type RawSession,
+  type TrendCard,
+} from "@/lib/sessions-derived";
+import { useSleepNights } from "@/lib/use-sleep-nights";
 
-const calendarDays = [
-  { day: 1, score: 64, tone: "bad" },
-  { day: 2, score: 68, tone: "warn" },
-  { day: 3, score: 71, tone: "warn" },
-  { day: 4, score: 69, tone: "warn" },
-  { day: 5, score: 73, tone: "warn" },
-  { day: 6, score: 76, tone: "good" },
-  { day: 7, score: 78, tone: "good", active: true },
-  { day: 8, score: 74, tone: "warn" },
-  { day: 9, score: 82, tone: "good" },
-  { day: 10, score: 67, tone: "warn" },
-  { day: 11, score: 58, tone: "bad" },
-  { day: 12, score: 72, tone: "warn" },
-];
+type Baselines = {
+  hrvMs?: number | null;
+  restingHrBpm?: number | null;
+  reactMs?: number | null;
+};
+
+function readBaselines(): Baselines | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem("vyro.baselines.v1");
+    return raw ? (JSON.parse(raw) as Baselines) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function TrendsView() {
+  const fetchSessions = useServerFn(getMySessions);
+  const { data, isLoading } = useQuery({
+    queryKey: ["sessions"],
+    queryFn: () => fetchSessions(),
+  });
+
+  const sessions = (data ?? []) as RawSession[];
+  const baselines = readBaselines();
+  const { scores: sleepScores, last: lastNight, nights } = useSleepNights();
+
+  const cards = useMemo(
+    () => buildTrendCards(sessions, baselines, sleepScores),
+    [sessions, baselines, sleepScores],
+  );
+
+  const featured = cards[0];
+  const hasData = sessions.length > 0;
+
   return (
     <div className="mx-auto max-w-[430px] space-y-7 pb-8 text-vyro-text">
       <header className="space-y-3">
         <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Player dashboard · Progress</p>
-        <h2 className="text-[28px] font-black leading-tight text-vyro-text">Ryan's trend intelligence</h2>
+        <h2 className="text-[28px] font-black leading-tight text-vyro-text">Trend intelligence</h2>
         <p className="text-[15px] leading-relaxed text-vyro-mute">
-          All tracked VYRO metrics translated into trend graphs, progress signals, and AI coaching notes.
+          {hasData
+            ? `Computed from ${sessions.length} recorded session${sessions.length === 1 ? "" : "s"} and your live baselines.`
+            : "Trends populate once you save your first tracked session."}
         </p>
-        <Badge icon={<Sparkles className="h-4 w-4" />}>AI insights</Badge>
+        <Badge icon={<Sparkles className="h-4 w-4" />}>{hasData ? "Live" : "Awaiting data"}</Badge>
       </header>
 
-      <TrajectoryCard />
-      <FeaturedGraph />
-      <AiReadout />
-      <RecoveryTrend />
-      <CalendarView />
-      <MetricTrendStack />
+      {isLoading ? (
+        <VCard><p className="py-12 text-center text-[14px] text-vyro-mute">Loading session history…</p></VCard>
+      ) : !hasData ? (
+        <VCard>
+          <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">No data yet</p>
+          <h3 className="mt-4 text-[22px] font-black leading-tight">Run a tracked session.</h3>
+          <p className="mt-3 text-[14px] leading-relaxed text-vyro-mute">
+            Open the Session tab, pick a sport, hit Begin tracking, and end the session when you're done. Trends and AI readouts compute themselves from the saved summary.
+          </p>
+        </VCard>
+      ) : (
+        <>
+          <TrajectoryCard cards={cards} />
+          <FeaturedGraph card={featured} />
+          <AiReadout cards={cards} sessions={sessions} />
+          <RecoveryTrend baselines={baselines} sessions={sessions} />
+          <CalendarView sessions={sessions} lastNight={lastNight?.score ?? null} loadToday={trainingLoad7d(sessions)} />
+          <MetricTrendStack cards={cards} />
+        </>
+      )}
+
+      {nights.length === 0 && hasData && (
+        <VCard className="border-dashed">
+          <p className="text-[13px] text-vyro-mute">
+            Sleep score is empty — no synced nights yet. As soon as the band syncs a sleep frame the Sleep card and the sleep trendline both populate.
+          </p>
+        </VCard>
+      )}
     </div>
   );
 }
 
-function TrajectoryCard() {
+function TrajectoryCard({ cards }: { cards: TrendCard[] }) {
+  const improving = cards.filter((c) => c.deltaPct != null && (c.higherIsBetter ? c.deltaPct > 0 : c.deltaPct < 0));
   return (
     <VCard className="border-vyro-text/42">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Performance trajectory</p>
-        <span className="rounded-xl border border-vyro-text/32 bg-vyro-text/8 px-4 py-2 font-mono text-[14px] uppercase tracking-[0.16em] text-vyro-text">Last 30 days</span>
+        <span className="rounded-xl border border-vyro-text/32 bg-vyro-text/8 px-4 py-2 font-mono text-[14px] uppercase tracking-[0.16em] text-vyro-text">Last 14 days</span>
       </div>
-      <h3 className="mt-5 text-[27px] font-black leading-tight text-vyro-text">Improving across 4 of 5 core metrics.</h3>
+      <h3 className="mt-5 text-[27px] font-black leading-tight text-vyro-text">
+        {improving.length > 0
+          ? `Improving on ${improving.length} of ${cards.filter((c) => c.deltaPct != null).length} metrics.`
+          : "Not enough recent history to score a trend."}
+      </h3>
       <div className="mt-7 space-y-4">
-        <TrajectoryMetric label="Agility" value="+10.5%" hint="Higher is better" />
-        <TrajectoryMetric label="Resting HR" value="-5 bpm" hint="Lower is better" />
-        <TrajectoryMetric label="T-control" value="+20.6%" hint="Higher is better" />
+        {cards.slice(0, 3).map((c) => (
+          <TrajectoryMetric
+            key={c.label}
+            label={c.label}
+            value={fmtDelta(c, true)}
+            hint={c.higherIsBetter ? "Higher is better" : "Lower is better"}
+          />
+        ))}
       </div>
     </VCard>
   );
 }
 
-function FeaturedGraph() {
+function FeaturedGraph({ card }: { card: TrendCard }) {
   return (
     <VCard className="bg-vyro-elev/75">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <div>
           <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Featured graph</p>
-          <h3 className="mt-4 text-[24px] font-black leading-none text-vyro-text">Agility score</h3>
+          <h3 className="mt-4 text-[24px] font-black leading-none text-vyro-text">{card.label}</h3>
         </div>
-        <span className="rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 py-2 font-mono text-[14px] text-vyro-text">84/100</span>
+        <span className="rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 py-2 font-mono text-[14px] text-vyro-text">
+          {card.current ?? "—"}{card.unit}
+        </span>
       </div>
-      <BigGraph />
-      <InsightBox>Agility score is up 10.5% over the last 12 sessions. The biggest driver is cleaner deceleration back to the T.</InsightBox>
+      {card.spark.length >= 2 ? (
+        <GraphSvg data={card.spark} height={170} className="mt-7 rounded-[18px] border border-vyro-line bg-vyro-panel/70" />
+      ) : (
+        <div className="mt-7 flex h-[170px] items-center justify-center rounded-[18px] border border-dashed border-vyro-line text-[13px] text-vyro-mute">
+          Need a few more sessions to chart this.
+        </div>
+      )}
+      <InsightBox>
+        {card.deltaPct == null
+          ? "Trend will appear once you have at least two scoreable windows."
+          : `${card.label} ${card.deltaPct >= 0 ? "is up" : "is down"} ${Math.abs(card.deltaPct).toFixed(1)}% over the comparison window.`}
+      </InsightBox>
     </VCard>
   );
 }
 
-function AiReadout() {
+function AiReadout({ cards, sessions }: { cards: TrendCard[]; sessions: RawSession[] }) {
+  const insights: string[] = [];
+  for (const c of cards) {
+    if (c.deltaPct == null) continue;
+    const dirGood = c.higherIsBetter ? c.deltaPct > 3 : c.deltaPct < -3;
+    if (dirGood) insights.push(`${c.label} ${c.deltaPct >= 0 ? "improved" : "improved (lower)"} ${Math.abs(c.deltaPct).toFixed(1)}%.`);
+  }
+  if (!insights.length) {
+    insights.push(`Latest session: ${sessions[0]?.sport ?? "—"} for ${Math.round(durationMin(sessions[0] ?? ({} as RawSession)))} min.`);
+  }
   return (
     <VCard className="bg-vyro-elev/75">
       <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">AI readout</p>
       <div className="mt-5 space-y-4">
-        <InsightBox>Resting heart rate has dropped 5 bpm versus the prior month, suggesting improved aerobic fitness and recovery capacity.</InsightBox>
-        <InsightBox>T-control is up 20.6%. You are winning more middle-court positioning after deep back-right retrievals.</InsightBox>
-        <InsightBox>Swing force consistency is up 8.6%, which points to better repeatability late in rallies.</InsightBox>
+        {insights.slice(0, 4).map((line, i) => <InsightBox key={i}>{line}</InsightBox>)}
       </div>
     </VCard>
   );
 }
 
-function RecoveryTrend() {
+function RecoveryTrend({ baselines, sessions }: { baselines: Baselines | null; sessions: RawSession[] }) {
+  const load = trainingLoad7d(sessions);
+  const recoveryHint = load >= 70 ? "High 7-day load — protect sleep tonight." : load >= 40 ? "Moderate load — typical session OK." : "Low load — fine to push tomorrow.";
   return (
     <VCard className="border-vyro-text/42">
-      <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">7-day recovery</p>
-      <p className="mt-6 text-[40px] font-black leading-none text-vyro-text">+12%</p>
-      <p className="mt-4 font-mono text-[15px] tracking-[0.12em] text-vyro-mute">vs prior week · moved from Athlete</p>
-      <RecoverySpark />
-      <InsightBox>Trend is up. Hold sleep above 8h and you'll peak Sunday for the league match.</InsightBox>
+      <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">7-day training load</p>
+      <p className="mt-6 text-[40px] font-black leading-none text-vyro-text">{load}<span className="text-[20px] text-vyro-mute">/100</span></p>
+      <p className="mt-4 font-mono text-[15px] tracking-[0.12em] text-vyro-mute">
+        {baselines?.hrvMs ? `HRV baseline ${Math.round(baselines.hrvMs)}ms` : "Tracking baselines…"}
+      </p>
+      <InsightBox>{recoveryHint}</InsightBox>
     </VCard>
   );
 }
 
-function CalendarView() {
+function CalendarView({ sessions, lastNight, loadToday }: { sessions: RawSession[]; lastNight: number | null; loadToday: number }) {
+  const days = useMemo(() => {
+    const ref = Date.now();
+    return Array.from({ length: 12 }).map((_, i) => {
+      const dayStart = new Date(ref - (11 - i) * 86_400_000);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = dayStart.getTime() + 86_400_000;
+      const inDay = sessions.filter((s) => {
+        const t = new Date(s.started_at).getTime();
+        return t >= dayStart.getTime() && t < dayEnd;
+      });
+      const avgAgility = inDay.length
+        ? Math.round(inDay.map(agilityScore).filter((v): v is number => v != null).reduce((a, b) => a + b, 0) / Math.max(1, inDay.length))
+        : 0;
+      const tone = avgAgility >= 75 ? "good" : avgAgility >= 60 ? "warn" : avgAgility > 0 ? "bad" : "off";
+      return { day: dayStart.getDate(), score: avgAgility, tone, active: i === 11 };
+    });
+  }, [sessions]);
+
   return (
     <VCard className="bg-vyro-elev/75">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
@@ -112,65 +214,70 @@ function CalendarView() {
           <p className="flex items-center gap-2 font-mono text-[13px] uppercase tracking-[0.28em] text-vyro-mute">
             <CalendarDays className="h-4 w-4" /> Calendar view
           </p>
-          <h3 className="mt-4 text-[24px] font-black leading-tight text-vyro-text">May training history</h3>
-          <p className="mt-3 text-[15px] leading-relaxed text-vyro-mute">Tap any date to replay the exact VYRO day: recovery, sleep, strain, agility, T-control, and session note.</p>
+          <h3 className="mt-4 text-[24px] font-black leading-tight text-vyro-text">Recent training history</h3>
+          <p className="mt-3 text-[15px] leading-relaxed text-vyro-mute">
+            Daily agility score from your saved sessions. Empty cells = no session that day.
+          </p>
         </div>
-        <span className="rounded-xl border border-vyro-text/32 bg-vyro-text/8 px-4 py-2 font-mono text-[14px] uppercase tracking-[0.12em] text-vyro-text">May<br />7</span>
       </div>
       <div className="mt-8 grid grid-cols-7 gap-2 text-center font-mono text-[12px] text-vyro-mute">
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={`${d}-${i}`}>{d}</span>)}
+        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <span key={`${d}-${i}`}>{d}</span>)}
       </div>
       <div className="mt-5 grid grid-cols-7 gap-2">
-        {calendarDays.map((day) => <CalendarDay key={day.day} {...day} />)}
+        {days.map((day, i) => <CalendarDay key={i} {...day} />)}
       </div>
       <div className="mt-6 space-y-4">
-        <CalendarMetric icon={<Activity className="h-5 w-5" />} label="Recovery" value="78%" />
-        <CalendarMetric icon={<Moon className="h-5 w-5" />} label="Sleep" value="87" />
-        <CalendarMetric icon={<Zap className="h-5 w-5" />} label="Strain" value="16.4" />
-        <div className="rounded-[18px] border border-vyro-line bg-vyro-panel/70 p-4">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-            <div className="min-w-0">
-              <p className="text-[18px] font-black text-vyro-text">League prep</p>
-              <p className="mt-2 text-[14px] leading-relaxed text-vyro-mute">Peak week signal. Keep evening work light.</p>
-            </div>
-            <span className="rounded-xl border border-vyro-text/32 bg-vyro-text/8 px-4 py-2 font-mono text-[14px] uppercase tracking-[0.1em] text-vyro-text">T-control<br />79%</span>
-          </div>
-        </div>
+        <CalendarMetric icon={<Activity className="h-5 w-5" />} label="7d load" value={`${loadToday}/100`} />
+        <CalendarMetric icon={<Moon className="h-5 w-5" />} label="Sleep" value={lastNight != null ? String(lastNight) : "—"} />
+        <CalendarMetric icon={<Zap className="h-5 w-5" />} label="Sessions" value={String(sessions.length)} />
       </div>
     </VCard>
   );
 }
 
-function MetricTrendStack() {
+function MetricTrendStack({ cards }: { cards: TrendCard[] }) {
   return (
     <div className="space-y-5">
-      {trendCards.map((card) => <MetricTrendCard key={card.label} {...card} />)}
+      {cards.map((card) => <MetricTrendCard key={card.label} card={card} />)}
     </div>
   );
 }
 
-function MetricTrendCard({ label, previous, value, unit, delta, progress, data }: typeof trendCards[number]) {
+function MetricTrendCard({ card }: { card: TrendCard }) {
   return (
     <VCard className="bg-vyro-elev/75">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-[18px] font-black text-vyro-text">{label}</h3>
-          <p className="mt-1 font-mono text-[14px] text-vyro-mute">Previous {previous}</p>
+          <h3 className="truncate text-[18px] font-black text-vyro-text">{card.label}</h3>
+          <p className="mt-1 font-mono text-[14px] text-vyro-mute">
+            {card.previous != null ? `Previous ${card.previous}${card.unit}` : "No prior window"}
+          </p>
         </div>
-        <span className="rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 py-1.5 font-mono text-[14px] text-vyro-text">↗ {delta}</span>
+        <span className="rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 py-1.5 font-mono text-[14px] text-vyro-text">
+          {fmtDelta(card, false)}
+        </span>
       </div>
       <div className="mt-7 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.25fr)] items-end gap-4">
         <div className="min-w-0">
-          <span className="text-[40px] font-black leading-none text-vyro-text">{value}</span>
-          <span className="ml-2 text-[18px] font-black text-vyro-mute">{unit}</span>
+          <span className="text-[40px] font-black leading-none text-vyro-text">
+            {card.current ?? "—"}
+          </span>
+          <span className="ml-2 text-[18px] font-black text-vyro-mute">{card.unit}</span>
         </div>
-        <SmallSpark data={data} />
+        {card.spark.length >= 2 ? <SmallSpark data={card.spark} /> : <div className="h-[72px]" />}
       </div>
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-vyro-text/8">
-        <span className="block h-full rounded-full bg-vyro-text" style={{ width: `${progress}%` }} />
+        <span className="block h-full rounded-full bg-vyro-text" style={{ width: `${Math.max(0, Math.min(100, card.progress))}%` }} />
       </div>
     </VCard>
   );
+}
+
+function fmtDelta(card: TrendCard, withArrow: boolean): string {
+  if (card.deltaPct == null) return "—";
+  const arrow = card.deltaPct >= 0 ? "↗" : "↘";
+  const num = `${card.deltaPct >= 0 ? "+" : ""}${card.deltaPct.toFixed(1)}%`;
+  return withArrow ? `${arrow} ${num}` : num;
 }
 
 function VCard({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -200,15 +307,6 @@ function InsightBox({ children }: { children: ReactNode }) {
   );
 }
 
-function BigGraph() {
-  const data = [12, 24, 18, 35, 48, 54, 70, 76, 88, 82, 96, 108];
-  return <GraphSvg data={data} height={170} className="mt-7 rounded-[18px] border border-vyro-line bg-vyro-panel/70" />;
-}
-
-function RecoverySpark() {
-  return <GraphSvg data={[20, 34, 44, 38, 52, 62, 68]} height={130} className="mt-6" stroke="var(--vyro-mint)" fill="var(--vyro-mint)" />;
-}
-
 function SmallSpark({ data }: { data: number[] }) {
   return <GraphSvg data={data} height={72} compact />;
 }
@@ -219,7 +317,7 @@ function GraphSvg({ data, height, className = "", stroke = "var(--vyro-text)", f
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
-  const step = (width - pad * 2) / (data.length - 1);
+  const step = (width - pad * 2) / Math.max(1, data.length - 1);
   const coords = data.map((value, index) => [pad + index * step, pad + (height - pad * 2) * (1 - (value - min) / range)] as const);
   const path = coords.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const area = `${path} L${width - pad},${height - pad} L${pad},${height - pad} Z`;
@@ -236,13 +334,13 @@ function GraphSvg({ data, height, className = "", stroke = "var(--vyro-text)", f
 }
 
 function CalendarDay({ day, score, tone, active }: { day: number; score: number; tone: string; active?: boolean }) {
-  const dot = tone === "good" ? "bg-vyro-mint" : tone === "bad" ? "bg-vyro-rose" : "bg-vyro-amber";
+  const dot = tone === "good" ? "bg-vyro-mint" : tone === "bad" ? "bg-vyro-rose" : tone === "warn" ? "bg-vyro-amber" : "bg-vyro-line";
   return (
-    <button className={`relative min-h-[48px] rounded-xl border bg-vyro-panel/70 p-2 text-left ${active ? "border-vyro-text" : "border-vyro-line"}`}>
+    <div className={`relative min-h-[48px] rounded-xl border bg-vyro-panel/70 p-2 text-left ${active ? "border-vyro-text" : "border-vyro-line"}`}>
       <span className={`absolute right-3 top-3 h-2.5 w-2.5 rounded-full ${dot}`} />
       <span className="block text-[15px] font-black text-vyro-text">{day}</span>
-      <span className="mt-2 block text-[22px] font-black leading-none text-vyro-text">{score}</span>
-    </button>
+      <span className="mt-2 block text-[22px] font-black leading-none text-vyro-text">{score || "—"}</span>
+    </div>
   );
 }
 
