@@ -643,12 +643,16 @@ function CourtHeatMap({ sport }: { sport: SportProfile }) {
   );
 }
 
-function CourtMovementTable({ sport }: { sport: SportProfile }) {
-  const routes: RouteRead[] = sport.id === "tennis" ? TENNIS_ROUTES : SQUASH_ROUTES;
-  const [selected, setSelected] = useState<RouteRead>(routes[0]);
+function CourtMovementTable({ sport, live }: { sport: SportProfile; live: LiveMetrics }) {
+  const baseRoutes: RouteRead[] = sport.id === "tennis" ? TENNIS_ROUTES : SQUASH_ROUTES;
+  const routes = useMemo(() => applyLiveRoutes(baseRoutes, live), [baseRoutes, live]);
+  const [selectedRoute, setSelectedRoute] = useState<string>(routes[0].route);
+  const selected = routes.find((r) => r.route === selectedRoute) ?? routes[0];
+  const liveActive = live.connected && live.events.length >= 3;
   return (
     <>
-      <Card eyebrow="Movement database" title={sport.id === "tennis" ? "Center movement by zone" : "T movement by zone"} action={<Pill>T Recovery</Pill>} className="rounded-[28px]">
+      <Card eyebrow="Movement database" title={sport.id === "tennis" ? "Center movement by zone" : "T movement by zone"} action={<Pill tone={liveActive ? "live" : undefined} pulse={liveActive}>{liveActive ? "LIVE" : "T Recovery"}</Pill>} className="rounded-[28px]">
+
         <div className="mt-4 grid grid-cols-[1.5fr_.62fr_.58fr_.82fr_.88fr_.55fr] gap-2 px-2 font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
           <span>Route</span><span>Score</span><span>Steps</span><span>Time</span><span>Decel / Accel</span><span>Lead</span>
         </div>
