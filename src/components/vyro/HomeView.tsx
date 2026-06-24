@@ -270,9 +270,9 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{
               m.connected
-                ? (m.heartRateBpm != null
+                ? (live(m.heartRateBpm) != null
                     ? `${m.heartRateBpm} bpm`
-                    : (m.batteryPct != null ? `band ${m.batteryPct}%` : "live"))
+                    : (live(m.batteryPct) != null ? `band ${m.batteryPct}%` : "live"))
                 : "offline"
             }</Pill>
             <button
@@ -417,7 +417,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         <Card
           eyebrow="Vitals · band stream"
           title={<span className="inline-flex items-center gap-2"><HeartPulse className="h-4 w-4 text-vyro-rose" /> Live body signals</span>}
-          action={<Pill tone={m.connected ? (m.heartRateBpm != null ? "live" : "warn") : "off"} pulse={m.heartRateBpm != null}>{m.connected ? (m.heartRateBpm != null ? "streaming" : "imu only") : "off"}</Pill>}
+          action={<Pill tone={m.connected ? (live(m.heartRateBpm) != null ? "live" : "warn") : "off"} pulse={live(m.heartRateBpm) != null}>{m.connected ? (live(m.heartRateBpm) != null ? "streaming" : "awaiting") : "off"}</Pill>}
         >
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <VitalTile label="Current HR" value={fmt(live(m.heartRateBpm))} unit="bpm" tone="rose" hint={live(m.heartRateBpm) != null ? "live from band" : "awaiting HR"} live={live(m.heartRateBpm) != null} />
@@ -430,7 +430,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
             <VitalTile label="Battery" value={fmt(live(m.batteryPct))} unit="%" tone="mint" hint={live(m.batteryPct) != null ? (m.batteryCharging ? "charging" : "watch frame") : "awaiting"} live={live(m.batteryPct) != null} />
           </div>
           <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.18em] text-vyro-mute">
-            {m.heartRateBpm != null
+            {live(m.heartRateBpm) != null
               ? "HR + steps + battery stream continuously. HRV / Stress / SpO₂ / Skin-Temp cycle every 5 min."
               : m.connected
                 ? "Connected — waiting for the band to publish heart rate."
@@ -444,10 +444,10 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
         <Card
           eyebrow="Fuel"
           title={<span className="inline-flex items-center gap-2"><Utensils className="h-4 w-4 text-vyro-amber" /> Calorie balance</span>}
-          action={<Pill tone={m.caloriesKcal != null ? "live" : "off"}>{m.caloriesKcal != null ? "live" : "no data"}</Pill>}
+          action={<Pill tone={live(m.caloriesKcal) != null ? "live" : "off"}>{live(m.caloriesKcal) != null ? "live" : "no data"}</Pill>}
         >
           <div className="grid grid-cols-3 gap-2">
-            <Stat label="Burn" value={m.caloriesKcal ?? "—"} unit="kcal" hint={m.caloriesKcal != null ? "from band" : "needs band"} />
+            <Stat label="Burn" value={live(m.caloriesKcal) ?? "—"} unit="kcal" hint={live(m.caloriesKcal) != null ? "from band" : "needs band"} />
             <Stat label="Eaten" value="—" unit="kcal" hint="log meals →" />
             <Stat label="Goal" value="—" unit="kcal" hint="set in Fuel" />
           </div>
