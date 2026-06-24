@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from "react";
 import { AlarmClock, Bed, Brain, CircleHelp, Moon, Sunrise, Waves, Zap } from "lucide-react";
+import { useSleepNights, fmtSleepDuration } from "@/lib/use-sleep-nights";
 
 type Tab = "overall" | "zones" | "wakeups" | "performance";
 
-const night = {
+// Demo placeholder — overridden by real values when a night is synced.
+const DEMO_NIGHT = {
   score: 87,
   asleepLabel: "6h 46m",
   inBedLabel: "7h 04m",
@@ -15,6 +17,36 @@ const night = {
   recBedtime: "10:25 PM",
   recWake: "6:15 AM",
 };
+const night = DEMO_NIGHT;
+
+function fmtTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  } catch {
+    return "—";
+  }
+}
+
+function useNightView() {
+  const { last } = useSleepNights();
+  if (!last) return { hasData: false as const, night: DEMO_NIGHT };
+  const bedtimeISO = new Date(new Date(last.endAt).getTime() - last.inBedMin * 60_000).toISOString();
+  return {
+    hasData: true as const,
+    night: {
+      score: last.score,
+      asleepLabel: fmtSleepDuration(last.asleepMin),
+      inBedLabel: fmtSleepDuration(last.inBedMin),
+      bedtime: fmtTime(bedtimeISO),
+      wake: fmtTime(last.endAt),
+      wakeups: last.wakeups,
+      debtLabel: last.debtMin != null ? fmtSleepDuration(Math.max(0, last.debtMin)) : "—",
+      targetLabel: "8h 10m",
+      recBedtime: DEMO_NIGHT.recBedtime,
+      recWake: DEMO_NIGHT.recWake,
+    },
+  };
+}
 
 const primaryTabs: { id: Tab; label: string }[] = [
   { id: "overall", label: "Overall Sleep" },
@@ -24,6 +56,7 @@ const primaryTabs: { id: Tab; label: string }[] = [
 
 export function SleepView() {
   const [tab, setTab] = useState<Tab>("overall");
+  const { hasData } = useNightView();
 
   return (
     <div className="mx-auto max-w-[430px] space-y-7 pb-8 text-vyro-text">
@@ -37,9 +70,15 @@ export function SleepView() {
         </div>
         <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-vyro-text/35 bg-vyro-text/5 px-3 font-mono text-[12px] uppercase tracking-[0.16em] text-vyro-text">
           <Moon className="h-4 w-4" />
-          Last night
+          {hasData ? "Last night" : "Preview · no synced nights"}
         </span>
+        {!hasData && (
+          <div className="rounded-xl border border-dashed border-vyro-line bg-vyro-elev/70 p-3 text-[12px] leading-relaxed text-vyro-mute">
+            No sleep data has been synced from the band yet. The numbers below are a preview layout — once the firmware emits a sleep frame it will replace these values automatically.
+          </div>
+        )}
       </header>
+
 
       <div>
         <div className="grid grid-cols-3 gap-3">
@@ -87,21 +126,24 @@ function SleepTabButton({ active, onClick, children }: { active: boolean; onClic
 }
 
 function OverallSleep() {
+  const { hasData, night: n } = useNightView();
   return (
     <div className="space-y-7">
       <VCard className="border-vyro-text/42">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep score</p>
-          <MiniBadge>Sleep synced</MiniBadge>
+          <MiniBadge>{hasData ? "Sleep synced" : "Preview"}</MiniBadge>
         </div>
-        <h3 className="mt-5 text-[24px] font-black leading-tight text-vyro-text">Recovered, not topped off.</h3>
+        <h3 className="mt-5 text-[24px] font-black leading-tight text-vyro-text">
+          {hasData ? interpretScore(n.score) : "Recovered, not topped off."}
+        </h3>
         <div className="mt-6 rounded-[20px] border border-vyro-text/25 bg-vyro-ink/35 p-5 text-center">
-          <SleepRing value={night.score} />
+          <SleepRing value={n.score} />
         </div>
         <div className="mt-5 space-y-4">
-          <MetricPanel icon={<Moon className="h-5 w-5" />} label="Asleep" value={night.asleepLabel} hint={`${night.bedtime} → ${night.wake}`} />
-          <MetricPanel icon={<AlarmClock className="h-5 w-5" />} label="Wakeups" value={night.wakeups} hint={`${night.inBedLabel} in bed`} />
-          <MetricPanel icon={<Zap className="h-5 w-5" />} label="Sleep debt" value={night.debtLabel} hint={`Target ${night.targetLabel}`} />
+          <MetricPanel icon={<Moon className="h-5 w-5" />} label="Asleep" value={n.asleepLabel} hint={`${n.bedtime} → ${n.wake}`} />
+          <MetricPanel icon={<AlarmClock className="h-5 w-5" />} label="Wakeups" value={n.wakeups} hint={`${n.inBedLabel} in bed`} />
+          <MetricPanel icon={<Zap className="h-5 w-5" />} label="Sleep debt" value={n.debtLabel} hint={`Target ${n.targetLabel}`} />
         </div>
       </VCard>
 
@@ -110,6 +152,13 @@ function OverallSleep() {
       <RecoveryInterpretation />
     </div>
   );
+}
+
+function interpretScore(score: number): string {
+  if (score >= 90) return "Fully topped off.";
+  if (score >= 80) return "Recovered, not topped off.";
+  if (score >= 65) return "Partial recovery — pace today.";
+  return "Under-recovered — cut intensity.";
 }
 
 function SleepDebtCard() {
