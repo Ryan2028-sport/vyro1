@@ -74,6 +74,9 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
         }
       />
 
+      <SquashSnapshotCard m={m} />
+      <PerformanceLensesCard m={m} />
+
       <EventCountsCard m={m} />
       <SwingCard m={m} />
       <MovementCard m={m} />
