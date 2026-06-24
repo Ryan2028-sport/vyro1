@@ -721,26 +721,131 @@ function InsightCard({ children }: { children: React.ReactNode }) {
 }
 
 // ============================================================================
-// Overnight tab
+// Overnight tab — next-day training readiness derived from live + historical data
 // ============================================================================
 
-const DRIVERS = [
-  { label: "HRV rebound", sub: "+8 ms vs 14-day baseline", value: 92, tone: "good" as const },
-  { label: "Resting HR reset", sub: "48 bpm asleep, trending down", value: 84, tone: "good" as const },
-  { label: "Muscle readiness", sub: "Calves still carrying match load", value: 72, tone: "warn" as const },
-  { label: "Sleep debt impact", sub: "1h 24m debt reduces ceiling", value: 66, tone: "warn" as const },
-  { label: "Inflammation proxy", sub: "Skin temp stable, no red flag", value: 88, tone: "good" as const },
-];
+type Baselines = {
+  reactMs?: number;
+  reactSamples?: number[];
+  readiness?: number;
+  readinessSamples?: number[];
+  restingHr?: number;
+  hrv?: number;
+};
+const BASELINE_KEY = "vyro.baselines.v1";
+function loadBaselines(): Baselines {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(window.localStorage.getItem(BASELINE_KEY) || "{}"); } catch { return {}; }
+}
 
-const PLAN = [
-  { tag: "AM", title: "Green warm-up", body: "8 min dynamic mobility, then progressive ghosting." },
-  { tag: "MID", title: "Hard block allowed", body: "Push intensity if live recovery holds above 70% after first block." },
-  { tag: "PM", title: "Downshift", body: "Keep evening work below Z3 and prioritize carbs + fluids." },
-];
+type SleepRow = { t: number; debtMin?: number };
+const SLEEP_KEY = "vyro.sleep.history.v1";
+function loadSleepHistory(): SleepRow[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(SLEEP_KEY) || "[]") as SleepRow[];
+    return Array.isArray(raw) ? raw.slice(-14) : [];
+  } catch { return []; }
+}
 
-function OvernightTab() {
-  const readiness = 86;
-  const risk = 34;
+function clamp(x: number, lo = 0, hi = 100) { return Math.max(lo, Math.min(hi, x)); }
+
+function OvernightTab({ m }: { m: LiveMetrics }) {
+  const base = loadBaselines();
+  const fatigueHistory = loadFatigueHistory();
+  const sleepHistory = loadSleepHistory();
+
+  // --- Drivers ------------------------------------------------------------
+  // HRV rebound — current HRV vs 14-day baseline. 0ms delta = 70, +20ms = 100.
+  const hrvDelta = m.hrvMs != null && base.hrv != null ? m.hrvMs - base.hrv : null;
+  const hrvRebound = m.hrvMs == null
+    ? null
+    : Math.round(clamp(70 + (hrvDelta ?? 0) * 1.5));
+
+  // Resting HR reset — lower vs baseline = better.
+  const rhrDelta = m.restingHrBpm != null && base.restingHr != null ? m.restingHrBpm - base.restingHr : null;
+  const rhrReset = m.restingHrBpm == null
+    ? null
+    : Math.round(clamp(80 - (rhrDelta ?? 0) * 3));
+
+  // Muscle readiness — inverse of recent 72h muscle load average.
+  const muscleLoadAvg = fatigueHistory.length
+    ? fatigueHistory.reduce((a, b) => a + b.muscle, 0) / fatigueHistory.length
+    : null;
+  const muscleReadiness = muscleLoadAvg == null ? null : Math.round(clamp(100 - muscleLoadAvg));
+
+  // Sleep debt impact — pulled from sleep history rolling debt (min).
+  const sleepDebtMin = sleepHistory.length
+    ? sleepHistory.reduce((a, b) => a + (b.debtMin ?? 0), 0)
+    : null;
+  const sleepDebtImpact = sleepDebtMin == null
+    ? null
+    : Math.round(clamp(100 - (sleepDebtMin / 60) * 8));
+
+  // Inflammation proxy — skin temp deviation from 33.5°C wrist baseline.
+  const inflammation = m.skinTempC == null
+    ? null
+    : Math.round(clamp(100 - Math.abs(m.skinTempC - 33.5) * 25));
+
+  const drivers = [
+    {
+      label: "HRV rebound",
+      sub: hrvDelta != null
+        ? `${hrvDelta > 0 ? "+" : ""}${Math.round(hrvDelta)} ms vs baseline`
+        : "Waiting on HRV stream",
+      value: hrvRebound,
+    },
+    {
+      label: "Resting HR reset",
+      sub: m.restingHrBpm != null
+        ? `${Math.round(m.restingHrBpm)} bpm${rhrDelta != null ? ` (${rhrDelta > 0 ? "+" : ""}${Math.round(rhrDelta)} vs baseline)` : ""}`
+        : "Waiting on resting HR",
+      value: rhrReset,
+    },
+    {
+      label: "Muscle readiness",
+      sub: muscleLoadAvg != null
+        ? `72h muscle load ${Math.round(muscleLoadAvg)}/100`
+        : "No load history yet",
+      value: muscleReadiness,
+    },
+    {
+      label: "Sleep debt impact",
+      sub: sleepDebtMin != null
+        ? `${Math.floor(sleepDebtMin / 60)}h ${sleepDebtMin % 60}m debt across last ${sleepHistory.length}d`
+        : "No sleep history yet",
+      value: sleepDebtImpact,
+    },
+    {
+      label: "Inflammation proxy",
+      sub: m.skinTempC != null
+        ? `Skin temp ${m.skinTempC.toFixed(1)}°C (Δ${(m.skinTempC - 33.5).toFixed(1)}°)`
+        : "Waiting on skin temp",
+      value: inflammation,
+    },
+  ];
+
+  // Composite readiness — weighted average of present drivers.
+  const present = drivers.filter((d) => d.value != null) as { value: number }[];
+  const readiness = present.length
+    ? Math.round(present.reduce((a, b) => a + b.value, 0) / present.length)
+    : null;
+
+  // Risk load — inverse of readiness, bumped by cardio strain history.
+  const cardioAvg = fatigueHistory.length
+    ? fatigueHistory.reduce((a, b) => a + b.cardio, 0) / fatigueHistory.length
+    : 0;
+  const risk = readiness == null
+    ? null
+    : Math.round(clamp((100 - readiness) * 0.7 + cardioAvg * 0.3));
+
+  const readinessDelta = readiness != null && base.readiness != null ? readiness - base.readiness : null;
+  const verdict = readiness == null
+    ? "Wear the band overnight to compute training readiness"
+    : readiness >= 80 ? `${readiness}% · cleared for hard session`
+    : readiness >= 60 ? `${readiness}% · train, but manage volume`
+    : `${readiness}% · prioritize recovery`;
+
   return (
     <>
       <Card>
@@ -752,41 +857,34 @@ function OvernightTab() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Overnight readiness</div>
-            <h3 className="mt-1 text-lg font-black leading-tight text-vyro-text">
-              {readiness}% · cleared for hard session
-            </h3>
+            <h3 className="mt-1 text-lg font-black leading-tight text-vyro-text">{verdict}</h3>
             <p className="mt-1.5 text-[12px] leading-relaxed text-vyro-mute">
-              Recovery tab now only explains tomorrow's training clearance. Sleep-stage architecture lives inside Sleep.
+              Derived from live HRV, resting HR, 72h load history, sleep debt, and skin-temp inflammation proxy.
             </p>
           </div>
         </div>
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full border border-vyro-line bg-vyro-elev">
-          <div className="h-full rounded-full bg-vyro-text" style={{ width: `${readiness}%` }} />
-        </div>
-        <div className="mt-3">
-          <InsightCard>
-            Best next-day use: one high-intensity block, then let live recovery decide whether to add volume.
-          </InsightCard>
+          <div className="h-full rounded-full bg-vyro-text" style={{ width: `${readiness ?? 0}%` }} />
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div>
             <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Readiness</div>
             <div className="mt-1 flex items-baseline gap-1">
-              <div className="text-3xl font-black tabular-nums text-vyro-text">{readiness}</div>
+              <div className="text-3xl font-black tabular-nums text-vyro-text">{readiness ?? "—"}</div>
               <div className="font-mono text-[11px] text-vyro-mute">%</div>
             </div>
-            <div className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] text-vyro-mint">
-              <span>↗</span><span>+6</span>
-            </div>
+            {readinessDelta != null && (
+              <div className={`mt-1 inline-flex items-center gap-1 font-mono text-[11px] ${readinessDelta >= 0 ? "text-vyro-mint" : "text-vyro-amber"}`}>
+                <span>{readinessDelta >= 0 ? "↗" : "↘"}</span>
+                <span>{readinessDelta > 0 ? "+" : ""}{readinessDelta}</span>
+              </div>
+            )}
           </div>
           <div>
             <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Risk load</div>
             <div className="mt-1 flex items-baseline gap-1">
-              <div className="text-3xl font-black tabular-nums text-vyro-text">{risk}</div>
+              <div className="text-3xl font-black tabular-nums text-vyro-text">{risk ?? "—"}</div>
               <div className="font-mono text-[11px] text-vyro-mute">/100</div>
-            </div>
-            <div className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] text-vyro-amber">
-              <span>↘</span><span>−8</span>
             </div>
           </div>
         </div>
@@ -794,53 +892,36 @@ function OvernightTab() {
 
       <Card eyebrow="Next-day readiness drivers">
         <div className="space-y-3.5">
-          {DRIVERS.map((d) => (
-            <div key={d.label}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[13px] font-bold text-vyro-text">{d.label}</div>
-                  <div className="mt-0.5 font-mono text-[10.5px] text-vyro-mute">{d.sub}</div>
+          {drivers.map((d) => {
+            const v = d.value ?? 0;
+            const tone = d.value == null ? "neutral" : v >= 75 ? "good" : v >= 55 ? "warn" : "bad";
+            return (
+              <div key={d.label}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-bold text-vyro-text">{d.label}</div>
+                    <div className="mt-0.5 font-mono text-[10.5px] text-vyro-mute">{d.sub}</div>
+                  </div>
+                  <div className="shrink-0 font-mono text-[14px] font-bold tabular-nums text-vyro-text">
+                    {d.value ?? "—"}
+                  </div>
                 </div>
-                <div className="shrink-0 font-mono text-[14px] font-bold tabular-nums text-vyro-text">{d.value}</div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-vyro-elev">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${v}%`,
+                      background:
+                        tone === "bad" ? "var(--vyro-rose)"
+                        : tone === "warn" ? "var(--vyro-amber)"
+                        : tone === "good" ? "var(--vyro-text)"
+                        : "var(--vyro-line)",
+                    }}
+                  />
+                </div>
               </div>
-              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-vyro-elev">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${d.value}%`,
-                    background: d.tone === "warn" ? "var(--vyro-amber)" : "var(--vyro-text)",
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <Card>
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-vyro-line bg-vyro-elev">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-vyro-text">
-              <path d="M3 12h4l2-7 4 14 2-7h6" />
-            </svg>
-          </div>
-          <div className="min-w-0">
-            <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Tomorrow's operating plan</div>
-            <h3 className="mt-1 text-base font-black leading-tight text-vyro-text">
-              Train hard, but let live recovery gate the second push.
-            </h3>
-          </div>
-        </div>
-        <div className="mt-3 space-y-2">
-          {PLAN.map((p) => (
-            <div key={p.tag} className="rounded-xl border border-vyro-line bg-vyro-panel p-3">
-              <div className="inline-flex items-center rounded-md border border-vyro-line bg-vyro-elev px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-vyro-text">
-                {p.tag}
-              </div>
-              <div className="mt-2 text-[14px] font-black text-vyro-text">{p.title}</div>
-              <div className="mt-1 text-[12px] leading-relaxed text-vyro-mute">{p.body}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
     </>
