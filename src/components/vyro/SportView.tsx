@@ -484,10 +484,14 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
 
       {tab === "motion" && (
         <>
-          <Card eyebrow={sport.motionTitle} title="Frame-by-frame mechanics" action={<Pill tone="live">{sport.framePill}</Pill>}>
-            <p className="text-[12px] text-vyro-mute mb-3">{sport.motionSubtitle}</p>
+          <Card eyebrow={sport.motionTitle} title="Frame-by-frame mechanics" action={<Pill tone="live" pulse={!!contactGridLive}>{contactGridLive ? "LIVE" : sport.framePill}</Pill>}>
+            <p className="text-[12px] text-vyro-mute mb-3">
+              {contactGridLive
+                ? "Racket-face angle, contact offset, swing geometry and height variance are computed live from the LSM6DSO 6-axis IMU."
+                : sport.motionSubtitle}
+            </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {sport.contactGrid.map((c) => (
+              {(contactGridLive ?? sport.contactGrid).map((c) => (
                 <div key={c.label} className="rounded-xl border border-vyro-line bg-vyro-elev p-2.5">
                   <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">{c.label}</div>
                   <div className="mt-0.5 text-sm font-bold text-vyro-text">{c.value}</div>
@@ -495,6 +499,7 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
               ))}
             </div>
           </Card>
+
 
           <Card eyebrow="Slow-motion metrics" title="Per-rep readings">
             <div className="space-y-2">
