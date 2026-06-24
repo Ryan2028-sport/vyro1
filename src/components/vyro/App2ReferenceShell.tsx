@@ -478,35 +478,39 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
   const fmtCell = (v: number | string | null | undefined) =>
     v == null || v === "" ? "—" : v;
+  const liveCell = (v: number | string | null | undefined) =>
+    m.connected ? fmtCell(v) : "—";
+  const liveNumber = (v: number | null | undefined) =>
+    m.connected ? v : null;
 
   const vitals = useMemo(
     () => [
-      { label: "Current HR", value: fmtCell(m.heartRateBpm), unit: "bpm",
-        trend: trend(m.heartRateBpm, m.restingHrBpm, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs rest`),
-        live: m.connected },
-      { label: "HRV (RMSSD)", value: fmtCell(m.hrvMs), unit: "ms",
-        trend: trend(m.hrvMs, base.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`),
-        live: m.connected },
-      { label: "Skin Temp", value: m.skinTempC != null ? m.skinTempC.toFixed(1) : "—", unit: "°C",
-        trend: m.skinTempC != null ? "live" : undefined,
-        live: m.connected },
-      { label: "Body Temp", value: m.skinTempC != null ? (m.skinTempC + 3.5).toFixed(1) : "—", unit: "°C",
-        trend: m.skinTempC != null ? "core est." : undefined,
-        live: m.connected },
+      { label: "Current HR", value: liveCell(m.heartRateBpm), unit: "bpm",
+        trend: m.connected ? trend(m.heartRateBpm, m.restingHrBpm, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs rest`) : undefined,
+        live: m.connected && m.heartRateBpm != null },
+      { label: "HRV (RMSSD)", value: liveCell(m.hrvMs), unit: "ms",
+        trend: m.connected ? trend(m.hrvMs, base.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`) : undefined,
+        live: m.connected && m.hrvMs != null },
+      { label: "Skin Temp", value: liveNumber(m.skinTempC) != null ? liveNumber(m.skinTempC)!.toFixed(1) : "—", unit: "°C",
+        trend: m.connected && m.skinTempC != null ? "watch frame" : undefined,
+        live: m.connected && m.skinTempC != null },
+      { label: "Blood Pressure", value: m.connected && m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—", unit: "mmHg",
+        trend: m.connected && m.bloodPressure ? "one-key" : undefined,
+        live: m.connected && m.bloodPressure != null },
       { label: "Strain", value: fmtCell(strain), unit: "/100",
         trend: strain != null ? (strain > 70 ? "overload" : strain > 40 ? "tempo" : "easy") : undefined,
-        live: m.connected },
-      { label: "SpO₂", value: fmtCell(m.spo2Pct), unit: "%",
-        trend: m.spo2Pct != null ? (m.spo2Pct >= 95 ? "stable" : "low") : undefined,
-        live: m.connected },
-      { label: "Resp Rate", value: m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm",
-        trend: m.respRateBrpm != null ? "live" : undefined,
-        live: m.connected },
-      { label: "Stress", value: fmtCell(m.stressScore), unit: "/100",
-        trend: m.stressScore != null ? (m.stressScore < 40 ? "calm" : m.stressScore < 70 ? "alert" : "high") : undefined,
-        live: m.connected },
+        live: m.connected && strain != null },
+      { label: "SpO₂", value: liveCell(m.spo2Pct), unit: "%",
+        trend: m.connected && m.spo2Pct != null ? (m.spo2Pct >= 95 ? "stable" : "low") : undefined,
+        live: m.connected && m.spo2Pct != null },
+      { label: "Resp Rate", value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm",
+        trend: m.connected && m.respRateBrpm != null ? "watch field" : undefined,
+        live: m.connected && m.respRateBrpm != null },
+      { label: "Stress", value: liveCell(m.stressScore), unit: "/100",
+        trend: m.connected && m.stressScore != null ? (m.stressScore < 40 ? "calm" : m.stressScore < 70 ? "alert" : "high") : undefined,
+        live: m.connected && m.stressScore != null },
     ],
-    [m.connected, m.heartRateBpm, m.hrvMs, m.restingHrBpm, m.skinTempC, m.spo2Pct, m.respRateBrpm, m.stressScore, strain, base.hrv],
+    [m.connected, m.heartRateBpm, m.hrvMs, m.restingHrBpm, m.skinTempC, m.bloodPressure, m.spo2Pct, m.respRateBrpm, m.stressScore, strain, base.hrv],
   );
 
   // RTP Validator — derived from real readiness vs 7d baseline (±5% target).
@@ -591,7 +595,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                   {readiness >= base.readiness ? "↗" : "↘"} Readiness {readiness - base.readiness > 0 ? "+" : ""}{readiness - base.readiness} vs baseline
                 </span>
               : <span className="app2-change">Calibrating baseline…</span>}
-            {m.hrvMs != null && base.hrv != null && (
+            {m.connected && m.hrvMs != null && base.hrv != null && (
               <span className="app2-change">↗ HRV {m.hrvMs - base.hrv > 0 ? "+" : ""}{Math.round(m.hrvMs - base.hrv)} ms</span>
             )}
             {strain != null && strain > 70 && <span className="app2-change warn">⚠ Strain {strain}/100</span>}
