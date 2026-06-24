@@ -1,6 +1,23 @@
-import { useState } from "react";
+// Coach view — single-athlete (current user) edition. The roster is built
+// from real live ctx + recent saved sessions instead of mocked teammates.
+// Team / opponent / aggregated views remain as empty states until a true
+// coach data model (other users, consent, team membership) exists.
+
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
 import { SportView } from "./SportView";
+import { useLiveMetrics, fmtNum } from "./useLiveMetrics";
+import { getMySessions } from "@/lib/sessions.functions";
+import {
+  agilityScore,
+  avgTControl,
+  swingConsistency,
+  trainingLoad7d,
+  type RawSession,
+} from "@/lib/sessions-derived";
+import { useSleepNights } from "@/lib/use-sleep-nights";
 
 type Tab = "team" | "sport" | "match" | "opponent" | "plan" | "heatmap";
 
@@ -27,7 +44,7 @@ const STATUS_LABEL: Record<Status, string> = {
   unavailable: "Unavailable",
 };
 
-const ROSTER: {
+type Roster = {
   name: string;
   status: Status;
   recovery: number;
@@ -36,38 +53,87 @@ const ROSTER: {
   swingConsistency: number;
   decel: number;
   action: string;
-}[] = [
-  { name: "Maya Torres", status: "ready", recovery: 88, hr: 72, tControl: 78, swingConsistency: 84, decel: 92, action: "Greenlight hard block" },
-  { name: "Jalen Brooks", status: "modified", recovery: 64, hr: 81, tControl: 71, swingConsistency: 78, decel: 80, action: "Cap court time 40 min" },
-  { name: "Eli Morgan", status: "attention", recovery: 41, hr: 88, tControl: 62, swingConsistency: 70, decel: 67, action: "Hold — recovery focus" },
-  { name: "Nina Park", status: "ready", recovery: 82, hr: 69, tControl: 76, swingConsistency: 81, decel: 88, action: "Reactive ghosting × 6" },
-  { name: "Owen Lee", status: "modified", recovery: 68, hr: 76, tControl: 69, swingConsistency: 73, decel: 79, action: "Easy session" },
-  { name: "Lucas Reed", status: "ready", recovery: 79, hr: 71, tControl: 74, swingConsistency: 79, decel: 86, action: "Match practice cleared" },
-  { name: "Mateo Silva", status: "unavailable", recovery: 0, hr: 0, tControl: 0, swingConsistency: 0, decel: 0, action: "Travel day" },
-  { name: "Zoe Kim", status: "ready", recovery: 84, hr: 70, tControl: 80, swingConsistency: 85, decel: 90, action: "Drill: decel to T" },
-];
+};
+
+function buildSelfRoster(
+  liveHr: number | null,
+  liveRecovery: number | null,
+  sessions: RawSession[],
+  pairedName: string | null,
+): Roster {
+  const t = avgTControl(sessions.slice(0, 10));
+  const sw = swingConsistency(sessions.slice(0, 10));
+  const recent = sessions[0];
+  const decel = recent ? Math.min(100, Math.round(agilityScore(recent) ?? 0)) : 0;
+  const recovery = liveRecovery ?? 0;
+  const status: Status =
+    recovery >= 75 ? "ready" : recovery >= 50 ? "modified" : recovery > 0 ? "attention" : "unavailable";
+  const action =
+    status === "ready"
+      ? "Greenlight hard block"
+      : status === "modified"
+        ? "Cap court time 40 min"
+        : status === "attention"
+          ? "Hold — recovery focus"
+          : "Pair band to populate metrics";
+
+  return {
+    name: pairedName ?? "You",
+    status,
+    recovery,
+    hr: liveHr ?? 0,
+    tControl: t ?? 0,
+    swingConsistency: sw ?? 0,
+    decel,
+    action,
+  };
+}
+
+// Quick recovery proxy from live ctx (mirrors AthleteHome): higher HRV/lower
+// resting HR → higher readiness. 0–100. Returns null when no signal.
+function liveRecoveryScore(live: ReturnType<typeof useLiveMetrics>): number | null {
+  const hrv = live.hrvMs;
+  const rhr = live.restingHrBpm;
+  if (hrv == null && rhr == null) return null;
+  const hrvScore = hrv == null ? 60 : Math.max(0, Math.min(100, (hrv - 20) * 2));
+  const rhrScore = rhr == null ? 60 : Math.max(0, Math.min(100, 120 - rhr));
+  return Math.round(hrvScore * 0.55 + rhrScore * 0.45);
+}
 
 export function CoachView() {
   const [tab, setTab] = useState<Tab>("team");
   const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
   const [compare, setCompare] = useState(false);
 
+  const live = useLiveMetrics();
+  const fetchSessions = useServerFn(getMySessions);
+  const { data } = useQuery({ queryKey: ["sessions"], queryFn: () => fetchSessions() });
+  const sessions = (data ?? []) as RawSession[];
+  const { last: lastNight } = useSleepNights();
+
+  const recovery = liveRecoveryScore(live);
+  const self = useMemo(
+    () => buildSelfRoster(live.heartRateBpm ?? null, recovery, sessions, live.pairedName ?? null),
+    [live.heartRateBpm, recovery, sessions, live.pairedName],
+  );
+
+  const ROSTER: Roster[] = [self];
   const filtered = statusFilter === "all" ? ROSTER : ROSTER.filter((r) => r.status === statusFilter);
   const active = ROSTER.filter((r) => r.status !== "unavailable");
-  const avgRecovery = Math.round(active.reduce((s, r) => s + r.recovery, 0) / active.length);
+  const avgRecovery = active.length ? Math.round(active.reduce((s, r) => s + r.recovery, 0) / active.length) : 0;
   const greenCount = ROSTER.filter((r) => r.status === "ready").length;
   const redCount = ROSTER.filter((r) => r.status === "attention").length;
+  const load = trainingLoad7d(sessions);
 
   return (
     <div className="space-y-4">
       <PageHeader
         eyebrow="Coach · iPad view"
         title="Coach"
-        subtitle="Live roster, opponent model, weekly plan, and team-wide heatmap. All metrics tied to verified band data."
-        action={<Pill tone="live" pulse>Live roster</Pill>}
+        subtitle="Live roster of athletes whose bands are linked to your account. Aggregated and per-athlete views populate as more athletes opt in."
+        action={<Pill tone={live.connected ? "live" : "neutral"} pulse={live.connected}>{live.connected ? "Live roster" : "Offline"}</Pill>}
       />
 
-      {/* Tab bar */}
       <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
         {TABS.map((t) => (
           <button
@@ -93,6 +159,9 @@ export function CoachView() {
               <Stat label="In green" value={greenCount} />
               <Stat label="In red" value={redCount} />
             </div>
+            <p className="mt-3 text-[11px] text-vyro-mute">
+              Only athletes who have paired their band to this account appear here.
+            </p>
           </Card>
 
           <Card
@@ -123,19 +192,11 @@ export function CoachView() {
                   {s === "all" ? "All" : STATUS_LABEL[s]}
                 </button>
               ))}
-              {statusFilter !== "all" && (
-                <button
-                  onClick={() => setStatusFilter("all")}
-                  className="whitespace-nowrap rounded-full border border-vyro-line bg-vyro-panel px-2.5 py-1 text-[10px] font-semibold text-vyro-mute"
-                >
-                  Clear filter
-                </button>
-              )}
             </div>
 
             {filtered.length === 0 ? (
               <div className="rounded-xl border border-dashed border-vyro-line bg-vyro-elev p-4 text-center text-[11px] text-vyro-mute">
-                No athletes in this filter.
+                No athletes match this filter.
               </div>
             ) : (
               <ul className="divide-y divide-vyro-line/60">
@@ -146,7 +207,9 @@ export function CoachView() {
                         <div className="text-sm font-bold text-vyro-text">{r.name}</div>
                         <div className="mt-0.5 flex items-center gap-1.5">
                           <Pill tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Pill>
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">Consent: full</span>
+                          <span className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">
+                            {live.connected ? "Live · band linked" : "Band offline"}
+                          </span>
                         </div>
                       </div>
                       <div className="text-right">
@@ -158,7 +221,7 @@ export function CoachView() {
                       <Mini label="HR" v={r.hr || "—"} />
                       <Mini label="T-Ctl %" v={r.tControl || "—"} />
                       <Mini label="Swing" v={r.swingConsistency || "—"} />
-                      <Mini label="Decel" v={r.decel || "—"} />
+                      <Mini label="Agility" v={r.decel || "—"} />
                     </div>
                     <div className="mt-2 text-[11px] text-vyro-mute">
                       <span className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute/80">Coach action · </span>
@@ -168,22 +231,22 @@ export function CoachView() {
                 ))}
               </ul>
             )}
-            <p className="mt-3 text-[11px] text-vyro-mute">Most ready: <span className="text-vyro-text font-semibold">Maya Torres</span>. Active athletes: {active.length}.</p>
+            <p className="mt-3 text-[11px] text-vyro-mute">
+              Sessions on file: <span className="text-vyro-text font-semibold">{sessions.length}</span>
+            </p>
           </Card>
         </>
       )}
 
-      {tab === "sport" && <CoachSportTab roster={ROSTER} />}
+      {tab === "sport" && <CoachSportTab roster={ROSTER} live={live} />}
 
       {tab === "match" && (
-        <>
-          <Card eyebrow="Match DB · team view" title="Verified opponent history">
-            <EmptyState
-              title="No team match data yet"
-              hint="Once athletes upload sport-specific sessions, the coach sees only this sport's opponent history here."
-            />
-          </Card>
-        </>
+        <Card eyebrow="Match DB · team view" title="Verified opponent history">
+          <EmptyState
+            title="No team match data yet"
+            hint="Once athletes upload sport-specific sessions, the coach sees only this sport's opponent history here."
+          />
+        </Card>
       )}
 
       {tab === "opponent" && (
@@ -206,35 +269,20 @@ export function CoachView() {
 
       {tab === "plan" && (
         <>
-          <Card eyebrow="Today's recommendations" title="AI-generated · weak-point targeted">
+          <Card eyebrow="Today's recommendations" title="Derived from your readiness + 7-day load">
             <ul className="space-y-2 text-sm text-vyro-text">
-              <li className="flex items-start gap-2 rounded-xl border border-vyro-line bg-vyro-elev p-3">
-                <Pill tone="live">Cleared</Pill>
-                <span>Hard interval session cleared</span>
-              </li>
-              <li className="flex items-start gap-2 rounded-xl border border-vyro-line bg-vyro-elev p-3">
-                <Pill tone="warn">Cap</Pill>
-                <span>Cap court time at 50 min</span>
-              </li>
-              <li className="flex items-start gap-2 rounded-xl border border-vyro-line bg-vyro-elev p-3">
-                <Pill tone="neutral">Drill</Pill>
-                <span>Drill: deceleration to T</span>
-              </li>
-            </ul>
-          </Card>
-
-          <Card eyebrow="Personalized training" title="Weak-point targeted">
-            <ul className="space-y-1.5 text-sm text-vyro-text">
-              <li>• Reactive ghosting × 6 sets</li>
-              <li>• Box breathing post-session</li>
-              <li>• Square-to-side-wall drill</li>
-              <li>• Single-leg eccentric Bulgarian split squat</li>
+              {planItems(recovery, load).map((p, i) => (
+                <li key={i} className="flex items-start gap-2 rounded-xl border border-vyro-line bg-vyro-elev p-3">
+                  <Pill tone={p.tone}>{p.label}</Pill>
+                  <span>{p.text}</span>
+                </li>
+              ))}
             </ul>
           </Card>
 
           <Card eyebrow="Overtraining detection" title="Today's load target">
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black tabular-nums text-vyro-text">68</span>
+              <span className="text-3xl font-black tabular-nums text-vyro-text">{load}</span>
               <span className="text-sm text-vyro-mute">/ 100</span>
             </div>
             <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-vyro-line">
@@ -245,45 +293,52 @@ export function CoachView() {
             <div className="mt-1.5 flex justify-between font-mono text-[9px] uppercase tracking-wider text-vyro-mute">
               <span>Rest</span><span>Easy</span><span>Hard</span>
             </div>
-            <p className="mt-3 text-[11px] text-vyro-mute">→ Easy session recommended today.</p>
-          </Card>
-
-          <Card eyebrow="Opponent tendency DB" title="No opponent data">
-            <p className="text-[12px] text-vyro-mute">Tag an upcoming opponent to surface critical-point shot choices and weak zones here.</p>
+            <p className="mt-3 text-[11px] text-vyro-mute">
+              {load >= 70 ? "→ Easy session recommended today." : load >= 40 ? "→ Moderate intensity is fine." : "→ Plenty of headroom to push."}
+            </p>
           </Card>
         </>
       )}
 
       {tab === "heatmap" && (
-        <>
-          <Card eyebrow="Team heatmap" title="HR · Live Rec · Sources">
-            <div className="-mx-1 mb-3 flex gap-1 overflow-x-auto px-1">
-              {["HR", "Live Rec", "Sources", "Sport", "Team model", "Athletes", "Live roster"].map((f) => (
-                <button key={f} className="whitespace-nowrap rounded-full border border-vyro-line bg-vyro-panel px-2.5 py-1 text-[10px] font-semibold text-vyro-mute">
-                  {f}
-                </button>
-              ))}
-            </div>
-            <div className="grid aspect-[4/3] place-items-center rounded-xl border border-dashed border-vyro-line bg-vyro-elev text-[11px] text-vyro-mute">
-              Aggregated team heatmap — populates as athletes complete sessions.
-            </div>
-            <p className="mt-2 text-[11px] text-vyro-mute">Glossary: <span className="text-vyro-text">Change of direction</span>, not shorthand average. <span className="text-vyro-text">Signal confidence</span> is a trust score, not a recovery organ system.</p>
-          </Card>
-
-          <Card eyebrow="Athlete Development" title="Long-term progress">
-            <p className="text-[12px] text-vyro-mute mb-3">14-day signal — overtraining detection and personalized programming.</p>
-            <ul className="space-y-2 text-[12px]">
-              <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5"><span className="font-semibold text-vyro-text">T-control trend:</span> <span className="text-vyro-mute">Up 22 points over 14 days. The T is becoming home.</span></li>
-              <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5"><span className="font-semibold text-vyro-text">RHR:</span> <span className="text-vyro-mute">Dropped 6 bpm — clean aerobic adaptation.</span></li>
-              <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5"><span className="font-semibold text-vyro-text">Agility score:</span> <span className="text-vyro-mute">Plateauing — introduce reactive ghosting drills.</span></li>
-              <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5"><span className="font-semibold text-vyro-text">Decel back to T:</span> <span className="text-vyro-mute">Cuts down 0.25s — direct ROI on plyometric work.</span></li>
-              <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5"><span className="font-semibold text-vyro-text">Z5 → Z2 recovery (bpm/30s):</span> <span className="text-vyro-mute">Cardiac zone recovery is your biggest gain. +18 bpm in 14 days.</span></li>
-            </ul>
-          </Card>
-        </>
+        <Card eyebrow="Team heatmap" title="HR · Live Rec · Sources">
+          <EmptyState
+            title={sessions.length === 0 ? "No sessions yet" : "Solo sample"}
+            hint="Aggregated team heatmap populates as more athletes complete sessions on linked bands."
+          />
+          <ul className="mt-3 space-y-2 text-[12px]">
+            <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5">
+              <span className="font-semibold text-vyro-text">Avg HR:</span>{" "}
+              <span className="text-vyro-mute">{fmtNum(live.heartRateBpm, live.connected, 0)} bpm</span>
+            </li>
+            <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5">
+              <span className="font-semibold text-vyro-text">HRV baseline:</span>{" "}
+              <span className="text-vyro-mute">{fmtNum(live.hrvMs, live.connected, 0)} ms</span>
+            </li>
+            <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5">
+              <span className="font-semibold text-vyro-text">Last sleep score:</span>{" "}
+              <span className="text-vyro-mute">{lastNight?.score ?? "—"}</span>
+            </li>
+          </ul>
+        </Card>
       )}
     </div>
   );
+}
+
+function planItems(recovery: number | null, load: number): { tone: "live" | "warn" | "off" | "neutral"; label: string; text: string }[] {
+  const items: { tone: "live" | "warn" | "off" | "neutral"; label: string; text: string }[] = [];
+  if (recovery == null) {
+    items.push({ tone: "neutral", label: "Pending", text: "Pair the band to compute readiness." });
+    return items;
+  }
+  if (recovery >= 75 && load < 70) items.push({ tone: "live", label: "Cleared", text: "Hard interval session cleared." });
+  else if (recovery >= 50) items.push({ tone: "warn", label: "Cap", text: "Cap court time at 50 min." });
+  else items.push({ tone: "off", label: "Hold", text: "Recovery focus today — skip the hard block." });
+
+  if (load >= 70) items.push({ tone: "warn", label: "Drill", text: "Drill: deceleration to T — keep intensity low." });
+  else items.push({ tone: "neutral", label: "Drill", text: "Reactive ghosting × 6 sets." });
+  return items;
 }
 
 function Mini({ label, v }: { label: string; v: any }) {
@@ -295,18 +350,10 @@ function Mini({ label, v }: { label: string; v: any }) {
   );
 }
 
-type RosterEntry = (typeof ROSTER)[number];
-
-function CoachSportTab({ roster }: { roster: RosterEntry[] }) {
+function CoachSportTab({ roster, live }: { roster: Roster[]; live: ReturnType<typeof useLiveMetrics> }) {
   const active = roster.filter((r) => r.status !== "unavailable");
-  const [mode, setMode] = useState<"aggregated" | "individual">("aggregated");
-  const [athleteName, setAthleteName] = useState<string>(active[0]?.name ?? "");
-  const athlete = active.find((a) => a.name === athleteName) ?? active[0];
-
-  const avg = (key: keyof RosterEntry) =>
-    Math.round(
-      active.reduce((s, r) => s + (typeof r[key] === "number" ? (r[key] as number) : 0), 0) / active.length,
-    );
+  const [mode, setMode] = useState<"aggregated" | "individual">("individual");
+  const athlete = active[0];
 
   return (
     <div className="space-y-4">
@@ -335,52 +382,28 @@ function CoachSportTab({ roster }: { roster: RosterEntry[] }) {
         }
       >
         {mode === "aggregated" ? (
-          <>
-            <p className="text-[12px] text-vyro-mute">
-              Team-wide rollup across {active.length} active athletes. Open any sport below to see the full Morphos suite — database cards, tendency reads, agility components, and slow-motion motion tab — applied to the squad average.
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="Team recovery" value={avg("recovery")} unit="%" />
-              <Stat label="Team T-Ctl" value={avg("tControl")} unit="%" />
-              <Stat label="Team swing" value={avg("swingConsistency")} unit="%" />
-              <Stat label="Team decel" value={avg("decel")} unit="%" />
-            </div>
-          </>
+          <p className="text-[12px] text-vyro-mute">
+            Aggregated view activates with ≥2 athletes on linked bands. You currently have {active.length}.
+          </p>
         ) : (
-          <>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-vyro-mute">Athlete</span>
-              <select
-                value={athleteName}
-                onChange={(e) => setAthleteName(e.target.value)}
-                className="rounded-lg border border-vyro-line bg-vyro-panel px-2 py-1 text-[12px] font-semibold text-vyro-text"
-              >
-                {active.map((a) => (
-                  <option key={a.name} value={a.name}>{a.name}</option>
-                ))}
-              </select>
-              {athlete && <Pill tone="live">Live band linked</Pill>}
+          athlete ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Stat label="Recovery" value={athlete.recovery} unit="%" />
+              <Stat label="T-Ctl" value={athlete.tControl} unit="%" />
+              <Stat label="Swing" value={athlete.swingConsistency} unit="%" />
+              <Stat label="Agility" value={athlete.decel} unit="%" />
             </div>
-            {athlete && (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <Stat label="Recovery" value={athlete.recovery} unit="%" />
-                <Stat label="T-Ctl" value={athlete.tControl} unit="%" />
-                <Stat label="Swing" value={athlete.swingConsistency} unit="%" />
-                <Stat label="Decel" value={athlete.decel} unit="%" />
-              </div>
-            )}
-            <p className="mt-3 text-[11px] text-vyro-mute">
-              Sport modules below now show <span className="text-vyro-text font-semibold">{athlete?.name}</span>'s session feed — same engine, single-athlete sample.
-            </p>
-          </>
+          ) : (
+            <EmptyState title="No athletes linked" hint="Pair a band to view sport metrics." />
+          )
         )}
       </Card>
 
       <div className="rounded-2xl border border-vyro-line bg-vyro-panel/40 p-3">
         <div className="mb-2 flex items-center justify-between">
           <span className="font-mono text-[10px] uppercase tracking-wider text-vyro-mute">Embedded · Sport selector</span>
-          <Pill tone={mode === "aggregated" ? "live" : "warn"}>
-            {mode === "aggregated" ? `Team avg · n=${active.length}` : `Solo · ${athlete?.name ?? "—"}`}
+          <Pill tone={live.connected ? "live" : "neutral"}>
+            {athlete ? `Solo · ${athlete.name}` : "—"}
           </Pill>
         </div>
         <SportView />
