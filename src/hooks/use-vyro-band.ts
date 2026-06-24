@@ -171,6 +171,32 @@ type PersistedBandMetrics = {
   bloodPressure: { sbp: number; dbp: number } | null;
 };
 
+export type VyroBandSignalTimestamps = {
+  batteryAt: number | null;
+  spo2At: number | null;
+  skinTempAt: number | null;
+  stepsAt: number | null;
+  distanceAt: number | null;
+  caloriesAt: number | null;
+  restingHrAt: number | null;
+  hrvAt: number | null;
+  stressAt: number | null;
+  bloodPressureAt: number | null;
+};
+
+const emptySignalTimestamps = (): VyroBandSignalTimestamps => ({
+  batteryAt: null,
+  spo2At: null,
+  skinTempAt: null,
+  stepsAt: null,
+  distanceAt: null,
+  caloriesAt: null,
+  restingHrAt: null,
+  hrvAt: null,
+  stressAt: null,
+  bloodPressureAt: null,
+});
+
 function numericInRange(value: unknown, min: number, max: number): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   if (value < min || value > max) return null;
@@ -239,7 +265,6 @@ function decodeHeartRate(bytes: Uint8Array): number | null {
 export function useVyroBand() {
   const ble = useBluetooth();
   const { connectedId, lastData } = ble;
-  const initialMetrics = useMemo(loadPersistedBandMetrics, []);
   const [events, setEvents] = useState<VyroEventEntry[]>([]);
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [sport, setSport] = useState<Sport>("squash");
@@ -260,21 +285,16 @@ export function useVyroBand() {
   const [respRateBrpm, setRespRateBrpm] = useState<number | null>(null);
   const [stressScore, setStressScore] = useState<number | null>(null);
   const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(null);
+  const [signalAt, setSignalAt] = useState<VyroBandSignalTimestamps>(() => emptySignalTimestamps());
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
   const activeConnectionRef = useRef<string | null>(null);
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
-  const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(
-    initialMetrics.stepsToday != null
-      ? {
-          day: todayActivityKeyPrefix(),
-          steps: initialMetrics.stepsToday,
-          distanceM: initialMetrics.distanceM ?? 0,
-          calories: initialMetrics.caloriesKcal ?? 0,
-          priority: 0,
-        }
-      : null,
-  );
+  const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(null);
   const bigDataV2Ref = useRef<{ expected: number; chunks: number[] } | null>(null);
+
+  const markSignal = (key: keyof VyroBandSignalTimestamps, at = Date.now()) => {
+    setSignalAt((prev) => ({ ...prev, [key]: at }));
+  };
 
   const applyActivity = (
     next: { steps: number; distanceM: number; calories: number },
@@ -299,6 +319,10 @@ export function useVyroBand() {
     setStepsToday(merged.steps);
     setDistanceM(merged.distanceM);
     setCaloriesKcal(merged.calories);
+    const now = Date.now();
+    markSignal("stepsAt", now);
+    markSignal("distanceAt", now);
+    markSignal("caloriesAt", now);
   };
 
   // When connected, always subscribe to the VYRO motion event characteristic
@@ -348,6 +372,7 @@ export function useVyroBand() {
     setRespRateBrpm(null);
     setStressScore(null);
     setBloodPressure(null);
+    setSignalAt(emptySignalTimestamps());
   }, [connectedId]);
 
   useEffect(() => {
@@ -403,6 +428,7 @@ export function useVyroBand() {
     if (buf.length >= 20) {
       const sorted = buf.map((s) => s.bpm).sort((a, b) => a - b);
       setRestingHrBpm(sorted[Math.max(0, Math.floor(sorted.length * 0.05))]);
+      markSignal("restingHrAt", heartRateAt);
     }
   }, [heartRateBpm, heartRateAt]);
 
@@ -679,6 +705,7 @@ export function useVyroBand() {
     }, 2_000);
 
     return () => {
+      if (shouldKeepNativeBleAliveOnCleanup()) return;
       cancelled = true;
       off();
       window.clearTimeout(fallback);
@@ -690,7 +717,6 @@ export function useVyroBand() {
       if (oneKeyTimer != null) window.clearInterval(oneKeyTimer);
       if (tempTimer != null) window.clearInterval(tempTimer);
       cleanupExtras?.();
-      if (shouldKeepNativeBleAliveOnCleanup()) return;
       if (qcBandService) {
         void bluetooth
           .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
@@ -744,6 +770,7 @@ export function useVyroBand() {
         if (bat) {
           setBatteryPct(bat.level);
           setBatteryCharging(bat.charging);
+          markSignal("batteryAt");
         }
       } else if (
         op === QCBAND_CMD_TODAY_SUMMARY ||
@@ -764,9 +791,15 @@ export function useVyroBand() {
           applyActivity(live, "live");
         }
         const temp = decodeQcBandTemperatureNotification(bytes);
-        if (temp != null) setSkinTempC(temp);
+        if (temp != null) {
+          setSkinTempC(temp);
+          markSignal("skinTempAt");
+        }
         const spo2 = decodeQcBandSpo2Notification(bytes);
-        if (spo2 != null) setSpo2Pct(spo2);
+        if (spo2 != null) {
+          setSpo2Pct(spo2);
+          markSignal("spo2At");
+        }
         if (bytes[1] === 0x01 && bytes[2] > 30 && bytes[2] < 250) {
           setHeartRateBpm(bytes[2]);
           setHeartRateAt(Date.now());
@@ -791,10 +824,16 @@ export function useVyroBand() {
         }
       } else if (op === QCBAND_CMD_SYNC_HRV) {
         const hrv = decodeQcBandHrvHistory(bytes);
-        if (hrv != null) setHrvMs(hrv);
+        if (hrv != null) {
+          setHrvMs(hrv);
+          markSignal("hrvAt");
+        }
       } else if (op === QCBAND_CMD_SYNC_STRESS) {
         const stress = decodeQcBandStressHistory(bytes);
-        if (stress != null) setStressScore(stress);
+        if (stress != null) {
+          setStressScore(stress);
+          markSignal("stressAt");
+        }
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame || frame.errorCode !== 0) return;
@@ -814,11 +853,26 @@ export function useVyroBand() {
             setHeartRateBpm(ok.hr);
             setHeartRateAt(Date.now());
           }
-          if (ok.spo2 != null) setSpo2Pct(ok.spo2);
-          if (ok.tempC != null) setSkinTempC(ok.tempC);
-          if (ok.hrvMs != null && ok.hrvMs >= 5) setHrvMs(ok.hrvMs);
-          if (ok.stress != null) setStressScore(ok.stress);
-          if (ok.sbp != null && ok.dbp != null) setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
+          if (ok.spo2 != null) {
+            setSpo2Pct(ok.spo2);
+            markSignal("spo2At");
+          }
+          if (ok.tempC != null) {
+            setSkinTempC(ok.tempC);
+            markSignal("skinTempAt");
+          }
+          if (ok.hrvMs != null && ok.hrvMs >= 5) {
+            setHrvMs(ok.hrvMs);
+            markSignal("hrvAt");
+          }
+          if (ok.stress != null) {
+            setStressScore(ok.stress);
+            markSignal("stressAt");
+          }
+          if (ok.sbp != null && ok.dbp != null) {
+            setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
+            markSignal("bloodPressureAt");
+          }
           // Respiratory rate must come from a real SDK signal. The QCBand
           // One-Key payload does not currently expose a resp-rate field, so
           // we leave that tile empty rather than estimating it from HR/HRV.
@@ -827,19 +881,31 @@ export function useVyroBand() {
         if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
           // handled as a composite SDK frame
         } else if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
-          if (frame.value >= 70 && frame.value <= 100) setSpo2Pct(frame.value);
+          if (frame.value >= 70 && frame.value <= 100) {
+            setSpo2Pct(frame.value);
+            markSignal("spo2At");
+          }
         } else if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value > 30 && frame.value < 250) {
             setHeartRateBpm(frame.value);
             setHeartRateAt(Date.now());
           }
         } else if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
-          if (frame.value >= 5 && frame.value < 250) setHrvMs(frame.value);
+          if (frame.value >= 5 && frame.value < 250) {
+            setHrvMs(frame.value);
+            markSignal("hrvAt");
+          }
         } else if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
-          if (frame.value > 0 && frame.value <= 100) setStressScore(frame.value);
+          if (frame.value > 0 && frame.value <= 100) {
+            setStressScore(frame.value);
+            markSignal("stressAt");
+          }
         } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
           const t = decodeQcBandTempPayload(frame.data);
-          if (t != null) setSkinTempC(t);
+          if (t != null) {
+            setSkinTempC(t);
+            markSignal("skinTempAt");
+          }
         }
       }
       return;
@@ -862,14 +928,23 @@ export function useVyroBand() {
       }
       console.log("[qcband] notify-v2 op=0x" + bytes[0].toString(16).padStart(2, "0"), bytesToHex(bytes));
       const spo2 = decodeQcBandSpo2History(bytes);
-      if (spo2 != null) setSpo2Pct(spo2);
+      if (spo2 != null) {
+        setSpo2Pct(spo2);
+        markSignal("spo2At");
+      }
       const temp = decodeQcBandTemperatureHistory(bytes);
-      if (temp != null) setSkinTempC(temp);
+      if (temp != null) {
+        setSkinTempC(temp);
+        markSignal("skinTempAt");
+      }
       return;
     }
     if (uuidMatches(cuuid, BAT_LVL_CHAR)) {
       const bytes = payloadToBytes(lastData.value);
-      if (bytes.length >= 1) setBatteryPct(bytes[0]);
+      if (bytes.length >= 1) {
+        setBatteryPct(bytes[0]);
+        markSignal("batteryAt");
+      }
       return;
     }
   }, [lastData]);
@@ -931,5 +1006,6 @@ export function useVyroBand() {
     hrvMs,
     respRateBrpm,
     stressScore,
+    signalAt,
   };
 }

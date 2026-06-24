@@ -424,6 +424,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   // otherwise pin the score to a static number (e.g. RHR alone → 36).
   const readinessInputs = computeReadiness({
     connected: m.connected,
+    heartRateBpm: m.connected ? m.heartRateBpm : null,
     hrvMs: m.connected ? m.hrvMs : null,
     restingHrBpm: m.connected ? m.restingHrBpm : null,
     stress: m.connected ? m.stressScore : null,

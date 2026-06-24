@@ -41,13 +41,14 @@ export function AthleteView() {
     () =>
       computeReadiness({
         connected: m.connected,
+        heartRateBpm: m.heartRateBpm,
         hrvMs: m.hrvMs,
         restingHrBpm: m.restingHrBpm,
         stress: m.stressScore,
         spo2: m.spo2Pct,
         peakJerk: m.peakJerk,
       }),
-    [m.connected, m.hrvMs, m.restingHrBpm, m.stressScore, m.spo2Pct, m.peakJerk],
+    [m.connected, m.heartRateBpm, m.hrvMs, m.restingHrBpm, m.stressScore, m.spo2Pct, m.peakJerk],
   );
 
   const sessionLoad = useMemo(() => {

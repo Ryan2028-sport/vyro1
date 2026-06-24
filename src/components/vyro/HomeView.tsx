@@ -168,6 +168,7 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   // render "—" when their underlying score is null.
   const { score: liveReadiness } = computeReadiness({
     connected: m.connected,
+    heartRateBpm: m.heartRateBpm,
     hrvMs: m.hrvMs,
     restingHrBpm: m.restingHrBpm,
     stress: m.stressScore,
