@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -25,8 +25,71 @@ import { SleepView } from "./SleepView";
 import { SocialView } from "./SocialView";
 import { SportView } from "./SportView";
 import { TrendsView } from "./TrendsView";
-import { computeReadiness, computeSubScores, useLiveMetrics } from "./useLiveMetrics";
+import { computeReadiness, computeSubScores, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
 import "./app2-reference.css";
+
+// ---------- Baseline persistence (rolling user baselines for divergence/RTP) ----------
+type Baselines = {
+  reactMs?: number;        // fastest rolling reaction (ms)
+  reactSamples?: number[]; // last N samples for median baseline
+  readiness?: number;      // 7d rolling avg readiness
+  readinessSamples?: number[];
+  restingHr?: number;
+  hrv?: number;
+};
+const BASELINE_KEY = "vyro.baselines.v1";
+function loadBaselines(): Baselines {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(window.localStorage.getItem(BASELINE_KEY) || "{}"); } catch { return {}; }
+}
+function saveBaselines(b: Baselines) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(BASELINE_KEY, JSON.stringify(b)); } catch { /* ignore */ }
+}
+function median(xs: number[]): number | undefined {
+  if (!xs.length) return undefined;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+function useBaselines(m: LiveMetrics) {
+  const [base, setBase] = useState<Baselines>(() => loadBaselines());
+  // Throttle writes via ref
+  const lastWrite = useRef(0);
+  useEffect(() => {
+    if (!m.connected) return;
+    setBase((prev) => {
+      const next: Baselines = { ...prev };
+      if (m.reactMin != null) {
+        const samples = [...(prev.reactSamples ?? []), m.reactMin].slice(-50);
+        next.reactSamples = samples;
+        next.reactMs = median(samples);
+      }
+      if (m.restingHrBpm != null) next.restingHr = prev.restingHr
+        ? prev.restingHr * 0.9 + m.restingHrBpm * 0.1 : m.restingHrBpm;
+      if (m.hrvMs != null) next.hrv = prev.hrv
+        ? prev.hrv * 0.9 + m.hrvMs * 0.1 : m.hrvMs;
+      const now = Date.now();
+      if (now - lastWrite.current > 5000) {
+        lastWrite.current = now;
+        saveBaselines(next);
+      }
+      return next;
+    });
+  }, [m.connected, m.reactMin, m.restingHrBpm, m.hrvMs]);
+
+  const recordReadiness = (score: number | null) => {
+    if (score == null) return;
+    setBase((prev) => {
+      const samples = [...(prev.readinessSamples ?? []), score].slice(-7);
+      const next = { ...prev, readinessSamples: samples, readiness: Math.round(samples.reduce((a, b) => a + b, 0) / samples.length) };
+      saveBaselines(next);
+      return next;
+    });
+  };
+  return { base, recordReadiness };
+}
 
 type App2View =
   | "athlete"
