@@ -87,6 +87,119 @@ export function fmtNum(
   return `${n.toFixed(digits)}${unit}`;
 }
 
+// =============================================================================
+// Canonical LIVE Recovery composite — SINGLE source of truth used by both the
+// Recovery view (big ring) and the Sport view (Readiness lens). Returns null
+// when there isn't enough real signal from the watch; callers MUST render "—"
+// in that case rather than substituting demo data.
+// =============================================================================
+export type LiveRecoveryInputs = {
+  connected: boolean;
+  heartRateBpm?: number | null;
+  restingHrBpm?: number | null;
+  hrvMs?: number | null;
+  spo2Pct?: number | null;
+  skinTempC?: number | null;
+  stepsToday?: number | null;
+  batteryPct?: number | null;
+  peakJerk?: number | null;
+  eventsLastMin?: number | null;
+};
+
+export type LiveRecoveryParts = {
+  cardio: number | null;
+  muscle: number | null;
+  loadDebt: number | null;
+  environment: number | null;
+  confidence: number | null;
+};
+
+export function computeLiveRecovery(i: LiveRecoveryInputs): {
+  score: number | null;
+  parts: LiveRecoveryParts;
+} {
+  const cardio = i.heartRateBpm == null ? null : (() => {
+    const rhr = i.restingHrBpm ?? 60;
+    const headroom = Math.max(0, (i.heartRateBpm as number) - rhr);
+    return Math.round(Math.max(0, Math.min(100, 100 - (headroom / 60) * 100)));
+  })();
+
+  const muscle = !i.connected ? null : (() => {
+    const jerkPenalty = Math.min(60, (i.peakJerk ?? 0) / 4);
+    const eventPenalty = Math.min(40, (i.eventsLastMin ?? 0) * 0.6);
+    return Math.round(Math.max(0, 100 - jerkPenalty - eventPenalty));
+  })();
+
+  const loadDebt = !i.connected ? null : (() => {
+    const base = Math.min(100, (i.eventsLastMin ?? 0) * 1.5);
+    const intensity = Math.min(30, (i.peakJerk ?? 0) / 6);
+    return Math.round(Math.max(0, 100 - Math.min(100, base * 0.7 + intensity)));
+  })();
+
+  const envParts: number[] = [];
+  if (i.spo2Pct != null) envParts.push(Math.max(0, Math.min(100, ((i.spo2Pct - 92) / 7) * 100)));
+  if (i.skinTempC != null) {
+    const dev = Math.abs(i.skinTempC - 33.5);
+    envParts.push(Math.max(0, 100 - dev * 25));
+  }
+  if (i.hrvMs != null) envParts.push(Math.max(0, Math.min(100, ((i.hrvMs - 20) / 70) * 100)));
+  const environment = envParts.length === 0
+    ? null
+    : Math.round(envParts.reduce((a, b) => a + b, 0) / envParts.length);
+
+  const streams = [
+    i.heartRateBpm != null,
+    i.hrvMs != null,
+    i.spo2Pct != null,
+    i.skinTempC != null,
+    i.stepsToday != null,
+    i.batteryPct != null,
+  ];
+  const liveCount = streams.filter(Boolean).length;
+  const confidence = liveCount === 0 ? null : Math.round((liveCount / streams.length) * 100);
+
+  const parts: LiveRecoveryParts = { cardio, muscle, loadDebt, environment, confidence };
+
+  const weighted: { v: number | null; w: number }[] = [
+    { v: cardio, w: 0.25 },
+    { v: muscle, w: 0.25 },
+    { v: loadDebt, w: 0.20 },
+    { v: environment, w: 0.15 },
+    { v: confidence, w: 0.15 },
+  ];
+  const present = weighted.filter((p) => p.v != null);
+  if (present.length === 0) return { score: null, parts };
+  const totalW = present.reduce((a, b) => a + b.w, 0);
+  const sum = present.reduce((a, b) => a + (b.v as number) * b.w, 0);
+  return { score: Math.round(sum / totalW), parts };
+}
+
+export function liveRecoveryFromMetrics(m: {
+  connected: boolean;
+  heartRateBpm?: number | null;
+  restingHrBpm?: number | null;
+  hrvMs?: number | null;
+  spo2Pct?: number | null;
+  skinTempC?: number | null;
+  stepsToday?: number | null;
+  batteryPct?: number | null;
+  peakJerk?: number | null;
+  eventsLastMin?: number | null;
+}) {
+  return computeLiveRecovery({
+    connected: m.connected,
+    heartRateBpm: m.heartRateBpm,
+    restingHrBpm: m.restingHrBpm,
+    hrvMs: m.hrvMs,
+    spo2Pct: m.spo2Pct,
+    skinTempC: m.skinTempC,
+    stepsToday: m.stepsToday,
+    batteryPct: m.batteryPct,
+    peakJerk: m.peakJerk,
+    eventsLastMin: m.eventsLastMin,
+  });
+}
+
 // Recovery band classification.
 export type RecoveryBand = "green" | "yellow" | "red" | "unknown";
 
