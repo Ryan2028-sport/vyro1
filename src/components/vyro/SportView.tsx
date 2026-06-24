@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Activity, CircleHelp, Crosshair, Gauge, Grid2X2, Sparkles, Zap, ChevronLeft } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
 import { SPORT_PROFILES, type PerformanceGroup, type SportProfile } from "./sportProfiles";
-import { computeReadiness, computeSubScores, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
+import { computeLiveRecovery, computeReadiness, computeSubScores, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
 
 // ============================================================================
 // Live overlays — translate raw LSM6DSO + GH3026 streams into the squash/tennis
