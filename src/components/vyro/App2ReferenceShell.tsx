@@ -133,15 +133,16 @@ function Logo() {
   );
 }
 
-function Ring({ value }: { value: number }) {
+function Ring({ value }: { value: number | null }) {
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (Math.max(0, Math.min(100, value)) / 100) * circumference;
+  const v = value ?? 0;
+  const offset = circumference - (Math.max(0, Math.min(100, v)) / 100) * circumference;
 
   return (
     <div>
       <div className="app2-ring-wrap">
-        <svg viewBox="0 0 104 104" role="img" aria-label={`Readiness ${value} out of 100`}>
+        <svg viewBox="0 0 104 104" role="img" aria-label={value == null ? "Readiness pending" : `Readiness ${value} out of 100`}>
           <circle
             cx="52"
             cy="52"
@@ -150,21 +151,23 @@ function Ring({ value }: { value: number }) {
             stroke="hsl(0 0% 100% / 0.12)"
             strokeWidth="6"
           />
-          <circle
-            cx="52"
-            cy="52"
-            r={radius}
-            fill="none"
-            stroke="hsl(var(--app2-ready))"
-            strokeLinecap="round"
-            strokeWidth="6"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-          />
+          {value != null && (
+            <circle
+              cx="52"
+              cy="52"
+              r={radius}
+              fill="none"
+              stroke="hsl(var(--app2-ready))"
+              strokeLinecap="round"
+              strokeWidth="6"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+            />
+          )}
         </svg>
         <div className="app2-ring-num">
           <div>
-            {value}
+            {value == null ? "—" : value}
             <small>/ 100</small>
           </div>
         </div>
@@ -561,7 +564,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
       <section className="app2-card app2-readiness">
         <div className="app2-ring-box">
-          <Ring value={readiness ?? 0} />
+          <Ring value={readiness} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="app2-mini-row">
