@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, PageHeader, Pill, Ring, Stat } from "./shared";
-import { computeSubScores, recoveryBand, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
+import { recoveryBand, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
 
 // Recovery & fatigue intelligence.
 // Mobile-first, WHOOP/Nike-style. Streams everything possible from the
