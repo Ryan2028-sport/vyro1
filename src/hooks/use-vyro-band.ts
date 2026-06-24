@@ -792,15 +792,9 @@ export function useVyroBand() {
           if (ok.hrvMs != null && ok.hrvMs >= 5) setHrvMs(ok.hrvMs);
           if (ok.stress != null) setStressScore(ok.stress);
           if (ok.sbp != null && ok.dbp != null) setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
-          if (ok.rriMs != null || ok.hr != null || ok.hrvMs != null || ok.stress != null) {
-            const base = ok.rriMs != null
-              ? 60_000 / Math.max(300, Math.min(2_000, ok.rriMs)) / 4.7
-              : 14;
-            const hrvAdj = ok.hrvMs != null ? (55 - ok.hrvMs) / 30 : 0;
-            const stressAdj = ok.stress != null ? (ok.stress - 50) / 35 : 0;
-            const rr = Math.max(8, Math.min(28, Math.round(base + hrvAdj + stressAdj)));
-            setRespRateBrpm(rr);
-          }
+          // Respiratory rate must come from a real SDK signal. The QCBand
+          // One-Key payload does not currently expose a resp-rate field, so
+          // we leave that tile empty rather than estimating it from HR/HRV.
           return true;
         };
         if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
@@ -816,11 +810,6 @@ export function useVyroBand() {
           if (frame.value >= 5 && frame.value < 250) setHrvMs(frame.value);
         } else if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value > 0 && frame.value <= 100) setStressScore(frame.value);
-        } else if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType)) {
-          if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
-            const t = decodeQcBandTempPayload(frame.data);
-            if (t != null) setSkinTempC(t);
-          }
         } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
           const t = decodeQcBandTempPayload(frame.data);
           if (t != null) setSkinTempC(t);
