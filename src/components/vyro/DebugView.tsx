@@ -157,7 +157,7 @@ export function DebugView() {
     { label: "Stress", value: fmt(m.stressScore, 0, "/100"), ok: isNum(m.stressScore), source: "QCBand stress packet" },
     {
       label: "Blood pressure",
-      value: m.bloodPressure ? `${m.bloodPressure.systolic}/${m.bloodPressure.diastolic}` : "—",
+      value: m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—",
       ok: !!m.bloodPressure,
       source: "QCBand BP packet",
     },
