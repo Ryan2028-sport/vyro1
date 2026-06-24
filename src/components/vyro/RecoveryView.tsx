@@ -401,52 +401,254 @@ function Sparkline({ points }: { points: number[] }) {
 }
 
 // ============================================================================
-// In-Game tab
+// In-Game tab — recovery speed under fatigue
 // ============================================================================
 
-const HR_DROPS = [42, 40, 38, 39, 37, 36, 35, 34, 33, 32, 31, 28];
-const Z5_TREND = [55, 38, 22, 68, 58, 46, 50, 48, 60, 42, 25, 70];
-const RECOV_SPEED = [40, 28, 44, 32, 50, 35, 46, 28, 30, 44, 42];
+// Track HR samples in a rolling 30-min window so we can segment "points":
+// every time HR rises above 160 then drops at least 10 bpm we record the
+// peak; the trough within the next 30s defines the between-point drop.
+type HrSample = { t: number; bpm: number };
+type Point = { peak: number; trough: number; drop: number; at: number };
 
-function InGameTab({ heartRateBpm: _hr }: { heartRateBpm: number | null }) {
-  const avgDrop = Math.round(HR_DROPS.reduce((a, b) => a + b, 0) / HR_DROPS.length);
+function useHrTimeSeries(heartRateBpm: number | null, heartRateAt: number | null) {
+  const bufRef = useRef<HrSample[]>([]);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (heartRateBpm == null || heartRateAt == null) return;
+    const buf = bufRef.current;
+    if (buf.length && buf[buf.length - 1].t === heartRateAt) return;
+    buf.push({ t: heartRateAt, bpm: heartRateBpm });
+    const cutoff = heartRateAt - 30 * 60_000;
+    while (buf.length && buf[0].t < cutoff) buf.shift();
+    setTick((x) => x + 1);
+  }, [heartRateBpm, heartRateAt]);
+
+  return useMemo(() => {
+    const samples = bufRef.current;
+    // Time at 180+ bpm (seconds) — integrate intervals where bpm stays >=180.
+    let z5Sec = 0;
+    for (let i = 1; i < samples.length; i++) {
+      const dt = Math.min(8_000, samples[i].t - samples[i - 1].t) / 1000;
+      if (samples[i - 1].bpm >= 180 && samples[i].bpm >= 180) z5Sec += dt;
+    }
+
+    // Segment points — local maxima >= 160 bpm with a trough at least 10
+    // bpm lower within the following 30 s.
+    const points: Point[] = [];
+    for (let i = 2; i < samples.length - 1; i++) {
+      const s = samples[i];
+      if (s.bpm < 160) continue;
+      if (samples[i - 1].bpm > s.bpm || samples[i + 1].bpm > s.bpm) continue;
+      const windowEnd = s.t + 30_000;
+      let trough = s.bpm;
+      for (let j = i + 1; j < samples.length && samples[j].t <= windowEnd; j++) {
+        if (samples[j].bpm < trough) trough = samples[j].bpm;
+      }
+      const drop = s.bpm - trough;
+      if (drop >= 10) {
+        // Coalesce: ignore peaks too close to the previous one.
+        if (!points.length || s.t - points[points.length - 1].at > 20_000) {
+          points.push({ peak: s.bpm, trough, drop, at: s.t });
+        }
+      }
+    }
+
+    const drops = points.map((p) => p.drop);
+    const avgDrop = drops.length ? Math.round(drops.reduce((a, b) => a + b, 0) / drops.length) : null;
+    const lastDrop = drops.length ? drops[drops.length - 1] : null;
+
+    // Insight alerts — flag any point whose drop sits outside 30-45 bpm.
+    const alerts: { idx: number; drop: number; reason: string }[] = [];
+    points.forEach((p, idx) => {
+      if (p.drop < 30) alerts.push({ idx: idx + 1, drop: p.drop, reason: "below 30 bpm target — cardio reserve bleeding" });
+      else if (p.drop > 45) alerts.push({ idx: idx + 1, drop: p.drop, reason: "above 45 bpm target — under-pacing or rest too long" });
+    });
+
+    return { samples, z5Sec, points, drops, avgDrop, lastDrop, alerts, tick };
+  }, [tick]);
+}
+
+function fmtMmSs(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function InGameTab({ m }: { m: LiveMetrics }) {
+  const ts = useHrTimeSeries(m.heartRateBpm, m.heartRateAt);
+  const hasData = ts.points.length > 0;
+  const z5Trend = useMemo(() => {
+    if (ts.samples.length < 2) return [] as number[];
+    // Bucket into 12 equal slices, value = max bpm in slice.
+    const buckets = new Array(12).fill(0);
+    const t0 = ts.samples[0].t;
+    const t1 = ts.samples[ts.samples.length - 1].t;
+    const span = Math.max(1, t1 - t0);
+    for (const s of ts.samples) {
+      const idx = Math.min(11, Math.floor(((s.t - t0) / span) * 12));
+      if (s.bpm > buckets[idx]) buckets[idx] = s.bpm;
+    }
+    return buckets;
+  }, [ts.samples, ts.tick]);
+
   return (
     <>
       <Card>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">
-              Between-point HR drop · Current match
+              Between-point HR drop · Current session
             </div>
             <h3 className="mt-1 text-base font-black text-vyro-text">Recovery speed under fatigue</h3>
           </div>
           <div className="shrink-0 rounded-lg border border-vyro-line bg-vyro-elev px-2 py-1 text-right">
             <div className="font-mono text-[8.5px] uppercase tracking-[0.18em] text-vyro-mute">avg drop</div>
-            <div className="font-mono text-[11px] font-bold tabular-nums text-vyro-text">{avgDrop} bpm</div>
+            <div className="font-mono text-[11px] font-bold tabular-nums text-vyro-text">
+              {ts.avgDrop != null ? `${ts.avgDrop} bpm` : "—"}
+            </div>
           </div>
         </div>
-        <BarChart points={HR_DROPS} labels={HR_DROPS.map((_, i) => `P${i + 1}`)} color="var(--vyro-mint)" max={50} />
+        {hasData ? (
+          <BarChart
+            points={ts.drops}
+            labels={ts.drops.map((_, i) => `P${i + 1}`)}
+            color="var(--vyro-mint)"
+            max={Math.max(50, ...ts.drops)}
+          />
+        ) : (
+          <p className="mt-3 text-[12px] leading-relaxed text-vyro-mute">
+            No between-point drops detected yet. Drops appear once HR peaks above 160 bpm and recovers ≥10 bpm within 30 s.
+          </p>
+        )}
       </Card>
 
       <Card eyebrow="Zone 5 exposure">
-        <div className="text-3xl font-black tabular-nums text-vyro-text">3:42</div>
+        <div className="text-3xl font-black tabular-nums text-vyro-text">
+          {ts.z5Sec > 0 ? fmtMmSs(ts.z5Sec) : "0:00"}
+        </div>
         <div className="mt-0.5 text-[12px] text-vyro-mute">total time at 180+ bpm</div>
-        <AreaSpark points={Z5_TREND} color="#ef5a6f" />
+        {z5Trend.length > 0 && <AreaSpark points={z5Trend} color="#ef5a6f" />}
       </Card>
 
       <Card eyebrow="Recovery speed (HR drop / 30s rest)">
         <div className="flex items-baseline gap-1.5">
-          <div className="text-3xl font-black tabular-nums text-vyro-text">38</div>
+          <div className="text-3xl font-black tabular-nums text-vyro-text">
+            {ts.lastDrop ?? "—"}
+          </div>
           <div className="font-mono text-[11px] text-vyro-mute">bpm</div>
         </div>
-        <div className="mt-0.5 text-[12px] text-vyro-mute">elite range: 30–45 bpm</div>
-        <AreaSpark points={RECOV_SPEED} color="var(--vyro-text)" />
+        <div className="mt-0.5 text-[12px] text-vyro-mute">target range: 30–45 bpm</div>
+        {ts.drops.length > 0 && <AreaSpark points={ts.drops} color="var(--vyro-text)" />}
       </Card>
 
-      <InsightCard>
-        HR drop between points held above 30 bpm through point 11. The dip on P12 (drop 40 bpm)
-        is the first sign cardio reserve is bleeding — pace the next game.
-      </InsightCard>
+      {ts.alerts.length > 0 ? (
+        <Card eyebrow="Insight log · auto">
+          <ul className="space-y-2">
+            {ts.alerts.slice(-5).reverse().map((a, i) => (
+              <li key={`${a.idx}-${i}`} className="flex items-start gap-2.5 rounded-xl border border-vyro-amber/30 bg-vyro-amber/5 p-2.5">
+                <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border border-vyro-amber/40 bg-vyro-amber/10 font-mono text-[10px] font-bold text-vyro-amber">!</span>
+                <div className="min-w-0 text-[12px] leading-relaxed text-vyro-text">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-amber">P{a.idx}</span>{" "}
+                  drop {a.drop} bpm — {a.reason}.
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : hasData ? (
+        <InsightCard>
+          {ts.points.length} point{ts.points.length === 1 ? "" : "s"} logged. All between-point drops sit inside the 30–45 bpm target range.
+        </InsightCard>
+      ) : (
+        <InsightCard>
+          Live HR stream will populate this view once the band is connected and HR enters competitive range.
+        </InsightCard>
+      )}
+    </>
+  );
+}
+
+// ============================================================================
+// Total Fatigue tab — 72h composite training load
+// ============================================================================
+
+type FatigueSample = { t: number; cardio: number; muscle: number; debt: number; stress: number };
+const FATIGUE_KEY = "vyro.recovery.fatigue72.v1";
+
+function loadFatigueHistory(): FatigueSample[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(FATIGUE_KEY) || "[]") as FatigueSample[];
+    const cutoff = Date.now() - 72 * 3600_000;
+    return Array.isArray(raw) ? raw.filter((s) => s && s.t >= cutoff) : [];
+  } catch { return []; }
+}
+
+function FatigueTab({
+  cardio, muscle, loadDebt, stress,
+}: { cardio: number | null; muscle: number | null; loadDebt: number | null; stress: number | null }) {
+  const [history, setHistory] = useState<FatigueSample[]>(() => loadFatigueHistory());
+  const lastWrite = useRef(0);
+
+  useEffect(() => {
+    // Sample at most once a minute. Need at least one signal to record.
+    const now = Date.now();
+    if (now - lastWrite.current < 60_000) return;
+    if (cardio == null && muscle == null && loadDebt == null && stress == null) return;
+    lastWrite.current = now;
+    setHistory((prev) => {
+      const next: FatigueSample[] = [
+        ...prev,
+        {
+          t: now,
+          cardio: cardio != null ? 100 - cardio : 0,
+          muscle: muscle != null ? 100 - muscle : 0,
+          debt: loadDebt != null ? 100 - loadDebt : 0,
+          stress: stress ?? 0,
+        },
+      ].filter((s) => s.t >= now - 72 * 3600_000);
+      try { window.localStorage.setItem(FATIGUE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, [cardio, muscle, loadDebt, stress]);
+
+  const agg = useMemo(() => {
+    if (!history.length) {
+      return {
+        cardio: cardio != null ? 100 - cardio : null,
+        muscle: muscle != null ? 100 - muscle : null,
+        debt: loadDebt != null ? 100 - loadDebt : null,
+        stress: stress ?? null,
+        composite: null as number | null,
+        n: 0,
+      };
+    }
+    const avg = (k: keyof FatigueSample) =>
+      Math.round(history.reduce((a, b) => a + (b[k] as number), 0) / history.length);
+    const c = avg("cardio"), mu = avg("muscle"), d = avg("debt"), st = avg("stress");
+    const composite = Math.round(c * 0.30 + mu * 0.30 + d * 0.25 + st * 0.15);
+    return { cardio: c, muscle: mu, debt: d, stress: st, composite, n: history.length };
+  }, [history, cardio, muscle, loadDebt, stress]);
+
+  return (
+    <>
+      <Card eyebrow="Total fatigue · Last 72h" title="Composite training load">
+        <div className="mb-3 flex items-baseline gap-2">
+          <div className="text-4xl font-black tabular-nums text-vyro-text">{agg.composite ?? "—"}</div>
+          <div className="font-mono text-[11px] text-vyro-mute">/100 composite</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Stat label="Cardio load" value={agg.cardio ?? "—"} unit="/100" />
+          <Stat label="Muscle load" value={agg.muscle ?? "—"} unit="/100" />
+          <Stat label="Total debt" value={agg.debt ?? "—"} unit="/100" />
+          <Stat label="Stress" value={agg.stress ?? "—"} unit="/100" />
+        </div>
+        <p className="mt-3 text-[12px] leading-relaxed text-vyro-mute">
+          {agg.n > 0
+            ? `Rolling 72-hour mix from ${agg.n} sample${agg.n === 1 ? "" : "s"} (cardio 30% · muscle 30% · debt 25% · stress 15%).`
+            : "Live composite — history builds as the band streams; the 72h mix replaces this once enough samples exist."}
+        </p>
+      </Card>
     </>
   );
 }
