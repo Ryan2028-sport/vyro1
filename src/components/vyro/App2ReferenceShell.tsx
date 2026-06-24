@@ -419,13 +419,16 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   ]);
   const [draft, setDraft] = useState({ time: "", title: "", load: "", color: "green" as PlanItem["color"] });
 
+  // Only feed live signals into readiness when the band is actually
+  // streaming. Cached localStorage values from a previous session would
+  // otherwise pin the score to a static number (e.g. RHR alone → 36).
   const readinessInputs = computeReadiness({
     connected: m.connected,
-    hrvMs: m.hrvMs,
-    restingHrBpm: m.restingHrBpm,
-    stress: m.stressScore,
-    spo2: m.spo2Pct,
-    peakJerk: m.peakJerk ?? null,
+    hrvMs: m.connected ? m.hrvMs : null,
+    restingHrBpm: m.connected ? m.restingHrBpm : null,
+    stress: m.connected ? m.stressScore : null,
+    spo2: m.connected ? m.spo2Pct : null,
+    peakJerk: m.connected ? (m.peakJerk ?? null) : null,
   });
   const subs = computeSubScores({
     connected: m.connected,
