@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
 import { SPORT_PROFILES, type SportProfile } from "./sportProfiles";
-import { useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
+import { useLiveMetrics, type LiveMetrics, computeLiveRecovery } from "./useLiveMetrics";
 
 // ============================================================================
 // Sport view — STRICT real-telemetry-only mode.
