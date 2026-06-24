@@ -13,6 +13,7 @@ import {
   Plus,
   Radio,
   Settings2,
+  Stethoscope,
   Trophy,
   UserRound,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import { CoachView } from "./CoachView";
 import { RecoveryView } from "./RecoveryView";
 import { SessionView } from "./SessionView";
 import { SleepView } from "./SleepView";
+import { DebugView } from "./DebugView";
 import { SocialView } from "./SocialView";
 import { SportView } from "./SportView";
 import { TrendsView } from "./TrendsView";
@@ -97,6 +99,7 @@ type App2View =
   | "sport"
   | "recovery"
   | "sleep"
+  | "debug"
   | "session"
   | "coach"
   | "social"
@@ -337,6 +340,13 @@ function EmbeddedView({
     return (
       <div className="app2-scroll-embed">
         <SleepView />
+      </div>
+    );
+  }
+  if (view === "debug") {
+    return (
+      <div className="app2-scroll-embed">
+        <DebugView />
       </div>
     );
   }
@@ -735,6 +745,7 @@ export function App2ReferenceShell() {
     { id: "sport" as App2View, label: "Sport", icon: Trophy },
     { id: "recovery" as App2View, label: "Recovery", icon: Heart },
     { id: "sleep" as App2View, label: "Sleep", icon: Moon },
+    { id: "debug" as App2View, label: "Debug", icon: Stethoscope },
   ];
 
   return (
