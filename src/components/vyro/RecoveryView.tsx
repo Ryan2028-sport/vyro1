@@ -63,14 +63,12 @@ export function RecoveryView() {
   // Trap detector — HR says ready, but muscle/load says be smart.
   const hrTrap = cardio != null && muscle != null && cardio - muscle >= 20;
 
-  // Baseline deltas — short-window comparison to a moving baseline.
-  // Until history is persisted we derive a stable baseline from each
-  // score, so the delta reads ±0 instead of a fake number.
-  const baselineDelta = (v: number | null) => (v == null ? null : 0);
-  const recoveryDelta = baselineDelta(recovery);
+  // Deltas vs personal baseline. We don't persist daily baselines yet, so
+  // any "vs baseline" delta would be fabricated — render nothing instead.
+  const recoveryDelta: number | null = null;
   const hrDelta = m.heartRateBpm != null && m.restingHrBpm != null ? m.heartRateBpm - m.restingHrBpm : null;
-  const muscleDelta = muscle != null ? muscle - 76 : null; // vs 76 readiness baseline
-  const ttrDelta = timeToReady != null ? timeToReady - 48 : null; // vs 48-min baseline
+  const muscleDelta: number | null = null;
+  const ttrDelta: number | null = null;
 
   function fmtDelta(n: number | null, unit = "") {
     if (n == null) return "—";
