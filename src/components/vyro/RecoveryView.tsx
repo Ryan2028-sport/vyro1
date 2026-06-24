@@ -14,76 +14,29 @@ export function RecoveryView() {
   const [tab, setTab] = useState<Tab>("live");
 
   // --- Subscores -----------------------------------------------------------
-  // Cardio Recovery — how close current HR is to resting HR (the lower
-  // the live HR vs RHR, the more cardio is restored).
-  const cardio = useMemo(() => {
-    if (m.heartRateBpm == null) return null;
-    const rhr = m.restingHrBpm ?? 60;
-    const headroom = Math.max(0, m.heartRateBpm - rhr);
-    // 0 bpm above RHR = 100, 60 bpm above = 0
-    return Math.round(Math.max(0, Math.min(100, 100 - (headroom / 60) * 100)));
-  }, [m.heartRateBpm, m.restingHrBpm]);
-
-  // Muscle Readiness — inverse of recent IMU peak-jerk + rolling event load.
-  const muscle = useMemo(() => {
-    if (!m.connected) return null;
-    const jerkPenalty = Math.min(60, (m.peakJerk ?? 0) / 4);
-    const eventPenalty = Math.min(40, m.eventsLastMin * 0.6);
-    return Math.round(Math.max(0, 100 - jerkPenalty - eventPenalty));
-  }, [m.connected, m.peakJerk, m.eventsLastMin]);
-
-  // Load Debt — short-term load proxy from current session intensity.
-  const loadDebt = useMemo(() => {
-    if (!m.connected) return null;
-    const base = Math.min(100, m.eventsLastMin * 1.5);
-    const intensity = Math.min(30, (m.peakJerk ?? 0) / 6);
-    return Math.round(Math.max(0, 100 - Math.min(100, base * 0.7 + intensity)));
-  }, [m.connected, m.eventsLastMin, m.peakJerk]);
-
-  // Recovery Environment — sleep + skin temp + spO2 (whichever are present).
-  const environment = useMemo(() => {
-    const parts: number[] = [];
-    if (m.spo2Pct != null) parts.push(Math.max(0, Math.min(100, ((m.spo2Pct - 92) / 7) * 100)));
-    if (m.skinTempC != null) {
-      // Closer to 33.5°C wrist baseline = better
-      const dev = Math.abs(m.skinTempC - 33.5);
-      parts.push(Math.max(0, 100 - dev * 25));
-    }
-    if (m.hrvMs != null) parts.push(Math.max(0, Math.min(100, ((m.hrvMs - 20) / 70) * 100)));
-    if (parts.length === 0) return null;
-    return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
-  }, [m.connected, m.spo2Pct, m.skinTempC, m.hrvMs]);
-
-  // Signal Confidence — how many independent streams are live right now.
-  const confidence = useMemo(() => {
-    const streams = [
-      m.heartRateBpm != null,
-      m.hrvMs != null,
-      m.spo2Pct != null,
-      m.skinTempC != null,
-      m.stepsToday != null,
-      m.batteryPct != null,
-    ];
-    const live = streams.filter(Boolean).length;
-    if (live === 0) return null;
-    return Math.round((live / streams.length) * 100);
-  }, [m.heartRateBpm, m.hrvMs, m.spo2Pct, m.skinTempC, m.stepsToday, m.batteryPct]);
-
-  // Composite LIVE Recovery — weighted blend matching the spec.
-  const recovery = useMemo(() => {
-    const parts: { v: number | null; w: number }[] = [
-      { v: cardio, w: 0.25 },
-      { v: muscle, w: 0.25 },
-      { v: loadDebt, w: 0.20 },
-      { v: environment, w: 0.15 },
-      { v: confidence, w: 0.15 },
-    ];
-    const present = parts.filter((p) => p.v != null);
-    if (present.length === 0) return null;
-    const totalW = present.reduce((a, b) => a + b.w, 0);
-    const sum = present.reduce((a, b) => a + (b.v as number) * b.w, 0);
-    return Math.round(sum / totalW);
-  }, [cardio, muscle, loadDebt, environment, confidence]);
+  // All recovery math lives in one place (useLiveMetrics > computeLiveRecovery)
+  // so the Recovery view's hero ring and the Sport view's "Live recovery" lens
+  // always show the IDENTICAL number from the watch — no divergence, no demo.
+  const { score: recovery, parts } = useMemo(
+    () => computeLiveRecovery({
+      connected: m.connected,
+      heartRateBpm: m.heartRateBpm,
+      restingHrBpm: m.restingHrBpm,
+      hrvMs: m.hrvMs,
+      spo2Pct: m.spo2Pct,
+      skinTempC: m.skinTempC,
+      stepsToday: m.stepsToday,
+      batteryPct: m.batteryPct,
+      peakJerk: m.peakJerk ?? null,
+      eventsLastMin: m.eventsLastMin,
+    }),
+    [m.connected, m.heartRateBpm, m.restingHrBpm, m.hrvMs, m.spo2Pct, m.skinTempC, m.stepsToday, m.batteryPct, m.peakJerk, m.eventsLastMin],
+  );
+  const cardio = parts.cardio;
+  const muscle = parts.muscle;
+  const loadDebt = parts.loadDebt;
+  const environment = parts.environment;
+  const confidence = parts.confidence;
 
   // Time-to-ready (min): rough estimate from cardio + muscle deficit.
   const timeToReady = useMemo(() => {
@@ -91,6 +44,7 @@ export function RecoveryView() {
     const deficit = (100 - cardio) * 0.4 + (100 - muscle) * 0.6;
     return Math.round(deficit * 0.6);
   }, [cardio, muscle]);
+
 
   const band = recoveryBand(recovery);
   const bandTone = band === "green" ? "live" : band === "yellow" ? "warn" : band === "red" ? "off" : "neutral";
