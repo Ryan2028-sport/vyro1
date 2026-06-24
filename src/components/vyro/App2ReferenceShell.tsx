@@ -551,24 +551,34 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
       <section className="app2-card app2-readiness">
         <div className="app2-ring-box">
-          <Ring value={readiness} />
+          <Ring value={readiness ?? 0} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="app2-mini-row">
-            <span className="app2-label-pill">Ready</span>
+            <span className="app2-label-pill">{readiness == null ? "—" : readiness >= 70 ? "Ready" : readiness >= 50 ? "Manage" : "Recover"}</span>
             <span className="app2-eyebrow">
-              Recovery {recovery} · Sleep {sleep}
+              Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
             </span>
           </div>
-          <h2 className="app2-card-title">You're ready to train.</h2>
+          <h2 className="app2-card-title">
+            {readiness == null ? "Awaiting band data" : readiness >= 70 ? "You're ready to train." : readiness >= 50 ? "Train moderate today." : "Prioritize recovery."}
+          </h2>
           <p className="app2-card-copy">
-            Recovery is green and agility is sharp. Train hard, but protect the back-left corner.
+            {m.connected
+              ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
+              : "Pair your VYRO Band to populate live signals."}
           </p>
           <div className="app2-change-stack">
             <span className="app2-eyebrow">What changed</span>
-            <span className="app2-change">↗ Recovery +6</span>
-            <span className="app2-change">↗ HRV +8 ms</span>
-            <span className="app2-change warn">⚠ Sleep debt 1h 24m</span>
+            {base.readiness != null && readiness != null
+              ? <span className={`app2-change${readiness < base.readiness ? " warn" : ""}`}>
+                  {readiness >= base.readiness ? "↗" : "↘"} Readiness {readiness - base.readiness > 0 ? "+" : ""}{readiness - base.readiness} vs baseline
+                </span>
+              : <span className="app2-change">Calibrating baseline…</span>}
+            {m.hrvMs != null && base.hrv != null && (
+              <span className="app2-change">↗ HRV {m.hrvMs - base.hrv > 0 ? "+" : ""}{Math.round(m.hrvMs - base.hrv)} ms</span>
+            )}
+            {strain != null && strain > 70 && <span className="app2-change warn">⚠ Strain {strain}/100</span>}
           </div>
         </div>
       </section>
@@ -576,16 +586,20 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
       <div className="app2-grid">
         <InfoCard eyebrow="Top opportunity">
           <p className="app2-card-copy">
-            Agility is peaking (+10.5% over 12 sessions) — a good day to push interval ghosting.
+            {agility != null && agility >= 75
+              ? `Agility ${agility}/100 — a good day to push interval ghosting.`
+              : recovery != null && recovery < 50
+                ? "Recovery is low — protect tomorrow with mobility + breath work."
+                : "Train within your zones and reassess after the next session."}
           </p>
         </InfoCard>
 
         <InfoCard eyebrow="Base readiness" title="Core metrics">
           <div className="app2-metric-grid">
-            <MiniMetric label="Fatigue" value={fatigue} unit="/100" trend="controlled" />
-            <MiniMetric label="Recovery" value={recovery} unit="/100" trend="+6" />
-            <MiniMetric label="Agility" value={agility} unit="/100" trend="+10.5%" />
-            <MiniMetric label="Sleep" value={sleep} unit="/100" trend="+4" />
+            <MiniMetric label="Fatigue" value={fatigue ?? "—"} unit="/100" trend={fatigue != null ? (fatigue < 40 ? "controlled" : fatigue < 70 ? "elevated" : "overload") : undefined} />
+            <MiniMetric label="Recovery" value={recovery ?? "—"} unit="/100" trend={trend(recovery, base.readiness, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`)} />
+            <MiniMetric label="Agility" value={agility ?? "—"} unit="/100" trend={agility != null ? (agility >= 75 ? "peaking" : agility >= 50 ? "steady" : "low") : undefined} />
+            <MiniMetric label="Sleep" value={sleep ?? "—"} unit="/100" trend={sleep != null ? (sleep >= 80 ? "rested" : "short") : undefined} />
           </div>
         </InfoCard>
 
@@ -597,18 +611,52 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </div>
         </InfoCard>
 
-        <CognitiveFatigueCard m={m} />
+        <CognitiveFatigueCard m={m} baselineMs={base.reactMs} />
 
-        <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone="amber">
+        <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone={withinBaseline ? "ready" : "amber"}>
           <p className="app2-card-copy">
-            Clearance is on hold until wearable power and AI video symmetry return inside the 5%
-            baseline.
+            {wearablePower == null || baselineReady == null
+              ? "Building 7-day readiness baseline — RTP unlocks once enough data is captured."
+              : withinBaseline
+                ? `Cleared — wearable power within ±5% of baseline (${deviationPct!.toFixed(1)}%).`
+                : `Hold — wearable power ${deviationPct! > 0 ? "above" : "below"} baseline by ${Math.abs(deviationPct!).toFixed(1)}% (target ±5%).`}
           </p>
           <div className="app2-metric-grid">
-            <MiniMetric label="Video symmetry" value="93" unit="/100" />
-            <MiniMetric label="Wearable power" value="91" unit="/100" />
+            <MiniMetric label="Wearable power" value={wearablePower ?? "—"} unit="/100" trend={baselineReady != null ? `base ${baselineReady}` : undefined} />
+            <MiniMetric label="Clearance" value={clearance ?? "—"} unit="/100" trend={withinBaseline ? "in range" : deviationPct != null ? "out of range" : undefined} />
           </div>
         </InfoCard>
+
+        <InfoCard eyebrow="Today's plan editable" title="Training blocks">
+          <div style={{ marginTop: 10 }}>
+            {liveSessionBlock && (
+              <div className="app2-plan-row" key="live-session" style={{ borderLeft: "2px solid hsl(var(--app2-live))" }}>
+                <div className="app2-plan-time">{liveSessionBlock.time}</div>
+                <div>
+                  <div className="app2-plan-title">{liveSessionBlock.title}</div>
+                  <div className="app2-plan-sub">{liveSessionBlock.load} · LIVE</div>
+                </div>
+                <span style={{ color: "hsl(var(--app2-live))", fontSize: 10, fontWeight: 700 }}>●</span>
+              </div>
+            )}
+            {items.map((item, index) => (
+              <div className="app2-plan-row" key={`${item.time}-${index}`}>
+                <div className="app2-plan-time">{item.time}</div>
+                <div>
+                  <div className="app2-plan-title">{item.title}</div>
+                  <div className="app2-plan-sub">{item.load}</div>
+                </div>
+                <button
+                  aria-label="Remove plan item"
+                  onClick={() => setItems((prev) => prev.filter((_, i) => i !== index))}
+                  style={{ color: "hsl(var(--app2-muted))" }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+
 
         <InfoCard eyebrow="Today's plan editable" title="Training blocks">
           <div style={{ marginTop: 10 }}>
