@@ -469,6 +469,7 @@
   z-index: 50;
   width: min(430px, 100vw);
   display: flex;
+  flex-wrap: nowrap;
   gap: 4px;
   overflow-x: auto;
   border-top: 1px solid hsl(var(--app2-border));
