@@ -1,12 +1,36 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useVyroBandCtx } from "./VyroBandProvider";
 
 export type LiveMetrics = ReturnType<typeof useLiveMetrics>;
 
 export function useLiveMetrics() {
   const ctx = useVyroBandCtx();
-  const { events, counts, connected, sessionState, ble, pairedId, pairedName, heartRateBpm, heartRateAt, batteryPct, batteryCharging, spo2Pct, skinTempC, stepsToday, distanceM, caloriesKcal, bloodPressure, restingHrBpm, hrvMs, respRateBrpm, stressScore } = ctx;
+  const { events, counts, connected, sessionState, ble, pairedId, pairedName, heartRateBpm, heartRateAt, batteryPct, batteryCharging, spo2Pct, skinTempC, stepsToday, distanceM, caloriesKcal, bloodPressure, restingHrBpm, hrvMs, respRateBrpm, stressScore, signalAt } = ctx;
   const connecting = ble.connectionState === "connecting";
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!connected) return;
+    const id = window.setInterval(() => setNow(Date.now()), 10_000);
+    return () => window.clearInterval(id);
+  }, [connected]);
+
+  const isFresh = (at: number | null | undefined, maxAgeMs: number) =>
+    connected && at != null && now - at >= 0 && now - at <= maxAgeMs;
+
+  const liveHeartRateBpm = isFresh(heartRateAt, 15_000) ? heartRateBpm : null;
+  const liveHeartRateAt = liveHeartRateBpm == null ? null : heartRateAt;
+  const liveBatteryPct = isFresh(signalAt.batteryAt, 5 * 60_000) ? batteryPct : null;
+  const liveBatteryCharging = liveBatteryPct != null && batteryCharging;
+  const liveSpo2Pct = isFresh(signalAt.spo2At, 20 * 60_000) ? spo2Pct : null;
+  const liveSkinTempC = isFresh(signalAt.skinTempAt, 20 * 60_000) ? skinTempC : null;
+  const liveStepsToday = isFresh(signalAt.stepsAt, 2 * 60_000) ? stepsToday : null;
+  const liveDistanceM = isFresh(signalAt.distanceAt, 2 * 60_000) ? distanceM : null;
+  const liveCaloriesKcal = isFresh(signalAt.caloriesAt, 2 * 60_000) ? caloriesKcal : null;
+  const liveBloodPressure = isFresh(signalAt.bloodPressureAt, 20 * 60_000) ? bloodPressure : null;
+  const liveRestingHrBpm = isFresh(signalAt.restingHrAt, 5 * 60_000) ? restingHrBpm : null;
+  const liveHrvMs = isFresh(signalAt.hrvAt, 20 * 60_000) ? hrvMs : null;
+  const liveStressScore = isFresh(signalAt.stressAt, 20 * 60_000) ? stressScore : null;
 
   const derived = useMemo(() => {
     let peakG = 0, peakDps = 0, peakJerk = 0;
@@ -59,20 +83,21 @@ export function useLiveMetrics() {
     events,
     pairedId,
     pairedName,
-    heartRateBpm,
-    heartRateAt,
-    batteryPct,
-    batteryCharging,
-    spo2Pct,
-    skinTempC,
-    stepsToday,
-    distanceM,
-    caloriesKcal,
-    bloodPressure,
-    restingHrBpm,
-    hrvMs,
+    heartRateBpm: liveHeartRateBpm,
+    heartRateAt: liveHeartRateAt,
+    batteryPct: liveBatteryPct,
+    batteryCharging: liveBatteryCharging,
+    spo2Pct: liveSpo2Pct,
+    skinTempC: liveSkinTempC,
+    stepsToday: liveStepsToday,
+    distanceM: liveDistanceM,
+    caloriesKcal: liveCaloriesKcal,
+    bloodPressure: liveBloodPressure,
+    restingHrBpm: liveRestingHrBpm,
+    hrvMs: liveHrvMs,
     respRateBrpm,
-    stressScore,
+    stressScore: liveStressScore,
+    signalAt,
     ...derived,
   };
 }
@@ -251,6 +276,7 @@ export function recoveryBand(score: number | null): RecoveryBand {
 // at least one weighted input is available.
 export type ReadinessInputs = {
   connected: boolean;
+  heartRateBpm?: number | null;
   hrvMs?: number | null;
   restingHrBpm?: number | null;
   sleepScore?: number | null;
@@ -263,11 +289,11 @@ export type ReadinessInputs = {
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 export function computeReadiness(i: ReadinessInputs): { score: number | null; parts: Record<string, number> } {
-  if (!i.connected) return { score: null, parts: {} };
+  if (!i.connected || i.heartRateBpm == null) return { score: null, parts: {} };
   const parts: Record<string, number> = {};
   const w: Record<string, number> = {};
   if (i.hrvMs != null) { parts.hrv = clamp01((i.hrvMs - 20) / 70); w.hrv = 0.30; }
-  if (i.hrvMs != null && i.restingHrBpm != null) { parts.rhr = clamp01((70 - i.restingHrBpm) / 25); w.rhr = 0.15; }
+  if (i.restingHrBpm != null) { parts.rhr = clamp01((70 - i.restingHrBpm) / 25); w.rhr = 0.15; }
   if (i.sleepScore != null) { parts.sleep = clamp01(i.sleepScore / 100); w.sleep = 0.25; }
   if (i.recoveryScore != null) { parts.recovery = clamp01(i.recoveryScore / 100); w.recovery = 0.15; }
   if (i.stress != null) { parts.stress = clamp01(1 - i.stress / 100); w.stress = 0.08; }
@@ -277,10 +303,10 @@ export function computeReadiness(i: ReadinessInputs): { score: number | null; pa
     w.load = 0.03;
   }
   const total = Object.values(w).reduce((a, b) => a + b, 0);
-  // Do not publish a readiness score from a single isolated signal (for
-  // example HRV alone → ~32). That reads like a real coach score when it is
-  // only one body channel. Wait for at least two fresh watch-derived parts.
-  if (Object.keys(w).length < 2 || total === 0) return { score: null, parts };
+  // Do not publish a readiness score from sparse / stale inputs (for example
+  // HRV + stress only → a convincing but meaningless ~37). A real readiness
+  // number needs live HR plus at least three fresh watch-derived factors.
+  if (Object.keys(w).length < 3 || total === 0) return { score: null, parts };
   let sum = 0;
   for (const k in w) sum += parts[k] * w[k];
   return { score: Math.round((sum / total) * 100), parts };
