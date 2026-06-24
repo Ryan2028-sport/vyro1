@@ -344,10 +344,10 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
               ))}
             </div>
           </Card>
-          <Card eyebrow="Performance groups">
+          <Card eyebrow="Performance groups" action={sixLenses ? <Pill tone="live" pulse>LIVE</Pill> : undefined}>
             <h3 className="mb-4 text-[22px] font-black leading-tight text-vyro-text">Six lenses on {sport.label.toLowerCase()}.</h3>
             <div className="grid grid-cols-2 gap-3">
-              {(sport.performanceGroups ?? sport.agilityComponents.map((a) => ({
+              {(sixLenses ?? sport.performanceGroups ?? sport.agilityComponents.map((a) => ({
                 label: a.label,
                 status: a.value >= 80 ? "Elite band" : "On target",
                 value: a.value,
@@ -356,8 +356,13 @@ function SportDetail({ sport, onBack }: { sport: SportProfile; onBack: () => voi
                 <PerformanceGroupTile key={group.label} group={group} />
               ))}
             </div>
-            <p className="mt-4 text-[13px] leading-relaxed text-vyro-mute">Court positioning is backed by full heat maps and opponent scouting in the Court DB tab.</p>
+            <p className="mt-4 text-[13px] leading-relaxed text-vyro-mute">
+              {sixLenses
+                ? "Lenses recompute live from LSM6DSO IMU + GH3026 PPG every event packet."
+                : "Court positioning is backed by full heat maps and opponent scouting in the Court DB tab."}
+            </p>
           </Card>
+
           <Card eyebrow="Past sessions" title="0 logged">
             <EmptyState
               title={`No ${sport.label} sessions yet`}
