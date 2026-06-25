@@ -446,8 +446,8 @@ export function todayActivityKeyPrefix(now = new Date()): string {
 export function decodeQcBandHrvHistory(bytes: Uint8Array): number | null {
   if (bytes.length < 4 || bytes[0] !== QCBAND_CMD_SYNC_HRV) return null;
   const packetNr = bytes[1] & 0xff;
-  if (packetNr === 0xff || packetNr === 0) return null;
-  const start = packetNr === 1 ? 3 : 2;
+  if (packetNr === 0xff) return null;
+  const start = packetNr === 0 || packetNr === 1 ? 3 : 2;
   let latest: number | null = null;
   for (let i = start; i < bytes.length - 1; i++) {
     const v = bytes[i] & 0xff;
@@ -461,8 +461,8 @@ export function decodeQcBandHrvHistory(bytes: Uint8Array): number | null {
 export function decodeQcBandStressHistory(bytes: Uint8Array): number | null {
   if (bytes.length < 4 || bytes[0] !== QCBAND_CMD_SYNC_STRESS) return null;
   const packetNr = bytes[1] & 0xff;
-  if (packetNr === 0xff || packetNr === 0) return null;
-  const start = packetNr === 1 ? 3 : 2;
+  if (packetNr === 0xff) return null;
+  const start = packetNr === 0 || packetNr === 1 ? 3 : 2;
   let latest: number | null = null;
   for (let i = start; i < bytes.length - 1; i++) {
     const v = bytes[i] & 0xff;
@@ -616,6 +616,7 @@ export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame 
   if (bytes[0] !== QCBAND_CMD_START_MEASURE && bytes[0] !== QCBAND_CMD_STOP_MEASURE) return null;
   const newSdkNoErrorByte = ([
     QCBAND_MEASURE_HR_SDK,
+    QCBAND_MEASURE_SPO2_SDK,
     QCBAND_MEASURE_ONE_KEY_SDK,
     QCBAND_MEASURE_STRESS_SDK,
     QCBAND_MEASURE_HRV_SDK,
