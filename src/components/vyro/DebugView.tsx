@@ -1020,6 +1020,66 @@ export function DebugView() {
           </div>
         )}
       </div>
+
+      <div
+        style={{
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 12,
+          background: "rgba(255,255,255,0.02)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Recent write log</div>
+          <div style={{ opacity: 0.6, fontSize: 11 }}>
+            {inspector.writes.ok}/{inspector.writes.total} ok
+          </div>
+        </div>
+        {inspector.writeLog.length === 0 ? (
+          <div style={{ opacity: 0.6, fontSize: 12 }}>
+            No commands sent yet. If this stays empty after connect, the app
+            never issued a measurement command — the band has nothing to reply to.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 4 }}>
+            {inspector.writeLog.map((w, i) => (
+              <div
+                key={`${w.ts}-${i}`}
+                style={{
+                  fontSize: 10,
+                  fontFamily: "ui-monospace, monospace",
+                  borderTop: "1px dashed rgba(255,255,255,0.05)",
+                  paddingTop: 4,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ opacity: 0.75 }}>
+                    {ageLabel(now - w.ts)} · {shortUuid(w.characteristic)}
+                    {w.opcode != null
+                      ? ` · 0x${w.opcode.toString(16).padStart(2, "0")}`
+                      : ""}
+                  </span>
+                  <span style={{ color: w.success ? "#22c55e" : "#ef4444", fontWeight: 700 }}>
+                    {w.success ? "ok" : "fail"}
+                  </span>
+                </div>
+                <div style={{ opacity: 0.85, wordBreak: "break-all" }}>{w.hex || "—"}</div>
+                {w.error ? (
+                  <div style={{ color: "#fca5a5", marginTop: 2 }}>{w.error}</div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
