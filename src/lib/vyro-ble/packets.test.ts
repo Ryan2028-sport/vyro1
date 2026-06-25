@@ -5,12 +5,17 @@ import {
   hexToBytes,
 } from "./packets";
 import {
+  decodeQcBandBloodPressurePayload,
   decodeQcBandTemperatureHistory,
   decodeQcBandTodaySports,
   decodeQcBandTodaySummary,
+  encodeQcBandHrvRequest,
+  encodeQcBandStressRequest,
   encodeQcBandTemperatureHistoryRequest,
   QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL,
   QCBAND_CMD_BIG_DATA_V2,
+  QCBAND_CMD_SYNC_HRV,
+  QCBAND_CMD_SYNC_STRESS,
 } from "./qcband";
 
 describe("decodeMotionEvent — swing reference vector", () => {
@@ -114,5 +119,26 @@ describe("QCBand SDK metric decoders", () => {
     // temp1=36.5, temp2=36.6, temp3=36.7 in 0.1°C little-endian units.
     const packet = hexToBytes("BC 74 0A 00 FF FF 74 01 01 00 6D 01 6E 01 6F 01");
     expect(decodeQcBandTemperatureHistory(packet)).toBeCloseTo(36.7, 1);
+  });
+
+  it("requests HRV/stress history with the required day index byte", () => {
+    expect(Array.from(encodeQcBandStressRequest(0)).slice(0, 3)).toEqual([
+      QCBAND_CMD_SYNC_STRESS,
+      0,
+      0,
+    ]);
+    expect(Array.from(encodeQcBandHrvRequest(0)).slice(0, 3)).toEqual([
+      QCBAND_CMD_SYNC_HRV,
+      0,
+      0,
+    ]);
+  });
+
+  it("decodes direct blood-pressure measurement payloads", () => {
+    expect(decodeQcBandBloodPressurePayload(hexToBytes("48 78 50"))).toEqual({
+      hr: 72,
+      sbp: 120,
+      dbp: 80,
+    });
   });
 });
