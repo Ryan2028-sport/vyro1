@@ -470,11 +470,14 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   // Strain — composite of session events + peak jerk + HR margin over rest.
   const strain = useMemo(() => {
     if (!m.connected) return null;
-    const evPart = Math.min(40, m.eventsLastMin * 0.6);
-    const jerkPart = Math.min(30, (m.peakJerk ?? 0) / 6);
-    const hrPart = m.heartRateBpm != null && m.restingHrBpm != null
-      ? Math.min(30, Math.max(0, (m.heartRateBpm - m.restingHrBpm) / 2)) : 0;
-    return Math.round(evPart + jerkPart + hrPart);
+    const contributors: number[] = [];
+    if (m.eventsLastMin > 0) contributors.push(Math.min(100, m.eventsLastMin * 1.4));
+    if ((m.peakJerk ?? 0) > 0) contributors.push(Math.min(100, (m.peakJerk ?? 0) / 2));
+    if (m.heartRateBpm != null && m.restingHrBpm != null) {
+      contributors.push(Math.min(100, Math.max(0, (m.heartRateBpm - m.restingHrBpm) * 2.2)));
+    }
+    if (contributors.length === 0) return null;
+    return Math.round(contributors.reduce((a, b) => a + b, 0) / contributors.length);
   }, [m.connected, m.eventsLastMin, m.peakJerk, m.heartRateBpm, m.restingHrBpm]);
 
   const fmtCell = (v: number | string | null | undefined) =>
