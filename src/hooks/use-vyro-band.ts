@@ -103,7 +103,7 @@ import {
   todayActivityKeyPrefix,
 } from "@/lib/vyro-ble/qcband";
 
-import { bluetooth, isNative, type BleDiscovered } from "@/lib/despia";
+import { bluetooth, isNative, type BleDataEvent, type BleDiscovered } from "@/lib/despia";
 
 export type SessionState = "idle" | "live" | "paused";
 
@@ -141,10 +141,13 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 function payloadToBytes(value: string): Uint8Array {
-  const hex = value.replace(/^0x/, "").replace(/[^0-9a-fA-F]/g, "");
-  if (hex.length >= 2 && hex.length % 2 === 0 && hex.length >= value.trim().length - 2) {
-    return hexToBytes(hex);
-  }
+  const trimmed = value.trim();
+  const withoutPrefix = trimmed.replace(/^0x/i, "");
+  const looksHex =
+    withoutPrefix.length >= 2 &&
+    /^[0-9a-fA-F\s:,-]+$/.test(withoutPrefix) &&
+    withoutPrefix.replace(/[^0-9a-fA-F]/g, "").length % 2 === 0;
+  if (looksHex) return hexToBytes(withoutPrefix);
   try {
     const raw = atob(value);
     return Uint8Array.from(raw, (ch) => ch.charCodeAt(0));
@@ -254,6 +257,8 @@ function shouldKeepNativeBleAliveOnCleanup(): boolean {
   return isNative && typeof document !== "undefined" && document.visibilityState === "hidden";
 }
 
+const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
 /** Heart Rate Measurement (GATT 0x2A37) decoder. */
 function decodeHeartRate(bytes: Uint8Array): number | null {
   if (bytes.length < 2) return null;
@@ -268,7 +273,7 @@ function decodeHeartRate(bytes: Uint8Array): number | null {
 
 export function useVyroBand() {
   const ble = useBluetooth();
-  const { connectedId, lastData } = ble;
+  const { connectedId } = ble;
   const [events, setEvents] = useState<VyroEventEntry[]>([]);
   const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [sport, setSport] = useState<Sport>("squash");
@@ -453,24 +458,47 @@ export function useVyroBand() {
     let oneKeyTimer: number | null = null;
     let tempTimer: number | null = null;
     let historyTimer: number | null = null;
+    let writeChain = Promise.resolve();
+    let measureChain = Promise.resolve();
+    const pendingMeasures = new Set<string>();
+
+    function enqueueWrite(task: () => Promise<void>) {
+      const run = writeChain
+        .catch(() => undefined)
+        .then(async () => {
+          if (cancelled) return;
+          await task();
+          // CoreBluetooth / Nordic-UART firmwares drop bursts of back-to-back
+          // writes. Pace every command through one queue so setup, polling and
+          // measurement starts cannot overrun the watch.
+          await wait(180);
+        });
+      writeChain = run;
+      return run;
+    }
 
     async function writeQcBand(service: string, write: string, bytes: Uint8Array) {
       const hex = bytesToHex(bytes);
-      try {
-        await bluetooth.write(connectedId!, service, write, hex, true);
-      } catch {
-        await bluetooth.write(connectedId!, service, write, hex, false);
-      }
+      return enqueueWrite(async () => {
+        try {
+          await bluetooth.write(connectedId!, service, write, hex, true);
+        } catch {
+          await bluetooth.write(connectedId!, service, write, hex, false);
+        }
+      });
     }
 
     async function writeQcBandV2(bytes: Uint8Array) {
       if (!qcBandV2Service) return;
       const hex = bytesToHex(bytes);
-      try {
-        await bluetooth.write(connectedId!, qcBandV2Service.service, qcBandV2Service.write, hex, true);
-      } catch {
-        await bluetooth.write(connectedId!, qcBandV2Service.service, qcBandV2Service.write, hex, false);
-      }
+      return enqueueWrite(async () => {
+        if (!qcBandV2Service) return;
+        try {
+          await bluetooth.write(connectedId!, qcBandV2Service.service, qcBandV2Service.write, hex, true);
+        } catch {
+          await bluetooth.write(connectedId!, qcBandV2Service.service, qcBandV2Service.write, hex, false);
+        }
+      });
     }
 
     async function startQcBandLiveHr(service: string, notify: string, write: string) {
@@ -576,27 +604,39 @@ export function useVyroBand() {
       window.setTimeout(pollHistory, 4_000);
       historyTimer = window.setInterval(pollHistory, 60_000);
 
+      const enqueueMeasure = (label: string, subType: number, durationMs: number) => {
+        const key = `${label}:0x${subType.toString(16)}`;
+        if (pendingMeasures.has(key)) return;
+        pendingMeasures.add(key);
+        measureChain = measureChain
+          .catch(() => undefined)
+          .then(async () => {
+            try {
+              if (cancelled) return;
+              console.log(`[qcband] ${label} measure start 0x${subType.toString(16)}`);
+              await writeQcBand(service, write, encodeQcBandMeasureStart(subType));
+              await wait(durationMs);
+              if (cancelled) return;
+              await writeQcBand(service, write, encodeQcBandMeasureStop(subType));
+              await wait(1500);
+            } finally {
+              pendingMeasures.delete(key);
+            }
+          });
+      };
+
       const runMeasureCycle = (label: string, subTypes: readonly number[], durationMs: number) => {
         subTypes.forEach((subType, index) => {
-          // These watches are sensitive to overlapping 0x69/0x6A measurement
-          // cycles. If we start several subtypes inside one optical-sensor
-          // window, the firmware often streams only HR and drops the others.
-          // Stagger each subtype by its own full measurement window.
-          const delay = index * (durationMs + 1500);
           window.setTimeout(() => {
-            console.log(`[qcband] ${label} measure start 0x${subType.toString(16)}`);
-            void writeQcBand(service, write, encodeQcBandMeasureStart(subType)).catch(() => undefined);
-          }, delay);
-          window.setTimeout(() => {
-            void writeQcBand(service, write, encodeQcBandMeasureStop(subType)).catch(() => undefined);
-          }, durationMs + delay);
+            enqueueMeasure(label, subType, durationMs);
+          }, index * 250);
         });
       };
 
       const runBloodPressureCycle = () => {
         runMeasureCycle("blood-pressure", QCBAND_MEASURE_BP_TYPES, 45_000);
       };
-      window.setTimeout(runBloodPressureCycle, 8_000);
+      window.setTimeout(runBloodPressureCycle, 320_000);
       const bpTimer = window.setInterval(runBloodPressureCycle, 5 * 60_000);
 
       // SpO₂ standalone cycle — kept as a fallback for firmwares that don't
@@ -604,7 +644,7 @@ export function useVyroBand() {
       const runSpo2Cycle = () => {
         runMeasureCycle("spo2", QCBAND_MEASURE_SPO2_TYPES, 40_000);
       };
-      window.setTimeout(runSpo2Cycle, 3_000);
+      window.setTimeout(runSpo2Cycle, 62_000);
       const spo2Timer = window.setInterval(runSpo2Cycle, 5 * 60_000);
 
       // Skin temperature — sub-type 0x09. Fire ~3s after connect so the user
@@ -612,7 +652,7 @@ export function useVyroBand() {
       const runTempCycle = () => {
         runMeasureCycle("temp", QCBAND_MEASURE_TEMP_TYPES, 45_000);
       };
-      window.setTimeout(runTempCycle, 6_000);
+      window.setTimeout(runTempCycle, 125_000);
       tempTimer = window.setInterval(runTempCycle, 5 * 60_000);
 
       // One-Key Measure — sub-type 0x05. Returns HR + HRV + Stress + SpO₂ +
@@ -622,7 +662,7 @@ export function useVyroBand() {
       const runOneKey = () => {
         runMeasureCycle("one-key", QCBAND_MEASURE_ONE_KEY_TYPES, 50_000);
       };
-      window.setTimeout(runOneKey, 10_000);
+      window.setTimeout(runOneKey, 3_000);
       oneKeyTimer = window.setInterval(runOneKey, 3 * 60_000);
 
       // Standalone HRV cycle (sub-type 0x0e) — fallback for firmwares that
@@ -631,14 +671,14 @@ export function useVyroBand() {
       const runHrvCycle = () => {
         runMeasureCycle("hrv", QCBAND_MEASURE_HRV_TYPES, 60_000);
       };
-      window.setTimeout(runHrvCycle, 20_000);
+      window.setTimeout(runHrvCycle, 255_000);
       const hrvTimer = window.setInterval(runHrvCycle, 10 * 60_000);
 
       // Standalone Stress cycle (sub-type 0x0d) — fallback. Fire ~30s in.
       const runStressCycle = () => {
         runMeasureCycle("stress", QCBAND_MEASURE_STRESS_TYPES, 60_000);
       };
-      window.setTimeout(runStressCycle, 30_000);
+      window.setTimeout(runStressCycle, 190_000);
       const stressTimer = window.setInterval(runStressCycle, 10 * 60_000);
 
       // Stash extra timers we created locally onto the outer refs via closure.
@@ -752,13 +792,17 @@ export function useVyroBand() {
   }, [connectedId]);
 
 
-  // Decode incoming notifications. Routes by characteristic UUID.
+  // Decode incoming notifications directly from the BLE event bus. Do not
+  // depend on `useBluetooth().lastData`: React state batching can coalesce a
+  // burst of HR + metric packets down to only the last packet, which makes the
+  // Debug tab show traffic while tiles remain grey.
   useEffect(() => {
-    if (!lastData) return;
-    const cuuid = lastData.characteristic.toLowerCase();
+    const handleBleData = (data: BleDataEvent) => {
+    if (connectedId && data.id && data.id !== connectedId) return;
+    const cuuid = data.characteristic.toLowerCase();
     if (uuidMatches(cuuid, VYRO_EVENT_CHAR_UUID)) {
       try {
-        const ev = decodeMotionEventFromString(lastData.value);
+        const ev = decodeMotionEventFromString(data.value);
         setEvents((prev) => {
           const next = [...prev, { ts: Date.now(), event: ev }];
           return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
@@ -769,7 +813,7 @@ export function useVyroBand() {
       return;
     }
     if (uuidMatches(cuuid, HR_MEAS_CHAR)) {
-      const bpm = decodeHeartRate(payloadToBytes(lastData.value));
+      const bpm = decodeHeartRate(payloadToBytes(data.value));
       if (bpm != null && bpm > 0 && bpm < 250) {
         setHeartRateBpm(bpm);
         setHeartRateAt(Date.now());
@@ -777,7 +821,7 @@ export function useVyroBand() {
       return;
     }
     if (uuidMatches(cuuid, QCBAND_NOTIFY_CHAR_UUID)) {
-      const bytes = payloadToBytes(lastData.value);
+      const bytes = payloadToBytes(data.value);
       const op = bytes[0];
       console.log("[qcband] notify op=0x" + op.toString(16).padStart(2, "0"), bytesToHex(bytes));
       if (op === QCBAND_CMD_REALTIME_HR) {
@@ -957,7 +1001,7 @@ export function useVyroBand() {
       return;
     }
     if (uuidMatches(cuuid, QCBAND_NOTIFY_V2_CHAR_UUID)) {
-      const chunk = payloadToBytes(lastData.value);
+      const chunk = payloadToBytes(data.value);
       if (chunk.length === 0) return;
       let bytes = chunk;
       if (chunk[0] === QCBAND_CMD_BIG_DATA_V2 && chunk.length >= 4) {
@@ -986,14 +1030,17 @@ export function useVyroBand() {
       return;
     }
     if (uuidMatches(cuuid, BAT_LVL_CHAR)) {
-      const bytes = payloadToBytes(lastData.value);
+      const bytes = payloadToBytes(data.value);
       if (bytes.length >= 1) {
         setBatteryPct(bytes[0]);
         markSignal("batteryAt");
       }
       return;
     }
-  }, [lastData]);
+    };
+    const off = bluetooth.on("data", handleBleData);
+    return off;
+  }, [connectedId]);
 
   const counts = useMemo(() => {
     const c = { swing: 0, rapid_start: 0, burst: 0, direction_change: 0 };
