@@ -27,6 +27,16 @@ export type OpStat = {
   characteristic: string;
 };
 
+export type WriteLogEntry = {
+  ts: number;
+  service: string;
+  characteristic: string;
+  hex: string;
+  opcode: number | null;
+  success: boolean;
+  error: string | null;
+};
+
 export type BleInspectorState = {
   perChar: Record<string, CharStat>;
   perOpcode: Record<string, OpStat>;
@@ -47,9 +57,23 @@ export type BleInspectorState = {
     lastCharacteristic: string | null;
     lastError: string | null;
   };
+  writeLog: WriteLogEntry[];
+  // Decoder outcome stats (frames we recognise vs. silently ignore).
+  decoderKnownCount: number;
+  decoderUnknownCount: number;
+  unknownOpcodes: Record<string, number>;
 };
 
-const MAX_RECENT = 40;
+const MAX_RECENT = 60;
+const MAX_WRITE_LOG = 25;
+
+// Opcodes the QCBand decoder pipeline currently understands. Anything outside
+// this set lands in "unknown" and is what to investigate first when a tile is
+// grey but notifications are flowing.
+const KNOWN_OPCODES = new Set<number>([
+  0x03, 0x07, 0x09, 0x12, 0x1e, 0x20, 0x32, 0x37, 0x39,
+  0x43, 0x48, 0x69, 0x6a, 0x73, 0x87, 0x89, 0xbc,
+]);
 
 const emptyWrites = () => ({
   total: 0,
@@ -67,6 +91,10 @@ const emptyState = (): BleInspectorState => ({
   discovered: null,
   totalNotifications: 0,
   writes: emptyWrites(),
+  writeLog: [],
+  decoderKnownCount: 0,
+  decoderUnknownCount: 0,
+  unknownOpcodes: {},
 });
 
 let singleton: {
@@ -146,6 +174,11 @@ function ensureInitialized() {
     ].slice(0, MAX_RECENT);
     const opcodeKey = opcode == null ? null : `0x${opcode.toString(16).padStart(2, "0")}`;
     const prevOp = opcodeKey ? s.state.perOpcode[opcodeKey] : undefined;
+    const isKnown = opcode != null && KNOWN_OPCODES.has(opcode);
+    const unknownOpcodes =
+      opcode != null && !isKnown && opcodeKey
+        ? { ...s.state.unknownOpcodes, [opcodeKey]: (s.state.unknownOpcodes[opcodeKey] ?? 0) + 1 }
+        : s.state.unknownOpcodes;
     s.state = {
       ...s.state,
       perChar: { ...s.state.perChar, [key]: stat },
@@ -164,6 +197,9 @@ function ensureInitialized() {
         : s.state.perOpcode,
       recent,
       totalNotifications: s.state.totalNotifications + 1,
+      decoderKnownCount: s.state.decoderKnownCount + (isKnown ? 1 : 0),
+      decoderUnknownCount: s.state.decoderUnknownCount + (!isKnown && opcode != null ? 1 : 0),
+      unknownOpcodes,
     };
     notify(s);
   });
@@ -175,6 +211,19 @@ function ensureInitialized() {
 
   bluetooth.on("writeComplete", (e) => {
     const now = Date.now();
+    const payload = (e as { payload?: string }).payload ?? "";
+    const bytes = payload ? toBytes(payload) : new Uint8Array(0);
+    const opcode = bytes.length > 0 ? bytes[0] : null;
+    const hex = bytesToHex(bytes);
+    const entry: WriteLogEntry = {
+      ts: now,
+      service: e.service,
+      characteristic: e.characteristic,
+      hex,
+      opcode,
+      success: e.success,
+      error: e.error || null,
+    };
     s.state = {
       ...s.state,
       writes: {
@@ -185,6 +234,7 @@ function ensureInitialized() {
         lastCharacteristic: e.characteristic,
         lastError: e.error || null,
       },
+      writeLog: [entry, ...s.state.writeLog].slice(0, MAX_WRITE_LOG),
     };
     notify(s);
   });
