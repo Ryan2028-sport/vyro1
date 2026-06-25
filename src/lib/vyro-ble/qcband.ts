@@ -446,8 +446,8 @@ export function todayActivityKeyPrefix(now = new Date()): string {
 export function decodeQcBandHrvHistory(bytes: Uint8Array): number | null {
   if (bytes.length < 4 || bytes[0] !== QCBAND_CMD_SYNC_HRV) return null;
   const packetNr = bytes[1] & 0xff;
-  if (packetNr === 0xff || packetNr === 0) return null;
-  const start = packetNr === 1 ? 3 : 2;
+  if (packetNr === 0xff) return null;
+  const start = packetNr === 0 || packetNr === 1 ? 3 : 2;
   let latest: number | null = null;
   for (let i = start; i < bytes.length - 1; i++) {
     const v = bytes[i] & 0xff;
@@ -461,8 +461,8 @@ export function decodeQcBandHrvHistory(bytes: Uint8Array): number | null {
 export function decodeQcBandStressHistory(bytes: Uint8Array): number | null {
   if (bytes.length < 4 || bytes[0] !== QCBAND_CMD_SYNC_STRESS) return null;
   const packetNr = bytes[1] & 0xff;
-  if (packetNr === 0xff || packetNr === 0) return null;
-  const start = packetNr === 1 ? 3 : 2;
+  if (packetNr === 0xff) return null;
+  const start = packetNr === 0 || packetNr === 1 ? 3 : 2;
   let latest: number | null = null;
   for (let i = start; i < bytes.length - 1; i++) {
     const v = bytes[i] & 0xff;
@@ -616,6 +616,7 @@ export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame 
   if (bytes[0] !== QCBAND_CMD_START_MEASURE && bytes[0] !== QCBAND_CMD_STOP_MEASURE) return null;
   const newSdkNoErrorByte = ([
     QCBAND_MEASURE_HR_SDK,
+    QCBAND_MEASURE_SPO2_SDK,
     QCBAND_MEASURE_ONE_KEY_SDK,
     QCBAND_MEASURE_STRESS_SDK,
     QCBAND_MEASURE_HRV_SDK,
@@ -624,6 +625,30 @@ export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame 
     QCBAND_MEASURE_ONE_KEY_HR,
   ] as readonly number[]).includes(bytes[1]);
   if (newSdkNoErrorByte && bytes[2] !== 0) {
+    return {
+      subType: bytes[1],
+      errorCode: 0,
+      value: bytes[2],
+      data: bytes.slice(2),
+    };
+  }
+  const likelyLegacyNoErrorByte = (() => {
+    const sub = bytes[1];
+    const v = bytes[2] & 0xff;
+    if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(sub)) return v > 30 && v < 250;
+    if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(sub)) return v >= 70 && v <= 100;
+    if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(sub)) return v >= 5 && v < 250;
+    if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(sub)) return v > 0 && v <= 100;
+    if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(sub)) return decodeQcBandTempPayload(bytes.slice(2)) != null;
+    if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(sub)) {
+      return bytes.length >= 5 && v > 30 && v < 220 && bytes[3] > 60 && bytes[4] > 30;
+    }
+    if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(sub)) {
+      return decodeQcBandOneKeyPayload(bytes.slice(2)) != null;
+    }
+    return false;
+  })();
+  if (likelyLegacyNoErrorByte) {
     return {
       subType: bytes[1],
       errorCode: 0,

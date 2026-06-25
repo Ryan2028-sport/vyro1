@@ -454,9 +454,21 @@ export const bluetooth = {
       emit("writeComplete", { id, service, characteristic, success: true });
       return;
     }
-    return run(
-      `bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`,
-    );
+    try {
+      await run(
+        `bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`,
+      );
+      emit("writeComplete", { id, service, characteristic, success: true });
+    } catch (err) {
+      emit("writeComplete", {
+        id,
+        service,
+        characteristic,
+        success: false,
+        error: (err as Error)?.message || String(err),
+      });
+      throw err;
+    }
   },
   subscribe: async (id: string, service: string, characteristic: string, server?: string) => {
     if (await ensureCapacitorBle()) {
