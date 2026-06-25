@@ -352,7 +352,7 @@ export function computeReadiness(i: ReadinessInputs): { score: number | null; pa
     i.recoveryScore != null,
     i.peakJerk != null && i.peakJerk > 0,
   ].filter(Boolean).length;
-  if (Object.keys(w).length < 3 || independentSignals < 2 || total === 0) return { score: null, parts };
+  if (Object.keys(w).length < 4 || independentSignals < 3 || total === 0) return { score: null, parts };
   let sum = 0;
   for (const k in w) sum += parts[k] * w[k];
   return { score: Math.round((sum / total) * 100), parts };
