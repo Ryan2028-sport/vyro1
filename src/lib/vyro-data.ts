@@ -1,11 +1,7 @@
-export const athlete = {
-  name: "Ryan Chen",
-  first: "Ryan",
-  sport: "Squash",
-  level: "D1 / National",
-  avatar: "RC",
-  handle: "@ryanchen",
-};
+import type { ViewId } from "@/components/vyro/Layout";
+
+export type { ViewId };
+export { viewTitles } from "@/components/vyro/Layout";
 
 export type HeroMetric = {
   id: string;
@@ -35,9 +31,9 @@ export const vitals: [string, string, string, string][] = [
 ];
 
 export const trendMetrics: [string, string, string, string, string][] = [
-  ["Agility Score", "84", "/100", "+10.5%", "Agility score is up 10.5% over the last 12 sessions. Cleaner deceleration back to the T is the biggest driver."],
-  ["Resting HR", "48", "bpm", "-5 bpm", "Resting heart rate has dropped by 5 bpm versus the prior month, suggesting improved aerobic fitness."],
-  ["T-Control", "82", "%", "+20.6%", "You are winning more middle-court positioning after deep back-right retrievals."],
+  ["Agility Score", "84", "/100", "+10.5%", "Agility score is up 10.5% over the last 12 sessions."],
+  ["Resting HR", "48", "bpm", "-5 bpm", "Resting heart rate has dropped by 5 bpm versus the prior month."],
+  ["T-Control", "82", "%", "+20.6%", "You are winning more middle-court positioning after deep retrievals."],
   ["Swing Force Consistency", "88", "%", "+8.6%", "Swing force consistency is improving late in rallies."],
   ["Sleep Score", "87", "/100", "+7 pts", "The next unlock is reducing wake events after high-load match days."],
 ];
@@ -54,37 +50,12 @@ export type SportProfile = {
 };
 
 export const sportProfiles: Record<string, SportProfile> = {
-  Squash: { heatmap: true, motion: "Racket swing path", db: "Court coverage + player match database", tendency: ["Back left: straight drive 72% on critical points", "Back right: straight drive 57% on critical points", "Left middle volley: volley kill 48% under pressure", "Right front: counter drop 58% under pressure"] },
+  Squash: { heatmap: true, motion: "Racket swing path", db: "Court coverage + player match database", tendency: ["Back left: straight drive 72%", "Back right: straight drive 57%", "Left middle volley: volley kill 48%", "Right front: counter drop 58%"] },
   Tennis: { heatmap: true, motion: "Tennis stroke path", db: "Court coverage + rally tendency database", tendency: ["Wide forehand: cross-court 54%", "Backhand corner: slice reset 38%", "Serve + one: forehand inside-out 41%", "Break point: first-serve body 47%"] },
   Golf: { heatmap: false, motion: "Golf club path", db: "Course tendency database", tendency: ["Approach over water: tempo speeds up 8%", "Holes 15-18: low-point control drifts", "Par save: grip tension spike predicts thin contact"] },
-  Baseball: { heatmap: false, motion: "Bat path + throwing arm slot", db: "Pitch, batter, and throw tendency database", tendency: ["0 outs: fastball up/in 48%", "1 out: changeup usage rises to 31%", "2 outs late: slider away jumps to 44%", "RISP: fastball rate drops 18%"] },
+  Baseball: { heatmap: false, motion: "Bat path + throwing arm slot", db: "Pitch and batter tendency database", tendency: ["0 outs: fastball up/in 48%", "1 out: changeup usage rises to 31%", "2 outs late: slider away 44%", "RISP: fastball rate drops 18%"] },
   Football: { heatmap: false, motion: "QB throw shape", db: "Route and coverage tendency database", tendency: ["Third down: quick out rises 38%", "Red zone: slant/flat combination 44%", "Late game: release speed drops under pressure"] },
   Basketball: { heatmap: false, motion: "Jump shot + change-of-direction", db: "Shot and substitution tendency database", tendency: ["Left wing: catch-shoot 42%", "Late clock: high ball screen 51%", "Fatigue: closeout speed decays 14%"] },
   Hockey: { heatmap: false, motion: "Shot release + goalie reaction", db: "Shot location and goalie tendency database", tendency: ["Power play: one-timer left circle 46%", "Breakaway: glove-side high 34%", "Late period: rebound control drops 11%"] },
   Soccer: { heatmap: false, motion: "Kick mechanics + goalie reaction", db: "Shot and keeper tendency database", tendency: ["Right channel: far-post shot 39%", "Penalty pressure: keeper dives left 58%", "Late game: sprint recovery drops 13%"] },
-};
-
-export type ViewId =
-  | "home"
-  | "trends"
-  | "session"
-  | "sport"
-  | "recovery"
-  | "sleep"
-  | "coach"
-  | "social"
-  | "video"
-  | "diet";
-
-export const viewTitles: Record<ViewId, string> = {
-  home: "Home",
-  trends: "Trends",
-  session: "Session",
-  sport: "Sport",
-  recovery: "Recovery",
-  sleep: "Sleep",
-  coach: "Coach",
-  social: "Social",
-  video: "AI Video Analyzer",
-  diet: "Diet Coach",
 };

@@ -10,14 +10,53 @@ import {
   MessageCircle,
   Moon,
   Settings,
-  Share2,
   TrendingUp,
   Trophy,
   Video,
-  Watch,
 } from "lucide-react";
-import type { ViewId } from "@/lib/vyro-data";
-import { viewTitles } from "@/lib/vyro-data";
+
+export type ViewId =
+  | "home"
+  | "trends"
+  | "session"
+  | "sport"
+  | "recovery"
+  | "sleep"
+  | "coach"
+  | "social"
+  | "video"
+  | "diet"
+  | "profile"
+  | "debug"
+  | "history"
+  | "athlete"
+  | "court"
+  | "swing"
+  | "tendency"
+  | "more"
+  | "band";
+
+export const viewTitles: Record<ViewId, string> = {
+  home: "Home",
+  trends: "Trends",
+  session: "Session",
+  sport: "Sport",
+  recovery: "Recovery",
+  sleep: "Sleep",
+  coach: "Coach",
+  social: "Social",
+  video: "AI Video",
+  diet: "Diet Coach",
+  profile: "Profile",
+  debug: "Debug",
+  history: "History",
+  athlete: "Athlete",
+  court: "Court DB",
+  swing: "Swing",
+  tendency: "Tendencies",
+  more: "More",
+  band: "Band",
+};
 
 const navItems: { id: ViewId; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
@@ -99,7 +138,10 @@ export function Layout({
               </div>
               <span className="text-sm font-semibold text-gray-900 lg:hidden">{viewTitles[activeView]}</span>
               <div className="flex items-center gap-2">
-                <button className="grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-gray-50 transition-colors hover:bg-gray-100">
+                <button
+                  onClick={() => setView("profile")}
+                  className="grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-gray-50 transition-colors hover:bg-gray-100"
+                >
                   <Settings className="h-4 w-4 text-gray-600" />
                 </button>
                 <button className="grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-gray-50 transition-colors hover:bg-gray-100">
@@ -144,15 +186,6 @@ export function Layout({
               );
             })}
           </nav>
-
-          <a
-            href="/bluetooth"
-            className="fixed bottom-24 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-white px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.18em] shadow-lg shadow-black/10 border border-gray-200 transition-transform active:scale-95 lg:bottom-6"
-          >
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_theme(colors.emerald.400)]" />
-            <Watch className="h-3.5 w-3.5" />
-            Watch Test
-          </a>
         </main>
       </div>
     </div>

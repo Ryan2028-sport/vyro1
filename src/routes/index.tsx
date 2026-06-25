@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
-import { Layout } from "@/components/vyro/Layout";
+import { Layout, type ViewId } from "@/components/vyro/Layout";
+import { VyroBandProvider } from "@/components/vyro/VyroBandProvider";
 import { HomeView } from "@/components/vyro/HomeView";
 import { TrendsView } from "@/components/vyro/TrendsView";
 import { SessionView } from "@/components/vyro/SessionView";
@@ -10,13 +11,21 @@ import { CoachView } from "@/components/vyro/CoachView";
 import { SocialView } from "@/components/vyro/SocialView";
 import { VideoView } from "@/components/vyro/VideoView";
 import { DietView } from "@/components/vyro/DietView";
-import type { ViewId } from "@/lib/vyro-data";
+import { SleepView } from "@/components/vyro/SleepView";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   component: App,
-  // TODO(temp): Onboarding redirect is disabled during development.
-  // Re-enable the beforeLoad guard below when onboarding should be enforced.
-  // beforeLoad: () => { ... redirect to /onboarding if not completed ... }
+  ssr: false,
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      const skipFlag =
+        typeof sessionStorage !== "undefined" &&
+        sessionStorage.getItem("vyro_skip_onboarding") === "true";
+      if (!skipFlag) throw redirect({ to: "/onboarding" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "VYRO · Athlete Intelligence for Racket Sports" },
@@ -51,34 +60,37 @@ function App() {
   };
 
   return (
-    <Layout activeView={activeView} setView={setActiveView}>
-      {activeView === "home" && <HomeView jump={jump} />}
-      {activeView === "trends" && <TrendsView />}
-      {activeView === "session" && <SessionView />}
-      {activeView === "sport" && (
-        <SportView
-          selectedSport={selectedSport}
-          setSelectedSport={setSelectedSport}
-          sportTab={sportTab}
-          setSportTab={setSportTab}
-        />
-      )}
-      {activeView === "recovery" && (
-        <RecoveryView
-          recoveryTab={recoveryTab}
-          setRecoveryTab={setRecoveryTab}
-          sleepTab={sleepTab}
-          setSleepTab={setSleepTab}
-          section={recoverySection}
-          setSection={setRecoverySection}
-        />
-      )}
-      {activeView === "coach" && <CoachView />}
-      {activeView === "social" && (
-        <SocialView socialTab={socialTab} setSocialTab={setSocialTab} />
-      )}
-      {activeView === "video" && <VideoView />}
-      {activeView === "diet" && <DietView />}
-    </Layout>
+    <VyroBandProvider>
+      <Layout activeView={activeView} setView={setActiveView}>
+        {activeView === "home" && <HomeView jump={jump} />}
+        {activeView === "trends" && <TrendsView />}
+        {activeView === "session" && <SessionView />}
+        {activeView === "sport" && (
+          <SportView
+            selectedSport={selectedSport}
+            setSelectedSport={setSelectedSport}
+            sportTab={sportTab}
+            setSportTab={setSportTab}
+          />
+        )}
+        {activeView === "recovery" && (
+          <RecoveryView
+            recoveryTab={recoveryTab}
+            setRecoveryTab={setRecoveryTab}
+            sleepTab={sleepTab}
+            setSleepTab={setSleepTab}
+            section={recoverySection}
+            setSection={setRecoverySection}
+          />
+        )}
+        {activeView === "sleep" && <SleepView sleepTab={sleepTab} setSleepTab={setSleepTab} />}
+        {activeView === "coach" && <CoachView />}
+        {activeView === "social" && (
+          <SocialView socialTab={socialTab} setSocialTab={setSocialTab} />
+        )}
+        {activeView === "video" && <VideoView />}
+        {activeView === "diet" && <DietView />}
+      </Layout>
+    </VyroBandProvider>
   );
 }

@@ -10,7 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
-import { Route as BluetoothRouteImport } from './routes/bluetooth'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicAnalyzeClipRouteImport } from './routes/api/public/analyze-clip'
 
@@ -19,9 +20,14 @@ const OnboardingRoute = OnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BluetoothRoute = BluetoothRouteImport.update({
-  id: '/bluetooth',
-  path: '/bluetooth',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SplatRoute = SplatRouteImport.update({
+  id: '/$',
+  path: '/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -37,39 +43,44 @@ const ApiPublicAnalyzeClipRoute = ApiPublicAnalyzeClipRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/bluetooth': typeof BluetoothRoute
+  '/$': typeof SplatRoute
+  '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/bluetooth': typeof BluetoothRoute
+  '/$': typeof SplatRoute
+  '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/bluetooth': typeof BluetoothRoute
+  '/$': typeof SplatRoute
+  '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
   '/api/public/analyze-clip': typeof ApiPublicAnalyzeClipRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bluetooth' | '/onboarding' | '/api/public/analyze-clip'
+  fullPaths: '/' | '/$' | '/auth' | '/onboarding' | '/api/public/analyze-clip'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bluetooth' | '/onboarding' | '/api/public/analyze-clip'
+  to: '/' | '/$' | '/auth' | '/onboarding' | '/api/public/analyze-clip'
   id:
     | '__root__'
     | '/'
-    | '/bluetooth'
+    | '/$'
+    | '/auth'
     | '/onboarding'
     | '/api/public/analyze-clip'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  BluetoothRoute: typeof BluetoothRoute
+  SplatRoute: typeof SplatRoute
+  AuthRoute: typeof AuthRoute
   OnboardingRoute: typeof OnboardingRoute
   ApiPublicAnalyzeClipRoute: typeof ApiPublicAnalyzeClipRoute
 }
@@ -83,11 +94,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/bluetooth': {
-      id: '/bluetooth'
-      path: '/bluetooth'
-      fullPath: '/bluetooth'
-      preLoaderRoute: typeof BluetoothRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$': {
+      id: '/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -109,20 +127,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  BluetoothRoute: BluetoothRoute,
+  SplatRoute: SplatRoute,
+  AuthRoute: AuthRoute,
   OnboardingRoute: OnboardingRoute,
   ApiPublicAnalyzeClipRoute: ApiPublicAnalyzeClipRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

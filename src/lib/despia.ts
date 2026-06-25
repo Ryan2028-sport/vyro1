@@ -3,10 +3,44 @@
 // so calls become safe no-ops in regular browsers.
 
 import despia from "despia-native";
+import {
+  BleClient,
+  dataViewToHexString,
+  hexStringToDataView,
+  type ScanResult,
+} from "@capacitor-community/bluetooth-le";
 
-export const isNative =
-  typeof navigator !== "undefined" &&
-  /despia/i.test(navigator.userAgent || "");
+// Detect the native iOS wrapper. Despia injects "despia" into the UA, but
+// the Capacitor TestFlight build does NOT — it sets window.Capacitor and the
+// UA reports plain Mobile Safari. Without this, the BLE layer falls back to
+// Web Bluetooth (which iOS WKWebView does not implement) and throws
+// "Web Bluetooth is not available". We treat ANY iOS app-context webview as
+// native: Despia UA, Capacitor bridge, or the standalone PWA install.
+function detectNative(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const w =
+    typeof window !== "undefined"
+      ? (window as unknown as {
+          Capacitor?: unknown;
+          webkit?: { messageHandlers?: unknown };
+          despia?: unknown;
+        })
+      : undefined;
+  const ua = navigator.userAgent || "";
+  if (/despia/i.test(ua)) return true;
+  if (w?.Capacitor) return true;
+  if (w?.despia) return true;
+  // WKWebView on iOS (TestFlight wrappers) exposes webkit.messageHandlers
+  // and reports as iPhone/iPad with no Safari token in the UA.
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (ua.includes("Mac") &&
+      (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! > 1);
+  const inAppWebView = !!w?.webkit?.messageHandlers || (isIOS && !/Safari\//.test(ua));
+  return isIOS && inAppWebView;
+}
+
+export const isNative = detectNative();
 
 /** Fire-and-forget a despia:// command. No-op outside the native runtime. */
 export async function run(command: string): Promise<void> {
@@ -55,12 +89,9 @@ export const biometrics = {
 };
 
 export const share = (message: string, url: string) =>
-  run(
-    `shareapp://message?=${encodeURIComponent(message)}&url=${encodeURIComponent(url)}`,
-  );
+  run(`shareapp://message?=${encodeURIComponent(message)}&url=${encodeURIComponent(url)}`);
 
-export const saveImage = (url: string) =>
-  run(`savethisimage://?url=${encodeURIComponent(url)}`);
+export const saveImage = (url: string) => run(`savethisimage://?url=${encodeURIComponent(url)}`);
 
 export const statusBar = {
   color: (hex: string) => run(`statusbarcolor://{${hex}}`),
@@ -70,22 +101,18 @@ export const statusBar = {
 };
 
 export const appInfo = () =>
-  runWatch<{ versionNumber: string; bundleNumber: string }>(
-    "getappversion://",
-    ["versionNumber", "bundleNumber"],
-  );
+  runWatch<{ versionNumber: string; bundleNumber: string }>("getappversion://", [
+    "versionNumber",
+    "bundleNumber",
+  ]);
 
-export const deviceUuid = () =>
-  runWatch<{ uuid: string }>("get-uuid://", ["uuid"]);
+export const deviceUuid = () => runWatch<{ uuid: string }>("get-uuid://", ["uuid"]);
 
 export const push = {
   register: () => run("registerpush://"),
   playerId: () =>
-    runWatch<{ onesignalPlayerId: string }>("getonesignalplayerid://", [
-      "onesignalPlayerId",
-    ]),
-  localMessage: (msg: string) =>
-    run(`sendlocalpushmsg://${encodeURIComponent(msg)}`),
+    runWatch<{ onesignalPlayerId: string }>("getonesignalplayerid://", ["onesignalPlayerId"]),
+  localMessage: (msg: string) => run(`sendlocalpushmsg://${encodeURIComponent(msg)}`),
 };
 
 export const location = {
@@ -178,6 +205,92 @@ function emit<K extends keyof BleEventMap>(key: K, payload: BleEventMap[K]) {
   }
 }
 
+let capacitorBleReady = false;
+
+const KNOWN_WATCH_SERVICES = [
+  "6e40fff0-b5a3-f393-e0a9-e50e24dcca9e",
+  "de5bf728-d711-4e47-af26-65e3012a5dc7",
+  "0000fea1-0000-1000-8000-00805f9b34fb",
+  "0000fea2-0000-1000-8000-00805f9b34fb",
+  "0000180d-0000-1000-8000-00805f9b34fb",
+  "0000180f-0000-1000-8000-00805f9b34fb",
+  "0000180a-0000-1000-8000-00805f9b34fb",
+];
+
+async function ensureCapacitorBle(): Promise<boolean> {
+  const w =
+    typeof window !== "undefined"
+      ? (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+      : undefined;
+  if (!w?.Capacitor) return false;
+  // If Capacitor is only the web shim, @capacitor-community/bluetooth-le
+  // delegates scans to navigator.bluetooth.requestLEScan, which iOS/WKWebView
+  // does not support. Only use BleClient when the real native runtime is
+  // present; otherwise fall back to Despia's native bluetooth:// bridge or the
+  // browser Web Bluetooth path handled by useBluetooth.
+  if (!w.Capacitor.isNativePlatform?.()) return false;
+  try {
+    if (!capacitorBleReady) {
+      await BleClient.initialize();
+      capacitorBleReady = true;
+    }
+    const enabled = await BleClient.isEnabled();
+    emit("state", { state: enabled ? "on" : "off" });
+    return true;
+  } catch (err) {
+    const message = (err as Error)?.message || String(err);
+    const denied = /permission|unauthori[sz]ed|denied/i.test(message);
+    emit("state", { state: denied ? "unauthorized" : "unsupported" });
+    emit("event", { type: "capacitor_ble_error", message });
+    console.warn("[capacitor-ble] init/state failed", err);
+    return true;
+  }
+}
+
+function mapCapacitorScanResult(result: ScanResult): BleDevice {
+  return {
+    id: result.device.deviceId,
+    name: result.localName || result.device.name || "Unknown device",
+    rssi: result.rssi,
+    services: result.uuids || result.device.uuids,
+  };
+}
+
+function mapCapacitorDevice(device: {
+  deviceId: string;
+  name?: string;
+  uuids?: string[];
+}): BleDevice {
+  return {
+    id: device.deviceId,
+    name: device.name || "Unknown device",
+    services: device.uuids,
+  };
+}
+
+async function emitConnectedCapacitorDevices(services: string[] = []): Promise<BleDevice[]> {
+  const serviceList = services.length ? services : KNOWN_WATCH_SERVICES;
+  const seen = new Map<string, BleDevice>();
+  for (const service of serviceList) {
+    try {
+      const devices = await BleClient.getConnectedDevices([service]);
+      for (const device of devices) {
+        const mapped = mapCapacitorDevice(device);
+        const existing = seen.get(mapped.id);
+        seen.set(mapped.id, {
+          ...existing,
+          ...mapped,
+          services: Array.from(new Set([...(existing?.services || []), ...(mapped.services || []), service])),
+        });
+      }
+    } catch (err) {
+      console.warn("[capacitor-ble] getConnectedDevices failed", service, err);
+    }
+  }
+  for (const device of seen.values()) emit("device", device);
+  return [...seen.values()];
+}
+
 // Wire up the global callbacks Despia fires from native.
 // These MUST be defined before any despia() BLE command runs — the native
 // side does not buffer foreground events, so late handlers miss events.
@@ -190,24 +303,95 @@ if (typeof window !== "undefined") {
   w.onBleScanEnd = (e: { count?: number } = {}) => emit("scanEnd", e);
   w.onBleDiscovered = (t: BleDiscovered) => emit("discovered", t);
   w.onBleWriteComplete = (e: BleWriteComplete) => emit("writeComplete", e);
-  w.onBleEvent = (e: { type: string; [k: string]: unknown }) =>
-    emit("event", e);
+  w.onBleEvent = (e: { type: string; [k: string]: unknown }) => emit("event", e);
 }
 
 export const bluetooth = {
   /** Start scanning. `services` is an optional UUID allow-list. */
-  scan: (services: string[] = [], durationMs = 10000) => {
+  scan: async (services: string[] = [], durationMs = 10000) => {
+    if (await ensureCapacitorBle()) {
+      await emitConnectedCapacitorDevices(services);
+      // IMPORTANT: on iOS Core Bluetooth, passing `services: []` filters to
+      // an empty allow-list and returns ZERO devices. Only include the
+      // `services` key when the caller actually supplied UUIDs.
+      const scanOpts: Parameters<typeof BleClient.requestLEScan>[0] = {
+        allowDuplicates: false,
+      };
+      if (services.length) {
+        scanOpts.services = services;
+        scanOpts.optionalServices = services;
+      }
+      console.log("[capacitor-ble] requestLEScan", scanOpts);
+      try {
+        await BleClient.requestLEScan(scanOpts, (result) =>
+          emit("device", mapCapacitorScanResult(result)),
+        );
+        window.setTimeout(() => void bluetooth.stopScan(), durationMs);
+      } catch (err) {
+        const message = (err as Error)?.message || String(err);
+        console.warn("[capacitor-ble] scan failed", err);
+        emit("event", { type: "capacitor_scan_error", message });
+        if (/permission|unauthori[sz]ed|denied/i.test(message)) {
+          emit("state", { state: "unauthorized" });
+        }
+        throw err;
+      }
+      return;
+    }
     const params = new URLSearchParams();
     if (services.length) params.set("services", services.join(","));
     params.set("duration", String(durationMs));
+    console.log("[despia] bluetooth scan", { services, durationMs, isNative });
     return run(`bluetooth://scan?${params.toString()}`);
   },
-  stopScan: () => run("bluetooth://stopscan"),
-  state: () => run("bluetooth://state"),
-  connect: (
+  stopScan: async () => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.stopLEScan().catch((err) =>
+        console.warn("[capacitor-ble] stop scan failed", err),
+      );
+      emit("scanEnd", {});
+      return;
+    }
+    return run("bluetooth://stopscan");
+  },
+  state: async () => {
+    if (await ensureCapacitorBle()) return;
+    return run("bluetooth://state");
+  },
+  connect: async (
     id: string,
     opts: { timeout?: number; autoConnect?: boolean; server?: string } = {},
   ) => {
+    if (await ensureCapacitorBle()) {
+      try {
+        const savedDevices = await BleClient.getDevices([id]).catch(() => []);
+        for (const device of savedDevices) emit("device", mapCapacitorDevice(device));
+        if (savedDevices.length === 0) await emitConnectedCapacitorDevices();
+        await BleClient.connect(
+          id,
+          (deviceId) => emit("connect", { id: deviceId, state: "disconnected" }),
+          { timeout: opts.timeout ?? 10000 },
+        );
+        emit("connect", { id, state: "connected" });
+        const services = await BleClient.getServices(id);
+        emit("discovered", {
+          id,
+          services: services.map((service) => ({
+            uuid: service.uuid,
+            characteristics: service.characteristics.map((c) => ({
+              uuid: c.uuid,
+              properties: Object.entries(c.properties)
+                .filter(([, enabled]) => enabled)
+                .map(([key]) => key),
+            })),
+          })),
+        });
+      } catch (err) {
+        const message = (err as Error)?.message || String(err);
+        emit("connect", { id, state: "failed", error: message });
+      }
+      return;
+    }
     const params = new URLSearchParams({
       id,
       timeout: String(opts.timeout ?? 10000),
@@ -216,40 +400,106 @@ export const bluetooth = {
     if (opts.server) params.set("server", opts.server);
     return run(`bluetooth://connect?${params.toString()}`);
   },
-  disconnect: (id: string) =>
-    run(`bluetooth://disconnect?id=${encodeURIComponent(id)}`),
-  discover: (id: string) =>
-    run(`bluetooth://discover?id=${encodeURIComponent(id)}`),
-  read: (id: string, service: string, characteristic: string) =>
-    run(
+  disconnect: async (id: string) => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.disconnect(id).catch((err) =>
+        console.warn("[capacitor-ble] disconnect failed", err),
+      );
+      emit("connect", { id, state: "disconnected" });
+      return;
+    }
+    return run(`bluetooth://disconnect?id=${encodeURIComponent(id)}`);
+  },
+  discover: async (id: string) => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.discoverServices(id);
+      const services = await BleClient.getServices(id);
+      emit("discovered", {
+        id,
+        services: services.map((service) => ({
+          uuid: service.uuid,
+          characteristics: service.characteristics.map((c) => ({
+            uuid: c.uuid,
+            properties: Object.entries(c.properties)
+              .filter(([, enabled]) => enabled)
+              .map(([key]) => key),
+          })),
+        })),
+      });
+      return;
+    }
+    return run(`bluetooth://discover?id=${encodeURIComponent(id)}`);
+  },
+  read: async (id: string, service: string, characteristic: string) => {
+    if (await ensureCapacitorBle()) {
+      const value = await BleClient.read(id, service, characteristic);
+      emit("data", { id, service, characteristic, value: dataViewToHexString(value) });
+      return;
+    }
+    return run(
       `bluetooth://read?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`,
-    ),
-  write: (
+    );
+  },
+  write: async (
     id: string,
     service: string,
     characteristic: string,
     text: string,
     withResponse = true,
-  ) =>
-    run(
-      `bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`,
-    ),
-  subscribe: (
-    id: string,
-    service: string,
-    characteristic: string,
-    server?: string,
   ) => {
+    if (await ensureCapacitorBle()) {
+      const value = hexStringToDataView(text);
+      if (withResponse) await BleClient.write(id, service, characteristic, value);
+      else await BleClient.writeWithoutResponse(id, service, characteristic, value);
+      emit("writeComplete", { id, service, characteristic, success: true });
+      return;
+    }
+    try {
+      await run(
+        `bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`,
+      );
+      emit("writeComplete", { id, service, characteristic, success: true });
+    } catch (err) {
+      emit("writeComplete", {
+        id,
+        service,
+        characteristic,
+        success: false,
+        error: (err as Error)?.message || String(err),
+      });
+      throw err;
+    }
+  },
+  subscribe: async (id: string, service: string, characteristic: string, server?: string) => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.startNotifications(id, service, characteristic, (value) => {
+        emit("data", { id, service, characteristic, value: dataViewToHexString(value) });
+      });
+      return;
+    }
     let url = `bluetooth://subscribe?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`;
     if (server) url += `&server=${encodeURIComponent(server)}`;
     return run(url);
   },
-  unsubscribe: (id: string, service: string, characteristic: string) =>
-    run(
+  unsubscribe: async (id: string, service: string, characteristic: string) => {
+    if (await ensureCapacitorBle()) {
+      await BleClient.stopNotifications(id, service, characteristic).catch((err) =>
+        console.warn("[capacitor-ble] unsubscribe failed", err),
+      );
+      return;
+    }
+    return run(
       `bluetooth://unsubscribe?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}`,
-    ),
-  rssi: (id: string) =>
-    run(`bluetooth://rssi?id=${encodeURIComponent(id)}`),
+    );
+  },
+  rssi: async (id: string) => {
+    if (await ensureCapacitorBle()) {
+      const value = await BleClient.readRssi(id);
+      emit("event", { type: "rssi", id, value });
+      return;
+    }
+    return run(`bluetooth://rssi?id=${encodeURIComponent(id)}`);
+  },
   emitBrowserConnect: (event: BleConnectEvent) => emit("connect", event),
   emitBrowserDiscovered: (tree: BleDiscovered) => emit("discovered", tree),
   /** Subscribe to BLE events. Returns an unsubscribe fn. */
