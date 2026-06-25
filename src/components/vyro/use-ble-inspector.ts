@@ -211,6 +211,19 @@ function ensureInitialized() {
 
   bluetooth.on("writeComplete", (e) => {
     const now = Date.now();
+    const payload = (e as { payload?: string }).payload ?? "";
+    const bytes = payload ? toBytes(payload) : new Uint8Array(0);
+    const opcode = bytes.length > 0 ? bytes[0] : null;
+    const hex = bytesToHex(bytes);
+    const entry: WriteLogEntry = {
+      ts: now,
+      service: e.service,
+      characteristic: e.characteristic,
+      hex,
+      opcode,
+      success: e.success,
+      error: e.error || null,
+    };
     s.state = {
       ...s.state,
       writes: {
@@ -221,6 +234,7 @@ function ensureInitialized() {
         lastCharacteristic: e.characteristic,
         lastError: e.error || null,
       },
+      writeLog: [entry, ...s.state.writeLog].slice(0, MAX_WRITE_LOG),
     };
     notify(s);
   });
