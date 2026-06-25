@@ -452,14 +452,14 @@ export const bluetooth = {
       const value = hexStringToDataView(text);
       if (withResponse) await BleClient.write(id, service, characteristic, value);
       else await BleClient.writeWithoutResponse(id, service, characteristic, value);
-      emit("writeComplete", { id, service, characteristic, success: true });
+      emit("writeComplete", { id, service, characteristic, success: true, payload: text });
       return;
     }
     try {
       await run(
         `bluetooth://write?id=${encodeURIComponent(id)}&service=${service}&char=${characteristic}&text=${encodeURIComponent(text)}&with_response=${withResponse}`,
       );
-      emit("writeComplete", { id, service, characteristic, success: true });
+      emit("writeComplete", { id, service, characteristic, success: true, payload: text });
     } catch (err) {
       emit("writeComplete", {
         id,
@@ -467,6 +467,7 @@ export const bluetooth = {
         characteristic,
         success: false,
         error: (err as Error)?.message || String(err),
+        payload: text,
       });
       throw err;
     }
