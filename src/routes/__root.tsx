@@ -21,7 +21,7 @@ function NotFoundComponent() {
     let cancelled = false;
     supabase.auth.getUser().then(({ data }) => {
       if (cancelled) return;
-      navigate({ to: data.user ? "/app" : "/auth", replace: true });
+      navigate({ to: data.user ? "/" : "/onboarding", replace: true });
     });
     return () => {
       cancelled = true;
@@ -109,6 +109,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
     ],
     links: [
+      {
+        rel: "stylesheet",
+        href: "https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&f[]=jet-brains-mono@400,700&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,

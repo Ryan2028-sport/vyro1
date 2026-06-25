@@ -5,15 +5,30 @@ import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
 import { BandPanel } from "./BandPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "@tanstack/react-router";
-import { LogOut, Save } from "lucide-react";
-import { Card, PageHeader, Pill, Stat } from "./shared";
+import {
+  LogOut,
+  Save,
+  Bug,
+  Bell,
+  Shield,
+  Palette,
+  User,
+  Watch,
+  ChevronRight,
+  Moon,
+  Smartphone,
+  Globe,
+  FileText,
+  HelpCircle,
+  Trash2,
+} from "lucide-react";
+import { Card, PageHeader } from "./shared";
 
 type Privacy = "private" | "team" | "coach" | "public";
-type DataSharing = "private" | "coach_approved" | "team_aggregate";
-type Theme = "system" | "vyro_dark" | "vyro_light" | "high_contrast";
-type MetricDetail = "expanded" | "compact" | "coach" | "beginner";
+type Theme = "system" | "light" | "dark";
+type Units = "metric" | "imperial";
 
-export function ProfileView() {
+export function ProfileView({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const fetchProfile = useServerFn(getMyProfile);
   const updateProfile = useServerFn(updateMyProfile);
   const navigate = useNavigate();
@@ -30,20 +45,12 @@ export function ProfileView() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Athlete identity (client-only until profile schema extends)
-  const [school, setSchool] = useState("Yale Squash · 2026");
-  const [coach, setCoach] = useState("Coach Shiv");
-  const [position, setPosition] = useState("Mid-Atlantic baseliner");
-  const [emergency, setEmergency] = useState("");
-  const [injuryNotes, setInjuryNotes] = useState("");
-
-  // Settings
   const [privacy, setPrivacy] = useState<Privacy>("team");
-  const [sharing, setSharing] = useState<DataSharing>("coach_approved");
-  const [scoutPublic, setScoutPublic] = useState(true);
-  const [theme, setTheme] = useState<Theme>("vyro_dark");
-  const [metricDetail, setMetricDetail] = useState<MetricDetail>("expanded");
-  const [coachVisibility, setCoachVisibility] = useState<Privacy>("team");
+  const [theme, setTheme] = useState<Theme>("light");
+  const [units, setUnits] = useState<Units>("metric");
+  const [notifications, setNotifications] = useState(true);
+  const [haptics, setHaptics] = useState(true);
+  const [autoRecord, setAutoRecord] = useState(true);
 
   useEffect(() => {
     if (!profile) return;
@@ -69,148 +76,203 @@ export function ProfileView() {
     await qc.cancelQueries();
     qc.clear();
     await supabase.auth.signOut();
-    navigate({ to: "/auth", replace: true });
+    navigate({ to: "/onboarding", replace: true });
   }
 
-  if (isLoading) return <div className="p-6 text-sm text-vyro-mute">Loading profile…</div>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-gray-900" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <PageHeader eyebrow="Account · scout profile" title={name || "Your profile"} subtitle="Identity, sport, settings, and the band you're paired with." />
+    <div className="space-y-5">
+      <PageHeader eyebrow="Settings" title="Profile & Settings" subtitle="Manage your account, band, and app preferences." />
 
-      <Card eyebrow="Identity" title="Personal info">
-        <Field label="Display name">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-xl border border-vyro-line bg-vyro-panel px-3 py-2.5 text-sm text-vyro-text outline-none focus:border-vyro-text/40"
-          />
-        </Field>
-        <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Primary sport">
-            <div className="flex gap-1.5">
-              {(["squash", "tennis"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSport(s)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${
-                    sport === s ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
-                  }`}
-                >{s}</button>
-              ))}
-            </div>
-          </Field>
-          <Field label="Handedness">
-            <div className="flex gap-1.5">
-              {(["left", "right"] as const).map((h) => (
-                <button
-                  key={h}
-                  onClick={() => setHand(h)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize ${
-                    hand === h ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
-                  }`}
-                >{h}</button>
-              ))}
-            </div>
-          </Field>
+      {/* Profile Card */}
+      <Card>
+        <div className="flex items-center gap-4 pb-4">
+          <div className="grid h-14 w-14 place-items-center rounded-full bg-gray-100 text-lg font-bold text-gray-600">
+            {name ? name.slice(0, 2).toUpperCase() : "?"}
+          </div>
+          <div className="flex-1">
+            <div className="text-base font-bold text-gray-900">{name || "Set your name"}</div>
+            <div className="font-mono text-[11px] text-gray-400 capitalize">{sport} · {hand}-handed</div>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="space-y-3 border-t border-gray-100 pt-4">
+          <Field label="Display name">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-gray-400"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Primary sport">
+              <div className="flex gap-1.5">
+                {(["squash", "tennis"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSport(s)}
+                    className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${
+                      sport === s
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
+                    }`}
+                  >{s}</button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Handedness">
+              <div className="flex gap-1.5">
+                {(["left", "right"] as const).map((h) => (
+                  <button
+                    key={h}
+                    onClick={() => setHand(h)}
+                    className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${
+                      hand === h
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
+                    }`}
+                  >{h}</button>
+                ))}
+              </div>
+            </Field>
+          </div>
           <button
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-vyro-mint px-4 py-2.5 text-sm font-bold text-vyro-ink hover:opacity-90 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
           >
-            <Save className="h-4 w-4" /> {saving ? "Saving…" : saved ? "Saved" : "Save"}
-          </button>
-          <button
-            onClick={signOut}
-            className="ml-auto flex items-center gap-2 rounded-xl border border-vyro-line bg-vyro-panel px-3 py-2 text-xs font-semibold text-vyro-mute"
-          >
-            <LogOut className="h-3.5 w-3.5" /> Sign out
+            <Save className="h-4 w-4" /> {saving ? "Saving…" : saved ? "Saved!" : "Save Changes"}
           </button>
         </div>
       </Card>
 
-      <Card eyebrow="Public athlete identity" title="School + team">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="School / team">
-            <input value={school} onChange={(e) => setSchool(e.target.value)} className="w-full rounded-xl border border-vyro-line bg-vyro-panel px-3 py-2 text-sm text-vyro-text outline-none focus:border-vyro-text/40" />
-          </Field>
-          <Field label="Coach">
-            <input value={coach} onChange={(e) => setCoach(e.target.value)} className="w-full rounded-xl border border-vyro-line bg-vyro-panel px-3 py-2 text-sm text-vyro-text outline-none focus:border-vyro-text/40" />
-          </Field>
-          <Field label="Position / style">
-            <input value={position} onChange={(e) => setPosition(e.target.value)} className="w-full rounded-xl border border-vyro-line bg-vyro-panel px-3 py-2 text-sm text-vyro-text outline-none focus:border-vyro-text/40" />
-          </Field>
-        </div>
-      </Card>
-
-      <Card eyebrow="Public scout profile" title="Recruiter view">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Stat label="Recruiter grade" value="A−" />
-          <Stat label="Global percentile" value="87" unit="pct" />
-          <Stat label="Reliability" value="High" />
-          <Stat label="Verified sessions" value="—" />
-          <Stat label="Avg recovery" value="—" unit="%" />
-          <Stat label="Avg sleep" value="—" unit="/100" />
-        </div>
-        <p className="mt-3 rounded-xl border border-vyro-line bg-vyro-elev p-3 text-[12px] text-vyro-mute">
-          <span className="font-mono text-[9px] uppercase tracking-wider text-vyro-text">Coach note · </span>
-          Average metric breakdown and heat-map movement are shared in the recruiting / coach packet.
-        </p>
-        <label className="mt-3 flex items-center gap-2 text-[12px] text-vyro-text">
-          <input type="checkbox" checked={scoutPublic} onChange={(e) => setScoutPublic(e.target.checked)} className="h-4 w-4 accent-[var(--vyro-mint)]" />
-          Public scout profile enabled
-        </label>
-      </Card>
-
-      <Card eyebrow="Safety + privacy" title="Coach access, emergency contact, prototype notes">
-        <Field label="Privacy mode">
-          <Select value={privacy} onChange={(v) => setPrivacy(v as Privacy)} options={[
-            ["private", "Private"], ["team", "Team + coach"], ["coach", "Coach only"], ["public", "Public scout profile"],
-          ]} />
-        </Field>
-        <Field label="Data sharing">
-          <Select value={sharing} onChange={(v) => setSharing(v as DataSharing)} options={[
-            ["private", "Private only"], ["coach_approved", "Coach approved"], ["team_aggregate", "Team aggregate"],
-          ]} />
-        </Field>
-        <Field label="Coach visibility">
-          <Select value={coachVisibility} onChange={(v) => setCoachVisibility(v as Privacy)} options={[
-            ["private", "Private"], ["team", "Team + coach"], ["coach", "Coach only"], ["public", "Public scout profile"],
-          ]} />
-        </Field>
-        <Field label="Emergency contact">
-          <input value={emergency} onChange={(e) => setEmergency(e.target.value)} placeholder="Name · phone" className="w-full rounded-xl border border-vyro-line bg-vyro-panel px-3 py-2 text-sm text-vyro-text outline-none focus:border-vyro-text/40" />
-        </Field>
-        <Field label="Injury / medical notes">
-          <textarea value={injuryNotes} onChange={(e) => setInjuryNotes(e.target.value)} rows={3} className="w-full rounded-xl border border-vyro-line bg-vyro-panel px-3 py-2 text-sm text-vyro-text outline-none focus:border-vyro-text/40" />
-        </Field>
-      </Card>
-
-      <Card eyebrow="App settings" title="Display + defaults">
-        <Field label="Theme preference">
-          <Select value={theme} onChange={(v) => setTheme(v as Theme)} options={[
-            ["system", "System"], ["vyro_dark", "VYRO dark"], ["vyro_light", "VYRO light"], ["high_contrast", "High contrast"],
-          ]} />
-        </Field>
-        <Field label="Metric detail default">
-          <Select value={metricDetail} onChange={(v) => setMetricDetail(v as MetricDetail)} options={[
-            ["expanded", "Expanded on tap"], ["compact", "Compact"], ["coach", "Coach-level detail"], ["beginner", "Beginner explanations"],
-          ]} />
-        </Field>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <Pill tone="live">Auto + manual sessions</Pill>
-          <Pill tone="neutral">Recovery + battery</Pill>
-          <Pill tone="neutral">CSV + PDF export</Pill>
-        </div>
-      </Card>
-
+      {/* Band */}
       <BandPanel
         pairedId={profile?.paired_band_id ?? null}
         pairedName={profile?.paired_band_name ?? null}
         defaultSport={sport}
       />
+
+      {/* App Preferences */}
+      <Card>
+        <SectionTitle icon={Palette} title="Appearance" />
+        <SettingRow label="Theme" description="App color scheme">
+          <SegmentedControl
+            value={theme}
+            onChange={(v) => setTheme(v as Theme)}
+            options={[
+              { value: "light", label: "Light" },
+              { value: "dark", label: "Dark" },
+              { value: "system", label: "Auto" },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow label="Units" description="Distance and weight">
+          <SegmentedControl
+            value={units}
+            onChange={(v) => setUnits(v as Units)}
+            options={[
+              { value: "metric", label: "Metric" },
+              { value: "imperial", label: "Imperial" },
+            ]}
+          />
+        </SettingRow>
+      </Card>
+
+      {/* Notifications & Recording */}
+      <Card>
+        <SectionTitle icon={Bell} title="Notifications & Sessions" />
+        <ToggleRow
+          label="Push notifications"
+          description="Recovery alerts, session summaries, coach messages"
+          checked={notifications}
+          onChange={setNotifications}
+        />
+        <ToggleRow
+          label="Haptic feedback"
+          description="Vibration on session start/end"
+          checked={haptics}
+          onChange={setHaptics}
+        />
+        <ToggleRow
+          label="Auto-record sessions"
+          description="Start recording when band detects activity"
+          checked={autoRecord}
+          onChange={setAutoRecord}
+        />
+      </Card>
+
+      {/* Privacy */}
+      <Card>
+        <SectionTitle icon={Shield} title="Privacy & Sharing" />
+        <SettingRow label="Profile visibility" description="Who can see your stats">
+          <select
+            value={privacy}
+            onChange={(e) => setPrivacy(e.target.value as Privacy)}
+            className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none"
+          >
+            <option value="private">Private</option>
+            <option value="coach">Coach only</option>
+            <option value="team">Team + coach</option>
+            <option value="public">Public</option>
+          </select>
+        </SettingRow>
+      </Card>
+
+      {/* Developer */}
+      <Card>
+        <SectionTitle icon={Bug} title="Developer" />
+        <LinkRow
+          label="BLE Debug Inspector"
+          description="Raw BLE traffic, GATT services, notify counts"
+          onClick={() => onNavigate?.("debug")}
+        />
+        <LinkRow
+          label="Export session data"
+          description="Download CSV of all recorded sessions"
+          onClick={() => {}}
+        />
+      </Card>
+
+      {/* Support & Legal */}
+      <Card>
+        <SectionTitle icon={HelpCircle} title="Support" />
+        <LinkRow label="Help center" description="FAQs and troubleshooting" onClick={() => {}} />
+        <LinkRow label="Privacy policy" description="How we handle your data" onClick={() => {}} />
+        <LinkRow label="Terms of service" description="Legal agreements" onClick={() => {}} />
+        <div className="mt-2 text-center font-mono text-[10px] text-gray-300">VYRO v0.1.0 · build 1</div>
+      </Card>
+
+      {/* Sign Out & Danger Zone */}
+      <Card>
+        <button
+          onClick={signOut}
+          className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+        >
+          <LogOut className="h-4 w-4" /> Sign out
+        </button>
+        <button
+          className="mt-3 flex w-full items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-500 transition-colors hover:bg-red-100"
+          onClick={() => {}}
+        >
+          <Trash2 className="h-4 w-4" /> Delete account
+        </button>
+      </Card>
+    </div>
+  );
+}
+
+function SectionTitle({ icon: Icon, title }: { icon: typeof User; title: string }) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <Icon className="h-4 w-4 text-gray-400" />
+      <span className="text-xs font-bold uppercase tracking-wider text-gray-400">{title}</span>
     </div>
   );
 }
@@ -218,20 +280,112 @@ export function ProfileView() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="mb-3 block">
-      <span className="mb-1 block text-[11px] font-semibold text-vyro-mute">{label}</span>
+      <span className="mb-1 block text-[11px] font-semibold text-gray-500">{label}</span>
       {children}
     </label>
   );
 }
 
-function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: [string, string][] }) {
+function SettingRow({
+  label,
+  description,
+  children,
+}: {
+  label: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-xl border border-vyro-line bg-vyro-panel px-3 py-2 text-sm text-vyro-text outline-none focus:border-vyro-text/40"
+    <div className="flex items-center justify-between gap-4 border-t border-gray-100 py-3 first:border-t-0 first:pt-0">
+      <div>
+        <div className="text-sm font-medium text-gray-900">{label}</div>
+        {description && <div className="text-[11px] text-gray-400">{description}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-t border-gray-100 py-3 first:border-t-0 first:pt-0">
+      <div>
+        <div className="text-sm font-medium text-gray-900">{label}</div>
+        {description && <div className="text-[11px] text-gray-400">{description}</div>}
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+          checked ? "bg-gray-900" : "bg-gray-200"
+        }`}
+      >
+        <div
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-[22px]" : "translate-x-0.5"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+function LinkRow({
+  label,
+  description,
+  onClick,
+}: {
+  label: string;
+  description?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center justify-between gap-4 border-t border-gray-100 py-3 text-left first:border-t-0 first:pt-0"
     >
-      {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-    </select>
+      <div>
+        <div className="text-sm font-medium text-gray-900">{label}</div>
+        {description && <div className="text-[11px] text-gray-400">{description}</div>}
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
+    </button>
+  );
+}
+
+function SegmentedControl({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            value === opt.value
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
   );
 }
