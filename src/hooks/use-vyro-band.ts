@@ -890,8 +890,28 @@ export function useVyroBand() {
           // we leave that tile empty rather than estimating it from HR/HRV.
           return true;
         };
+        const applyBloodPressure = () => {
+          const bp = decodeQcBandBloodPressurePayload(frame.data);
+          if (!bp) return false;
+          setBloodPressure({ sbp: bp.sbp, dbp: bp.dbp });
+          markSignal("bloodPressureAt");
+          if (bp.hr != null) {
+            setHeartRateBpm(bp.hr);
+            setHeartRateAt(Date.now());
+          }
+          return true;
+        };
+        const applyTemperature = () => {
+          const t = decodeQcBandTempPayload(frame.data);
+          if (t == null) return false;
+          setSkinTempC(t);
+          markSignal("skinTempAt");
+          return true;
+        };
         if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
           // handled as a composite SDK frame
+        } else if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(frame.subType) && applyBloodPressure()) {
+          // subtype 0x02 is BP on Oudmon/QCBand, but SpO₂ on newer SDKs; prefer BP only when the payload has SBP/DBP bytes.
         } else if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value >= 70 && frame.value <= 100) {
             setSpo2Pct(frame.value);
@@ -902,32 +922,24 @@ export function useVyroBand() {
             setHeartRateBpm(frame.value);
             setHeartRateAt(Date.now());
           }
-        } else if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(frame.subType)) {
-          const bp = decodeQcBandBloodPressurePayload(frame.data);
-          if (bp) {
-            setBloodPressure({ sbp: bp.sbp, dbp: bp.dbp });
-            markSignal("bloodPressureAt");
-            if (bp.hr != null) {
-              setHeartRateBpm(bp.hr);
-              setHeartRateAt(Date.now());
-            }
-          }
         } else if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value >= 5 && frame.value < 250) {
             setHrvMs(frame.value);
             markSignal("hrvAt");
           }
+        } else if (
+          frame.subType === 0x04 &&
+          frame.data.length >= 2 &&
+          applyTemperature()
+        ) {
+          // Legacy temp also uses 0x04; require a 2-byte temp payload so single-byte stress=36 is not misread as 36°C.
         } else if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value > 0 && frame.value <= 100) {
             setStressScore(frame.value);
             markSignal("stressAt");
           }
         } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
-          const t = decodeQcBandTempPayload(frame.data);
-          if (t != null) {
-            setSkinTempC(t);
-            markSignal("skinTempAt");
-          }
+          applyTemperature();
         }
       }
       return;
