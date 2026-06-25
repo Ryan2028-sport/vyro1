@@ -822,7 +822,8 @@ export function DebugView() {
           </button>
         }
       />
-      <Section title="Per-metric pipeline (cmd → notif → stored)" rows={pipelineRows} />
+      <Section title="Per-metric pipeline (cmd → notif → live)" rows={pipelineRows} />
+      <Section title="Firmware capability (what each opcode actually contains)" rows={capabilityRows} />
       <Section title="Decoder outcomes" rows={decoderRows} />
       <Section title="Vitals (PPG)" rows={health} />
       <Section title="Activity" rows={activity} />
