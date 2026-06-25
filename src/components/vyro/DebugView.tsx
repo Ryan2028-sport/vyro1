@@ -535,8 +535,181 @@ export function DebugView() {
     }));
   }, [inspector.discovered]);
 
+  // Per-metric pipeline derived from existing data:
+  //   cmd written → notif received (opcode) → value stored (signalAt timestamp).
+  // A grey stage tells you exactly where in the chain a tile is dying.
+  const pipelineRows = useMemo(() => {
+    const op = (code: number) =>
+      inspector.perOpcode[`0x${code.toString(16).padStart(2, "0")}`];
+    const writeForOp = (codes: number[]) =>
+      inspector.writeLog.find((w) => w.opcode != null && codes.includes(w.opcode));
+    const sumOp = (codes: number[]) =>
+      codes.reduce((acc, c) => acc + (op(c)?.count ?? 0), 0);
+    const lastOp = (codes: number[]) => {
+      let t = 0;
+      for (const c of codes) {
+        const at = op(c)?.lastAt ?? 0;
+        if (at > t) t = at;
+      }
+      return t || null;
+    };
+    type P = { metric: string; cmdOps: number[]; notifOps: number[]; storedAt: number | null | undefined; value: string };
+    const rows: P[] = [
+      { metric: "Heart rate", cmdOps: [0x1e], notifOps: [0x1e], storedAt: ctx.heartRateAt, value: fmt(ctx.heartRateBpm, 0, " bpm") },
+      { metric: "SpO₂", cmdOps: [0x69, 0xbc], notifOps: [0x69, 0x73, 0xbc], storedAt: ctx.signalAt.spo2At, value: fmt(ctx.spo2Pct, 0, " %") },
+      { metric: "Skin temp", cmdOps: [0x69, 0xbc], notifOps: [0x69, 0x73, 0xbc], storedAt: ctx.signalAt.skinTempAt, value: fmt(ctx.skinTempC, 1, " °C") },
+      { metric: "HRV", cmdOps: [0x39, 0x69], notifOps: [0x39, 0x69], storedAt: ctx.signalAt.hrvAt, value: fmt(ctx.hrvMs, 0, " ms") },
+      { metric: "Stress", cmdOps: [0x37, 0x69], notifOps: [0x37, 0x69], storedAt: ctx.signalAt.stressAt, value: fmt(ctx.stressScore, 0) },
+      { metric: "Blood pressure", cmdOps: [0x69], notifOps: [0x69], storedAt: ctx.signalAt.bloodPressureAt, value: ctx.bloodPressure ? `${ctx.bloodPressure.sbp}/${ctx.bloodPressure.dbp}` : "—" },
+      { metric: "Steps", cmdOps: [0x09, 0x07, 0x43], notifOps: [0x09, 0x07, 0x43, 0x48, 0x73], storedAt: ctx.signalAt.stepsAt, value: fmt(ctx.stepsToday, 0) },
+      { metric: "Battery", cmdOps: [0x03], notifOps: [0x03], storedAt: ctx.signalAt.batteryAt, value: fmt(ctx.batteryPct, 0, " %") },
+      { metric: "Motion (IMU)", cmdOps: [0x12, 0x20], notifOps: [0x69, 0x73, 0x87, 0x89], storedAt: m.peakG > 0 ? now : null, value: m.peakG > 0 ? fmt(m.peakG, 2, " g") : "—" },
+      { metric: "Sleep", cmdOps: [0x32], notifOps: [0x32], storedAt: lastSleep ? Date.now() : null, value: lastSleep ? `${lastSleep.score}/100` : "—" },
+    ];
+    return rows.map((r) => {
+      const cmd = writeForOp(r.cmdOps);
+      const notifCount = sumOp(r.notifOps);
+      const notifAt = lastOp(r.notifOps);
+      const stored = r.storedAt != null;
+      const stages = [
+        cmd ? "cmd ✓" : "cmd ✗",
+        notifCount > 0 ? `notif ✓ ×${notifCount}` : "notif ✗",
+        stored ? "stored ✓" : "stored ✗",
+      ];
+      const stageOk = !!cmd && notifCount > 0 && stored;
+      return {
+        label: r.metric,
+        value: r.value,
+        ok: stageOk,
+        source: stages.join(" → "),
+        note: notifAt ? `last notif ${ageLabel(now - notifAt)}` : cmd ? "no notification after cmd" : "command never sent",
+        ageMs: r.storedAt != null ? signalAge(r.storedAt) : undefined,
+      } as Row;
+    });
+  }, [ctx, m, lastSleep, inspector.perOpcode, inspector.writeLog, now]);
+
+  const decoderRows: Row[] = useMemo(() => {
+    const total = inspector.decoderKnownCount + inspector.decoderUnknownCount;
+    const unknownEntries = Object.entries(inspector.unknownOpcodes)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([k, v]) => `${k}×${v}`)
+      .join(" ");
+    return [
+      {
+        label: "Frames recognised by decoder",
+        value: `${inspector.decoderKnownCount}/${total || 0}`,
+        ok: inspector.decoderKnownCount > 0,
+        source: "opcode in QCBand known-opcode set",
+      },
+      {
+        label: "Frames silently ignored",
+        value: String(inspector.decoderUnknownCount),
+        ok: inspector.decoderUnknownCount === 0,
+        source: "opcode not in known-opcode set",
+        note: unknownEntries || undefined,
+      },
+    ];
+  }, [inspector.decoderKnownCount, inspector.decoderUnknownCount, inspector.unknownOpcodes]);
+
+  const buildDebugBundle = () => ({
+    capturedAt: new Date().toISOString(),
+    connected: m.connected,
+    pairedId: m.pairedId,
+    connectedId: ctx.ble.connectedId,
+    powerState: ctx.ble.powerState,
+    lastError: ctx.ble.error || null,
+    totalNotifications: inspector.totalNotifications,
+    writes: inspector.writes,
+    decoder: {
+      known: inspector.decoderKnownCount,
+      unknown: inspector.decoderUnknownCount,
+      unknownOpcodes: inspector.unknownOpcodes,
+    },
+    perOpcode: Object.fromEntries(
+      Object.entries(inspector.perOpcode).map(([k, v]) => [k, { count: v.count, lastAt: v.lastAt, lastHex: v.lastHex }]),
+    ),
+    perChar: Object.fromEntries(
+      Object.entries(inspector.perChar).map(([k, v]) => [k, { count: v.count, lastAt: v.lastAt, lastOpcode: v.lastOpcode, lastHex: v.lastHex }]),
+    ),
+    pipeline: pipelineRows.map((r) => ({ metric: r.label, value: r.value, ok: r.ok, stages: r.source, note: r.note })),
+    recentNotifications: inspector.recent,
+    writeLog: inspector.writeLog,
+    gatt: inspector.discovered?.services.map((s) => ({
+      service: s.uuid,
+      characteristics: s.characteristics.map((c) => ({ uuid: c.uuid, properties: c.properties })),
+    })) ?? [],
+    ctx: {
+      heartRateBpm: ctx.heartRateBpm,
+      spo2Pct: ctx.spo2Pct,
+      skinTempC: ctx.skinTempC,
+      hrvMs: ctx.hrvMs,
+      stressScore: ctx.stressScore,
+      bloodPressure: ctx.bloodPressure,
+      stepsToday: ctx.stepsToday,
+      caloriesKcal: ctx.caloriesKcal,
+      distanceM: ctx.distanceM,
+      batteryPct: ctx.batteryPct,
+    },
+    motion: { peakG: m.peakG, peakDps: m.peakDps, peakJerk: m.peakJerk, eventsLastMin: m.eventsLastMin, sessionState: m.sessionState },
+  });
+
+  const [bundleCopied, setBundleCopied] = useState<string | null>(null);
+  const copyBundle = async () => {
+    const json = JSON.stringify(buildDebugBundle(), null, 2);
+    try {
+      await navigator.clipboard.writeText(json);
+      setBundleCopied("Copied to clipboard");
+    } catch {
+      // Fallback: open a textarea selection
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = json;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setBundleCopied("Copied to clipboard");
+      } catch {
+        setBundleCopied("Copy failed — see console");
+        // eslint-disable-next-line no-console
+        console.log("[debug-bundle]", json);
+      }
+    }
+    window.setTimeout(() => setBundleCopied(null), 2500);
+  };
+
   return (
     <div style={{ padding: 14, color: "#e5e7eb", fontFamily: "Satoshi, system-ui, sans-serif" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 10,
+        }}
+      >
+        <div style={{ fontSize: 12, opacity: 0.75 }}>
+          {bundleCopied || "Paste the bundle into chat for a one-shot diagnosis."}
+        </div>
+        <button
+          type="button"
+          onClick={copyBundle}
+          style={{
+            border: "1px solid rgba(255,255,255,0.18)",
+            borderRadius: 10,
+            padding: "6px 12px",
+            background: "rgba(59,130,246,0.18)",
+            color: "inherit",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Copy debug bundle
+        </button>
+      </div>
       <div
         style={{
           padding: "10px 12px",
