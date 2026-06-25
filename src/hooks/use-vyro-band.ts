@@ -1203,29 +1203,41 @@ export function useVyroBand() {
           markSignal("stressAt");
           return true;
         };
-        if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(frame.subType) && applyBloodPressure()) {
+        let handled = false;
+        if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(frame.subType)) {
           // subtype 0x02 is BP on Oudmon/QCBand, but SpO₂ on newer SDKs; prefer BP only when the payload has SBP/DBP bytes.
-        } else if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
-          applySpo2Scalar();
-        } else if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(frame.subType)) {
-          applyHeartRateScalar();
-        } else if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
-          applyHrvScalar();
-        } else if (
+          handled = applyBloodPressure() || handled;
+        }
+        if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applySpo2Scalar() || handled;
+        }
+        if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applyHeartRateScalar() || handled;
+        }
+        if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applyHrvScalar() || handled;
+        }
+        if (
           frame.subType === 0x04 &&
           frame.data.length >= 2 &&
           applyTemperature()
         ) {
           // Legacy temp also uses 0x04; require a 2-byte temp payload so single-byte stress=36 is not misread as 36°C.
-        } else if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
-          applyStressScalar();
-        } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
-          applyTemperature();
-        } else if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
+          handled = true;
+        }
+        if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applyStressScalar() || handled;
+        }
+        if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applyTemperature() || handled;
+        }
+        if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
           // handled as a composite SDK frame only after exact scalar decoders
           // had first refusal; this prevents 0x03 SpO₂ frames being misread as
           // one-key HR frames and leaving SpO₂/temp/HRV grey.
+          handled = true;
         }
+        void handled;
       }
       return;
     }
