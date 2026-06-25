@@ -93,10 +93,11 @@ function getStore(): {
 function toBytes(value: string): Uint8Array {
   try {
     const trimmed = value.trim();
+    const withoutPrefix = trimmed.replace(/^0x/i, "");
     const isHex =
-      /^[0-9a-fA-F\s:,-]+$/.test(trimmed.replace(/^0x/i, "")) &&
-      trimmed.replace(/^0x/i, "").replace(/[^0-9a-fA-F]/g, "").length % 2 === 0;
-    return isHex ? hexToBytes(trimmed) : base64ToBytes(value);
+      /^[0-9a-fA-F\s:,-]+$/.test(withoutPrefix) &&
+      withoutPrefix.replace(/[^0-9a-fA-F]/g, "").length % 2 === 0;
+    return isHex ? hexToBytes(withoutPrefix) : base64ToBytes(value);
   } catch {
     return new Uint8Array(0);
   }
