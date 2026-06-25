@@ -840,6 +840,7 @@ export function useVyroBand() {
     }
     if (uuidMatches(cuuid, QCBAND_NOTIFY_CHAR_UUID)) {
       const bytes = payloadToBytes(data.value);
+      if (bytes.length === 0) return;
       const op = bytes[0];
       console.log("[qcband] notify op=0x" + op.toString(16).padStart(2, "0"), bytesToHex(bytes));
       if (op === QCBAND_CMD_REALTIME_HR) {
