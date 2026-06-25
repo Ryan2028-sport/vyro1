@@ -29,6 +29,7 @@ import {
 } from "@/lib/vyro-ble/session-control";
 import {
   decodeQcBandBattery,
+  decodeQcBandBloodPressurePayload,
   decodeQcBandHistoricalActivity,
   decodeQcBandHrvHistory,
   decodeQcBandLiveActivityNotification,
@@ -80,6 +81,7 @@ import {
   QCBAND_CMD_TODAY_SPORTS,
   QCBAND_MEASURE_HR,
   QCBAND_MEASURE_HR_TYPES,
+  QCBAND_MEASURE_BP_TYPES,
   QCBAND_MEASURE_HRV,
   QCBAND_MEASURE_HRV_TYPES,
   QCBAND_MEASURE_ONE_KEY,
@@ -579,6 +581,12 @@ export function useVyroBand() {
         });
       };
 
+      const runBloodPressureCycle = () => {
+        runMeasureCycle("blood-pressure", QCBAND_MEASURE_BP_TYPES, 45_000);
+      };
+      window.setTimeout(runBloodPressureCycle, 8_000);
+      const bpTimer = window.setInterval(runBloodPressureCycle, 5 * 60_000);
+
       // SpO₂ standalone cycle — kept as a fallback for firmwares that don't
       // populate the One-Key payload's SpO₂ field. 5-minute cadence.
       const runSpo2Cycle = () => {
@@ -624,6 +632,7 @@ export function useVyroBand() {
       // Stash extra timers we created locally onto the outer refs via closure.
       const stop = () => {
         window.clearInterval(spo2Timer);
+        window.clearInterval(bpTimer);
         window.clearInterval(hrvTimer);
         window.clearInterval(stressTimer);
       };
@@ -892,6 +901,16 @@ export function useVyroBand() {
           if (frame.value > 30 && frame.value < 250) {
             setHeartRateBpm(frame.value);
             setHeartRateAt(Date.now());
+          }
+        } else if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(frame.subType)) {
+          const bp = decodeQcBandBloodPressurePayload(frame.data);
+          if (bp) {
+            setBloodPressure({ sbp: bp.sbp, dbp: bp.dbp });
+            markSignal("bloodPressureAt");
+            if (bp.hr != null) {
+              setHeartRateBpm(bp.hr);
+              setHeartRateAt(Date.now());
+            }
           }
         } else if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
           if (frame.value >= 5 && frame.value < 250) {
