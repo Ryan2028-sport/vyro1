@@ -18,8 +18,18 @@ export type CharStat = {
   lastOpcode: number | null;
 };
 
+export type OpStat = {
+  opcode: number;
+  count: number;
+  lastAt: number;
+  lastHex: string;
+  service: string;
+  characteristic: string;
+};
+
 export type BleInspectorState = {
   perChar: Record<string, CharStat>;
+  perOpcode: Record<string, OpStat>;
   recent: Array<{
     ts: number;
     service: string;
@@ -29,6 +39,14 @@ export type BleInspectorState = {
   }>;
   discovered: BleDiscovered | null;
   totalNotifications: number;
+  writes: {
+    total: number;
+    ok: number;
+    failed: number;
+    lastAt: number | null;
+    lastCharacteristic: string | null;
+    lastError: string | null;
+  };
 };
 
 const MAX_RECENT = 40;
@@ -102,9 +120,24 @@ function ensureInitialized() {
       { ts: now, service: e.service, characteristic: e.characteristic, hex, opcode },
       ...s.state.recent,
     ].slice(0, MAX_RECENT);
+    const opcodeKey = opcode == null ? null : `0x${opcode.toString(16).padStart(2, "0")}`;
+    const prevOp = opcodeKey ? s.state.perOpcode[opcodeKey] : undefined;
     s.state = {
       ...s.state,
       perChar: { ...s.state.perChar, [key]: stat },
+      perOpcode: opcodeKey
+        ? {
+            ...s.state.perOpcode,
+            [opcodeKey]: {
+              opcode: opcode!,
+              count: (prevOp?.count ?? 0) + 1,
+              lastAt: now,
+              lastHex: hex,
+              service: e.service,
+              characteristic: e.characteristic,
+            },
+          }
+        : s.state.perOpcode,
       recent,
       totalNotifications: s.state.totalNotifications + 1,
     };
@@ -113,6 +146,22 @@ function ensureInitialized() {
 
   bluetooth.on("discovered", (tree: BleDiscovered) => {
     s.state = { ...s.state, discovered: tree };
+    notify(s);
+  });
+
+  bluetooth.on("writeComplete", (e) => {
+    const now = Date.now();
+    s.state = {
+      ...s.state,
+      writes: {
+        total: s.state.writes.total + 1,
+        ok: s.state.writes.ok + (e.success ? 1 : 0),
+        failed: s.state.writes.failed + (e.success ? 0 : 1),
+        lastAt: now,
+        lastCharacteristic: e.characteristic,
+        lastError: e.error || null,
+      },
+    };
     notify(s);
   });
 
