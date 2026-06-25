@@ -77,7 +77,7 @@ export type ViewId =
   | "diet";
 
 export const viewTitles: Record<ViewId, string> = {
-  home: "Athlete",
+  home: "Home",
   trends: "Trends",
   session: "Session",
   sport: "Sport",

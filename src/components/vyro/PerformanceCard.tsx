@@ -44,7 +44,7 @@ export function PerformanceCard({
         {label}
       </span>
       <div className="flex items-baseline gap-1.5">
-        <span className={cn("text-4xl font-black tabular-nums tracking-tight", ACCENT[metricType])}>
+        <span className={cn("text-4xl font-semibold tabular-nums tracking-tight", ACCENT[metricType])}>
           {value}
         </span>
         {unit && <span className="text-sm font-medium text-neutral-500">{unit}</span>}

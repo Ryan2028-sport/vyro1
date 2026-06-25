@@ -37,9 +37,8 @@ export function SocialView({ socialTab, setSocialTab }: { socialTab: Tab; setSoc
   return (
     <>
       <PageHeader
-        eyebrow="VYRO Social"
-        title="Community · Group · Compete"
-        subtitle="Shared receipts. Earned in the corners, not on the timeline."
+        eyebrow="Social"
+        title="Community"
       />
       <div className="mb-5 flex gap-2 overflow-x-auto">
         {tabs.map(([id, label]) => (
@@ -47,7 +46,7 @@ export function SocialView({ socialTab, setSocialTab }: { socialTab: Tab; setSoc
             key={id}
             onClick={() => setSocialTab(id)}
             className={`rounded-full border px-4 py-2 text-sm ${
-              socialTab === id ? "border-white/25 bg-white/15" : "border-white/10 text-white/60"
+              socialTab === id ? "border-gray-300 bg-gray-100 text-gray-900" : "border-gray-200 text-gray-500"
             }`}
           >
             {label}
@@ -70,22 +69,22 @@ function Feed() {
         {posts.map((m) => (
           <Card key={m.name}>
             <div className="flex gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-xs font-black">
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-gray-200 text-xs font-semibold">
                 {m.initials}
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-bold">{m.name}</div>
-                    <div className="font-mono text-[10px] text-white/45">{m.handle} · Columbia</div>
+                    <div className="font-medium">{m.name}</div>
+                    <div className="font-mono text-[10px] text-gray-400">{m.handle} · Columbia</div>
                   </div>
                   <Pill>{m.metric}</Pill>
                 </div>
-                <p className="mt-2 text-sm text-white/70">{m.post}</p>
-                <div className="mt-3 grid aspect-video place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/45">
+                <p className="mt-2 text-sm text-gray-600">{m.post}</p>
+                <div className="mt-3 grid aspect-video place-items-center rounded-2xl border border-gray-200 bg-gray-50 text-gray-400">
                   Match clip · swing-path overlay
                 </div>
-                <div className="mt-3 flex gap-4 text-xs text-white/45">
+                <div className="mt-3 flex gap-4 text-xs text-gray-400">
                   ♡ {m.likes} · {m.comments} comments
                 </div>
               </div>
@@ -94,20 +93,17 @@ function Feed() {
         ))}
       </div>
       <Card>
-        <h3 className="font-black">Crowd-Sourced Scout</h3>
-        <p className="mt-2 text-sm text-white/55">
-          Blind-ranks athletes by normalized Power-to-Fatigue ratio to create a verified performance resume.
-        </p>
+        <h3 className="font-semibold">Scout rankings</h3>
         <div className="mt-4 space-y-2 text-sm">
           {[...columbiaGroup]
             .sort((a, b) => b.agility + b.recovery - (a.agility + a.recovery))
             .slice(0, 6)
             .map((m, i) => (
-              <div key={m.name} className="flex items-center justify-between rounded-xl bg-white/[0.04] px-3 py-2">
+              <div key={m.name} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
                 <span>
                   {i + 1}. {m.name}
                 </span>
-                <span className="tabular-nums text-white/55">{Math.round((m.agility + m.recovery) / 2)}</span>
+                <span className="tabular-nums text-gray-500">{Math.round((m.agility + m.recovery) / 2)}</span>
               </div>
             ))}
         </div>
@@ -122,9 +118,9 @@ function ColumbiaGroup() {
       <Card>
         <div className="flex items-start justify-between">
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">Group · invite-only</div>
-            <h3 className="mt-1 text-xl font-black">Columbia Squash</h3>
-            <p className="mt-1 text-sm text-white/55">10 members · 247 sessions logged this month · 86% avg recovery</p>
+            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-gray-400">Group · invite-only</div>
+            <h3 className="mt-1 text-xl font-semibold">Columbia Squash</h3>
+            <p className="mt-1 text-sm text-gray-500">10 members · 247 sessions logged this month · 86% avg recovery</p>
           </div>
           <Pill color="amber">live</Pill>
         </div>
@@ -141,28 +137,28 @@ function ColumbiaGroup() {
         {columbiaGroup.map((m) => (
           <Card key={m.name}>
             <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-xs font-black">
+              <div className="grid h-11 w-11 place-items-center rounded-full bg-gray-200 text-xs font-semibold">
                 {m.initials}
               </div>
               <div className="flex-1">
-                <div className="text-sm font-bold">{m.name}</div>
-                <div className="font-mono text-[10px] text-white/45">{m.handle}</div>
+                <div className="text-sm font-medium">{m.name}</div>
+                <div className="font-mono text-[10px] text-gray-400">{m.handle}</div>
               </div>
               <Pill>{m.metric}</Pill>
             </div>
-            <p className="mt-3 text-xs text-white/65">{m.post}</p>
+            <p className="mt-3 text-xs text-gray-600">{m.post}</p>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">
-              <div className="rounded-lg bg-white/5 py-1.5">
+              <div className="rounded-lg bg-gray-50 py-1.5">
                 <b className="text-sm">{m.agility}</b>
-                <div className="text-white/45">Agility</div>
+                <div className="text-gray-400">Agility</div>
               </div>
-              <div className="rounded-lg bg-white/5 py-1.5">
+              <div className="rounded-lg bg-gray-50 py-1.5">
                 <b className="text-sm">{m.recovery}</b>
-                <div className="text-white/45">Recovery</div>
+                <div className="text-gray-400">Recovery</div>
               </div>
-              <div className="rounded-lg bg-white/5 py-1.5">
+              <div className="rounded-lg bg-gray-50 py-1.5">
                 <b className="text-sm">{m.likes}</b>
-                <div className="text-white/45">Likes</div>
+                <div className="text-gray-400">Likes</div>
               </div>
             </div>
           </Card>
@@ -176,28 +172,25 @@ function Compete() {
   const ranked = [...columbiaGroup].sort((a, b) => b.agility - a.agility);
   return (
     <Card>
-      <h3 className="font-black">VYRO Compete · Columbia leaderboard</h3>
-      <p className="mt-2 text-sm text-white/55">
-        Leaderboards by sport, sleep score, recovery, sessions, agility, and verified performance receipts.
-      </p>
+      <h3 className="font-semibold">Leaderboard</h3>
       <div className="mt-5 space-y-2">
         {ranked.map((m, i) => (
-          <div key={m.name} className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-3">
-            <div className="w-6 text-center font-mono text-xs text-white/45">{i + 1}</div>
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[11px] font-black">
+          <div key={m.name} className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+            <div className="w-6 text-center font-mono text-xs text-gray-400">{i + 1}</div>
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-gray-200 text-[11px] font-semibold">
               {m.initials}
             </div>
             <div className="flex-1">
-              <div className="text-sm font-bold">{m.name}</div>
-              <div className="font-mono text-[10px] text-white/45">{m.handle}</div>
+              <div className="text-sm font-medium">{m.name}</div>
+              <div className="font-mono text-[10px] text-gray-400">{m.handle}</div>
             </div>
             <div className="text-right">
-              <div className="text-sm font-black tabular-nums">{m.agility}</div>
-              <div className="text-[10px] text-white/45">Agility</div>
+              <div className="text-sm font-semibold tabular-nums">{m.agility}</div>
+              <div className="text-[10px] text-gray-400">Agility</div>
             </div>
             <div className="text-right">
-              <div className="text-sm font-black tabular-nums">{m.recovery}</div>
-              <div className="text-[10px] text-white/45">Recovery</div>
+              <div className="text-sm font-semibold tabular-nums">{m.recovery}</div>
+              <div className="text-[10px] text-gray-400">Recovery</div>
             </div>
           </div>
         ))}
@@ -208,9 +201,9 @@ function Compete() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-white/[0.04] py-2">
-      <div className="text-xl font-black tabular-nums">{value}</div>
-      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/45">{label}</div>
+    <div className="rounded-xl bg-gray-50 py-2">
+      <div className="text-xl font-semibold tabular-nums">{value}</div>
+      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-gray-400">{label}</div>
     </div>
   );
 }
@@ -219,19 +212,19 @@ function Profile() {
   return (
     <Card>
       <div className="text-center">
-        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full border border-white/20 bg-white/10 text-2xl font-black">
+        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full border border-gray-200 bg-gray-100 text-2xl font-semibold">
           RC
         </div>
-        <h3 className="mt-3 text-xl font-black">Ryan Chen</h3>
-        <p className="font-mono text-xs text-white/45">@ryanchen · Squash · Columbia</p>
+        <h3 className="mt-3 text-xl font-semibold">Ryan Chen</h3>
+        <p className="font-mono text-xs text-gray-400">@ryanchen · Squash · Columbia</p>
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <div><b className="text-2xl">28</b><br /><span className="text-xs text-white/45">Posts</span></div>
-          <div><b className="text-2xl">412</b><br /><span className="text-xs text-white/45">Followers</span></div>
-          <div><b className="text-2xl">86</b><br /><span className="text-xs text-white/45">Following</span></div>
+          <div><b className="text-2xl">28</b><br /><span className="text-xs text-gray-400">Posts</span></div>
+          <div><b className="text-2xl">412</b><br /><span className="text-xs text-gray-400">Followers</span></div>
+          <div><b className="text-2xl">86</b><br /><span className="text-xs text-gray-400">Following</span></div>
         </div>
         <div className="mt-5 grid grid-cols-3 gap-2">
           {Array.from({ length: 9 }, (_, i) => (
-            <div key={i} className="aspect-square rounded-xl bg-white/[0.06] border border-white/10" />
+            <div key={i} className="aspect-square rounded-xl bg-gray-50 border border-gray-200" />
           ))}
         </div>
       </div>

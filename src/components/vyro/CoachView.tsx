@@ -149,9 +149,8 @@ export function CoachView() {
   return (
     <>
       <PageHeader
-        eyebrow="Coach-only portal"
-        title="Sport-scoped roster intelligence"
-        subtitle="Coaches see athletes by sport. Strength trainers can toggle sports without seeing everyone at once."
+        eyebrow="Coach"
+        title="Roster"
       />
       <div className="mb-4 flex gap-2 overflow-x-auto">
         {sports.map((s) => {
@@ -166,10 +165,10 @@ export function CoachView() {
                 if (!comingSoon) setSelectedSport(s as "Squash" | "Tennis");
               }}
               className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
-                active ? "border-white/30 bg-white/15 text-white" : "border-white/10 text-white/70"
+                active ? "border-gray-300 bg-gray-100 text-gray-900" : "border-gray-200 text-gray-500"
               } ${comingSoon ? "cursor-not-allowed opacity-45" : ""}`}
             >
-              {s} <span className="text-white/35">{comingSoon ? "Coming soon" : count}</span>
+              {s} <span className="text-gray-400">{comingSoon ? "Coming soon" : count}</span>
             </button>
           );
         })}
@@ -178,30 +177,30 @@ export function CoachView() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <div className="flex items-center justify-between">
-            <h3 className="font-black">Columbia {selectedSport.toLowerCase()} roster</h3>
+            <h3 className="font-semibold">Columbia {selectedSport.toLowerCase()}</h3>
             <Pill>{roster.length} athletes</Pill>
           </div>
           <div className="mt-4 space-y-2">
             {roster.map((a) => (
-              <div key={a.name} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+              <div key={a.name} className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
                 <div className="flex items-center gap-3">
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[11px] font-black">
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-gray-200 text-[11px] font-semibold">
                     {initialsOf(a.name)}
                   </div>
                   <div className="flex-1">
-                    <div className="text-sm font-bold">{a.name}</div>
-                    <div className="text-[11px] text-white/45">
+                    <div className="text-sm font-medium">{a.name}</div>
+                    <div className="text-[11px] text-gray-400">
                       {a.matches} matches · {a.wins}W-{a.matches - a.wins}L · HRV {a.hrv}ms
                     </div>
                   </div>
                   <Pill color={statusColor(a.status) as "white" | "amber" | "red"}>{a.status}</Pill>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="text-[10px] text-white/45">Load</span>
+                  <span className="text-[10px] text-gray-400">Load</span>
                   <div className="flex-1">
                     <Bar value={a.load} color={a.load > 75 ? "amber" : "white"} />
                   </div>
-                  <span className="text-[10px] tabular-nums text-white/55">{a.load}</span>
+                  <span className="text-[10px] tabular-nums text-gray-500">{a.load}</span>
                 </div>
               </div>
             ))}
@@ -211,10 +210,7 @@ export function CoachView() {
         <Card className="lg:col-span-2">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="font-black">Combined opponent model · {sportOpp.focus}</h3>
-              <p className="mt-1 text-sm text-white/55">
-                Toggle which teammates' match databases to combine. Percentages are sample-weighted across all selected rallies.
-              </p>
+              <h3 className="font-semibold">Opponent model · {sportOpp.focus}</h3>
             </div>
             <Pill>{consolidated[0]?.sample ?? 0} rallies</Pill>
           </div>
@@ -227,7 +223,7 @@ export function CoachView() {
                   key={name}
                   onClick={() => toggle(name)}
                   className={`rounded-full border px-3 py-1.5 text-xs ${
-                    on ? "border-white/30 bg-white/15 text-white" : "border-white/10 text-white/55"
+                    on ? "border-gray-300 bg-gray-100 text-gray-900" : "border-gray-200 text-gray-500"
                   }`}
                 >
                   {on ? "✓ " : "+ "}
@@ -239,17 +235,17 @@ export function CoachView() {
 
           <div className="mt-5 space-y-4">
             {consolidated.length === 0 && (
-              <p className="text-sm text-white/45">Select at least one teammate to build a tendency database.</p>
+              <p className="text-sm text-gray-400">Select at least one teammate to build a tendency database.</p>
             )}
             {consolidated.map((row) => (
               <div key={row.zone + row.shot}>
                 <div className="flex items-center justify-between text-sm">
                   <div>
-                    <span className="font-bold">{row.zone}</span>{" "}
-                    <span className="text-white/55">· {row.shot}</span>
+                    <span className="font-medium">{row.zone}</span>{" "}
+                    <span className="text-gray-500">· {row.shot}</span>
                   </div>
-                  <div className="tabular-nums text-white/70">
-                    {row.pct}% <span className="text-[11px] text-white/40">· n={row.sample} · {row.contributors} sources</span>
+                  <div className="tabular-nums text-gray-600">
+                    {row.pct}% <span className="text-[11px] text-gray-400">· n={row.sample} · {row.contributors} sources</span>
                   </div>
                 </div>
                 <Bar value={row.pct} color={row.pct >= 65 ? "white" : row.pct >= 50 ? "amber" : "white"} />
@@ -259,10 +255,7 @@ export function CoachView() {
         </Card>
 
         <Card className="lg:col-span-3">
-          <h3 className="font-black">Coach's iPad · live match board</h3>
-          <p className="mt-2 text-sm text-white/55">
-            Live roster, substitution readiness, red-zone fatigue, and player availability.
-          </p>
+          <h3 className="font-semibold">Match board</h3>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: "Available now", value: roster.filter((a) => a.status !== "Recover").length, sub: `of ${roster.length} on roster` },
@@ -270,10 +263,10 @@ export function CoachView() {
               { label: "Avg team HRV", value: Math.round(roster.reduce((s, a) => s + a.hrv, 0) / Math.max(1, roster.length)), sub: "ms · 7-day" },
               { label: "Win rate · 30d", value: Math.round((roster.reduce((s, a) => s + a.wins, 0) / Math.max(1, roster.reduce((s, a) => s + a.matches, 0))) * 100), sub: "% across rosters" },
             ].map((s) => (
-              <div key={s.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{s.label}</div>
-                <div className="mt-1 text-3xl font-black tabular-nums">{s.value}</div>
-                <div className="text-[11px] text-white/45">{s.sub}</div>
+              <div key={s.label} className="rounded-2xl border border-gray-200 bg-gray-50/80 p-3">
+                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-gray-500">{s.label}</div>
+                <div className="mt-1 text-3xl font-semibold tabular-nums">{s.value}</div>
+                <div className="text-[11px] text-gray-400">{s.sub}</div>
               </div>
             ))}
           </div>

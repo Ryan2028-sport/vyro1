@@ -41,12 +41,12 @@ export function SessionView() {
           live ? (
             <button
               onClick={stop}
-              className="rounded-xl border border-[#ff2b2b]/40 bg-[#ff2b2b]/15 px-4 py-2 text-sm font-bold text-[#ff2b2b]"
+              className="rounded-xl border border-vyro-red/40 bg-vyro-red/15 px-4 py-2 text-sm font-medium text-vyro-red"
             >
               End session
             </button>
           ) : (
-            <button onClick={start} className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-black">
+            <button onClick={start} className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white">
               Start session
             </button>
           )
@@ -55,19 +55,19 @@ export function SessionView() {
       <div className="grid gap-4 lg:grid-cols-5">
         {stats.map((x) => (
           <Card key={x[0]}>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">{x[0]}</div>
-            <div className="mt-2 text-4xl font-black tabular-nums">{x[1]}</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500">{x[0]}</div>
+            <div className="mt-2 text-4xl font-semibold tabular-nums">{x[1]}</div>
           </Card>
         ))}
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Heart rate · 60s</div>
-          <Spark points={[25, 35, 48, 60, 72, 67, 80, 74, 84, 78]} color="#ff2b2b" />
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500">Heart rate · 60s</div>
+          <Spark points={[25, 35, 48, 60, 72, 67, 80, 74, 84, 78]} color="var(--vyro-red)" />
         </Card>
         <Card>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Acceleration · burst detection</div>
-          <Spark points={[8, 12, 40, 75, 20, 18, 85, 44, 16, 10]} color="#ffb020" />
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500">Acceleration · burst detection</div>
+          <Spark points={[8, 12, 40, 75, 20, 18, 85, 44, 16, 10]} color="var(--vyro-amber)" />
         </Card>
       </div>
     </>

@@ -22,20 +22,19 @@ export function SportView({
   return (
     <>
       <PageHeader
-        eyebrow="Sport Intelligence"
-        title={`${activeSport} performance lab.`}
-        subtitle={profile.db}
+        eyebrow="Sport"
+        title={activeSport}
         action={
           <button
             onClick={() => setPickerOpen((o) => !o)}
-            className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold"
+            className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-900"
           >
             Change sport
           </button>
         }
       />
       {pickerOpen && (
-        <div className="mb-4 rounded-[24px] border border-white/10 bg-white/[0.055] p-3">
+        <div className="mb-4 rounded-[24px] border border-gray-200 bg-white p-3 shadow-sm">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {sports.map((s) => {
               const comingSoon = comingSoonSports.includes(s);
@@ -50,12 +49,12 @@ export function SportView({
                     setPickerOpen(false);
                   }}
                   className={`rounded-2xl border px-4 py-3 text-left ${
-                    activeSport === s ? "border-white/30 bg-white/15" : "border-white/10 bg-black/20"
+                    activeSport === s ? "border-gray-300 bg-gray-100" : "border-gray-200 bg-gray-50"
                   } ${comingSoon ? "cursor-not-allowed opacity-45" : ""}`}
                 >
-                  <div className="font-bold">{s}</div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
-                    {comingSoon ? "Coming soon" : "Active VYRO sport module"}
+                  <div className="font-medium">{s}</div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-gray-500">
+                    {comingSoon ? "Coming soon" : "Active"}
                   </div>
                 </button>
               );
@@ -75,7 +74,7 @@ export function SportView({
             key={id}
             onClick={() => setSportTab(id)}
             className={`rounded-full border px-4 py-2 text-sm ${
-              sportTab === id ? "border-white/25 bg-white/15" : "border-white/10 text-white/60"
+              sportTab === id ? "border-gray-300 bg-gray-100 text-gray-900" : "border-gray-200 text-gray-500"
             }`}
           >
             {label}
@@ -96,11 +95,11 @@ function SportDatabase({ profile, selectedSport }: { profile: SportProfile; sele
       {profile.heatmap ? (
         <Card>
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-black">{isTennis ? "Shot location heat map" : "Red heat map"}</h3>
+            <h3 className="text-lg font-semibold">{isTennis ? "Shot location heat map" : "Red heat map"}</h3>
             <Pill>{isTennis ? "rally landings" : "court coverage"}</Pill>
           </div>
           {isTennis ? <TennisHeatmap /> : <SquashHeatmap />}
-          <div className="mt-3 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-white/55">
+          <div className="mt-3 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-gray-400">
             <span>low density</span>
             <div className="mx-3 h-2 flex-1 rounded-full" style={{ background: "linear-gradient(to right, rgba(255,43,43,0.08), rgba(255,43,43,0.45), rgba(255,43,43,0.95))" }} />
             <span>hot zone</span>
@@ -108,18 +107,17 @@ function SportDatabase({ profile, selectedSport }: { profile: SportProfile; sele
         </Card>
       ) : (
         <Card>
-          <h3 className="text-lg font-black">No heat map for {selectedSport}</h3>
-          <p className="mt-2 text-sm text-white/55">
-            Heat maps stay limited to squash and tennis. This sport uses tendency profiles and motion intelligence
-            instead.
+          <h3 className="text-lg font-semibold">No heat map for {selectedSport}</h3>
+          <p className="mt-2 text-sm text-gray-500">
+            Available for squash and tennis only.
           </p>
         </Card>
       )}
       <Card>
-        <h3 className="text-lg font-black">Tendency profile</h3>
+        <h3 className="text-lg font-semibold">Tendency profile</h3>
         <div className="mt-4 space-y-3">
           {profile.tendency.map((x) => (
-            <div key={x} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm">
+            <div key={x} className="rounded-2xl border border-gray-200 bg-gray-50 p-3 text-sm">
               {x}
             </div>
           ))}
@@ -131,7 +129,7 @@ function SportDatabase({ profile, selectedSport }: { profile: SportProfile; sele
 
 function SquashHeatmap() {
   return (
-    <div className="mt-4 aspect-[3/4] rounded-2xl border border-white/15 bg-black p-4">
+    <div className="mt-4 aspect-[3/4] rounded-2xl border border-gray-300 bg-black p-4">
       <div className="relative h-full w-full rounded-xl border-2 border-white/60">
         <div className="absolute left-0 right-0 top-[14%] border-t border-white/50" />
         <div className="absolute left-0 right-0 top-[38%] border-t border-white/50" />
@@ -147,19 +145,18 @@ function SquashHeatmap() {
 }
 
 function TennisHeatmap() {
-  // Heat blobs placed in normalized SVG coordinates (court 100x200, viewed end-on with net at y=100)
   const blobs = [
-    { x: 18, y: 22, r: 22, i: 0.92 }, // deuce-side deep corner (returner)
-    { x: 82, y: 22, r: 20, i: 0.78 }, // ad-side deep corner
-    { x: 28, y: 70, r: 14, i: 0.55 }, // approach
-    { x: 72, y: 132, r: 14, i: 0.5 }, // opponent approach
-    { x: 18, y: 178, r: 22, i: 0.88 }, // ad-side serve target (T)
-    { x: 82, y: 178, r: 18, i: 0.7 }, // deuce-side wide serve
-    { x: 50, y: 178, r: 12, i: 0.6 }, // body serve
-    { x: 50, y: 100, r: 9, i: 0.35 }, // net cord touches
+    { x: 18, y: 22, r: 22, i: 0.92 },
+    { x: 82, y: 22, r: 20, i: 0.78 },
+    { x: 28, y: 70, r: 14, i: 0.55 },
+    { x: 72, y: 132, r: 14, i: 0.5 },
+    { x: 18, y: 178, r: 22, i: 0.88 },
+    { x: 82, y: 178, r: 18, i: 0.7 },
+    { x: 50, y: 178, r: 12, i: 0.6 },
+    { x: 50, y: 100, r: 9, i: 0.35 },
   ];
   return (
-    <div className="mt-4 aspect-[3/4] overflow-hidden rounded-2xl border border-white/15 bg-[#0a3d1f] p-3">
+    <div className="mt-4 aspect-[3/4] overflow-hidden rounded-2xl border border-gray-300 bg-[#0a3d1f] p-3">
       <div className="relative h-full w-full overflow-hidden rounded-xl" style={{ background: "linear-gradient(180deg,#0d4a26 0%,#0a3d1f 50%,#0d4a26 100%)" }}>
         <svg viewBox="0 0 100 200" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
           <defs>
@@ -171,32 +168,22 @@ function TennisHeatmap() {
               </radialGradient>
             ))}
           </defs>
-          {/* heat */}
           {blobs.map((b, idx) => (
             <ellipse key={idx} cx={b.x} cy={b.y} rx={b.r} ry={b.r * 1.05} fill={`url(#tg${idx})`} />
           ))}
-          {/* court lines — full doubles court */}
           <g fill="none" stroke="white" strokeOpacity="0.92" strokeWidth="0.7">
-            {/* outer doubles */}
             <rect x="6" y="6" width="88" height="188" />
-            {/* singles sidelines */}
             <line x1="14" y1="6" x2="14" y2="194" />
             <line x1="86" y1="6" x2="86" y2="194" />
-            {/* baselines already part of rect; service boxes */}
             <line x1="14" y1="60" x2="86" y2="60" />
             <line x1="14" y1="140" x2="86" y2="140" />
-            {/* center service line */}
             <line x1="50" y1="60" x2="50" y2="140" />
-            {/* center marks on baseline */}
             <line x1="50" y1="6" x2="50" y2="10" />
             <line x1="50" y1="190" x2="50" y2="194" />
-            {/* net */}
             <line x1="6" y1="100" x2="94" y2="100" strokeWidth="1.4" strokeOpacity="1" />
           </g>
-          {/* net band shading */}
           <rect x="6" y="98.5" width="88" height="3" fill="rgba(255,255,255,0.15)" />
         </svg>
-        {/* labels */}
         <div className="absolute left-2 top-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/70">opponent baseline</div>
         <div className="absolute bottom-2 left-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/70">your baseline</div>
         <div className="absolute right-2 top-1/2 -translate-y-1/2 rotate-90 font-mono text-[9px] uppercase tracking-[0.18em] text-white/55">net</div>
@@ -204,7 +191,6 @@ function TennisHeatmap() {
     </div>
   );
 }
-
 
 function SportAgility({ selectedSport }: { selectedSport: string }) {
   const isSquash = selectedSport === "Squash";
@@ -220,11 +206,7 @@ function SportAgility({ selectedSport }: { selectedSport: string }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
-        <h3 className="text-lg font-black">Agility / Movement breakdown</h3>
-        <p className="mt-2 text-sm text-white/55">
-          First-step burst, acceleration, deceleration, change of direction, and return control are mapped to
-          sport-specific mechanics.
-        </p>
+        <h3 className="text-lg font-semibold">Agility / Movement</h3>
         <div className="mt-4 space-y-3">
           {items.map((x) => (
             <div key={x}>
@@ -235,8 +217,8 @@ function SportAgility({ selectedSport }: { selectedSport: string }) {
         </div>
       </Card>
       <Card>
-        <h3 className="text-lg font-black">Movement technique</h3>
-        <div className="mt-4 space-y-3 text-sm text-white/65">
+        <h3 className="text-lg font-semibold">Movement technique</h3>
+        <div className="mt-4 space-y-3 text-sm text-gray-600">
           <div>First step from {baseLabel}: 2.4 ft</div>
           <div>Steps to target zone: 3.1 avg</div>
           <div>{returnLabel}: 1.37s</div>
@@ -260,10 +242,10 @@ export function SportSwing({ profile }: { profile: SportProfile }) {
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-black">{profile.motion}</h3>
+          <h3 className="text-lg font-semibold">{profile.motion}</h3>
           <Pill>slow motion</Pill>
         </div>
-        <div className="relative mt-4 aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black">
+        <div className="relative mt-4 aspect-video overflow-hidden rounded-2xl border border-gray-300 bg-black">
           <svg viewBox="0 0 500 280" className="h-full w-full">
             <path d="M80 210 C160 80 310 70 420 120" fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" />
             <circle cx="355" cy="115" r="18" fill="#fff" />
@@ -275,10 +257,10 @@ export function SportSwing({ profile }: { profile: SportProfile }) {
         </div>
       </Card>
       <Card>
-        <h3 className="text-lg font-black">Motion metrics</h3>
+        <h3 className="text-lg font-semibold">Motion metrics</h3>
         <div className="mt-4 grid grid-cols-2 gap-3">
           {metrics.map((x) => (
-            <div key={x} className="rounded-2xl bg-white/[0.05] p-3">
+            <div key={x} className="rounded-2xl bg-gray-50 p-3">
               <b>{x}</b>
             </div>
           ))}
