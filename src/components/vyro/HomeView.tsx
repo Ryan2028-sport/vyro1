@@ -193,9 +193,17 @@ export function HomeView({ setView }: { setView: (v: ViewId) => void }) {
   const fatigue = subs.fatigue;
   const agility = subs.agility;
 
-  const strain = m.connected
-    ? Math.round(Math.min(100, m.eventsLastMin * 1.2 + Math.min(42, m.peakJerk / 6)))
-    : null;
+  const strain = useMemo(() => {
+    if (!m.connected) return null;
+    const contributors: number[] = [];
+    if (m.eventsLastMin > 0) contributors.push(Math.min(100, m.eventsLastMin * 1.4));
+    if ((m.peakJerk ?? 0) > 0) contributors.push(Math.min(100, (m.peakJerk ?? 0) / 2));
+    if (m.heartRateBpm != null && m.restingHrBpm != null) {
+      contributors.push(Math.min(100, Math.max(0, (m.heartRateBpm - m.restingHrBpm) * 2.2)));
+    }
+    if (contributors.length === 0) return null;
+    return Math.round(contributors.reduce((a, b) => a + b, 0) / contributors.length);
+  }, [m.connected, m.eventsLastMin, m.peakJerk, m.heartRateBpm, m.restingHrBpm]);
 
   const band = recoveryBand(readiness);
   const bandTone = band === "green" ? "live" : band === "red" ? "off" : band === "yellow" ? "warn" : "neutral";

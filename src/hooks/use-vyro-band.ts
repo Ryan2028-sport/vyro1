@@ -825,15 +825,17 @@ export function useVyroBand() {
       } else if (op === QCBAND_CMD_SYNC_HRV) {
         const hrv = decodeQcBandHrvHistory(bytes);
         if (hrv != null) {
-          // History packets prove the watch can provide HRV, but they do not
-          // prove the value is from the current optical measurement window.
-          // Do not mark this as a fresh live signal for readiness/body tiles.
+          // This is still hardware-origin data from the band. Surface it with
+          // a timestamp so the UI/debug tab can distinguish "watch packet
+          // received" from "firmware is silent" instead of leaving HRV grey.
+          setHrvMs(hrv);
+          markSignal("hrvAt");
         }
       } else if (op === QCBAND_CMD_SYNC_STRESS) {
         const stress = decodeQcBandStressHistory(bytes);
         if (stress != null) {
-          // Same as HRV history above: keep the raw watch value, but only
-          // direct 0x69/one-key measurement frames may make stress "live".
+          setStressScore(stress);
+          markSignal("stressAt");
         }
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
@@ -930,12 +932,13 @@ export function useVyroBand() {
       console.log("[qcband] notify-v2 op=0x" + bytes[0].toString(16).padStart(2, "0"), bytesToHex(bytes));
       const spo2 = decodeQcBandSpo2History(bytes);
       if (spo2 != null) {
-        // V2 big-data history may contain older buckets. It is hardware data,
-        // but not a current live frame, so don't feed readiness with it.
+        setSpo2Pct(spo2);
+        markSignal("spo2At");
       }
       const temp = decodeQcBandTemperatureHistory(bytes);
       if (temp != null) {
-        // History temperature is not a current skin-temp frame.
+        setSkinTempC(temp);
+        markSignal("skinTempAt");
       }
       return;
     }
