@@ -6,6 +6,9 @@ import {
 } from "./packets";
 import {
   decodeQcBandBloodPressurePayload,
+  decodeQcBandHrvHistory,
+  decodeQcBandMeasureFrame,
+  decodeQcBandStressHistory,
   decodeQcBandTemperatureHistory,
   decodeQcBandTodaySports,
   decodeQcBandTodaySummary,
@@ -14,8 +17,10 @@ import {
   encodeQcBandTemperatureHistoryRequest,
   QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL,
   QCBAND_CMD_BIG_DATA_V2,
+  QCBAND_CMD_START_MEASURE,
   QCBAND_CMD_SYNC_HRV,
   QCBAND_CMD_SYNC_STRESS,
+  QCBAND_MEASURE_SPO2_SDK,
 } from "./qcband";
 
 describe("decodeMotionEvent — swing reference vector", () => {
@@ -132,6 +137,19 @@ describe("QCBand SDK metric decoders", () => {
       0,
       0,
     ]);
+  });
+
+  it("decodes today's HRV/stress history packets with packet index 0", () => {
+    expect(decodeQcBandHrvHistory(hexToBytes("39 00 00 01 2A 00"))).toBe(42);
+    expect(decodeQcBandStressHistory(hexToBytes("37 00 00 01 35 00"))).toBe(53);
+  });
+
+  it("treats new-SDK SpO₂ measure frames as value-only payloads", () => {
+    expect(
+      decodeQcBandMeasureFrame(
+        new Uint8Array([QCBAND_CMD_START_MEASURE, QCBAND_MEASURE_SPO2_SDK, 97]),
+      ),
+    ).toMatchObject({ subType: QCBAND_MEASURE_SPO2_SDK, errorCode: 0, value: 97 });
   });
 
   it("decodes direct blood-pressure measurement payloads", () => {
