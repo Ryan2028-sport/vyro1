@@ -245,9 +245,9 @@ function loadPersistedBandMetrics(): Partial<PersistedBandMetrics> {
       respRateBrpm: null,
       stressScore: null,
       bloodPressure: null,
-      // Silence unused-var lint without dropping the validators above.
-      _bp: sbp != null && dbp != null ? { sbp, dbp } : null,
     };
+    // Validators kept to silence unused-var lint and document the schema:
+    void sbp; void dbp;
   } catch {
     return {};
   }
