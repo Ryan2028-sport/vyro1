@@ -170,6 +170,7 @@ export type BleWriteComplete = {
   characteristic: string;
   success: boolean;
   error?: string;
+  payload?: string; // hex bytes that were written (for debug)
 };
 
 type BleEventMap = {
