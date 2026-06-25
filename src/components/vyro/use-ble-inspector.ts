@@ -51,16 +51,38 @@ export type BleInspectorState = {
 
 const MAX_RECENT = 40;
 
+const emptyWrites = () => ({
+  total: 0,
+  ok: 0,
+  failed: 0,
+  lastAt: null,
+  lastCharacteristic: null,
+  lastError: null,
+});
+
+const emptyState = (): BleInspectorState => ({
+  perChar: {},
+  perOpcode: {},
+  recent: [],
+  discovered: null,
+  totalNotifications: 0,
+  writes: emptyWrites(),
+});
+
 let singleton: {
   state: BleInspectorState;
   subs: Set<(s: BleInspectorState) => void>;
   initialized: boolean;
 } | null = null;
 
-function getStore() {
+function getStore(): {
+  state: BleInspectorState;
+  subs: Set<(s: BleInspectorState) => void>;
+  initialized: boolean;
+} {
   if (!singleton) {
     singleton = {
-      state: { perChar: {}, recent: [], discovered: null, totalNotifications: 0 },
+      state: emptyState(),
       subs: new Set(),
       initialized: false,
     };
@@ -70,10 +92,11 @@ function getStore() {
 
 function toBytes(value: string): Uint8Array {
   try {
+    const trimmed = value.trim();
     const isHex =
-      /^[0-9a-fA-F\s:]+$/.test(value) &&
-      value.replace(/[^0-9a-fA-F]/g, "").length % 2 === 0;
-    return isHex ? hexToBytes(value) : base64ToBytes(value);
+      /^[0-9a-fA-F\s:,-]+$/.test(trimmed.replace(/^0x/i, "")) &&
+      trimmed.replace(/^0x/i, "").replace(/[^0-9a-fA-F]/g, "").length % 2 === 0;
+    return isHex ? hexToBytes(trimmed) : base64ToBytes(value);
   } catch {
     return new Uint8Array(0);
   }
