@@ -28,6 +28,7 @@ import { SocialView } from "./SocialView";
 import { SportView } from "./SportView";
 import { TrendsView } from "./TrendsView";
 import { computeReadiness, computeSubScores, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
+import { useSleepNights } from "@/lib/use-sleep-nights";
 import "./app2-reference.css";
 
 // ---------- Baseline persistence (rolling user baselines for divergence/RTP) ----------
