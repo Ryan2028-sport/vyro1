@@ -30,6 +30,7 @@ import {
   shortUuid,
   useBleInspector,
   type CharStat,
+  type OpStat,
 } from "./use-ble-inspector";
 
 type Row = {
@@ -362,6 +363,39 @@ export function DebugView() {
     [inspector.perChar],
   );
 
+  const opcodeStats: OpStat[] = useMemo(
+    () => Object.values(inspector.perOpcode).sort((a, b) => b.lastAt - a.lastAt),
+    [inspector.perOpcode],
+  );
+
+  const expectedTraffic: Row[] = useMemo(() => {
+    const op = (code: number) => inspector.perOpcode[`0x${code.toString(16).padStart(2, "0")}`];
+    const mk = (label: string, code: number, source: string, note?: string): Row => {
+      const stat = op(code);
+      return {
+        label,
+        value: stat ? String(stat.count) : "0",
+        ok: !!stat,
+        source,
+        note: stat ? `last ${stat.lastHex}` : note,
+        ageMs: stat ? now - stat.lastAt : undefined,
+      };
+    };
+    return [
+      mk("Realtime HR frames", 0x1e, "QCBand opcode 0x1e", "HR works if this increments"),
+      mk("Battery replies", 0x03, "QCBand opcode 0x03", "sent every 60s"),
+      mk("Steps / summary replies", 0x09, "QCBand opcode 0x09", "also check opcode 0x07 / 0x43 below"),
+      mk("Steps alt replies", 0x07, "QCBand opcode 0x07", "older daily total"),
+      mk("Activity history", 0x43, "QCBand opcode 0x43", "hourly activity sync"),
+      mk("Measurement frames", 0x69, "QCBand opcode 0x69", "SpO₂/temp/HRV/stress one-key/manual"),
+      mk("Measurement stop/echo", 0x6a, "QCBand opcode 0x6a", "some firmwares answer on stop"),
+      mk("Stress history", 0x37, "QCBand opcode 0x37", "30-min stress sync"),
+      mk("HRV history", 0x39, "QCBand opcode 0x39", "30-min HRV sync"),
+      mk("Live notifications", 0x73, "QCBand opcode 0x73", "activity / SpO₂ / temp notify"),
+      mk("V2 big-data", 0xbc, "QCBand V2 opcode 0xbc", "SpO₂/temp history service"),
+    ];
+  }, [inspector.perOpcode, now]);
+
   // GATT tree — group by service.
   const gattRows = useMemo(() => {
     const services = inspector.discovered?.services ?? [];
@@ -407,6 +441,16 @@ export function DebugView() {
       <Section title="Session engine" rows={session} />
       <Section title="Sleep pipeline" rows={sleep} />
       <Section title="Tab wiring" rows={tabs} />
+      <Section
+        title="Expected BLE traffic by metric"
+        rows={expectedTraffic}
+        rightSlot={
+          <span>
+            writes {inspector.writes.ok}/{inspector.writes.total}
+            {inspector.writes.lastAt ? ` · ${ageLabel(now - inspector.writes.lastAt)}` : ""}
+          </span>
+        }
+      />
 
       <div
         style={{
@@ -459,6 +503,78 @@ export function DebugView() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 12,
+          background: "rgba(255,255,255,0.02)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Opcode counters</div>
+          <div style={{ opacity: 0.6, fontSize: 11 }}>
+            {opcodeStats.length} opcodes seen
+          </div>
+        </div>
+        {opcodeStats.length === 0 ? (
+          <div style={{ opacity: 0.6, fontSize: 12 }}>
+            No decodable opcodes yet.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 6 }}>
+            {opcodeStats.map((s) => {
+              const age = now - s.lastAt;
+              const fresh = age < 10_000;
+              return (
+                <div
+                  key={s.opcode}
+                  style={{
+                    borderTop: "1px dashed rgba(255,255,255,0.06)",
+                    paddingTop: 6,
+                    fontSize: 11,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Status ok={fresh} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>
+                        0x{s.opcode.toString(16).padStart(2, "0")}
+                      </div>
+                      <div style={{ opacity: 0.55, fontSize: 10 }}>
+                        {shortUuid(s.characteristic)} · {ageLabel(age)}
+                      </div>
+                    </div>
+                    <div style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
+                      {s.count}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "ui-monospace, monospace",
+                      fontSize: 10,
+                      opacity: 0.7,
+                      marginTop: 3,
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {s.lastHex || "—"}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
