@@ -42,6 +42,15 @@ type Row = {
   ageMs?: number;
 };
 
+const FIRMWARE_DIAGNOSTIC_MS = 15 * 60_000;
+
+function durationLabel(ms: number): string {
+  const safe = Math.max(0, Math.floor(ms / 1000));
+  const min = Math.floor(safe / 60);
+  const sec = safe % 60;
+  return `${min}:${String(sec).padStart(2, "0")}`;
+}
+
 function Status({ ok }: { ok: boolean }) {
   return (
     <span
@@ -179,11 +188,35 @@ export function DebugView() {
   const ctx = useVyroBandCtx();
   const { last: lastSleep, nights } = useSleepNights();
   const inspector = useBleInspector();
+  const diagnosticStartRef = useRef(Date.now());
+  const diagnosticBaselineRef = useRef<{
+    totalNotifications: number;
+    writes: { total: number; ok: number; failed: number };
+    opcodes: Record<string, number>;
+  } | null>(null);
+  const [diagnosticRun, setDiagnosticRun] = useState(0);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
+  const snapshotDiagnosticBaseline = () => ({
+    totalNotifications: inspector.totalNotifications,
+    writes: {
+      total: inspector.writes.total,
+      ok: inspector.writes.ok,
+      failed: inspector.writes.failed,
+    },
+    opcodes: Object.fromEntries(
+      Object.entries(inspector.perOpcode).map(([key, stat]) => [key, stat.count]),
+    ),
+  });
+  if (!diagnosticBaselineRef.current) diagnosticBaselineRef.current = snapshotDiagnosticBaseline();
+  const restartFirmwareDiagnostic = () => {
+    diagnosticStartRef.current = Date.now();
+    diagnosticBaselineRef.current = snapshotDiagnosticBaseline();
+    setDiagnosticRun((run) => run + 1);
+  };
   const signalAge = (at: number | null | undefined) => (at ? now - at : undefined);
   const hardwareSeen = (value: unknown, at?: number | null) =>
     m.connected && value != null && (at == null || now - at < 30 * 60_000);
@@ -354,6 +387,98 @@ export function DebugView() {
     { label: "Coach", value: "wired (heuristics)", ok: true, source: "CoachView ← live ctx + baselines" },
   ];
 
+  const firmwareDiagnosticRows: Row[] = useMemo(() => {
+    const baseline = diagnosticBaselineRef.current ?? snapshotDiagnosticBaseline();
+    const opDelta = (code: number) => {
+      const key = `0x${code.toString(16).padStart(2, "0")}`;
+      return Math.max(0, (inspector.perOpcode[key]?.count ?? 0) - (baseline.opcodes[key] ?? 0));
+    };
+    const opAge = (code: number) => {
+      const key = `0x${code.toString(16).padStart(2, "0")}`;
+      const at = inspector.perOpcode[key]?.lastAt;
+      return at ? now - at : undefined;
+    };
+    const notifDelta = Math.max(0, inspector.totalNotifications - baseline.totalNotifications);
+    const writeTotalDelta = Math.max(0, inspector.writes.total - baseline.writes.total);
+    const writeOkDelta = Math.max(0, inspector.writes.ok - baseline.writes.ok);
+    const writeFailDelta = Math.max(0, inspector.writes.failed - baseline.writes.failed);
+    const stepsDelta = opDelta(0x09) + opDelta(0x07) + opDelta(0x43) + opDelta(0x48);
+    const measureDelta = opDelta(0x69) + opDelta(0x6a);
+    return [
+      {
+        label: "Capture duration",
+        value: durationLabel(now - diagnosticStartRef.current),
+        ok: now - diagnosticStartRef.current >= FIRMWARE_DIAGNOSTIC_MS,
+        source: "15-minute firmware diagnostic window",
+        note: now - diagnosticStartRef.current >= FIRMWARE_DIAGNOSTIC_MS ? "minimum complete; still recording" : `${durationLabel(FIRMWARE_DIAGNOSTIC_MS - (now - diagnosticStartRef.current))} remaining`,
+      },
+      {
+        label: "Notifications captured",
+        value: String(notifDelta),
+        ok: notifDelta > 0,
+        source: "raw BLE data events since diagnostic start",
+      },
+      {
+        label: "Writes acknowledged",
+        value: `${writeOkDelta}/${writeTotalDelta}`,
+        ok: writeTotalDelta > 0 && writeFailDelta === 0,
+        source: "firmware command writes since diagnostic start",
+        note: writeFailDelta > 0 ? `${writeFailDelta} failed` : undefined,
+        ageMs: inspector.writes.lastAt ? now - inspector.writes.lastAt : undefined,
+      },
+      {
+        label: "Heart-rate firmware path",
+        value: String(opDelta(0x1e)),
+        ok: opDelta(0x1e) > 0,
+        source: "opcode 0x1e realtime HR",
+        ageMs: opAge(0x1e),
+      },
+      {
+        label: "Activity firmware path",
+        value: String(stepsDelta),
+        ok: stepsDelta > 0,
+        source: "opcodes 0x09 / 0x07 / 0x43 / 0x48",
+        ageMs: Math.min(opAge(0x09) ?? Infinity, opAge(0x07) ?? Infinity, opAge(0x43) ?? Infinity, opAge(0x48) ?? Infinity),
+      },
+      {
+        label: "Optical measure path",
+        value: String(measureDelta),
+        ok: measureDelta > 0,
+        source: "opcodes 0x69 / 0x6a for SpO₂, temp, HRV, stress",
+        ageMs: Math.min(opAge(0x69) ?? Infinity, opAge(0x6a) ?? Infinity),
+      },
+      {
+        label: "HRV history path",
+        value: String(opDelta(0x39)),
+        ok: opDelta(0x39) > 0,
+        source: "opcode 0x39 today HRV/RMSSD history",
+        ageMs: opAge(0x39),
+      },
+      {
+        label: "Stress history path",
+        value: String(opDelta(0x37)),
+        ok: opDelta(0x37) > 0,
+        source: "opcode 0x37 today stress history",
+        ageMs: opAge(0x37),
+      },
+      {
+        label: "Live notification path",
+        value: String(opDelta(0x73)),
+        ok: opDelta(0x73) > 0,
+        source: "opcode 0x73 live activity / SpO₂ / temp notify",
+        ageMs: opAge(0x73),
+      },
+      {
+        label: "V2 history path",
+        value: String(opDelta(0xbc)),
+        ok: opDelta(0xbc) > 0,
+        source: "opcode 0xbc big-data SpO₂ / temperature history",
+        note: "only expected if the V2 service is advertised",
+        ageMs: opAge(0xbc),
+      },
+    ];
+  }, [diagnosticRun, inspector, now]);
+
   // Per-characteristic counter table.
   const charStats: CharStat[] = useMemo(
     () =>
@@ -435,6 +560,27 @@ export function DebugView() {
       </div>
 
       <Section title="Connection" rows={connection} />
+      <Section
+        title="Firmware diagnostic recorder"
+        rows={firmwareDiagnosticRows}
+        rightSlot={
+          <button
+            type="button"
+            onClick={restartFirmwareDiagnostic}
+            style={{
+              border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 8,
+              padding: "4px 8px",
+              background: "rgba(255,255,255,0.06)",
+              color: "inherit",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            Restart 15m
+          </button>
+        }
+      />
       <Section title="Vitals (PPG)" rows={health} />
       <Section title="Activity" rows={activity} />
       <Section title="Motion (IMU)" rows={imu} />
