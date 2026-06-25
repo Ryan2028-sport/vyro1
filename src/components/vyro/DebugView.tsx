@@ -754,6 +754,8 @@ export function DebugView() {
           </button>
         }
       />
+      <Section title="Per-metric pipeline (cmd → notif → stored)" rows={pipelineRows} />
+      <Section title="Decoder outcomes" rows={decoderRows} />
       <Section title="Vitals (PPG)" rows={health} />
       <Section title="Activity" rows={activity} />
       <Section title="Motion (IMU)" rows={imu} />
