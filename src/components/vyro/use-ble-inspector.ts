@@ -87,7 +87,7 @@ function getStore(): {
       initialized: false,
     };
   }
-  return singleton;
+  return singleton!;
 }
 
 function toBytes(value: string): Uint8Array {
