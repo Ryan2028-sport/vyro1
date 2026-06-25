@@ -17,8 +17,11 @@ export const QCBAND_COMMAND_V2_CHAR_UUID = "de5bf72a-d711-4e47-af26-65e3012a5dc7
 export const QCBAND_NOTIFY_V2_CHAR_UUID = "de5bf729-d711-4e47-af26-65e3012a5dc7";
 
 // Opcodes (selected — see Oudmon protocol).
+export const QCBAND_CMD_SET_TIME = 0x01;         // 1 — required setup on some H59/QC firmwares
 export const QCBAND_CMD_BATTERY = 0x03;          // 3
 export const QCBAND_CMD_TODAY_SUMMARY = 0x09;    // 9 — steps/distance/calories
+export const QCBAND_CMD_HEART_RATE_HISTORY = 0x15; // 21 — 5-min HR history
+export const QCBAND_CMD_HEART_RATE_LOG = 0x16;   // 22 — automatic HR logging preference
 export const QCBAND_CMD_SYNC_STRESS = 0x37;      // 55 — 30-min stress history
 export const QCBAND_CMD_SYNC_HRV = 0x39;         // 57 — 30-min HRV/RMSSD history
 export const QCBAND_CMD_SYNC_ACTIVITY = 0x43;    // 67 — hourly steps/activity history
@@ -78,8 +81,8 @@ export const QCBAND_MEASURE_BP_TYPES = [QCBAND_MEASURE_BP] as const;
 export const QCBAND_MEASURE_SPO2_TYPES = [QCBAND_MEASURE_SPO2, QCBAND_MEASURE_SPO2_SDK] as const;
 export const QCBAND_MEASURE_ONE_KEY_TYPES = [QCBAND_MEASURE_ONE_KEY_HR, QCBAND_MEASURE_ONE_KEY, QCBAND_MEASURE_ONE_KEY_SDK] as const;
 export const QCBAND_MEASURE_TEMP_TYPES = [QCBAND_MEASURE_TEMP_SDK, QCBAND_MEASURE_TEMP, QCBAND_MEASURE_TEMP_LEGACY] as const;
-export const QCBAND_MEASURE_STRESS_TYPES = [QCBAND_MEASURE_STRESS, QCBAND_MEASURE_PRESSURE_SDK, QCBAND_MEASURE_STRESS_SDK] as const;
-export const QCBAND_MEASURE_HRV_TYPES = [QCBAND_MEASURE_HRV, QCBAND_MEASURE_HRV_DATA_REQUEST, QCBAND_MEASURE_HRV_SDK] as const;
+export const QCBAND_MEASURE_STRESS_TYPES = [QCBAND_MEASURE_PRESSURE_SDK, QCBAND_MEASURE_STRESS, QCBAND_MEASURE_STRESS_SDK] as const;
+export const QCBAND_MEASURE_HRV_TYPES = [QCBAND_MEASURE_HRV_DATA_REQUEST, QCBAND_MEASURE_HRV, QCBAND_MEASURE_HRV_SDK] as const;
 
 export type QcBandRealtimeHrCommand = "start" | "end" | "hold";
 
@@ -99,6 +102,34 @@ function sdkCommand(bytes: number[]): Uint8Array {
   }
   out[15] = checksum;
   return out;
+}
+
+function decToBcd(v: number): number {
+  const n = Math.max(0, Math.min(99, Math.trunc(v)));
+  return (((Math.floor(n / 10) << 4) | (n % 10)) & 0xff);
+}
+
+// ---- Setup / feature enabling --------------------------------------------
+export function encodeQcBandSetTime(date = new Date()): Uint8Array {
+  return sdkCommand([
+    QCBAND_CMD_SET_TIME,
+    decToBcd(date.getFullYear() % 100),
+    decToBcd(date.getMonth() + 1),
+    decToBcd(date.getDate()),
+    decToBcd(date.getHours()),
+    decToBcd(date.getMinutes()),
+    decToBcd(date.getSeconds()),
+    0x01,
+  ]);
+}
+
+export function encodeQcBandHeartRateLogging(enabled = true, intervalMin = 5): Uint8Array {
+  return sdkCommand([
+    QCBAND_CMD_HEART_RATE_LOG,
+    0x02,
+    enabled ? 0x01 : 0x02,
+    Math.max(1, Math.min(60, Math.trunc(intervalMin))),
+  ]);
 }
 
 export function encodeQcBandBindingAlert(): Uint8Array {
