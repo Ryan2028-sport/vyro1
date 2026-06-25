@@ -27,6 +27,16 @@ export type OpStat = {
   characteristic: string;
 };
 
+export type WriteLogEntry = {
+  ts: number;
+  service: string;
+  characteristic: string;
+  hex: string;
+  opcode: number | null;
+  success: boolean;
+  error: string | null;
+};
+
 export type BleInspectorState = {
   perChar: Record<string, CharStat>;
   perOpcode: Record<string, OpStat>;
@@ -47,9 +57,23 @@ export type BleInspectorState = {
     lastCharacteristic: string | null;
     lastError: string | null;
   };
+  writeLog: WriteLogEntry[];
+  // Decoder outcome stats (frames we recognise vs. silently ignore).
+  decoderKnownCount: number;
+  decoderUnknownCount: number;
+  unknownOpcodes: Record<string, number>;
 };
 
-const MAX_RECENT = 40;
+const MAX_RECENT = 60;
+const MAX_WRITE_LOG = 25;
+
+// Opcodes the QCBand decoder pipeline currently understands. Anything outside
+// this set lands in "unknown" and is what to investigate first when a tile is
+// grey but notifications are flowing.
+const KNOWN_OPCODES = new Set<number>([
+  0x03, 0x07, 0x09, 0x12, 0x1e, 0x20, 0x32, 0x37, 0x39,
+  0x43, 0x48, 0x69, 0x6a, 0x73, 0x87, 0x89, 0xbc,
+]);
 
 const emptyWrites = () => ({
   total: 0,
