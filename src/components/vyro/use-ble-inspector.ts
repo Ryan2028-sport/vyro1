@@ -174,6 +174,11 @@ function ensureInitialized() {
     ].slice(0, MAX_RECENT);
     const opcodeKey = opcode == null ? null : `0x${opcode.toString(16).padStart(2, "0")}`;
     const prevOp = opcodeKey ? s.state.perOpcode[opcodeKey] : undefined;
+    const isKnown = opcode != null && KNOWN_OPCODES.has(opcode);
+    const unknownOpcodes =
+      opcode != null && !isKnown && opcodeKey
+        ? { ...s.state.unknownOpcodes, [opcodeKey]: (s.state.unknownOpcodes[opcodeKey] ?? 0) + 1 }
+        : s.state.unknownOpcodes;
     s.state = {
       ...s.state,
       perChar: { ...s.state.perChar, [key]: stat },
@@ -192,6 +197,9 @@ function ensureInitialized() {
         : s.state.perOpcode,
       recent,
       totalNotifications: s.state.totalNotifications + 1,
+      decoderKnownCount: s.state.decoderKnownCount + (isKnown ? 1 : 0),
+      decoderUnknownCount: s.state.decoderUnknownCount + (!isKnown && opcode != null ? 1 : 0),
+      unknownOpcodes,
     };
     notify(s);
   });
