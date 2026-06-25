@@ -632,6 +632,30 @@ export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame 
       data: bytes.slice(2),
     };
   }
+  const likelyLegacyNoErrorByte = (() => {
+    const sub = bytes[1];
+    const v = bytes[2] & 0xff;
+    if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(sub)) return v > 30 && v < 250;
+    if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(sub)) return v >= 70 && v <= 100;
+    if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(sub)) return v >= 5 && v < 250;
+    if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(sub)) return v > 0 && v <= 100;
+    if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(sub)) return decodeQcBandTempPayload(bytes.slice(2)) != null;
+    if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(sub)) {
+      return bytes.length >= 5 && v > 30 && v < 220 && bytes[3] > 60 && bytes[4] > 30;
+    }
+    if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(sub)) {
+      return decodeQcBandOneKeyPayload(bytes.slice(2)) != null;
+    }
+    return false;
+  })();
+  if (likelyLegacyNoErrorByte) {
+    return {
+      subType: bytes[1],
+      errorCode: 0,
+      value: bytes[2],
+      data: bytes.slice(2),
+    };
+  }
   return {
     subType: bytes[1],
     errorCode: bytes.length >= 4 ? bytes[2] : 0,
