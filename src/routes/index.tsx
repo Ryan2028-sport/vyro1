@@ -41,13 +41,15 @@ export const Route = createFileRoute("/")({
 });
 
 function App() {
-  const [activeView, setActiveView] = useState<ViewId>("home");
+  const storedRole = typeof localStorage !== "undefined" ? localStorage.getItem("vyro_user_role") : null;
+  const [activeView, setActiveView] = useState<ViewId>(storedRole === "coach" ? "coach" : "home");
   const [selectedSport, setSelectedSport] = useState("Squash");
   const [sportTab, setSportTab] = useState<"database" | "agility" | "swing">("database");
   const [recoveryTab, setRecoveryTab] = useState<"live" | "ingame" | "fatigue" | "overnight">("live");
   const [sleepTab, setSleepTab] = useState<"overall" | "timeline" | "wakeups" | "performance">("overall");
   const [recoverySection, setRecoverySection] = useState<"recovery" | "sleep">("recovery");
   const [socialTab, setSocialTab] = useState<"feed" | "profile" | "group" | "compete">("feed");
+  const [viewingAthlete, setViewingAthlete] = useState<string | null>(null);
 
   const jump = (v: ViewId, tab?: string) => {
     if (v === "sleep") {
@@ -60,6 +62,30 @@ function App() {
     if (v === "sport" && tab) setSportTab(tab as typeof sportTab);
     if (v === "recovery" && tab) setRecoveryTab(tab as typeof recoveryTab);
   };
+
+  if (viewingAthlete) {
+    return (
+      <VyroBandProvider>
+        <Layout activeView="home" setView={setActiveView}>
+          <div className="mb-4">
+            <button
+              onClick={() => setViewingAthlete(null)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to roster
+            </button>
+          </div>
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-gray-400">
+            Viewing · {viewingAthlete}
+          </div>
+          <HomeView jump={jump} />
+        </Layout>
+      </VyroBandProvider>
+    );
+  }
 
   return (
     <VyroBandProvider>
@@ -86,7 +112,9 @@ function App() {
           />
         )}
         {activeView === "sleep" && <SleepView sleepTab={sleepTab} setSleepTab={setSleepTab} />}
-        {activeView === "coach" && <CoachView />}
+        {activeView === "coach" && (
+          <CoachView onViewAthlete={(name) => setViewingAthlete(name)} />
+        )}
         {activeView === "social" && (
           <SocialView socialTab={socialTab} setSocialTab={setSocialTab} />
         )}

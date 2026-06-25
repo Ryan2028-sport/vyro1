@@ -86,7 +86,7 @@ export function AuthScreen({
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-white px-6 pb-10 pt-4">
+    <div className="flex min-h-screen w-full flex-col bg-[#f2f2f2] px-6 pb-10 pt-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -99,7 +99,7 @@ export function AuthScreen({
       </div>
 
       <div className="mx-auto mt-6 flex w-full max-w-sm flex-1 flex-col">
-        <VyroLogo className="mb-2 w-[120px]" />
+        <VyroLogo className="mb-2 w-[120px] self-center" />
         <h1 className="text-2xl font-bold text-gray-900">
           {mode === "signup" ? "Create your account" : "Welcome back"}
         </h1>

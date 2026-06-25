@@ -1,10 +1,8 @@
 import { Suspense, useRef, useEffect, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment } from "@react-three/drei";
-import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
-import { useLoader } from "@react-three/fiber";
-import { TextureLoader, MeshStandardMaterial, Box3, Vector3 } from "three";
-import type { Group } from "three";
+import { Environment, useGLTF } from "@react-three/drei";
+import { Box3, Vector3 } from "three";
+import type { Group, Mesh, MeshStandardMaterial } from "three";
 import { useBluetooth } from "@/hooks/use-bluetooth";
 import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
@@ -14,25 +12,33 @@ type SyncState = "idle" | "scanning" | "found" | "connecting" | "connected" | "e
 
 function Band() {
   const ref = useRef<Group>(null);
-  const fbx = useLoader(FBXLoader, "/models/band.fbx");
-  const texture = useLoader(TextureLoader, "/models/polished-silver.jpg");
+  const gltf = useGLTF("/models/vyro-band.glb");
   const [normalizedScale, setNormalizedScale] = useState(1);
   const [offset, setOffset] = useState(new Vector3());
 
   useEffect(() => {
-    fbx.traverse((child) => {
+    gltf.scene.traverse((child) => {
       if ("isMesh" in child && child.isMesh) {
-        (child as unknown as { material: MeshStandardMaterial }).material =
-          new MeshStandardMaterial({
-            color: 0x222222,
-            metalness: 0.9,
-            roughness: 0.15,
-            envMapIntensity: 1.5,
-          });
+        const mesh = child as Mesh;
+        const materials = Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material];
+
+        materials.forEach((material) => {
+          const bandMaterial = material as MeshStandardMaterial;
+          bandMaterial.color?.set("#20242a");
+          bandMaterial.metalness = 0.12;
+          bandMaterial.roughness = 0.82;
+          bandMaterial.envMapIntensity = 0.25;
+          bandMaterial.needsUpdate = true;
+        });
+
+        child.castShadow = true;
+        child.receiveShadow = true;
       }
     });
 
-    const box = new Box3().setFromObject(fbx);
+    const box = new Box3().setFromObject(gltf.scene);
     const size = new Vector3();
     const center = new Vector3();
     box.getSize(size);
@@ -43,18 +49,17 @@ function Band() {
       setNormalizedScale(targetSize / maxDim);
       setOffset(center.multiplyScalar(targetSize / maxDim));
     }
-  }, [fbx, texture]);
+  }, [gltf.scene]);
 
   useFrame(() => {
     if (!ref.current) return;
     ref.current.rotation.y += 0.008;
-    ref.current.position.y = -offset.y + Math.sin(Date.now() * 0.0015) * 0.12;
   });
 
   return (
     <group ref={ref} position={[0, 0, 0]}>
       <primitive
-        object={fbx}
+        object={gltf.scene}
         scale={normalizedScale}
         position={[-offset.x, -offset.y, -offset.z]}
         rotation={[0.3, 0, 0.15]}
@@ -62,6 +67,8 @@ function Band() {
     </group>
   );
 }
+
+useGLTF.preload("/models/vyro-band.glb");
 
 function BandScene() {
   return (

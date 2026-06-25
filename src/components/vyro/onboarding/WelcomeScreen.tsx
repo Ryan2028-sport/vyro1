@@ -34,7 +34,7 @@ export function WelcomeScreen({
   }, [advance]);
 
   return (
-    <div className="relative flex h-screen w-full flex-col bg-white">
+    <div className="relative flex h-screen w-full flex-col bg-[#f2f2f2]">
       {/* Image carousel — top 2/3 */}
       <div className="relative flex-[2] overflow-hidden">
         {slides.map((src, i) => (
@@ -48,7 +48,7 @@ export function WelcomeScreen({
           />
         ))}
         {/* Gradient overlay fading into white */}
-        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-white via-white/80 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-[30%] bg-gradient-to-t from-[#f2f2f2] via-[#f2f2f2]/80 to-transparent" />
 
         {/* Slide indicators */}
         <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 gap-1.5">
@@ -86,7 +86,7 @@ export function WelcomeScreen({
           </button>
           <button
             onClick={onLogin}
-            className="h-[52px] w-full rounded-2xl border border-gray-200 bg-white text-[15px] font-semibold text-gray-900 transition-colors active:bg-gray-50"
+            className="h-[52px] w-full rounded-2xl border border-gray-300 bg-white/60 text-[15px] font-semibold text-gray-900 transition-colors active:bg-white/80"
           >
             Log In
           </button>

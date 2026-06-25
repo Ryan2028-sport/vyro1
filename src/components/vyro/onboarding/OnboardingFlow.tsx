@@ -43,17 +43,14 @@ export function OnboardingFlow() {
     const { data } = await supabase.auth.getSession();
     if (data.session) {
       await supabase.auth.updateUser({
-        data: { onboarding_complete: true },
+        data: { onboarding_complete: true, role },
       });
       localStorage.setItem("vyro_onboarding_complete", "true");
     }
-    // TODO(temp): Guest bypass — sessionStorage flag lets unauthenticated
-    // users access the app for the current browser session only. On
-    // reload/new tab they're sent back to onboarding. Remove once auth
-    // is enforced and guest access is no longer needed.
+    localStorage.setItem("vyro_user_role", role);
     sessionStorage.setItem("vyro_skip_onboarding", "true");
     navigate({ to: "/" });
-  }, [navigate]);
+  }, [navigate, role]);
 
   // TODO(temp): "Skip for now" bypasses auth for dev/testing. Advances
   // through the rest of onboarding without creating an account. Remove

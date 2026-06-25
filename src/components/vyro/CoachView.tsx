@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { comingSoonSports, sports } from "@/lib/vyro-data";
 import { Bar, Card, PageHeader, Pill } from "./shared";
+import type { ViewId } from "./Layout";
 
 type Athlete = {
   name: string;
@@ -36,6 +36,8 @@ const rosters: Record<string, Athlete[]> = {
     { name: "Andrew Kotzen", initials: "AK", status: "Caution", load: 77, hrv: 63, resting: 55, sleep: 72, agility: 78, matches: 21, wins: 13 },
   ],
 };
+
+const availableSports = ["Squash", "Tennis"];
 
 type Tendency = { zone: string; shot: string; pct: number; sample: number };
 
@@ -103,7 +105,7 @@ const opponentDataBySport: Record<string, { focus: string; data: Record<string, 
 const statusColor = (s: Athlete["status"]) =>
   s === "Peak" ? "white" : s === "Ready" ? "white" : s === "Caution" ? "amber" : "red";
 
-export function CoachView() {
+export function CoachView({ onViewAthlete }: { onViewAthlete?: (athleteName: string) => void }) {
   const [selectedSport, setSelectedSport] = useState<"Squash" | "Tennis">("Squash");
 
   const roster = rosters[selectedSport] ?? [];
@@ -148,27 +150,20 @@ export function CoachView() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Coach"
-        title="Roster"
-      />
+      <PageHeader title="Roster" />
       <div className="mb-4 flex gap-2 overflow-x-auto">
-        {sports.map((s) => {
-          const comingSoon = comingSoonSports.includes(s);
+        {availableSports.map((s) => {
           const count = rosters[s]?.length ?? 0;
           const active = s === selectedSport;
           return (
             <button
               key={s}
-              disabled={comingSoon}
-              onClick={() => {
-                if (!comingSoon) setSelectedSport(s as "Squash" | "Tennis");
-              }}
-              className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
-                active ? "border-gray-300 bg-gray-100 text-gray-900" : "border-gray-200 text-gray-500"
-              } ${comingSoon ? "cursor-not-allowed opacity-45" : ""}`}
+              onClick={() => setSelectedSport(s as "Squash" | "Tennis")}
+              className={`shrink-0 rounded-full border px-4 py-2 text-sm transition-colors ${
+                active ? "border-gray-300 bg-gray-100 text-gray-900" : "border-gray-200 text-gray-500 hover:border-gray-300"
+              }`}
             >
-              {s} <span className="text-gray-400">{comingSoon ? "Coming soon" : count}</span>
+              {s} <span className="text-gray-400">{count}</span>
             </button>
           );
         })}
@@ -182,7 +177,11 @@ export function CoachView() {
           </div>
           <div className="mt-4 space-y-2">
             {roster.map((a) => (
-              <div key={a.name} className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+              <button
+                key={a.name}
+                onClick={() => onViewAthlete?.(a.name)}
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-gray-300 hover:bg-gray-100 active:scale-[0.99]"
+              >
                 <div className="flex items-center gap-3">
                   <div className="grid h-9 w-9 place-items-center rounded-full bg-gray-200 text-[11px] font-semibold">
                     {initialsOf(a.name)}
@@ -202,7 +201,7 @@ export function CoachView() {
                   </div>
                   <span className="text-[10px] tabular-nums text-gray-500">{a.load}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </Card>
