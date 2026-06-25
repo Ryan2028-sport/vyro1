@@ -314,11 +314,29 @@ export function useVyroBand() {
     const current = activityTotalRef.current?.day === day ? activityTotalRef.current : null;
     // 0x43 history is hourly/fallback and is often lower than the exact daily
     // total. Never let it overwrite a better live/today-sports number.
-    if (current && priority < current.priority) return;
+    if (current && priority < current.priority) {
+      const now = Date.now();
+      markSignal("stepsAt", now);
+      markSignal("distanceAt", now);
+      markSignal("caloriesAt", now);
+      return;
+    }
     // Same-day step totals should be monotonic. This rejects malformed decodes
     // without blocking normal increases from the watch.
-    if (current && next.steps < current.steps) return;
-    if (current && next.steps === 0 && current.steps > 0) return;
+    if (current && next.steps < current.steps) {
+      const now = Date.now();
+      markSignal("stepsAt", now);
+      markSignal("distanceAt", now);
+      markSignal("caloriesAt", now);
+      return;
+    }
+    if (current && next.steps === 0 && current.steps > 0) {
+      const now = Date.now();
+      markSignal("stepsAt", now);
+      markSignal("distanceAt", now);
+      markSignal("caloriesAt", now);
+      return;
+    }
     const merged = {
       steps: next.steps,
       distanceM: next.distanceM > 0 ? next.distanceM : current?.distanceM ?? 0,
@@ -601,7 +619,7 @@ export function useVyroBand() {
           void writeQcBandV2(encodeQcBandTemperatureManualHistoryRequest()).catch(() => undefined);
         }, 3_500);
       };
-      window.setTimeout(pollHistory, 4_000);
+      window.setTimeout(pollHistory, 6_000);
       historyTimer = window.setInterval(pollHistory, 60_000);
 
       const enqueueMeasure = (label: string, subType: number, durationMs: number) => {
@@ -904,7 +922,7 @@ export function useVyroBand() {
         }
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
-        if (!frame || frame.errorCode !== 0) return;
+        if (!frame) return;
         const applyOneKey = () => {
           const ok = decodeQcBandOneKeyPayload(frame.data);
           if (!ok) return false;
