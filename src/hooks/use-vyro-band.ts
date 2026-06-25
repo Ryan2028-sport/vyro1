@@ -220,8 +220,13 @@ function loadPersistedBandMetrics(): Partial<PersistedBandMetrics> {
     const savedAt = numericInRange(saved.savedAt, 1, Date.now() + 60_000);
     if (!savedAt || Date.now() - savedAt > PERSISTED_METRICS_MAX_AGE_MS) return {};
     const sameDay = saved.day === todayActivityKeyPrefix();
-    const sbp = numericInRange(saved.bloodPressure?.sbp, 70, 250);
-    const dbp = numericInRange(saved.bloodPressure?.dbp, 40, 160);
+    // Push-only metrics (skinTemp, HRV, stress, BP) are intentionally NOT
+    // rehydrated from localStorage. If the watch firmware does not actively
+    // emit a real frame for them, the tile must stay grey rather than
+    // showing a stale value from a previous session and making the debug
+    // pipeline lie about "stored ✓". HR / SpO₂ / steps / battery are still
+    // rehydrated because they have proven dedicated decoder paths.
+    void saved.bloodPressure;
     return {
       savedAt,
       day: sameDay ? todayActivityKeyPrefix() : saved.day,
@@ -230,15 +235,15 @@ function loadPersistedBandMetrics(): Partial<PersistedBandMetrics> {
       batteryPct: numericInRange(saved.batteryPct, 0, 100),
       batteryCharging: saved.batteryCharging === true,
       spo2Pct: numericInRange(saved.spo2Pct, 70, 100),
-      skinTempC: numericInRange(saved.skinTempC, 20, 45),
+      skinTempC: null,
       stepsToday: sameDay ? numericInRange(saved.stepsToday, 0, 200_000) : null,
       distanceM: sameDay ? numericInRange(saved.distanceM, 0, 250_000) : null,
       caloriesKcal: sameDay ? numericInRange(saved.caloriesKcal, 0, 20_000) : null,
       restingHrBpm: numericInRange(saved.restingHrBpm, 30, 120),
-      hrvMs: numericInRange(saved.hrvMs, 5, 250),
-      respRateBrpm: numericInRange(saved.respRateBrpm, 6, 40),
-      stressScore: numericInRange(saved.stressScore, 0, 100),
-      bloodPressure: sbp != null && dbp != null ? { sbp, dbp } : null,
+      hrvMs: null,
+      respRateBrpm: null,
+      stressScore: null,
+      bloodPressure: null,
     };
   } catch {
     return {};

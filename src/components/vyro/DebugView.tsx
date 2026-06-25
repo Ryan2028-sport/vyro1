@@ -553,40 +553,108 @@ export function DebugView() {
       }
       return t || null;
     };
-    type P = { metric: string; cmdOps: number[]; notifOps: number[]; storedAt: number | null | undefined; value: string };
+    type P = {
+      metric: string;
+      // pushOnly = firmware streams this without us asking; do not require a
+      // matching cmd in the pipeline check.
+      pushOnly?: boolean;
+      cmdOps: number[];
+      notifOps: number[];
+      storedAt: number | null | undefined;
+      value: string;
+    };
     const rows: P[] = [
-      { metric: "Heart rate", cmdOps: [0x1e], notifOps: [0x1e], storedAt: ctx.heartRateAt, value: fmt(ctx.heartRateBpm, 0, " bpm") },
-      { metric: "SpO₂", cmdOps: [0x69, 0xbc], notifOps: [0x69, 0x73, 0xbc], storedAt: ctx.signalAt.spo2At, value: fmt(ctx.spo2Pct, 0, " %") },
-      { metric: "Skin temp", cmdOps: [0x69, 0xbc], notifOps: [0x69, 0x73, 0xbc], storedAt: ctx.signalAt.skinTempAt, value: fmt(ctx.skinTempC, 1, " °C") },
-      { metric: "HRV", cmdOps: [0x39, 0x69], notifOps: [0x39, 0x69], storedAt: ctx.signalAt.hrvAt, value: fmt(ctx.hrvMs, 0, " ms") },
-      { metric: "Stress", cmdOps: [0x37, 0x69], notifOps: [0x37, 0x69], storedAt: ctx.signalAt.stressAt, value: fmt(ctx.stressScore, 0) },
-      { metric: "Blood pressure", cmdOps: [0x69], notifOps: [0x69], storedAt: ctx.signalAt.bloodPressureAt, value: ctx.bloodPressure ? `${ctx.bloodPressure.sbp}/${ctx.bloodPressure.dbp}` : "—" },
-      { metric: "Steps", cmdOps: [0x09, 0x07, 0x43], notifOps: [0x09, 0x07, 0x43, 0x48, 0x73], storedAt: ctx.signalAt.stepsAt, value: fmt(ctx.stepsToday, 0) },
-      { metric: "Battery", cmdOps: [0x03], notifOps: [0x03], storedAt: ctx.signalAt.batteryAt, value: fmt(ctx.batteryPct, 0, " %") },
-      { metric: "Motion (IMU)", cmdOps: [0x12, 0x20], notifOps: [0x69, 0x73, 0x87, 0x89], storedAt: m.peakG > 0 ? now : null, value: m.peakG > 0 ? fmt(m.peakG, 2, " g") : "—" },
-      { metric: "Sleep", cmdOps: [0x32], notifOps: [0x32], storedAt: lastSleep ? Date.now() : null, value: lastSleep ? `${lastSleep.score}/100` : "—" },
+      { metric: "Heart rate",     cmdOps: [0x1e],              notifOps: [0x1e],                    storedAt: ctx.heartRateAt,             value: fmt(ctx.heartRateBpm, 0, " bpm") },
+      // SpO₂/temp/HRV/stress/BP arrive INSIDE 0x69 composite frames that the
+      // watch pushes on its own cadence — no explicit cmd is required.
+      { metric: "SpO₂",           pushOnly: true,  cmdOps: [],  notifOps: [0x69, 0x73, 0xbc],       storedAt: ctx.signalAt.spo2At,         value: fmt(ctx.spo2Pct, 0, " %") },
+      { metric: "Skin temp",      pushOnly: true,  cmdOps: [],  notifOps: [0x69, 0x73, 0xbc, 0x87], storedAt: ctx.signalAt.skinTempAt,     value: fmt(ctx.skinTempC, 1, " °C") },
+      { metric: "HRV",            pushOnly: true,  cmdOps: [],  notifOps: [0x39, 0x69],             storedAt: ctx.signalAt.hrvAt,          value: fmt(ctx.hrvMs, 0, " ms") },
+      { metric: "Stress",         pushOnly: true,  cmdOps: [],  notifOps: [0x37, 0x69],             storedAt: ctx.signalAt.stressAt,       value: fmt(ctx.stressScore, 0) },
+      { metric: "Blood pressure", pushOnly: true,  cmdOps: [],  notifOps: [0x69, 0x89],             storedAt: ctx.signalAt.bloodPressureAt, value: ctx.bloodPressure ? `${ctx.bloodPressure.sbp}/${ctx.bloodPressure.dbp}` : "—" },
+      { metric: "Steps",          cmdOps: [0x09, 0x07, 0x43, 0x48], notifOps: [0x09, 0x07, 0x43, 0x48, 0x73], storedAt: ctx.signalAt.stepsAt, value: fmt(ctx.stepsToday, 0) },
+      // Battery on this firmware: response often piggybacks the 0x09 today-
+      // summary path even though encodeQcBandBatteryRequest writes 0x03.
+      { metric: "Battery",        cmdOps: [0x03, 0x09],        notifOps: [0x03, 0x09],              storedAt: ctx.signalAt.batteryAt,      value: fmt(ctx.batteryPct, 0, " %") },
+      { metric: "Motion (IMU)",   pushOnly: true,  cmdOps: [], notifOps: [0x69, 0x73, 0x87, 0x89],  storedAt: m.peakG > 0 ? now : null,    value: m.peakG > 0 ? fmt(m.peakG, 2, " g (derived)") : "—" },
+      { metric: "Sleep",          cmdOps: [0x32],              notifOps: [0x32],                    storedAt: lastSleep ? Date.now() : null, value: lastSleep ? `${lastSleep.score}/100` : "—" },
     ];
+    const FRESH_MS = 60_000;
     return rows.map((r) => {
       const cmd = writeForOp(r.cmdOps);
       const notifCount = sumOp(r.notifOps);
       const notifAt = lastOp(r.notifOps);
       const stored = r.storedAt != null;
+      const fresh = stored && now - (r.storedAt ?? 0) < FRESH_MS;
       const stages = [
-        cmd ? "cmd ✓" : "cmd ✗",
+        r.pushOnly ? "push-only" : cmd ? "cmd ✓" : "cmd ✗",
         notifCount > 0 ? `notif ✓ ×${notifCount}` : "notif ✗",
-        stored ? "stored ✓" : "stored ✗",
+        fresh ? "live ✓" : stored ? "stale ⚠" : "no data ✗",
       ];
-      const stageOk = !!cmd && notifCount > 0 && stored;
+      // Honest pass criteria: a live value in the last 60s. For cmd-driven
+      // metrics, also require we actually wrote the command.
+      const stageOk = fresh && (r.pushOnly || !!cmd);
+      let note: string;
+      if (fresh) note = `live ${ageLabel(now - (r.storedAt ?? 0))}`;
+      else if (stored) note = `last value ${ageLabel(now - (r.storedAt ?? 0))} — watch silent`;
+      else if (notifCount > 0) note = "frames arrive but decoder gets no value (firmware empty payload)";
+      else if (r.pushOnly) note = "watch firmware never pushes this opcode";
+      else if (!cmd) note = "command never sent";
+      else note = "cmd sent, no notification reply";
       return {
         label: r.metric,
         value: r.value,
         ok: stageOk,
         source: stages.join(" → "),
-        note: notifAt ? `last notif ${ageLabel(now - notifAt)}` : cmd ? "no notification after cmd" : "command never sent",
+        note,
         ageMs: r.storedAt != null ? signalAge(r.storedAt) : undefined,
       } as Row;
     });
   }, [ctx, m, lastSleep, inspector.perOpcode, inspector.writeLog, now]);
+
+  // Firmware-capability report — for each notify opcode we've seen, classify
+  // what the watch is actually telling us based on its status byte. Catches
+  // the "watch sends 0x87/0x89 but byte[1]=0xee = unsupported" case.
+  const capabilityRows: Row[] = useMemo(() => {
+    const entries = Object.entries(inspector.perOpcode);
+    if (entries.length === 0) {
+      return [{ label: "No frames received yet", value: "—", ok: false, source: "connect the watch and wait ~10s" }];
+    }
+    const interpret = (opHex: string, lastHex: string): { verdict: string; ok: boolean } => {
+      const code = parseInt(opHex, 16);
+      const bytes = lastHex.split(" ").map((b) => parseInt(b, 16));
+      const b1 = bytes[1] ?? 0;
+      if (code === 0x1e) return { verdict: `HR scalar — bpm=${b1}`, ok: b1 > 30 && b1 < 220 };
+      if (code === 0x69) {
+        const sub = b1;
+        const hr = bytes[3] ?? 0;
+        const spo2 = bytes[5] ?? 0;
+        return { verdict: `composite sub=0x${sub.toString(16)} → hr=${hr} spo2=${spo2} (no temp/HRV/BP bytes)`, ok: hr > 0 || spo2 > 0 };
+      }
+      if (code === 0x43) return { verdict: b1 === 0xff ? "watch reports NO activity history (0xff)" : `activity sub=0x${b1.toString(16)}`, ok: b1 !== 0xff };
+      if (code === 0x48) return { verdict: b1 === 0 && (bytes[2] ?? 0) === 0 ? "today-sports all-zero (watch hasn't logged steps today)" : "today-sports payload present", ok: b1 !== 0 || (bytes[2] ?? 0) !== 0 };
+      if (code === 0x87 || code === 0x89) {
+        if (b1 === 0xee) return { verdict: "status 0xee = keep-alive / feature unsupported on this firmware", ok: false };
+        return { verdict: `payload b1=0x${b1.toString(16)} — investigate`, ok: true };
+      }
+      if (code === 0x03) return { verdict: `battery level=${b1}%`, ok: b1 > 0 };
+      if (code === 0x37) return { verdict: `stress history bucket=${b1}`, ok: b1 > 0 };
+      if (code === 0x39) return { verdict: `HRV history bucket=${b1}`, ok: b1 > 0 };
+      return { verdict: `unknown opcode payload b1=0x${b1.toString(16)}`, ok: false };
+    };
+    return entries
+      .sort((a, b) => (b[1].count - a[1].count))
+      .map(([opHex, stat]) => {
+        const v = interpret(opHex, stat.lastHex);
+        return {
+          label: `${opHex} ×${stat.count}`,
+          value: v.verdict,
+          ok: v.ok,
+          source: stat.lastHex,
+          ageMs: now - stat.lastAt,
+        } as Row;
+      });
+  }, [inspector.perOpcode, now]);
 
   const decoderRows: Row[] = useMemo(() => {
     const total = inspector.decoderKnownCount + inspector.decoderUnknownCount;
@@ -754,7 +822,8 @@ export function DebugView() {
           </button>
         }
       />
-      <Section title="Per-metric pipeline (cmd → notif → stored)" rows={pipelineRows} />
+      <Section title="Per-metric pipeline (cmd → notif → live)" rows={pipelineRows} />
+      <Section title="Firmware capability (what each opcode actually contains)" rows={capabilityRows} />
       <Section title="Decoder outcomes" rows={decoderRows} />
       <Section title="Vitals (PPG)" rows={health} />
       <Section title="Activity" rows={activity} />
