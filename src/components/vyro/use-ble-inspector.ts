@@ -91,6 +91,10 @@ const emptyState = (): BleInspectorState => ({
   discovered: null,
   totalNotifications: 0,
   writes: emptyWrites(),
+  writeLog: [],
+  decoderKnownCount: 0,
+  decoderUnknownCount: 0,
+  unknownOpcodes: {},
 });
 
 let singleton: {
