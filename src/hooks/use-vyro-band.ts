@@ -44,6 +44,7 @@ import {
   decodeQcBandTemperatureNotification,
   decodeQcBandTodaySports,
   decodeQcBandTodaySummary,
+  encodeQcBandHeartRateLogging,
   encodeQcBandActivityRequest,
   encodeQcBandAutoHrv,
   encodeQcBandAutoSpo2,
@@ -54,6 +55,7 @@ import {
   encodeQcBandMeasureStart,
   encodeQcBandMeasureStop,
   encodeQcBandRealtimeHeartRate,
+  encodeQcBandSetTime,
   encodeQcBandSpo2HistoryRequest,
   encodeQcBandSpo2IntervalHistoryRequest,
   encodeQcBandSpo2Start,
@@ -484,6 +486,12 @@ export function useVyroBand() {
       await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(
         (err) => console.warn("[vyro] QCBand HR start write failed", err),
       );
+      // Some Colmi/H59/QC firmwares don't unlock historical/body metrics until
+      // the app first performs the normal SDK setup handshake: set the band time
+      // and enable periodic HR logging. Without this, real-time HR works but
+      // steps, HRV, stress, SpO₂ and temp requests can be ignored.
+      await writeQcBand(service, write, encodeQcBandSetTime()).catch(() => undefined);
+      await writeQcBand(service, write, encodeQcBandHeartRateLogging(true, 5)).catch(() => undefined);
       // Make sure the firmware's automatic health collectors are enabled.
       // Without these preferences, HR may stream but HRV/RMSSD, stress, SpO₂
       // and skin temperature can legitimately stay blank forever.
@@ -570,7 +578,11 @@ export function useVyroBand() {
 
       const runMeasureCycle = (label: string, subTypes: readonly number[], durationMs: number) => {
         subTypes.forEach((subType, index) => {
-          const delay = index * 900;
+          // These watches are sensitive to overlapping 0x69/0x6A measurement
+          // cycles. If we start several subtypes inside one optical-sensor
+          // window, the firmware often streams only HR and drops the others.
+          // Stagger each subtype by its own full measurement window.
+          const delay = index * (durationMs + 1500);
           window.setTimeout(() => {
             console.log(`[qcband] ${label} measure start 0x${subType.toString(16)}`);
             void writeQcBand(service, write, encodeQcBandMeasureStart(subType)).catch(() => undefined);
