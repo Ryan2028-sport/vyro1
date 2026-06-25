@@ -432,6 +432,10 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
     spo2: m.connected ? m.spo2Pct : null,
     peakJerk: m.connected ? (m.peakJerk ?? null) : null,
   });
+  // Pull last-night sleep score so the Sleep ring/tile isn't permanently
+  // empty when the watch has any history (the sleep engine writes this
+  // via `recordSleepNight` in use-sleep-nights.ts).
+  const { last: lastNight } = useSleepNights();
   const subs = computeSubScores({
     connected: m.connected,
     hrvMs: m.hrvMs,
@@ -441,6 +445,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
     peakG: m.peakG ?? null,
     eventsLastMin: m.eventsLastMin,
     reactMin: m.reactMin,
+    sleepScore: lastNight?.score ?? null,
   });
   const readiness = readinessInputs.score;
   const recovery = subs.recovery;
@@ -468,18 +473,34 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
     return fmt(d);
   };
 
-  // Strain — composite of session events + peak jerk + HR margin over rest.
+  // Strain — composite of HR margin over rest, IMU jerk and session events.
+  // We normalize each contributor against a fixed ceiling (so the divisor
+  // never changes) and then EMA-smooth so the tile doesn't whip between
+  // e.g. 75 and 11 sample-to-sample when HR briefly drops back to rest.
+  const strainEmaRef = useRef<number | null>(null);
+  const strainSampleNonce = `${m.heartRateBpm ?? ""}|${m.restingHrBpm ?? ""}|${m.peakJerk ?? ""}|${m.eventsLastMin ?? ""}`;
   const strain = useMemo(() => {
-    if (!m.connected) return null;
-    const contributors: number[] = [];
-    if (m.eventsLastMin > 0) contributors.push(Math.min(100, m.eventsLastMin * 1.4));
-    if ((m.peakJerk ?? 0) > 0) contributors.push(Math.min(100, (m.peakJerk ?? 0) / 2));
-    if (m.heartRateBpm != null && m.restingHrBpm != null) {
-      contributors.push(Math.min(100, Math.max(0, (m.heartRateBpm - m.restingHrBpm) * 2.2)));
-    }
-    if (contributors.length === 0) return null;
-    return Math.round(contributors.reduce((a, b) => a + b, 0) / contributors.length);
-  }, [m.connected, m.eventsLastMin, m.peakJerk, m.heartRateBpm, m.restingHrBpm]);
+    if (!m.connected) { strainEmaRef.current = null; return null; }
+    const hrMargin =
+      m.heartRateBpm != null && m.restingHrBpm != null
+        ? Math.max(0, m.heartRateBpm - m.restingHrBpm)
+        : null;
+    const margin01 = hrMargin != null ? Math.min(1, hrMargin / 60) : null;
+    const jerk01 = (m.peakJerk ?? 0) > 0 ? Math.min(1, (m.peakJerk ?? 0) / 220) : null;
+    const events01 = (m.eventsLastMin ?? 0) > 0 ? Math.min(1, (m.eventsLastMin ?? 0) / 80) : null;
+    // Fixed weights — missing contributors count as 0 against their slot, but
+    // we require at least the HR-margin signal before showing anything to
+    // avoid a meaningless number while idle.
+    if (margin01 == null && jerk01 == null && events01 == null) return null;
+    const wm = 0.5, wj = 0.25, we = 0.25;
+    const inst =
+      ((margin01 ?? 0) * wm + (jerk01 ?? 0) * wj + (events01 ?? 0) * we) * 100;
+    const prev = strainEmaRef.current;
+    const next = prev == null ? inst : prev * 0.8 + inst * 0.2;
+    strainEmaRef.current = next;
+    return Math.round(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [m.connected, strainSampleNonce]);
 
   const fmtCell = (v: number | string | null | undefined) =>
     v == null || v === "" ? "—" : v;
