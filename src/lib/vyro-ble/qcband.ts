@@ -60,6 +60,7 @@ export const QCBAND_MEASURE_HR_SDK = 0x00;
 export const QCBAND_MEASURE_BP = 0x02;
 export const QCBAND_MEASURE_SPO2 = 0x03;
 export const QCBAND_MEASURE_SPO2_SDK = 0x02;
+export const QCBAND_MEASURE_TEMP_LEGACY = 0x04;
 export const QCBAND_MEASURE_ONE_KEY = 0x05; // legacy composite
 export const QCBAND_MEASURE_ONE_KEY_SDK = 0x03;
 export const QCBAND_MEASURE_STRESS_SDK = 0x04;
@@ -73,9 +74,10 @@ export const QCBAND_MEASURE_STRESS = 0x0d;
 export const QCBAND_MEASURE_HRV = 0x0e;
 
 export const QCBAND_MEASURE_HR_TYPES = [QCBAND_MEASURE_HR, QCBAND_MEASURE_HR_SDK] as const;
+export const QCBAND_MEASURE_BP_TYPES = [QCBAND_MEASURE_BP] as const;
 export const QCBAND_MEASURE_SPO2_TYPES = [QCBAND_MEASURE_SPO2, QCBAND_MEASURE_SPO2_SDK] as const;
 export const QCBAND_MEASURE_ONE_KEY_TYPES = [QCBAND_MEASURE_ONE_KEY_HR, QCBAND_MEASURE_ONE_KEY, QCBAND_MEASURE_ONE_KEY_SDK] as const;
-export const QCBAND_MEASURE_TEMP_TYPES = [QCBAND_MEASURE_TEMP_SDK, QCBAND_MEASURE_TEMP] as const;
+export const QCBAND_MEASURE_TEMP_TYPES = [QCBAND_MEASURE_TEMP_SDK, QCBAND_MEASURE_TEMP, QCBAND_MEASURE_TEMP_LEGACY] as const;
 export const QCBAND_MEASURE_STRESS_TYPES = [QCBAND_MEASURE_STRESS, QCBAND_MEASURE_PRESSURE_SDK, QCBAND_MEASURE_STRESS_SDK] as const;
 export const QCBAND_MEASURE_HRV_TYPES = [QCBAND_MEASURE_HRV, QCBAND_MEASURE_HRV_DATA_REQUEST, QCBAND_MEASURE_HRV_SDK] as const;
 
@@ -179,18 +181,15 @@ export function encodeQcBandTodaySportsRequest(): Uint8Array {
   return sdkCommand([QCBAND_CMD_TODAY_SPORTS]);
 }
 
-export function encodeQcBandStressRequest(): Uint8Array {
-  return sdkCommand([QCBAND_CMD_SYNC_STRESS]);
+export function encodeQcBandStressRequest(daysAgo = 0): Uint8Array {
+  // QCBand/Oudmon history commands expect a one-byte day index. Sending only
+  // the opcode can be ignored by the firmware, leaving stress grey forever.
+  return sdkCommand([QCBAND_CMD_SYNC_STRESS, daysAgo & 0xff]);
 }
 
 export function encodeQcBandHrvRequest(daysAgo = 0): Uint8Array {
-  const out = new Uint8Array(5);
-  out[0] = QCBAND_CMD_SYNC_HRV;
-  out[1] = daysAgo & 0xff;
-  out[2] = (daysAgo >> 8) & 0xff;
-  out[3] = (daysAgo >> 16) & 0xff;
-  out[4] = (daysAgo >> 24) & 0xff;
-  return sdkCommand([...out]);
+  // Same one-byte day-index layout as stress history.
+  return sdkCommand([QCBAND_CMD_SYNC_HRV, daysAgo & 0xff]);
 }
 
 function bigDataV2Request(type: number, payload: number[] = []): Uint8Array {
@@ -670,6 +669,39 @@ export function decodeQcBandOneKeyPayload(data: Uint8Array): {
     stress: validStress(data[2]),
     rriMs: rriA >= 300 && rriA <= 2000 ? rriA : rriB,
   };
+}
+
+export function decodeQcBandBloodPressurePayload(data: Uint8Array): {
+  sbp: number;
+  dbp: number;
+  hr: number | null;
+} | null {
+  if (data.length < 3) return null;
+  const validHr = (v: number) => (v > 30 && v < 220 ? v : null);
+  const validSbp = (v: number) => (v > 60 && v < 220 ? v : null);
+  const validDbp = (v: number) => (v > 30 && v < 160 ? v : null);
+
+  // Direct BP measure frame from Oudmon/QCBand:
+  // [0x69, 0x02, 0x00, heartRate, systolic, diastolic, ...]
+  const direct = {
+    hr: validHr(data[0]),
+    sbp: validSbp(data[1]),
+    dbp: validDbp(data[2]),
+  };
+  if (direct.sbp != null && direct.dbp != null) {
+    return { sbp: direct.sbp, dbp: direct.dbp, hr: direct.hr };
+  }
+
+  // Some firmwares omit HR and only send [systolic, diastolic].
+  const compact = {
+    sbp: validSbp(data[0]),
+    dbp: validDbp(data[1]),
+  };
+  if (compact.sbp != null && compact.dbp != null) {
+    return { sbp: compact.sbp, dbp: compact.dbp, hr: null };
+  }
+
+  return null;
 }
 
 /** Decode a temperature payload. Handles both `[int, frac]` and
