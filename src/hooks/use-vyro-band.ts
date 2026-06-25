@@ -487,16 +487,27 @@ export function useVyroBand() {
         currLrG: { value: 0, saturated: false },
       };
     } else {
-      event = {
-        type: delta > 60 ? "burst" : "rapid_start",
-        code: delta > 60 ? 0x12 : 0x11,
-        accelPeakG,
-        jerkPeakGps,
-        gyroPeakDps,
-        durationMs,
-        refFwdG: { value: 0, saturated: false },
-        refLrG: { value: 0, saturated: false },
-      };
+      event = delta > 60
+        ? {
+            type: "burst",
+            code: 0x12,
+            accelPeakG,
+            jerkPeakGps,
+            gyroPeakDps,
+            durationMs,
+            refFwdG: { value: 0, saturated: false },
+            refLrG: { value: 0, saturated: false },
+          }
+        : {
+            type: "rapid_start",
+            code: 0x11,
+            accelPeakG,
+            jerkPeakGps,
+            gyroPeakDps,
+            durationMs,
+            refFwdG: { value: 0, saturated: false },
+            refLrG: { value: 0, saturated: false },
+          };
     }
     rawMotionLastEventAtRef.current = now;
     setEvents((prevEvents) => {
