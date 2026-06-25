@@ -183,20 +183,23 @@ export function DebugView() {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
+  const signalAge = (at: number | null | undefined) => (at ? now - at : undefined);
+  const hardwareSeen = (value: unknown, at?: number | null) =>
+    m.connected && value != null && (at == null || now - at < 30 * 60_000);
 
   const fresh = useFreshness({
-    heartRateBpm: m.heartRateBpm,
-    restingHrBpm: m.restingHrBpm,
-    hrvMs: m.hrvMs,
-    spo2Pct: m.spo2Pct,
-    skinTempC: m.skinTempC,
-    respRateBrpm: m.respRateBrpm,
-    stressScore: m.stressScore,
-    bloodPressure: m.bloodPressure,
-    batteryPct: m.batteryPct,
-    stepsToday: m.stepsToday,
-    distanceM: m.distanceM,
-    caloriesKcal: m.caloriesKcal,
+    heartRateBpm: ctx.heartRateBpm,
+    restingHrBpm: ctx.restingHrBpm,
+    hrvMs: ctx.hrvMs,
+    spo2Pct: ctx.spo2Pct,
+    skinTempC: ctx.skinTempC,
+    respRateBrpm: ctx.respRateBrpm,
+    stressScore: ctx.stressScore,
+    bloodPressure: ctx.bloodPressure,
+    batteryPct: ctx.batteryPct,
+    stepsToday: ctx.stepsToday,
+    distanceM: ctx.distanceM,
+    caloriesKcal: ctx.caloriesKcal,
     peakG: m.peakG > 0 ? m.peakG : null,
     peakDps: m.peakDps > 0 ? m.peakDps : null,
     peakJerk: m.peakJerk > 0 ? m.peakJerk : null,
@@ -256,27 +259,27 @@ export function DebugView() {
   ];
 
   const health: Row[] = [
-    { label: "Heart rate", value: fmt(m.heartRateBpm, 0, " bpm"), ok: isNum(m.heartRateBpm), source: "Goodix PPG · QCBand 0x18/0x69(0x07)", ageMs: fresh.heartRateBpm },
-    { label: "Resting HR", value: fmt(m.restingHrBpm, 0, " bpm"), ok: isNum(m.restingHrBpm), source: "5-min HR buffer · 5th percentile", ageMs: fresh.restingHrBpm },
-    { label: "HRV (RMSSD)", value: fmt(m.hrvMs, 0, " ms"), ok: isNum(m.hrvMs), source: "QCBand 0x39 / 0x69(0x0e/0x05)", ageMs: fresh.hrvMs },
-    { label: "SpO₂", value: fmt(m.spo2Pct, 0, " %"), ok: isNum(m.spo2Pct), source: "QCBand 0x69(0x0a/0x05) · V2 0xbc", ageMs: fresh.spo2Pct },
-    { label: "Skin temp", value: fmt(m.skinTempC, 1, " °C"), ok: isNum(m.skinTempC), source: "QCBand 0x69(0x09/0x05) · V2 0xbd", ageMs: fresh.skinTempC },
-    { label: "Respiration", value: fmt(m.respRateBrpm, 1, " brpm"), ok: isNum(m.respRateBrpm), source: "Derived from RRI / HRV / stress", ageMs: fresh.respRateBrpm },
-    { label: "Stress", value: fmt(m.stressScore, 0, "/100"), ok: isNum(m.stressScore), source: "QCBand 0x37 / 0x69(0x0d/0x05)", ageMs: fresh.stressScore },
+    { label: "Heart rate", value: fmt(ctx.heartRateBpm, 0, " bpm"), ok: hardwareSeen(ctx.heartRateBpm, ctx.heartRateAt), source: "Goodix PPG · realtime HR / measure frame", ageMs: signalAge(ctx.heartRateAt) },
+    { label: "Resting HR", value: fmt(ctx.restingHrBpm, 0, " bpm"), ok: hardwareSeen(ctx.restingHrBpm, ctx.signalAt.restingHrAt), source: "5-min live HR buffer · 5th percentile", ageMs: signalAge(ctx.signalAt.restingHrAt) },
+    { label: "HRV (RMSSD)", value: fmt(ctx.hrvMs, 0, " ms"), ok: hardwareSeen(ctx.hrvMs, ctx.signalAt.hrvAt), source: "QCBand hardware · 0x39 history / 0x69 measure", ageMs: signalAge(ctx.signalAt.hrvAt) },
+    { label: "SpO₂", value: fmt(ctx.spo2Pct, 0, " %"), ok: hardwareSeen(ctx.spo2Pct, ctx.signalAt.spo2At), source: "QCBand hardware · 0x69 / V2 0xbc / notify", ageMs: signalAge(ctx.signalAt.spo2At) },
+    { label: "Skin temp", value: fmt(ctx.skinTempC, 1, " °C"), ok: hardwareSeen(ctx.skinTempC, ctx.signalAt.skinTempAt), source: "QCBand hardware · 0x69 / V2 0xbc / notify", ageMs: signalAge(ctx.signalAt.skinTempAt) },
+    { label: "Respiration", value: fmt(ctx.respRateBrpm, 1, " brpm"), ok: isNum(ctx.respRateBrpm), source: "Awaiting real resp-rate field from firmware", ageMs: fresh.respRateBrpm },
+    { label: "Stress", value: fmt(ctx.stressScore, 0, "/100"), ok: hardwareSeen(ctx.stressScore, ctx.signalAt.stressAt), source: "QCBand hardware · 0x37 history / 0x69 measure", ageMs: signalAge(ctx.signalAt.stressAt) },
     {
       label: "Blood pressure",
-      value: m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—",
-      ok: !!m.bloodPressure,
+      value: ctx.bloodPressure ? `${ctx.bloodPressure.sbp}/${ctx.bloodPressure.dbp}` : "—",
+      ok: hardwareSeen(ctx.bloodPressure, ctx.signalAt.bloodPressureAt),
       source: "QCBand 0x69(0x05) one-key payload",
-      ageMs: fresh.bloodPressure,
+      ageMs: signalAge(ctx.signalAt.bloodPressureAt),
     },
-    { label: "Battery", value: fmt(m.batteryPct, 0, " %"), ok: isNum(m.batteryPct), source: "GATT 0x2A19 · QCBand 0x03", ageMs: fresh.batteryPct },
+    { label: "Battery", value: fmt(ctx.batteryPct, 0, " %"), ok: hardwareSeen(ctx.batteryPct, ctx.signalAt.batteryAt), source: "GATT 0x2A19 · QCBand 0x03", ageMs: signalAge(ctx.signalAt.batteryAt) },
   ];
 
   const activity: Row[] = [
-    { label: "Steps today", value: fmt(m.stepsToday, 0), ok: isNum(m.stepsToday), source: "QCBand summary 0x0d/0x4e/0x43", ageMs: fresh.stepsToday },
-    { label: "Distance", value: fmt(m.distanceM, 0, " m"), ok: isNum(m.distanceM), source: "QCBand activity payload", ageMs: fresh.distanceM },
-    { label: "Calories", value: fmt(m.caloriesKcal, 0, " kcal"), ok: isNum(m.caloriesKcal), source: "QCBand activity payload", ageMs: fresh.caloriesKcal },
+    { label: "Steps today", value: fmt(ctx.stepsToday, 0), ok: hardwareSeen(ctx.stepsToday, ctx.signalAt.stepsAt), source: "QCBand summary / live / history packet", ageMs: signalAge(ctx.signalAt.stepsAt) },
+    { label: "Distance", value: fmt(ctx.distanceM, 0, " m"), ok: hardwareSeen(ctx.distanceM, ctx.signalAt.distanceAt), source: "QCBand activity payload", ageMs: signalAge(ctx.signalAt.distanceAt) },
+    { label: "Calories", value: fmt(ctx.caloriesKcal, 0, " kcal"), ok: hardwareSeen(ctx.caloriesKcal, ctx.signalAt.caloriesAt), source: "QCBand activity payload", ageMs: signalAge(ctx.signalAt.caloriesAt) },
   ];
 
   const imu: Row[] = [
