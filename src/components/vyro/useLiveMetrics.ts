@@ -11,7 +11,7 @@ export function useLiveMetrics() {
 
   useEffect(() => {
     if (!connected) return;
-    const id = window.setInterval(() => setNow(Date.now()), 10_000);
+    const id = window.setInterval(() => setNow(Date.now()), 2_000);
     return () => window.clearInterval(id);
   }, [connected]);
 
