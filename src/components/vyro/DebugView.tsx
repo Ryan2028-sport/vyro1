@@ -535,8 +535,249 @@ export function DebugView() {
     }));
   }, [inspector.discovered]);
 
+  // Per-metric pipeline derived from existing data:
+  //   cmd written → notif received (opcode) → value stored (signalAt timestamp).
+  // A grey stage tells you exactly where in the chain a tile is dying.
+  const pipelineRows = useMemo(() => {
+    const op = (code: number) =>
+      inspector.perOpcode[`0x${code.toString(16).padStart(2, "0")}`];
+    const writeForOp = (codes: number[]) =>
+      inspector.writeLog.find((w) => w.opcode != null && codes.includes(w.opcode));
+    const sumOp = (codes: number[]) =>
+      codes.reduce((acc, c) => acc + (op(c)?.count ?? 0), 0);
+    const lastOp = (codes: number[]) => {
+      let t = 0;
+      for (const c of codes) {
+        const at = op(c)?.lastAt ?? 0;
+        if (at > t) t = at;
+      }
+      return t || null;
+    };
+    type P = {
+      metric: string;
+      // pushOnly = firmware streams this without us asking; do not require a
+      // matching cmd in the pipeline check.
+      pushOnly?: boolean;
+      cmdOps: number[];
+      notifOps: number[];
+      storedAt: number | null | undefined;
+      value: string;
+    };
+    const rows: P[] = [
+      { metric: "Heart rate",     cmdOps: [0x1e],              notifOps: [0x1e],                    storedAt: ctx.heartRateAt,             value: fmt(ctx.heartRateBpm, 0, " bpm") },
+      // SpO₂/temp/HRV/stress/BP arrive INSIDE 0x69 composite frames that the
+      // watch pushes on its own cadence — no explicit cmd is required.
+      { metric: "SpO₂",           pushOnly: true,  cmdOps: [],  notifOps: [0x69, 0x73, 0xbc],       storedAt: ctx.signalAt.spo2At,         value: fmt(ctx.spo2Pct, 0, " %") },
+      { metric: "Skin temp",      pushOnly: true,  cmdOps: [],  notifOps: [0x69, 0x73, 0xbc, 0x87], storedAt: ctx.signalAt.skinTempAt,     value: fmt(ctx.skinTempC, 1, " °C") },
+      { metric: "HRV",            pushOnly: true,  cmdOps: [],  notifOps: [0x39, 0x69],             storedAt: ctx.signalAt.hrvAt,          value: fmt(ctx.hrvMs, 0, " ms") },
+      { metric: "Stress",         pushOnly: true,  cmdOps: [],  notifOps: [0x37, 0x69],             storedAt: ctx.signalAt.stressAt,       value: fmt(ctx.stressScore, 0) },
+      { metric: "Blood pressure", pushOnly: true,  cmdOps: [],  notifOps: [0x69, 0x89],             storedAt: ctx.signalAt.bloodPressureAt, value: ctx.bloodPressure ? `${ctx.bloodPressure.sbp}/${ctx.bloodPressure.dbp}` : "—" },
+      { metric: "Steps",          cmdOps: [0x09, 0x07, 0x43, 0x48], notifOps: [0x09, 0x07, 0x43, 0x48, 0x73], storedAt: ctx.signalAt.stepsAt, value: fmt(ctx.stepsToday, 0) },
+      // Battery on this firmware: response often piggybacks the 0x09 today-
+      // summary path even though encodeQcBandBatteryRequest writes 0x03.
+      { metric: "Battery",        cmdOps: [0x03, 0x09],        notifOps: [0x03, 0x09],              storedAt: ctx.signalAt.batteryAt,      value: fmt(ctx.batteryPct, 0, " %") },
+      { metric: "Motion (IMU)",   pushOnly: true,  cmdOps: [], notifOps: [0x69, 0x73, 0x87, 0x89],  storedAt: m.peakG > 0 ? now : null,    value: m.peakG > 0 ? fmt(m.peakG, 2, " g (derived)") : "—" },
+      { metric: "Sleep",          cmdOps: [0x32],              notifOps: [0x32],                    storedAt: lastSleep ? Date.now() : null, value: lastSleep ? `${lastSleep.score}/100` : "—" },
+    ];
+    const FRESH_MS = 60_000;
+    return rows.map((r) => {
+      const cmd = writeForOp(r.cmdOps);
+      const notifCount = sumOp(r.notifOps);
+      const notifAt = lastOp(r.notifOps);
+      const stored = r.storedAt != null;
+      const fresh = stored && now - (r.storedAt ?? 0) < FRESH_MS;
+      const stages = [
+        r.pushOnly ? "push-only" : cmd ? "cmd ✓" : "cmd ✗",
+        notifCount > 0 ? `notif ✓ ×${notifCount}` : "notif ✗",
+        fresh ? "live ✓" : stored ? "stale ⚠" : "no data ✗",
+      ];
+      // Honest pass criteria: a live value in the last 60s. For cmd-driven
+      // metrics, also require we actually wrote the command.
+      const stageOk = fresh && (r.pushOnly || !!cmd);
+      let note: string;
+      if (fresh) note = `live ${ageLabel(now - (r.storedAt ?? 0))}`;
+      else if (stored) note = `last value ${ageLabel(now - (r.storedAt ?? 0))} — watch silent`;
+      else if (notifCount > 0) note = "frames arrive but decoder gets no value (firmware empty payload)";
+      else if (r.pushOnly) note = "watch firmware never pushes this opcode";
+      else if (!cmd) note = "command never sent";
+      else note = "cmd sent, no notification reply";
+      return {
+        label: r.metric,
+        value: r.value,
+        ok: stageOk,
+        source: stages.join(" → "),
+        note,
+        ageMs: r.storedAt != null ? signalAge(r.storedAt) : undefined,
+      } as Row;
+    });
+  }, [ctx, m, lastSleep, inspector.perOpcode, inspector.writeLog, now]);
+
+  // Firmware-capability report — for each notify opcode we've seen, classify
+  // what the watch is actually telling us based on its status byte. Catches
+  // the "watch sends 0x87/0x89 but byte[1]=0xee = unsupported" case.
+  const capabilityRows: Row[] = useMemo(() => {
+    const entries = Object.entries(inspector.perOpcode);
+    if (entries.length === 0) {
+      return [{ label: "No frames received yet", value: "—", ok: false, source: "connect the watch and wait ~10s" }];
+    }
+    const interpret = (opHex: string, lastHex: string): { verdict: string; ok: boolean } => {
+      const code = parseInt(opHex, 16);
+      const bytes = lastHex.split(" ").map((b) => parseInt(b, 16));
+      const b1 = bytes[1] ?? 0;
+      if (code === 0x1e) return { verdict: `HR scalar — bpm=${b1}`, ok: b1 > 30 && b1 < 220 };
+      if (code === 0x69) {
+        const sub = b1;
+        const hr = bytes[3] ?? 0;
+        const spo2 = bytes[5] ?? 0;
+        return { verdict: `composite sub=0x${sub.toString(16)} → hr=${hr} spo2=${spo2} (no temp/HRV/BP bytes)`, ok: hr > 0 || spo2 > 0 };
+      }
+      if (code === 0x43) return { verdict: b1 === 0xff ? "watch reports NO activity history (0xff)" : `activity sub=0x${b1.toString(16)}`, ok: b1 !== 0xff };
+      if (code === 0x48) return { verdict: b1 === 0 && (bytes[2] ?? 0) === 0 ? "today-sports all-zero (watch hasn't logged steps today)" : "today-sports payload present", ok: b1 !== 0 || (bytes[2] ?? 0) !== 0 };
+      if (code === 0x87 || code === 0x89) {
+        if (b1 === 0xee) return { verdict: "status 0xee = keep-alive / feature unsupported on this firmware", ok: false };
+        return { verdict: `payload b1=0x${b1.toString(16)} — investigate`, ok: true };
+      }
+      if (code === 0x03) return { verdict: `battery level=${b1}%`, ok: b1 > 0 };
+      if (code === 0x37) return { verdict: `stress history bucket=${b1}`, ok: b1 > 0 };
+      if (code === 0x39) return { verdict: `HRV history bucket=${b1}`, ok: b1 > 0 };
+      return { verdict: `unknown opcode payload b1=0x${b1.toString(16)}`, ok: false };
+    };
+    return entries
+      .sort((a, b) => (b[1].count - a[1].count))
+      .map(([opHex, stat]) => {
+        const v = interpret(opHex, stat.lastHex);
+        return {
+          label: `${opHex} ×${stat.count}`,
+          value: v.verdict,
+          ok: v.ok,
+          source: stat.lastHex,
+          ageMs: now - stat.lastAt,
+        } as Row;
+      });
+  }, [inspector.perOpcode, now]);
+
+  const decoderRows: Row[] = useMemo(() => {
+    const total = inspector.decoderKnownCount + inspector.decoderUnknownCount;
+    const unknownEntries = Object.entries(inspector.unknownOpcodes)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([k, v]) => `${k}×${v}`)
+      .join(" ");
+    return [
+      {
+        label: "Frames recognised by decoder",
+        value: `${inspector.decoderKnownCount}/${total || 0}`,
+        ok: inspector.decoderKnownCount > 0,
+        source: "opcode in QCBand known-opcode set",
+      },
+      {
+        label: "Frames silently ignored",
+        value: String(inspector.decoderUnknownCount),
+        ok: inspector.decoderUnknownCount === 0,
+        source: "opcode not in known-opcode set",
+        note: unknownEntries || undefined,
+      },
+    ];
+  }, [inspector.decoderKnownCount, inspector.decoderUnknownCount, inspector.unknownOpcodes]);
+
+  const buildDebugBundle = () => ({
+    capturedAt: new Date().toISOString(),
+    connected: m.connected,
+    pairedId: m.pairedId,
+    connectedId: ctx.ble.connectedId,
+    powerState: ctx.ble.powerState,
+    lastError: ctx.ble.error || null,
+    totalNotifications: inspector.totalNotifications,
+    writes: inspector.writes,
+    decoder: {
+      known: inspector.decoderKnownCount,
+      unknown: inspector.decoderUnknownCount,
+      unknownOpcodes: inspector.unknownOpcodes,
+    },
+    perOpcode: Object.fromEntries(
+      Object.entries(inspector.perOpcode).map(([k, v]) => [k, { count: v.count, lastAt: v.lastAt, lastHex: v.lastHex }]),
+    ),
+    perChar: Object.fromEntries(
+      Object.entries(inspector.perChar).map(([k, v]) => [k, { count: v.count, lastAt: v.lastAt, lastOpcode: v.lastOpcode, lastHex: v.lastHex }]),
+    ),
+    pipeline: pipelineRows.map((r) => ({ metric: r.label, value: r.value, ok: r.ok, stages: r.source, note: r.note })),
+    recentNotifications: inspector.recent,
+    writeLog: inspector.writeLog,
+    gatt: inspector.discovered?.services.map((s) => ({
+      service: s.uuid,
+      characteristics: s.characteristics.map((c) => ({ uuid: c.uuid, properties: c.properties })),
+    })) ?? [],
+    ctx: {
+      heartRateBpm: ctx.heartRateBpm,
+      spo2Pct: ctx.spo2Pct,
+      skinTempC: ctx.skinTempC,
+      hrvMs: ctx.hrvMs,
+      stressScore: ctx.stressScore,
+      bloodPressure: ctx.bloodPressure,
+      stepsToday: ctx.stepsToday,
+      caloriesKcal: ctx.caloriesKcal,
+      distanceM: ctx.distanceM,
+      batteryPct: ctx.batteryPct,
+    },
+    motion: { peakG: m.peakG, peakDps: m.peakDps, peakJerk: m.peakJerk, eventsLastMin: m.eventsLastMin, sessionState: m.sessionState },
+  });
+
+  const [bundleCopied, setBundleCopied] = useState<string | null>(null);
+  const copyBundle = async () => {
+    const json = JSON.stringify(buildDebugBundle(), null, 2);
+    try {
+      await navigator.clipboard.writeText(json);
+      setBundleCopied("Copied to clipboard");
+    } catch {
+      // Fallback: open a textarea selection
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = json;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setBundleCopied("Copied to clipboard");
+      } catch {
+        setBundleCopied("Copy failed — see console");
+        // eslint-disable-next-line no-console
+        console.log("[debug-bundle]", json);
+      }
+    }
+    window.setTimeout(() => setBundleCopied(null), 2500);
+  };
+
   return (
     <div style={{ padding: 14, color: "#e5e7eb", fontFamily: "Satoshi, system-ui, sans-serif" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 10,
+        }}
+      >
+        <div style={{ fontSize: 12, opacity: 0.75 }}>
+          {bundleCopied || "Paste the bundle into chat for a one-shot diagnosis."}
+        </div>
+        <button
+          type="button"
+          onClick={copyBundle}
+          style={{
+            border: "1px solid rgba(255,255,255,0.18)",
+            borderRadius: 10,
+            padding: "6px 12px",
+            background: "rgba(59,130,246,0.18)",
+            color: "inherit",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Copy debug bundle
+        </button>
+      </div>
       <div
         style={{
           padding: "10px 12px",
@@ -581,6 +822,9 @@ export function DebugView() {
           </button>
         }
       />
+      <Section title="Per-metric pipeline (cmd → notif → live)" rows={pipelineRows} />
+      <Section title="Firmware capability (what each opcode actually contains)" rows={capabilityRows} />
+      <Section title="Decoder outcomes" rows={decoderRows} />
       <Section title="Vitals (PPG)" rows={health} />
       <Section title="Activity" rows={activity} />
       <Section title="Motion (IMU)" rows={imu} />
@@ -840,6 +1084,66 @@ export function DebugView() {
                   </span>
                 </div>
                 <div style={{ opacity: 0.85, wordBreak: "break-all" }}>{r.hex || "—"}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 12,
+          background: "rgba(255,255,255,0.02)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Recent write log</div>
+          <div style={{ opacity: 0.6, fontSize: 11 }}>
+            {inspector.writes.ok}/{inspector.writes.total} ok
+          </div>
+        </div>
+        {inspector.writeLog.length === 0 ? (
+          <div style={{ opacity: 0.6, fontSize: 12 }}>
+            No commands sent yet. If this stays empty after connect, the app
+            never issued a measurement command — the band has nothing to reply to.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 4 }}>
+            {inspector.writeLog.map((w, i) => (
+              <div
+                key={`${w.ts}-${i}`}
+                style={{
+                  fontSize: 10,
+                  fontFamily: "ui-monospace, monospace",
+                  borderTop: "1px dashed rgba(255,255,255,0.05)",
+                  paddingTop: 4,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ opacity: 0.75 }}>
+                    {ageLabel(now - w.ts)} · {shortUuid(w.characteristic)}
+                    {w.opcode != null
+                      ? ` · 0x${w.opcode.toString(16).padStart(2, "0")}`
+                      : ""}
+                  </span>
+                  <span style={{ color: w.success ? "#22c55e" : "#ef4444", fontWeight: 700 }}>
+                    {w.success ? "ok" : "fail"}
+                  </span>
+                </div>
+                <div style={{ opacity: 0.85, wordBreak: "break-all" }}>{w.hex || "—"}</div>
+                {w.error ? (
+                  <div style={{ color: "#fca5a5", marginTop: 2 }}>{w.error}</div>
+                ) : null}
               </div>
             ))}
           </div>

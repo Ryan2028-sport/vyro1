@@ -1,8 +1,57 @@
-import { Bar, Card, ScoreRing, Spark } from "./shared";
+import { useMemo } from "react";
+import { Bar, Card, Pill, ScoreRing, Spark } from "./shared";
+import { computeSubScores, liveRecoveryFromMetrics, useLiveMetrics } from "./useLiveMetrics";
 
 type RecoveryTab = "live" | "ingame" | "fatigue" | "overnight";
 type SleepTab = "overall" | "timeline" | "wakeups" | "performance";
 type TopSection = "recovery" | "sleep";
+
+const DASH = "\u2014";
+
+function fmt(value: number | null | undefined, digits = 0) {
+  if (value == null || !Number.isFinite(value)) return DASH;
+  return value.toFixed(digits);
+}
+
+function liveLabel(connected: boolean, value: unknown) {
+  if (!connected) return "no watch";
+  return value == null ? "waiting" : "live";
+}
+
+function liveTone(connected: boolean, value: unknown): "live" | "off" | "neutral" {
+  if (!connected) return "off";
+  return value == null ? "neutral" : "live";
+}
+
+function RecoveryMetric({
+  label,
+  value,
+  unit,
+  connected,
+  rawValue,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  connected: boolean;
+  rawValue: unknown;
+}) {
+  const muted = !connected || rawValue == null;
+  return (
+    <div className={`rounded-2xl border border-gray-100 p-3 ${muted ? "bg-gray-50/80" : "bg-white"}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-gray-400">{label}</div>
+        <Pill tone={liveTone(connected, rawValue)} pulse={connected && rawValue != null}>
+          {liveLabel(connected, rawValue)}
+        </Pill>
+      </div>
+      <div className={`mt-3 text-2xl font-semibold tabular-nums leading-none ${muted ? "text-gray-400" : "text-gray-900"}`}>
+        {value}
+        {unit && value !== DASH && <span className="ml-1 text-xs text-gray-400">{unit}</span>}
+      </div>
+    </div>
+  );
+}
 
 export function RecoveryView({
   recoveryTab,
@@ -167,36 +216,63 @@ function SleepContent({ sleepTab }: { sleepTab: SleepTab }) {
 }
 
 function RecoveryLive() {
+  const m = useLiveMetrics();
+  const recovery = useMemo(() => liveRecoveryFromMetrics(m), [m]);
   const subscores = [
-    "Cardio Recovery 92",
-    "Muscle Readiness 64",
-    "Load Debt 71",
-    "Recovery Environment 88",
-    "Confidence 81",
-  ];
+    ["Cardio Recovery", recovery.parts.cardio],
+    ["Muscle Readiness", recovery.parts.muscle],
+    ["Load Debt", recovery.parts.loadDebt],
+    ["Recovery Environment", recovery.parts.environment],
+    ["Confidence", recovery.parts.confidence],
+  ] as const;
+  const hasSignals = subscores.some(([, value]) => value != null);
+
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="flex items-center justify-center">
-        <ScoreRing metric={{ label: "LIVE Recovery", value: 78, color: "teal" }} />
+        <ScoreRing metric={{ label: "LIVE Recovery", value: recovery.score, color: "teal" }} />
       </div>
       <Card className="lg:col-span-2">
-        <h3 className="font-semibold">Subscores</h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="font-semibold">Subscores</h3>
+          <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>
+            {m.connected ? "live" : "offline"}
+          </Pill>
+        </div>
         <div className="mt-4 space-y-3">
-          {subscores.map((x) => {
-            const v = parseInt(x.match(/\d+/)![0]);
+          {subscores.map(([label, value]) => {
+            const v = value ?? 0;
             return (
-              <div key={x}>
-                {x}
-                <Bar value={v} color={v < 70 ? "amber" : "white"} />
+              <div key={label} className={value == null ? "text-gray-400" : ""}>
+                <div className="flex items-center justify-between text-sm">
+                  <span>{label}</span>
+                  <b className="tabular-nums">{value ?? DASH}</b>
+                </div>
+                <Bar value={v} color={value == null || v < 70 ? "amber" : "white"} />
               </div>
             );
           })}
         </div>
       </Card>
       <Card className="lg:col-span-3">
-        <h3 className="font-semibold text-vyro-amber">HR-only trap detected</h3>
+        <h3 className="font-semibold">Live recovery signals</h3>
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <RecoveryMetric label="Current HR" value={fmt(m.heartRateBpm)} unit="bpm" connected={m.connected} rawValue={m.heartRateBpm} />
+          <RecoveryMetric label="Resting HR" value={fmt(m.restingHrBpm)} unit="bpm" connected={m.connected} rawValue={m.restingHrBpm} />
+          <RecoveryMetric label="HRV" value={fmt(m.hrvMs)} unit="ms" connected={m.connected} rawValue={m.hrvMs} />
+          <RecoveryMetric label="Stress" value={fmt(m.stressScore)} unit="/100" connected={m.connected} rawValue={m.stressScore} />
+          <RecoveryMetric label="SpO2" value={fmt(m.spo2Pct)} unit="%" connected={m.connected} rawValue={m.spo2Pct} />
+          <RecoveryMetric label="Skin temp" value={fmt(m.skinTempC, 1)} unit="C" connected={m.connected} rawValue={m.skinTempC} />
+        </div>
+      </Card>
+      <Card className="lg:col-span-3">
+        <h3 className={`font-semibold ${hasSignals ? "text-vyro-amber" : "text-gray-500"}`}>
+          {hasSignals ? "Live recovery is hardware-gated" : "Waiting for recovery signals"}
+        </h3>
         <p className="mt-2 text-sm text-gray-500">
-          HR within 6 bpm of baseline, but muscle readiness still 64/100 after Z5 rallies.
+          {hasSignals
+            ? "The score only publishes from real watch channels. Missing HRV, stress, SpO2, skin temperature, or motion channels stay blank until firmware sends them."
+            : "Connect and wear the band to stream HR, HRV, stress, SpO2, skin temperature, and motion load. No demo recovery values are shown here."}
         </p>
       </Card>
     </div>
@@ -204,23 +280,51 @@ function RecoveryLive() {
 }
 
 function RecoveryFatigue() {
-  const items = ["Court coverage fatigue 71", "Cardio fatigue 48", "Total fatigue 62"];
+  const m = useLiveMetrics();
+  const subs = useMemo(
+    () =>
+      computeSubScores({
+        connected: m.connected,
+        hrvMs: m.hrvMs,
+        restingHrBpm: m.restingHrBpm,
+        stress: m.stressScore,
+        peakJerk: m.peakJerk,
+        peakG: m.peakG,
+        eventsLastMin: m.eventsLastMin,
+        reactMin: m.reactMin,
+      }),
+    [m.connected, m.hrvMs, m.restingHrBpm, m.stressScore, m.peakJerk, m.peakG, m.eventsLastMin, m.reactMin],
+  );
+  const loadFatigue = m.connected && (m.eventsLastMin > 0 || m.peakJerk > 0)
+    ? Math.round(Math.min(100, Math.min(70, m.eventsLastMin * 1.4) + Math.min(30, m.peakJerk / 6)))
+    : null;
+  const cardioFatigue = m.connected && m.heartRateBpm != null && m.restingHrBpm != null
+    ? Math.round(Math.max(0, Math.min(100, ((m.heartRateBpm - m.restingHrBpm) / 70) * 100)))
+    : null;
+  const items = [
+    ["Court coverage fatigue", loadFatigue],
+    ["Cardio fatigue", cardioFatigue],
+    ["Total fatigue", subs.fatigue],
+  ] as const;
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      {items.map((x) => {
-        const v = parseInt(x.match(/\d+/)![0]);
+      {items.map(([label, value]) => {
+        const v = value ?? 0;
         return (
-          <Card key={x}>
+          <Card key={label} className={value == null ? "bg-gray-50/80" : ""}>
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500">
-              {x.replace(/\d+/, "")}
+              {label}
             </div>
-            <div className="mt-2 text-5xl font-semibold tabular-nums">{v}</div>
+            <div className={`mt-2 text-5xl font-semibold tabular-nums ${value == null ? "text-gray-400" : ""}`}>
+              {value ?? DASH}
+            </div>
             <Bar value={v} color="amber" />
+            <div className="mt-2 text-xs text-gray-400">{liveLabel(m.connected, value)}</div>
           </Card>
         );
       })}
       <Card className="lg:col-span-3">
-        <h3 className="font-semibold">Fatigue decay · 14 days</h3>
+        <h3 className="font-semibold">Fatigue load - live session</h3>
         <Spark points={[42, 51, 58, 64, 71, 68, 62, 56, 49, 54, 61, 65, 60, 62]} color="var(--vyro-amber)" />
       </Card>
     </div>

@@ -172,14 +172,14 @@ export function ScoreRing({
   metric,
   onClick,
 }: {
-  metric: { label: string; value: number; color: "amber" | "teal"; target?: string; tab?: string };
+  metric: { label: string; value: number | null; color: "amber" | "teal"; target?: string; tab?: string };
   onClick?: () => void;
 }) {
   const ringColor = metric.color === "amber" ? "var(--vyro-amber)" : "var(--vyro-teal)";
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const timer = requestAnimationFrame(() => setProgress(metric.value));
+    const timer = requestAnimationFrame(() => setProgress(metric.value ?? 0));
     return () => cancelAnimationFrame(timer);
   }, [metric.value]);
 
@@ -196,7 +196,7 @@ export function ScoreRing({
         }}
       >
         <div className="grid h-[62px] w-[62px] place-items-center rounded-full bg-gradient-to-b from-white to-gray-50/50">
-          <span className="text-2xl font-semibold tabular-nums leading-none text-gray-900">{metric.value}</span>
+          <span className="text-2xl font-semibold tabular-nums leading-none text-gray-900">{metric.value ?? "\u2014"}</span>
         </div>
       </div>
       <div className="mt-2 text-[10px] font-mono uppercase tracking-[0.18em] text-gray-500">{metric.label}</div>

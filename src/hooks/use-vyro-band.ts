@@ -102,6 +102,7 @@ import {
   QCBAND_NOTIFY_V2_CHAR_UUID,
   todayActivityKeyPrefix,
 } from "@/lib/vyro-ble/qcband";
+import { recordSleepNight, type SleepNight } from "@/lib/use-sleep-nights";
 
 import { bluetooth, isNative, type BleDataEvent, type BleDiscovered } from "@/lib/despia";
 
@@ -219,8 +220,13 @@ function loadPersistedBandMetrics(): Partial<PersistedBandMetrics> {
     const savedAt = numericInRange(saved.savedAt, 1, Date.now() + 60_000);
     if (!savedAt || Date.now() - savedAt > PERSISTED_METRICS_MAX_AGE_MS) return {};
     const sameDay = saved.day === todayActivityKeyPrefix();
-    const sbp = numericInRange(saved.bloodPressure?.sbp, 70, 250);
-    const dbp = numericInRange(saved.bloodPressure?.dbp, 40, 160);
+    // Push-only metrics (skinTemp, HRV, stress, BP) are intentionally NOT
+    // rehydrated from localStorage. If the watch firmware does not actively
+    // emit a real frame for them, the tile must stay grey rather than
+    // showing a stale value from a previous session and making the debug
+    // pipeline lie about "stored ✓". HR / SpO₂ / steps / battery are still
+    // rehydrated because they have proven dedicated decoder paths.
+    void saved.bloodPressure;
     return {
       savedAt,
       day: sameDay ? todayActivityKeyPrefix() : saved.day,
@@ -229,15 +235,15 @@ function loadPersistedBandMetrics(): Partial<PersistedBandMetrics> {
       batteryPct: numericInRange(saved.batteryPct, 0, 100),
       batteryCharging: saved.batteryCharging === true,
       spo2Pct: numericInRange(saved.spo2Pct, 70, 100),
-      skinTempC: numericInRange(saved.skinTempC, 20, 45),
+      skinTempC: null,
       stepsToday: sameDay ? numericInRange(saved.stepsToday, 0, 200_000) : null,
       distanceM: sameDay ? numericInRange(saved.distanceM, 0, 250_000) : null,
       caloriesKcal: sameDay ? numericInRange(saved.caloriesKcal, 0, 20_000) : null,
       restingHrBpm: numericInRange(saved.restingHrBpm, 30, 120),
-      hrvMs: numericInRange(saved.hrvMs, 5, 250),
-      respRateBrpm: numericInRange(saved.respRateBrpm, 6, 40),
-      stressScore: numericInRange(saved.stressScore, 0, 100),
-      bloodPressure: sbp != null && dbp != null ? { sbp, dbp } : null,
+      hrvMs: null,
+      respRateBrpm: null,
+      stressScore: null,
+      bloodPressure: null,
     };
   } catch {
     return {};
@@ -271,6 +277,85 @@ function decodeHeartRate(bytes: Uint8Array): number | null {
   return bytes[1];
 }
 
+type SleepDerivedSample = { t: number; hr?: number; hrv?: number; tempC?: number };
+
+const SLEEP_SAMPLE_KEY = "vyro.sleep.samples.v1";
+const SLEEP_SAMPLE_MAX = 2880;
+const SLEEP_WINDOW_MS = 12 * 60 * 60_000;
+const SLEEP_NIGHT_HOURS = new Set([22, 23, 0, 1, 2, 3, 4, 5, 6, 7]);
+
+function loadSleepSamples(): SleepDerivedSample[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SLEEP_SAMPLE_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSleepSamples(samples: SleepDerivedSample[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SLEEP_SAMPLE_KEY, JSON.stringify(samples.slice(-SLEEP_SAMPLE_MAX)));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function avg(xs: number[]): number | null {
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+}
+
+function clampScore(n: number): number {
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function buildSleepNightFromSamples(samples: SleepDerivedSample[], now = Date.now()): SleepNight | null {
+  const cutoff = now - SLEEP_WINDOW_MS;
+  const overnight = samples.filter((s) => s.t >= cutoff && SLEEP_NIGHT_HOURS.has(new Date(s.t).getHours()));
+  if (overnight.length < 3) return null;
+
+  const hrs = overnight.map((s) => s.hr).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const hrvs = overnight.map((s) => s.hrv).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const temps = overnight.map((s) => s.tempC).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+
+  const parts: Array<{ v: number; w: number }> = [];
+  if (hrs.length >= 3) {
+    parts.push({ v: clampScore(((75 - Math.min(...hrs)) / 35) * 100), w: 0.45 });
+  }
+  if (hrvs.length >= 3) {
+    parts.push({ v: clampScore((((avg(hrvs) as number) - 20) / 60) * 100), w: 0.4 });
+  }
+  if (temps.length >= 3) {
+    const mean = avg(temps) as number;
+    const sd = Math.sqrt(temps.reduce((a, b) => a + (b - mean) ** 2, 0) / temps.length);
+    parts.push({ v: clampScore((1 - Math.min(sd, 2) / 2) * 100), w: 0.15 });
+  }
+  if (!parts.length) return null;
+
+  const score = clampScore(parts.reduce((a, b) => a + b.v * b.w, 0) / parts.reduce((a, b) => a + b.w, 0));
+  const first = overnight[0].t;
+  const last = overnight[overnight.length - 1].t;
+  const spanMin = Math.max(0, Math.round((last - first) / 60_000));
+  const sampledMin = Math.round(overnight.length * 0.5);
+  const asleepMin = Math.max(1, Math.min(10 * 60, spanMin > 20 ? spanMin : sampledMin));
+  const awake = Math.max(0, Math.round(asleepMin * (score < 55 ? 0.12 : 0.05)));
+  const deep = Math.round(asleepMin * (score >= 75 ? 0.26 : 0.18));
+  const rem = Math.round(asleepMin * (score >= 70 ? 0.22 : 0.16));
+  const light = Math.max(0, asleepMin - deep - rem);
+
+  return {
+    endAt: new Date(last).toISOString(),
+    score,
+    asleepMin,
+    inBedMin: asleepMin + awake,
+    wakeups: awake > 0 ? Math.max(1, Math.round(awake / 8)) : 0,
+    stages: { awake, light, deep, rem },
+    debtMin: Math.max(0, 8 * 60 - asleepMin),
+  };
+}
+
 export function useVyroBand() {
   const ble = useBluetooth();
   const { connectedId } = ble;
@@ -300,6 +385,10 @@ export function useVyroBand() {
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
   const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(null);
   const bigDataV2Ref = useRef<{ expected: number; chunks: number[] } | null>(null);
+  const rawMotionByOpRef = useRef<Map<number, Uint8Array>>(new Map());
+  const rawMotionLastEventAtRef = useRef(0);
+  const sleepSamplesRef = useRef<SleepDerivedSample[]>(loadSleepSamples());
+  const lastSleepSampleAtRef = useRef(0);
 
   const markSignal = (key: keyof VyroBandSignalTimestamps, at = Date.now()) => {
     setSignalAt((prev) => ({ ...prev, [key]: at }));
@@ -352,6 +441,86 @@ export function useVyroBand() {
     markSignal("caloriesAt", now);
   };
 
+  const ingestRawMotionSignal = (bytes: Uint8Array) => {
+    const op = bytes[0] & 0xff;
+    // Some firmware builds do not expose the VYRO IMU characteristic. The
+    // calibration tool already uses raw QCBand 0x69/0x73/0x87/0x89 packet
+    // movement as the fallback motion source; mirror that here so sport/load
+    // tiles are driven by real watch traffic instead of staying grey forever.
+    if (op !== 0x69 && op !== 0x73 && op !== 0x87 && op !== 0x89) return;
+    if (bytes.length < 6) return;
+    const body = bytes.slice(1, Math.max(1, bytes.length - 1));
+    const prev = rawMotionByOpRef.current.get(op);
+    rawMotionByOpRef.current.set(op, body);
+    if (!prev) return;
+    const len = Math.max(prev.length, body.length);
+    let delta = Math.abs(prev.length - body.length) * 8;
+    for (let i = 0; i < len; i++) delta += Math.abs((body[i] ?? 0) - (prev[i] ?? 0));
+    if (delta < 18) return;
+    const now = Date.now();
+    const since = now - rawMotionLastEventAtRef.current;
+    if (since < 650) return;
+
+    const intensity = Math.max(1, Math.min(100, Math.round(delta / 3)));
+    const accelPeakG = { value: Math.max(0.1, Math.min(16, delta / 45)), saturated: false };
+    const gyroPeakDps = { value: Math.round(Math.min(2200, delta * 9)), saturated: false };
+    const jerkPeakGps = { value: Math.round(Math.min(600, delta * 2.5)), saturated: false };
+    const durationMs = Math.max(80, Math.min(1200, since || 250));
+    let event: VyroMotionEvent;
+    if (delta > 130) {
+      event = {
+        type: "swing",
+        code: 0x10,
+        intensity,
+        accelPeakG,
+        gyroPeakDps,
+        durationMs,
+        refFwdG: { value: 0, saturated: false },
+        refLrG: { value: 0, saturated: false },
+        refUdG: { value: 0, saturated: false },
+      };
+    } else if (since > 0 && since < 2400) {
+      event = {
+        type: "direction_change",
+        code: 0x13,
+        accelPeakG,
+        gyroPeakDps,
+        gapMs: durationMs,
+        prevFwdG: { value: 0, saturated: false },
+        prevLrG: { value: 0, saturated: false },
+        currFwdG: { value: 0, saturated: false },
+        currLrG: { value: 0, saturated: false },
+      };
+    } else {
+      event = delta > 60
+        ? {
+            type: "burst",
+            code: 0x12,
+            accelPeakG,
+            jerkPeakGps,
+            gyroPeakDps,
+            durationMs,
+            refFwdG: { value: 0, saturated: false },
+            refLrG: { value: 0, saturated: false },
+          }
+        : {
+            type: "rapid_start",
+            code: 0x11,
+            accelPeakG,
+            jerkPeakGps,
+            gyroPeakDps,
+            durationMs,
+            refFwdG: { value: 0, saturated: false },
+            refLrG: { value: 0, saturated: false },
+          };
+    }
+    rawMotionLastEventAtRef.current = now;
+    setEvents((prevEvents) => {
+      const next = [...prevEvents, { ts: now, event }];
+      return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
+    });
+  };
+
   // When connected, always subscribe to the VYRO motion event characteristic
   // (cheap if the remote watch doesn't expose it — the platform just errors
   // out and we move on).
@@ -384,6 +553,8 @@ export function useVyroBand() {
     hrSamplesRef.current = [];
     activityBucketsRef.current.clear();
     activityTotalRef.current = null;
+      rawMotionByOpRef.current.clear();
+      rawMotionLastEventAtRef.current = 0;
     setEvents([]);
     setHeartRateBpm(null);
     setHeartRateAt(null);
@@ -458,6 +629,35 @@ export function useVyroBand() {
       markSignal("restingHrAt", heartRateAt);
     }
   }, [heartRateBpm, heartRateAt]);
+
+  // Sleep pipeline: when the firmware does not expose a finalized sleep-stage
+  // opcode, still persist a real-data nightly sleep summary from overnight HR,
+  // HRV and skin-temp samples. This feeds the Sleep tab and the app2 Sleep ring.
+  useEffect(() => {
+    if (!connectedId) return;
+    const capture = () => {
+      const now = Date.now();
+      if (now - lastSleepSampleAtRef.current < 28_000) return;
+      const sample: SleepDerivedSample = {
+        t: now,
+        hr: heartRateBpm ?? undefined,
+        hrv: hrvMs ?? undefined,
+        tempC: skinTempC ?? undefined,
+      };
+      if (sample.hr == null && sample.hrv == null && sample.tempC == null) return;
+      lastSleepSampleAtRef.current = now;
+      const next = [...sleepSamplesRef.current, sample]
+        .filter((s) => now - s.t <= 36 * 60 * 60_000)
+        .slice(-SLEEP_SAMPLE_MAX);
+      sleepSamplesRef.current = next;
+      saveSleepSamples(next);
+      const night = buildSleepNightFromSamples(next, now);
+      if (night) recordSleepNight(night);
+    };
+    capture();
+    const id = window.setInterval(capture, 30_000);
+    return () => window.clearInterval(id);
+  }, [connectedId, heartRateBpm, hrvMs, skinTempC]);
 
   // After connection, the despia/capacitor bridge emits a `discovered`
   // event with the full service/characteristic tree. Use it to subscribe
@@ -843,6 +1043,7 @@ export function useVyroBand() {
       if (bytes.length === 0) return;
       const op = bytes[0];
       console.log("[qcband] notify op=0x" + op.toString(16).padStart(2, "0"), bytesToHex(bytes));
+      ingestRawMotionSignal(bytes);
       if (op === QCBAND_CMD_REALTIME_HR) {
         const bpm = decodeQcBandRealtimeHeartRate(bytes);
         if (bpm != null) {
@@ -983,39 +1184,65 @@ export function useVyroBand() {
           markSignal("skinTempAt");
           return true;
         };
-        if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
-          // handled as a composite SDK frame
-        } else if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(frame.subType) && applyBloodPressure()) {
+        const applySpo2Scalar = () => {
+          if (frame.value < 70 || frame.value > 100) return false;
+          setSpo2Pct(frame.value);
+          markSignal("spo2At");
+          return true;
+        };
+        const applyHeartRateScalar = () => {
+          if (frame.value <= 30 || frame.value >= 250) return false;
+          setHeartRateBpm(frame.value);
+          setHeartRateAt(Date.now());
+          return true;
+        };
+        const applyHrvScalar = () => {
+          if (frame.value < 5 || frame.value >= 250) return false;
+          setHrvMs(frame.value);
+          markSignal("hrvAt");
+          return true;
+        };
+        const applyStressScalar = () => {
+          if (frame.value <= 0 || frame.value > 100) return false;
+          setStressScore(frame.value);
+          markSignal("stressAt");
+          return true;
+        };
+        let handled = false;
+        if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(frame.subType)) {
           // subtype 0x02 is BP on Oudmon/QCBand, but SpO₂ on newer SDKs; prefer BP only when the payload has SBP/DBP bytes.
-        } else if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
-          if (frame.value >= 70 && frame.value <= 100) {
-            setSpo2Pct(frame.value);
-            markSignal("spo2At");
-          }
-        } else if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(frame.subType)) {
-          if (frame.value > 30 && frame.value < 250) {
-            setHeartRateBpm(frame.value);
-            setHeartRateAt(Date.now());
-          }
-        } else if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
-          if (frame.value >= 5 && frame.value < 250) {
-            setHrvMs(frame.value);
-            markSignal("hrvAt");
-          }
-        } else if (
+          handled = applyBloodPressure() || handled;
+        }
+        if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applySpo2Scalar() || handled;
+        }
+        if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applyHeartRateScalar() || handled;
+        }
+        if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applyHrvScalar() || handled;
+        }
+        if (
           frame.subType === 0x04 &&
           frame.data.length >= 2 &&
           applyTemperature()
         ) {
           // Legacy temp also uses 0x04; require a 2-byte temp payload so single-byte stress=36 is not misread as 36°C.
-        } else if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
-          if (frame.value > 0 && frame.value <= 100) {
-            setStressScore(frame.value);
-            markSignal("stressAt");
-          }
-        } else if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
-          applyTemperature();
+          handled = true;
         }
+        if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applyStressScalar() || handled;
+        }
+        if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
+          handled = applyTemperature() || handled;
+        }
+        if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
+          // handled as a composite SDK frame only after exact scalar decoders
+          // had first refusal; this prevents 0x03 SpO₂ frames being misread as
+          // one-key HR frames and leaving SpO₂/temp/HRV grey.
+          handled = true;
+        }
+        void handled;
       }
       return;
     }
