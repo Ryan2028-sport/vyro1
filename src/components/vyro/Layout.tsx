@@ -34,7 +34,8 @@ export type ViewId =
   | "swing"
   | "tendency"
   | "more"
-  | "band";
+  | "band"
+  | "settings";
 
 export const viewTitles: Record<ViewId, string> = {
   home: "Home",
@@ -56,6 +57,7 @@ export const viewTitles: Record<ViewId, string> = {
   tendency: "Tendencies",
   more: "More",
   band: "Band",
+  settings: "Settings",
 };
 
 const navItems: { id: ViewId; label: string; icon: typeof Home }[] = [
@@ -139,8 +141,8 @@ export function Layout({
               <span className="text-sm font-semibold text-gray-900 lg:hidden">{viewTitles[activeView]}</span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setView("profile")}
-                  className="grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-gray-50 transition-colors hover:bg-gray-100"
+                  onClick={() => setView("settings")}
+                  className={`grid h-9 w-9 place-items-center rounded-full border transition-colors ${activeView === "settings" ? "border-gray-300 bg-gray-100" : "border-gray-200 bg-gray-50 hover:bg-gray-100"}`}
                 >
                   <Settings className="h-4 w-4 text-gray-600" />
                 </button>

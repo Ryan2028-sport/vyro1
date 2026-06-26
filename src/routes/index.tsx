@@ -14,6 +14,7 @@ import { DietView } from "@/components/vyro/DietView";
 import { SleepView } from "@/components/vyro/SleepView";
 import { ProfileView } from "@/components/vyro/ProfileView";
 import { DebugView } from "@/components/vyro/DebugView";
+import { SettingsView } from "@/components/vyro/SettingsView";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
@@ -122,6 +123,7 @@ function App() {
         {activeView === "diet" && <DietView />}
         {activeView === "profile" && <ProfileView onNavigate={(v) => setActiveView(v as ViewId)} />}
         {activeView === "debug" && <DebugView />}
+        {activeView === "settings" && <SettingsView />}
       </Layout>
     </VyroBandProvider>
   );
