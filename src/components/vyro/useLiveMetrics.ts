@@ -11,27 +11,43 @@ export function useLiveMetrics() {
 
   useEffect(() => {
     if (!connected) return;
-    const id = window.setInterval(() => setNow(Date.now()), 10_000);
+    const id = window.setInterval(() => setNow(Date.now()), 2_000);
     return () => window.clearInterval(id);
   }, [connected]);
 
   const currentTime = Math.max(now, Date.now());
-  const isFresh = (at: number | null | undefined, maxAgeMs: number) =>
-    connected && at != null && currentTime - at >= 0 && currentTime - at <= maxAgeMs;
+  // Freshness gate. The watch delivers a value + a `signalAt.*` timestamp
+  // together, but during a reconnect the value can briefly arrive before
+  // `signalAt` is rehydrated. In that race the tile would go grey even
+  // though the value is right there in context. Fix: if the band is
+  // connected and we have a value, show it. Use the timestamp only to
+  // hide truly stale readings (older than `maxAgeMs`).
+  const isFresh = (
+    at: number | null | undefined,
+    value: number | null | undefined,
+    maxAgeMs: number,
+  ) => {
+    if (!connected || value == null) return false;
+    if (at == null) return true; // value present, timestamp not yet wired — trust it
+    const age = currentTime - at;
+    if (age < 0) return true;
+    return age <= maxAgeMs;
+  };
 
-  const liveHeartRateBpm = isFresh(heartRateAt, 15_000) ? heartRateBpm : null;
+  const liveHeartRateBpm = isFresh(heartRateAt, heartRateBpm, 30_000) ? heartRateBpm : null;
   const liveHeartRateAt = liveHeartRateBpm == null ? null : heartRateAt;
-  const liveBatteryPct = isFresh(signalAt.batteryAt, 5 * 60_000) ? batteryPct : null;
+  const liveBatteryPct = isFresh(signalAt.batteryAt, batteryPct, 10 * 60_000) ? batteryPct : null;
   const liveBatteryCharging = liveBatteryPct != null && batteryCharging;
-  const liveSpo2Pct = isFresh(signalAt.spo2At, 20 * 60_000) ? spo2Pct : null;
-  const liveSkinTempC = isFresh(signalAt.skinTempAt, 20 * 60_000) ? skinTempC : null;
-  const liveStepsToday = isFresh(signalAt.stepsAt, 2 * 60_000) ? stepsToday : null;
-  const liveDistanceM = isFresh(signalAt.distanceAt, 2 * 60_000) ? distanceM : null;
-  const liveCaloriesKcal = isFresh(signalAt.caloriesAt, 2 * 60_000) ? caloriesKcal : null;
-  const liveBloodPressure = isFresh(signalAt.bloodPressureAt, 20 * 60_000) ? bloodPressure : null;
-  const liveRestingHrBpm = isFresh(signalAt.restingHrAt, 5 * 60_000) ? restingHrBpm : null;
-  const liveHrvMs = isFresh(signalAt.hrvAt, 20 * 60_000) ? hrvMs : null;
-  const liveStressScore = isFresh(signalAt.stressAt, 20 * 60_000) ? stressScore : null;
+  const liveSpo2Pct = isFresh(signalAt.spo2At, spo2Pct, 30 * 60_000) ? spo2Pct : null;
+  const liveSkinTempC = isFresh(signalAt.skinTempAt, skinTempC, 30 * 60_000) ? skinTempC : null;
+  const liveStepsToday = isFresh(signalAt.stepsAt, stepsToday, 5 * 60_000) ? stepsToday : null;
+  const liveDistanceM = isFresh(signalAt.distanceAt, distanceM, 5 * 60_000) ? distanceM : null;
+  const liveCaloriesKcal = isFresh(signalAt.caloriesAt, caloriesKcal, 5 * 60_000) ? caloriesKcal : null;
+  const liveBloodPressure = isFresh(signalAt.bloodPressureAt, bloodPressure ? 1 : null, 30 * 60_000) ? bloodPressure : null;
+  const liveRestingHrBpm = isFresh(signalAt.restingHrAt, restingHrBpm, 10 * 60_000) ? restingHrBpm : null;
+  const liveHrvMs = isFresh(signalAt.hrvAt, hrvMs, 30 * 60_000) ? hrvMs : null;
+  const liveStressScore = isFresh(signalAt.stressAt, stressScore, 30 * 60_000) ? stressScore : null;
+
 
   const derived = useMemo(() => {
     let peakG = 0, peakDps = 0, peakJerk = 0;
