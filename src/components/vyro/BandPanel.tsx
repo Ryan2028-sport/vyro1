@@ -1,9 +1,14 @@
 // Pairing + live event feed + OTA firmware uploader. Used inside Profile.
 // Light-theme to match the rest of the app on mobile.
-import { Activity, Bluetooth, CheckCircle2, Upload, XCircle } from "lucide-react";
+import { Activity, Bluetooth, CheckCircle2, Download, Upload, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { runOtaUpload, type OtaProgress } from "@/lib/vyro-ble/ota";
 import { openSmpTransport, requestVyroBand } from "@/lib/vyro-ble/web-transport";
+import {
+  checkFirmwareUpdate,
+  isManifestConfigured,
+  type FirmwareCheckResult,
+} from "@/lib/vyro-ble/firmware-manifest";
 import { useVyroBandCtx } from "./VyroBandProvider";
 import type { VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import { useServerFn } from "@tanstack/react-start";
