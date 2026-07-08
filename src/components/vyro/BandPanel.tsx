@@ -113,6 +113,64 @@ export function BandPanel({
   const [otaSuccess, setOtaSuccess] = useState(false);
   const otaInputRef = useRef<HTMLInputElement>(null);
 
+  // Firmware manifest check — runs when the watch reports a firmware
+  // revision via BLE DIS (0x2a26). Compares against VITE_FIRMWARE_MANIFEST_URL.
+  // Does NOT auto-install: install is blocked when the watch doesn't expose
+  // the MCUmgr/SMP GATT service (Armand's current firmware doesn't).
+  const [firmwareCheck, setFirmwareCheck] = useState<FirmwareCheckResult | null>(null);
+  const [firmwareChecking, setFirmwareChecking] = useState(false);
+  const [downloadingUpdate, setDownloadingUpdate] = useState(false);
+  useEffect(() => {
+    if (!connected || !firmwareRevision) return;
+    if (!isManifestConfigured()) {
+      setFirmwareCheck({
+        manifest: null,
+        currentVersion: firmwareRevision,
+        updateAvailable: false,
+        error: "VITE_FIRMWARE_MANIFEST_URL not set",
+      });
+      return;
+    }
+    let cancelled = false;
+    setFirmwareChecking(true);
+    void checkFirmwareUpdate(firmwareRevision)
+      .then((r) => {
+        if (!cancelled) setFirmwareCheck(r);
+      })
+      .finally(() => {
+        if (!cancelled) setFirmwareChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connected, firmwareRevision]);
+
+  // Detect whether the currently connected watch exposes the MCUmgr/SMP
+  // service. Without it, `runOtaUpload` cannot flash the device. We surface
+  // this so the "Install" button doesn't lie.
+  const smpAvailable = ble.services.some(
+    (s) => s.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
+  );
+
+  const downloadUpdate = useCallback(async () => {
+    if (!firmwareCheck?.manifest) return;
+    setOtaError(null);
+    setDownloadingUpdate(true);
+    try {
+      const res = await fetch(firmwareCheck.manifest.downloadUrl);
+      if (!res.ok) throw new Error(`download HTTP ${res.status}`);
+      const buf = await res.arrayBuffer();
+      const file = new File([buf], `firmware-${firmwareCheck.manifest.latestVersion}.bin`, {
+        type: "application/octet-stream",
+      });
+      setOtaFile(file);
+    } catch (e) {
+      setOtaError((e as Error)?.message || String(e));
+    } finally {
+      setDownloadingUpdate(false);
+    }
+  }, [firmwareCheck]);
+
   const runOta = useCallback(async () => {
     if (!otaFile) return;
     setOtaError(null);
