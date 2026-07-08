@@ -1413,5 +1413,8 @@ export function useVyroBand() {
     respRateBrpm,
     stressScore,
     signalAt,
+    firmwareRevision,
+    hardwareRevision,
+    serialNumber,
   };
 }
