@@ -1,59 +1,55 @@
-## Goal
-Metrics stay grey/stale in the app even after the Armand firmware update. We need to prove exactly where each metric dies (firmware → BLE notify → decoder → context → freshness gate → UI) and fix the broken link for every metric individually — not just HR/SpO₂.
+## What the latest debug bundle proves
 
-## Investigation (before any fix)
+From your connect (81 notifs, 29 writes, all OK):
 
-1. Read the decoder + context wiring to map every metric to its opcode and setter:
-   - `src/lib/vyro-ble/packets.ts` (frame parsing, opcode → field mapping)
-   - `src/lib/vyro-ble/qcband.ts` (command requests sent to watch)
-   - `src/hooks/use-vyro-band.ts` (context setters, rehydrate logic, signalAt timestamps)
-   - `src/components/vyro/VyroBandProvider.tsx` (context shape)
-   - `src/components/vyro/useLiveMetrics.ts` (freshness gate — already relaxed)
-   - `src/components/vyro/use-ble-inspector.ts` (current debug counters)
+**Working (ctx has real values):**
+- HRV = 40, Stress = 37, Steps = 2744, Cal = 9184, Distance = 2173, Battery = 63
 
-2. Build a per-metric truth table from the code:
-   | Metric | Request opcode | Response opcode | Decoder field | Context setter | signalAt key |
-   Any row with a `—` is a broken link we must fix.
+**Broken (ctx = null):**
+- Heart rate, SpO₂, Skin temperature, Blood pressure
 
-## Fixes (scoped to what the investigation proves)
+**Opcode traffic received:**
+- `0x1e` × 11 — realtime HR responses, but payload is `1e 00 00 ...` → **bpm byte = 0** every time. Watch is ACKing "started" but never sending a real HR reading.
+- `0x43` × 30, `0x48` × 4 — activity/today-sports (steps/cal/dist land here ✓)
+- `0x03` × 1 — battery ✓
+- `0x87` × 4, `0x89` × 4 — payload `ee` (238). Currently in "known opcodes" list but I need to confirm they're what's populating HRV/stress, or they're something else and HRV/stress are coming from `0x1e`/handshake side-effects.
+- **No `0x69` responses at all** — the SDK "start measure" channel that HR/SpO₂/Temp/BP live on is never returning data.
+- Unknown opcodes (`0x2f 0x01 0x16 0x2c 0x36 0x38 0x3a`, one each) are just write-ACKs from the connect-time preference commands; harmless.
 
-### A. Force every metric to be requested on connect
-In `use-vyro-band.ts` connect sequence, send the full opcode sweep the new firmware supports (HR, SpO₂, HRV, stress, skin temp, BP, steps/cal/distance, battery, resting HR, respiration) with correct spacing. Log each request into the write log.
+**Verdict:** The firmware is not producing HR/SpO₂/Skin Temp/BP because either (a) the app never sends a `0x69` start-measure for those sub-types after connect, or (b) it sends it but the watch's response opcode differs on this firmware line. `0x1e` HR is being started but the watch keeps returning bpm=0 — likely because HR must first be armed via `0x69` with the SDK's HR sub-type before `0x1e` returns non-zero.
 
-### B. Decoder: handle every response opcode the firmware now emits
-In `packets.ts`, add/repair parsers for any opcode the Debug bundle shows as "unknown" but the firmware advertises. Emit a normalized `{field, value, ts}` for each.
+## What to change (all inside `/app2` shell)
 
-### C. Context: setter + timestamp for every field
-In `use-vyro-band.ts`, ensure each decoded field calls `setX(value)` AND `setSignalAt(prev => ({...prev, xAt: Date.now()}))` in the same tick. Remove any code path that sets the value without the timestamp (this was the root cause of the earlier freshness race).
+### 1. Wire the Decoder Tap into HRV/Stress/Battery paths (missing today)
+`decoder-tap.ts` already exists. Confirm every metric setter in `use-vyro-band.ts` calls `tapDecoded(...)` — right now HRV/stress/steps values arrive but the decoder-tap section of Debug is empty because the tap isn't invoked on those paths. Without it we cannot tell whether `0x87`/`0x89` are the HRV/stress source or noise.
 
-### D. Rehydration policy
-Keep push-only metrics unrehydrated (already done). Rehydrate only battery + steps/cal/distance which the firmware repeats on a schedule.
+### 2. Send a full `0x69` start-measure sweep on connect
+In `use-vyro-band.ts` connect sequence, add sequential `encodeQcBandMeasureStart(subType)` writes with ~500ms spacing for:
+- HR (both `0x01` and SDK `0x00`)
+- SpO₂ (both `0x03` and SDK `0x02`)
+- Skin Temp (`0x07` SDK, `0x09` legacy, `0x04` legacy)
+- BP (`0x02`)
+- HRV (`0x06` SDK, `0x0e` legacy)
+- Stress (`0x04` SDK, `0x0d` legacy)
 
-### E. Debug tab: per-metric verdict row
-Extend `DebugView.tsx` to render one row per metric with a live verdict:
-- `requested ✓ / ✗` (from write log)
-- `notified ✓ ×N / ✗` (from decoder counters, per opcode)
-- `parsed ✓ / unknown-opcode / bad-length` (new decoder outcome per opcode)
-- `stored ✓ (age Xs) / null` (from context)
-- `ui ✓ / grey (reason)` (freshness gate result)
+Both variants are needed because your firmware line hasn't declared which mapping it uses. Log every write into the existing write log so Debug shows them.
 
-This turns the Debug bundle into a self-diagnosing report — one glance shows whether the break is firmware, decoder, context, or gate.
+### 3. Add decoders / taps for `0x87` and `0x89`
+They arrive on this firmware but currently only bump the "known" counter without producing a stored value. Add parsers in `packets.ts` (single-byte value at byte 1 is `0xee` → 238; likely a raw HRV/stress sample or a session marker) and route to the correct setter with `tapDecoded()`. If they turn out to be junk, at least the Debug tap will show that unambiguously.
 
-### F. Auto re-request on silence
-If a metric was requested but produced 0 notifications within 20s, resend the request once. Log both attempts.
+### 4. Auto re-arm on silence
+If any of HR/SpO₂/Temp/BP produces 0 decoded values within 20s of connect, re-send its `0x69` start-measure once. Log both attempts.
 
-## Verification
-1. Reconnect watch, wait 60s.
-2. Debug tab: every metric row should reach at least `stored ✓`. Any row still red points at a specific layer (firmware vs decoder vs gate) — no more guessing.
-3. Home / Recovery / Sport tiles: every metric with `stored ✓` must be non-grey.
-4. Paste new debug bundle to confirm.
+### 5. Extend Debug tab: per-metric verdict row
+One row per metric with: `requested ✓ (write hex) / ✗`, `notified ✓ ×N (last opcode) / ✗`, `decoded ✓ ×N (last value) / null`, `stored ✓ (age) / null`, `ui ✓ / grey (reason)`. Reading top-to-bottom pinpoints the exact broken layer.
 
-## Out of scope
-- UI redesign of tiles.
-- Changes outside `/app2` shell.
-- Firmware-side changes (we adapt to what Armand's firmware now emits).
+## What we're deliberately not doing
+- No UI redesign of tiles.
+- No firmware changes — we adapt to what Armand's firmware emits.
+- No edits outside `src/lib/vyro-ble/`, `src/hooks/use-vyro-band.ts`, and `src/components/vyro/{DebugView,use-ble-inspector,useLiveMetrics,VyroBandProvider}`.
+- No touching `src/integrations/supabase/*` (auto-generated).
 
-## Technical notes
-- Do not touch `src/integrations/supabase/*` (auto-generated).
-- Keep all edits inside `src/lib/vyro-ble/`, `src/hooks/use-vyro-band.ts`, and `src/components/vyro/` (DebugView, use-ble-inspector, useLiveMetrics, VyroBandProvider).
-- Preserve the existing relaxed freshness gate.
+## How we verify
+1. Reconnect the watch, wait 60s.
+2. Paste new debug bundle. Debug tab should show per-metric rows.
+3. Expected: HR row goes `requested ✓ (69 01 01…) → notified ✓ (0x69) → decoded ✓ → stored ✓`; if it stops at `notified ✗`, the firmware is refusing that sub-type and we try the SDK variant next.
