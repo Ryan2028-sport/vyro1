@@ -414,7 +414,7 @@ export function BandPanel({
             {otaFile ? `${otaFile.name} · ${(otaFile.size / 1024).toFixed(1)} KB` : "No file selected"}
           </div>
           <button
-            disabled={!otaFile || (!!otaProgress && otaProgress.phase !== "done" && !otaError)}
+            disabled={!otaFile || !smpAvailable || (!!otaProgress && otaProgress.phase !== "done" && !otaError)}
             onClick={runOta}
             className="rounded-xl bg-vyro-mint px-4 py-2 text-xs font-bold text-vyro-ink disabled:opacity-30"
           >
