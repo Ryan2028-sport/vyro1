@@ -387,6 +387,9 @@ export function useVyroBand() {
   const [respRateBrpm, setRespRateBrpm] = useState<number | null>(null);
   const [stressScore, setStressScore] = useState<number | null>(null);
   const [bloodPressure, setBloodPressure] = useState<{ sbp: number; dbp: number } | null>(null);
+  const [firmwareRevision, setFirmwareRevision] = useState<string | null>(null);
+  const [hardwareRevision, setHardwareRevision] = useState<string | null>(null);
+  const [serialNumber, setSerialNumber] = useState<string | null>(null);
   const [signalAt, setSignalAt] = useState<VyroBandSignalTimestamps>(() => emptySignalTimestamps());
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
   const activeConnectionRef = useRef<string | null>(null);
