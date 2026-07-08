@@ -1041,6 +1041,7 @@ export function useVyroBand() {
       if (bpm != null && bpm > 0 && bpm < 250) {
         setHeartRateBpm(bpm);
         setHeartRateAt(Date.now());
+        tapDecoded("hr", bpm, payloadToBytes(data.value));
       }
       return;
     }
