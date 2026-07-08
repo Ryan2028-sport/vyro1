@@ -584,6 +584,9 @@ export function useVyroBand() {
     setRespRateBrpm(null);
     setStressScore(null);
     setBloodPressure(null);
+    setFirmwareRevision(null);
+    setHardwareRevision(null);
+    setSerialNumber(null);
     setSignalAt(emptySignalTimestamps());
   }, [connectedId]);
 
