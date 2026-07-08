@@ -103,6 +103,7 @@ import {
   todayActivityKeyPrefix,
 } from "@/lib/vyro-ble/qcband";
 import { recordSleepNight, type SleepNight } from "@/lib/use-sleep-nights";
+import { tapDecoded } from "@/lib/vyro-ble/decoder-tap";
 
 import { bluetooth, isNative, type BleDataEvent, type BleDiscovered } from "@/lib/despia";
 
