@@ -629,8 +629,10 @@ export function useVyroBand() {
     while (buf.length && buf[0].t < cutoff) buf.shift();
     if (buf.length >= 20) {
       const sorted = buf.map((s) => s.bpm).sort((a, b) => a - b);
-      setRestingHrBpm(sorted[Math.max(0, Math.floor(sorted.length * 0.05))]);
+      const rhr = sorted[Math.max(0, Math.floor(sorted.length * 0.05))];
+      setRestingHrBpm(rhr);
       markSignal("restingHrAt", heartRateAt);
+      tapDecoded("restingHr", rhr);
     }
   }, [heartRateBpm, heartRateAt]);
 
