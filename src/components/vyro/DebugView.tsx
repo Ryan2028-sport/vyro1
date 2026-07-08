@@ -300,6 +300,40 @@ export function DebugView() {
     },
   ];
 
+  const deviceInfo: Row[] = [
+    {
+      label: "Firmware revision",
+      value: ctx.firmwareRevision || "—",
+      ok: !!ctx.firmwareRevision,
+      source: "BLE Device Info Service · 0x2a26",
+    },
+    {
+      label: "Hardware revision",
+      value: ctx.hardwareRevision || "—",
+      ok: !!ctx.hardwareRevision,
+      source: "BLE Device Info Service · 0x2a27",
+    },
+    {
+      label: "Serial number",
+      value: ctx.serialNumber || "—",
+      ok: !!ctx.serialNumber,
+      source: "BLE Device Info Service · 0x2a25",
+    },
+    {
+      label: "SMP (MCUmgr) service",
+      value:
+        (inspector.discovered?.services ?? []).some(
+          (s) => s.uuid.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
+        )
+          ? "available (OTA supported)"
+          : "not exposed by firmware (OTA blocked)",
+      ok: (inspector.discovered?.services ?? []).some(
+        (s) => s.uuid.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
+      ),
+      source: "ble.on('discovered') · 8d53dc1d…",
+    },
+  ];
+
   const health: Row[] = [
     { label: "Heart rate", value: fmt(ctx.heartRateBpm, 0, " bpm"), ok: hardwareSeen(ctx.heartRateBpm, ctx.heartRateAt), source: "Goodix PPG · realtime HR / measure frame", ageMs: signalAge(ctx.heartRateAt) },
     { label: "Resting HR", value: fmt(ctx.restingHrBpm, 0, " bpm"), ok: hardwareSeen(ctx.restingHrBpm, ctx.signalAt.restingHrAt), source: "5-min live HR buffer · 5th percentile", ageMs: signalAge(ctx.signalAt.restingHrAt) },
@@ -844,6 +878,7 @@ export function DebugView() {
       </div>
 
       <Section title="Connection" rows={connection} />
+      <Section title="Device info (BLE DIS)" rows={deviceInfo} />
       <Section
         title="Firmware diagnostic recorder"
         rows={firmwareDiagnosticRows}

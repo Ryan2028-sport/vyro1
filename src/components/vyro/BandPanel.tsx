@@ -1,10 +1,16 @@
 // Pairing + live event feed + OTA firmware uploader. Used inside Profile.
 // Light-theme to match the rest of the app on mobile.
-import { Activity, Bluetooth, CheckCircle2, Upload, XCircle } from "lucide-react";
+import { Activity, Bluetooth, CheckCircle2, Download, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { runOtaUpload, type OtaProgress } from "@/lib/vyro-ble/ota";
 import { openSmpTransport, requestVyroBand } from "@/lib/vyro-ble/web-transport";
+import {
+  checkFirmwareUpdate,
+  isManifestConfigured,
+  type FirmwareCheckResult,
+} from "@/lib/vyro-ble/firmware-manifest";
 import { useVyroBandCtx } from "./VyroBandProvider";
+import { useBleInspector } from "./use-ble-inspector";
 import type { VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
@@ -59,7 +65,8 @@ export function BandPanel({
   defaultSport?: "squash" | "tennis";
 }) {
   const vyro = useVyroBandCtx();
-  const { ble, connected, events, sessionState: _s, sport: _sp, setSport } = vyro;
+  const inspector = useBleInspector();
+  const { ble, connected, events, sessionState: _s, sport: _sp, setSport, firmwareRevision, hardwareRevision } = vyro;
   const updateProfile = useServerFn(updateMyProfile);
 
   useEffect(() => {
@@ -107,6 +114,64 @@ export function BandPanel({
   const [otaError, setOtaError] = useState<string | null>(null);
   const [otaSuccess, setOtaSuccess] = useState(false);
   const otaInputRef = useRef<HTMLInputElement>(null);
+
+  // Firmware manifest check — runs when the watch reports a firmware
+  // revision via BLE DIS (0x2a26). Compares against VITE_FIRMWARE_MANIFEST_URL.
+  // Does NOT auto-install: install is blocked when the watch doesn't expose
+  // the MCUmgr/SMP GATT service (Armand's current firmware doesn't).
+  const [firmwareCheck, setFirmwareCheck] = useState<FirmwareCheckResult | null>(null);
+  const [firmwareChecking, setFirmwareChecking] = useState(false);
+  const [downloadingUpdate, setDownloadingUpdate] = useState(false);
+  useEffect(() => {
+    if (!connected || !firmwareRevision) return;
+    if (!isManifestConfigured()) {
+      setFirmwareCheck({
+        manifest: null,
+        currentVersion: firmwareRevision,
+        updateAvailable: false,
+        error: "VITE_FIRMWARE_MANIFEST_URL not set",
+      });
+      return;
+    }
+    let cancelled = false;
+    setFirmwareChecking(true);
+    void checkFirmwareUpdate(firmwareRevision)
+      .then((r) => {
+        if (!cancelled) setFirmwareCheck(r);
+      })
+      .finally(() => {
+        if (!cancelled) setFirmwareChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connected, firmwareRevision]);
+
+  // Detect whether the currently connected watch exposes the MCUmgr/SMP
+  // service. Without it, `runOtaUpload` cannot flash the device. We surface
+  // this so the "Install" button doesn't lie.
+  const smpAvailable = (inspector.discovered?.services ?? []).some(
+    (s) => s.uuid.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
+  );
+
+  const downloadUpdate = useCallback(async () => {
+    if (!firmwareCheck?.manifest) return;
+    setOtaError(null);
+    setDownloadingUpdate(true);
+    try {
+      const res = await fetch(firmwareCheck.manifest.downloadUrl);
+      if (!res.ok) throw new Error(`download HTTP ${res.status}`);
+      const buf = await res.arrayBuffer();
+      const file = new File([buf], `firmware-${firmwareCheck.manifest.latestVersion}.bin`, {
+        type: "application/octet-stream",
+      });
+      setOtaFile(file);
+    } catch (e) {
+      setOtaError((e as Error)?.message || String(e));
+    } finally {
+      setDownloadingUpdate(false);
+    }
+  }, [firmwareCheck]);
 
   const runOta = useCallback(async () => {
     if (!otaFile) return;
@@ -263,6 +328,65 @@ export function BandPanel({
 
       {/* OTA */}
       <Card eyebrow="Update" title="Watch software update">
+        {/* Current firmware / hardware — read from BLE Device Information Service (0x180a). */}
+        <div className="mb-3 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-vyro-text/55">
+          <span className="rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px]">
+            firmware: {firmwareRevision || (connected ? "reading…" : "—")}
+          </span>
+          {hardwareRevision && (
+            <span className="rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px]">
+              hardware: {hardwareRevision}
+            </span>
+          )}
+          <span
+            className={`rounded-md border px-1.5 py-[1px] ${
+              smpAvailable
+                ? "border-emerald-500/30 bg-emerald-50 text-emerald-700"
+                : "border-amber-500/30 bg-amber-50 text-amber-800"
+            }`}
+          >
+            SMP: {smpAvailable ? "available" : "not exposed by firmware"}
+          </span>
+        </div>
+
+        {/* Update-available banner from the manifest URL. */}
+        {firmwareCheck?.updateAvailable && firmwareCheck.manifest && (
+          <div className="mb-3 rounded-xl border border-vyro-mint/40 bg-vyro-mint/10 px-3 py-2 text-xs text-vyro-ink">
+            <div className="mb-1 flex items-center gap-2 font-semibold">
+              <Download className="h-4 w-4" /> Firmware update available: {firmwareCheck.manifest.latestVersion}
+              {firmwareRevision ? <span className="font-normal text-vyro-text/60">(you have {firmwareRevision})</span> : null}
+            </div>
+            {firmwareCheck.manifest.notes && (
+              <p className="mb-2 text-[11px] leading-relaxed text-vyro-text/70">{firmwareCheck.manifest.notes}</p>
+            )}
+            <button
+              disabled={downloadingUpdate}
+              onClick={downloadUpdate}
+              className="rounded-lg border border-vyro-text/15 bg-vyro-panel px-3 py-1.5 text-[11px] font-semibold text-vyro-text hover:bg-vyro-text/[0.04] disabled:opacity-40"
+            >
+              {downloadingUpdate ? "Downloading…" : "Download image"}
+            </button>
+          </div>
+        )}
+        {firmwareChecking && !firmwareCheck?.updateAvailable && (
+          <div className="mb-3 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-[11px] text-vyro-text/60">
+            Checking for firmware updates…
+          </div>
+        )}
+        {!isManifestConfigured() && (
+          <div className="mb-3 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-[11px] text-vyro-text/60">
+            Set <span className="font-mono">VITE_FIRMWARE_MANIFEST_URL</span> in project env to enable automatic
+            firmware update checks. Manifest shape: <span className="font-mono">{"{ latestVersion, downloadUrl, sha256?, notes? }"}</span>.
+          </div>
+        )}
+        {!smpAvailable && connected && (
+          <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+            This watch does not expose the MCUmgr/SMP GATT service, so this app cannot flash it directly. Ask
+            Armand to enable SMP in the firmware, or provide the QCBand-proprietary OTA opcodes and we'll wire
+            up a custom installer.
+          </div>
+        )}
+
         <p className="mb-3 text-xs leading-relaxed text-vyro-text/60">
           Choose an update file to install on your watch. It will restart and
           reconnect automatically once the update finishes.
@@ -290,7 +414,7 @@ export function BandPanel({
             {otaFile ? `${otaFile.name} · ${(otaFile.size / 1024).toFixed(1)} KB` : "No file selected"}
           </div>
           <button
-            disabled={!otaFile || (!!otaProgress && otaProgress.phase !== "done" && !otaError)}
+            disabled={!otaFile || !smpAvailable || (!!otaProgress && otaProgress.phase !== "done" && !otaError)}
             onClick={runOta}
             className="rounded-xl bg-vyro-mint px-4 py-2 text-xs font-bold text-vyro-ink disabled:opacity-30"
           >
