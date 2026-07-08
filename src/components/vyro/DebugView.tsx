@@ -878,6 +878,7 @@ export function DebugView() {
       </div>
 
       <Section title="Connection" rows={connection} />
+      <Section title="Device info (BLE DIS)" rows={deviceInfo} />
       <Section
         title="Firmware diagnostic recorder"
         rows={firmwareDiagnosticRows}
