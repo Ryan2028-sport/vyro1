@@ -32,6 +32,12 @@ import {
   type CharStat,
   type OpStat,
 } from "./use-ble-inspector";
+import {
+  getDecodedSnapshot,
+  subscribeDecoded,
+  type DecodedSnapshot,
+  type MetricKey,
+} from "@/lib/vyro-ble/decoder-tap";
 
 type Row = {
   label: string;
@@ -188,6 +194,8 @@ export function DebugView() {
   const ctx = useVyroBandCtx();
   const { last: lastSleep, nights } = useSleepNights();
   const inspector = useBleInspector();
+  const [decoded, setDecoded] = useState<DecodedSnapshot>(() => getDecodedSnapshot());
+  useEffect(() => subscribeDecoded(setDecoded), []);
   const diagnosticStartRef = useRef(Date.now());
   const diagnosticBaselineRef = useRef<{
     totalNotifications: number;
@@ -680,6 +688,40 @@ export function DebugView() {
     ];
   }, [inspector.decoderKnownCount, inspector.decoderUnknownCount, inspector.unknownOpcodes]);
 
+  // Per-metric decoder output — the ground truth of "did our JavaScript
+  // actually extract a value from the last frame we received?". If a metric
+  // shows notif ✓ in the pipeline but "0 decoded" here, the raw bytes are
+  // arriving but the decoder returns null — that's a decoder/firmware-shape
+  // mismatch to fix, not a BLE issue.
+  const decoderOutputRows: Row[] = useMemo(() => {
+    const list: Array<{ key: MetricKey; label: string }> = [
+      { key: "hr", label: "Heart rate" },
+      { key: "restingHr", label: "Resting HR" },
+      { key: "spo2", label: "SpO₂" },
+      { key: "skinTemp", label: "Skin temp" },
+      { key: "hrv", label: "HRV" },
+      { key: "stress", label: "Stress" },
+      { key: "bp", label: "Blood pressure" },
+      { key: "battery", label: "Battery" },
+      { key: "steps", label: "Steps" },
+      { key: "distance", label: "Distance" },
+      { key: "calories", label: "Calories" },
+    ];
+    return list.map(({ key, label }) => {
+      const e = decoded[key];
+      const age = e ? now - e.lastAt : undefined;
+      const fresh = e != null && (age ?? Infinity) < 60_000;
+      return {
+        label,
+        value: e ? `${e.lastValue}  ×${e.count}` : "0 decoded",
+        ok: fresh,
+        source: e ? `raw: ${e.lastRaw}` : "decoder has never returned a value",
+        note: e && !fresh ? `stale ${ageLabel(age ?? 0)}` : undefined,
+        ageMs: age,
+      } as Row;
+    });
+  }, [decoded, now]);
+
   const buildDebugBundle = () => ({
     capturedAt: new Date().toISOString(),
     connected: m.connected,
@@ -701,6 +743,7 @@ export function DebugView() {
       Object.entries(inspector.perChar).map(([k, v]) => [k, { count: v.count, lastAt: v.lastAt, lastOpcode: v.lastOpcode, lastHex: v.lastHex }]),
     ),
     pipeline: pipelineRows.map((r) => ({ metric: r.label, value: r.value, ok: r.ok, stages: r.source, note: r.note })),
+    decoderOutput: decoded,
     recentNotifications: inspector.recent,
     writeLog: inspector.writeLog,
     gatt: inspector.discovered?.services.map((s) => ({
@@ -825,6 +868,7 @@ export function DebugView() {
       <Section title="Per-metric pipeline (cmd → notif → live)" rows={pipelineRows} />
       <Section title="Firmware capability (what each opcode actually contains)" rows={capabilityRows} />
       <Section title="Decoder outcomes" rows={decoderRows} />
+      <Section title="Decoder output per metric (raw bytes → JS value)" rows={decoderOutputRows} />
       <Section title="Vitals (PPG)" rows={health} />
       <Section title="Activity" rows={activity} />
       <Section title="Motion (IMU)" rows={imu} />

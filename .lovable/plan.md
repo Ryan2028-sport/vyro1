@@ -1,39 +1,59 @@
 ## Goal
+Metrics stay grey/stale in the app even after the Armand firmware update. We need to prove exactly where each metric dies (firmware → BLE notify → decoder → context → freshness gate → UI) and fix the broken link for every metric individually — not just HR/SpO₂.
 
-Make the in-app UI match the VYRO spec: 8 metric domains (Athlete Health, Recovery & Fatigue, Sleep, Session, Court/Heat Map, Swing, Tendency/Coach, Diet Coach) — each as a real screen wired to the existing BLE band hook, with live data where the band provides it and clearly-labeled placeholders where it doesn't yet.
+## Investigation (before any fix)
 
-Keep everything already working: TanStack Start routing, Supabase auth, `VyroBandProvider`, `useVyroBand` hook, BLE/Capacitor pairing, OTA, session start/pause/end.
+1. Read the decoder + context wiring to map every metric to its opcode and setter:
+   - `src/lib/vyro-ble/packets.ts` (frame parsing, opcode → field mapping)
+   - `src/lib/vyro-ble/qcband.ts` (command requests sent to watch)
+   - `src/hooks/use-vyro-band.ts` (context setters, rehydrate logic, signalAt timestamps)
+   - `src/components/vyro/VyroBandProvider.tsx` (context shape)
+   - `src/components/vyro/useLiveMetrics.ts` (freshness gate — already relaxed)
+   - `src/components/vyro/use-ble-inspector.ts` (current debug counters)
 
-## Scope (this turn — Phase 1)
+2. Build a per-metric truth table from the code:
+   | Metric | Request opcode | Response opcode | Decoder field | Context setter | signalAt key |
+   Any row with a `—` is a broken link we must fix.
 
-Rebuild navigation + the 4 highest-value screens end-to-end so the new structure is in place. Remaining screens get stub views with the correct metric layout but "—" values, ready to wire next turns.
+## Fixes (scoped to what the investigation proves)
 
-### Files to add / change
+### A. Force every metric to be requested on connect
+In `use-vyro-band.ts` connect sequence, send the full opcode sweep the new firmware supports (HR, SpO₂, HRV, stress, skin temp, BP, steps/cal/distance, battery, resting HR, respiration) with correct spacing. Log each request into the write log.
 
-1. `src/components/vyro/featureSpecs.ts` — replace the current feature list with the 8 canonical domains from the spec (id, label, icon, blurb, route).
-2. `src/components/vyro/Layout.tsx` — bottom-tab nav becomes: **Home · Session · Recovery · Sleep · More**. "More" opens a grid of the remaining domains (Court DB, Swing, Coach, Diet).
-3. `src/components/vyro/HomeView.tsx` — Athlete dashboard from the spec: Current HR, Resting HR, HRV, Respiratory rate, SpO₂, Skin temp, Stress, Steps, Calories, Wear time, Signal confidence, plus a LIVE Recovery hero card and quick "Start Session" CTA.
-4. **NEW** `src/components/vyro/RecoveryView.tsx` — LIVE Recovery score, status band (green/yellow/red), Total fatigue + subcomponents (court coverage, cardio, muscle load debt, HRV suppression, sleep debt), Time-to-ready, Return-to-Play validator.
-5. **NEW** `src/components/vyro/SleepView.tsx` — Sleep score, time in bed, asleep duration, efficiency, stage breakdown (Deep/REM/Light/Awake), bedtime/wake, latency, debt, 7-night trend, wake events list.
-6. `src/components/vyro/SessionView.tsx` — extend existing console: live HR, avg/max HR, HR-zone bars, Z4/Z5 time, between-point HR drop, movement intensity, burst count, T-control %, T-recoveries, session load.
-7. **NEW** stubs (correct layout, "—" values): `CourtDbView.tsx`, `SwingView.tsx`, `CoachView.tsx`, `DietView.tsx`, `TendencyView.tsx`.
-8. `src/routes/_authenticated/app.tsx` — register the new view ids in the switch.
-9. `src/components/vyro/useLiveMetrics.ts` — extend with derived placeholders (RecoveryScore, FatigueScore, HR zone bucketer) so views stay reactive when real values are missing.
+### B. Decoder: handle every response opcode the firmware now emits
+In `packets.ts`, add/repair parsers for any opcode the Debug bundle shows as "unknown" but the firmware advertises. Emit a normalized `{field, value, ts}` for each.
 
-### Out of scope this turn
+### C. Context: setter + timestamp for every field
+In `use-vyro-band.ts`, ensure each decoded field calls `setX(value)` AND `setSignalAt(prev => ({...prev, xAt: Date.now()}))` in the same tick. Remove any code path that sets the value without the timestamp (this was the root cause of the earlier freshness race).
 
-- Heat-map canvas rendering (Phase 2 — needs a position model the band doesn't yet emit).
-- AI Video overlays (Phase 2).
-- Coach roster multi-athlete data (needs DB schema work — Phase 3).
-- Pixel-matching the minified HTML's exact colors/typography. We keep the existing Tailwind theme; visual polish pass comes after structure is right.
+### D. Rehydration policy
+Keep push-only metrics unrehydrated (already done). Rehydrate only battery + steps/cal/distance which the firmware repeats on a schedule.
+
+### E. Debug tab: per-metric verdict row
+Extend `DebugView.tsx` to render one row per metric with a live verdict:
+- `requested ✓ / ✗` (from write log)
+- `notified ✓ ×N / ✗` (from decoder counters, per opcode)
+- `parsed ✓ / unknown-opcode / bad-length` (new decoder outcome per opcode)
+- `stored ✓ (age Xs) / null` (from context)
+- `ui ✓ / grey (reason)` (freshness gate result)
+
+This turns the Debug bundle into a self-diagnosing report — one glance shows whether the break is firmware, decoder, context, or gate.
+
+### F. Auto re-request on silence
+If a metric was requested but produced 0 notifications within 20s, resend the request once. Log both attempts.
+
+## Verification
+1. Reconnect watch, wait 60s.
+2. Debug tab: every metric row should reach at least `stored ✓`. Any row still red points at a specific layer (firmware vs decoder vs gate) — no more guessing.
+3. Home / Recovery / Sport tiles: every metric with `stored ✓` must be non-grey.
+4. Paste new debug bundle to confirm.
+
+## Out of scope
+- UI redesign of tiles.
+- Changes outside `/app2` shell.
+- Firmware-side changes (we adapt to what Armand's firmware now emits).
 
 ## Technical notes
-
-- All new views use the existing `Card`, `Stat`, `Pill`, `PageHeader` primitives from `src/components/vyro/shared.tsx`.
-- BLE stays untouched: `VyroBandProvider`, `use-vyro-band.ts`, `use-bluetooth.ts`, `vyro-ble/*`, `despia.ts` are not modified.
-- All "real" metrics read from `useLiveMetrics()`; missing-sensor metrics render `—` with a small "needs firmware" hint so the UI stays honest.
-- No DB schema changes this turn.
-
-## After Phase 1
-
-Confirm the new structure looks right in preview, then I'll wire heat-map canvas, route DB tables, and per-swing event detail in Phase 2.
+- Do not touch `src/integrations/supabase/*` (auto-generated).
+- Keep all edits inside `src/lib/vyro-ble/`, `src/hooks/use-vyro-band.ts`, and `src/components/vyro/` (DebugView, use-ble-inspector, useLiveMetrics, VyroBandProvider).
+- Preserve the existing relaxed freshness gate.
