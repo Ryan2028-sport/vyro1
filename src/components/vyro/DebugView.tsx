@@ -868,6 +868,7 @@ export function DebugView() {
       <Section title="Per-metric pipeline (cmd → notif → live)" rows={pipelineRows} />
       <Section title="Firmware capability (what each opcode actually contains)" rows={capabilityRows} />
       <Section title="Decoder outcomes" rows={decoderRows} />
+      <Section title="Decoder output per metric (raw bytes → JS value)" rows={decoderOutputRows} />
       <Section title="Vitals (PPG)" rows={health} />
       <Section title="Activity" rows={activity} />
       <Section title="Motion (IMU)" rows={imu} />
