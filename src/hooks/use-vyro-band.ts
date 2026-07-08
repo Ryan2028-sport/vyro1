@@ -440,6 +440,9 @@ export function useVyroBand() {
     markSignal("stepsAt", now);
     markSignal("distanceAt", now);
     markSignal("caloriesAt", now);
+    tapDecoded("steps", merged.steps);
+    tapDecoded("distance", merged.distanceM);
+    tapDecoded("calories", merged.calories);
   };
 
   const ingestRawMotionSignal = (bytes: Uint8Array) => {
