@@ -743,6 +743,7 @@ export function DebugView() {
       Object.entries(inspector.perChar).map(([k, v]) => [k, { count: v.count, lastAt: v.lastAt, lastOpcode: v.lastOpcode, lastHex: v.lastHex }]),
     ),
     pipeline: pipelineRows.map((r) => ({ metric: r.label, value: r.value, ok: r.ok, stages: r.source, note: r.note })),
+    decoderOutput: decoded,
     recentNotifications: inspector.recent,
     writeLog: inspector.writeLog,
     gatt: inspector.discovered?.services.map((s) => ({
