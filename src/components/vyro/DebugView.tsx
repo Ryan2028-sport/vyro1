@@ -194,6 +194,8 @@ export function DebugView() {
   const ctx = useVyroBandCtx();
   const { last: lastSleep, nights } = useSleepNights();
   const inspector = useBleInspector();
+  const [decoded, setDecoded] = useState<DecodedSnapshot>(() => getDecodedSnapshot());
+  useEffect(() => subscribeDecoded(setDecoded), []);
   const diagnosticStartRef = useRef(Date.now());
   const diagnosticBaselineRef = useRef<{
     totalNotifications: number;
