@@ -975,6 +975,19 @@ export function useVyroBand() {
             void bluetooth.subscribe(connectedId, svc.uuid, ch.uuid).catch(() => undefined);
           }
         }
+        if (uuidMatches(svc.uuid, DIS_SERVICE)) {
+          // Fire-and-forget reads for each characteristic. Values arrive on
+          // the same `data` event bus as notifications and are handled in
+          // the onNotify effect below.
+          for (const target of [DIS_FIRMWARE_REV_CHAR, DIS_HARDWARE_REV_CHAR, DIS_SERIAL_NUM_CHAR]) {
+            const ch = svc.characteristics.find((c) => uuidMatches(c.uuid, target));
+            if (ch) {
+              void bluetooth
+                .read(connectedId, svc.uuid, ch.uuid)
+                .catch((err) => console.warn("[vyro] DIS read failed", target, err));
+            }
+          }
+        }
       }
     });
     void bluetooth.discover(connectedId).catch(() => undefined);
