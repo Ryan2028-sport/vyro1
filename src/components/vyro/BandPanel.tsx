@@ -64,7 +64,7 @@ export function BandPanel({
   defaultSport?: "squash" | "tennis";
 }) {
   const vyro = useVyroBandCtx();
-  const { ble, connected, events, sessionState: _s, sport: _sp, setSport } = vyro;
+  const { ble, connected, events, sessionState: _s, sport: _sp, setSport, firmwareRevision, hardwareRevision } = vyro;
   const updateProfile = useServerFn(updateMyProfile);
 
   useEffect(() => {
