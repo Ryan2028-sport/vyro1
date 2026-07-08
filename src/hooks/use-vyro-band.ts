@@ -1056,6 +1056,7 @@ export function useVyroBand() {
         if (bpm != null) {
           setHeartRateBpm(bpm);
           setHeartRateAt(Date.now());
+          tapDecoded("hr", bpm, bytes);
         }
       } else if (op === QCBAND_CMD_BATTERY) {
         const bat = decodeQcBandBattery(bytes);
@@ -1063,6 +1064,7 @@ export function useVyroBand() {
           setBatteryPct(bat.level);
           setBatteryCharging(bat.charging);
           markSignal("batteryAt");
+          tapDecoded("battery", bat.level, bytes);
         }
       } else if (
         op === QCBAND_CMD_TODAY_SUMMARY ||
@@ -1086,15 +1088,18 @@ export function useVyroBand() {
         if (temp != null) {
           setSkinTempC(temp);
           markSignal("skinTempAt");
+          tapDecoded("skinTemp", temp, bytes);
         }
         const spo2 = decodeQcBandSpo2Notification(bytes);
         if (spo2 != null) {
           setSpo2Pct(spo2);
           markSignal("spo2At");
+          tapDecoded("spo2", spo2, bytes);
         }
         if (bytes[1] === 0x01 && bytes[2] > 30 && bytes[2] < 250) {
           setHeartRateBpm(bytes[2]);
           setHeartRateAt(Date.now());
+          tapDecoded("hr", bytes[2], bytes);
         }
       } else if (op === QCBAND_CMD_SYNC_ACTIVITY) {
         const sample = decodeQcBandHistoricalActivity(bytes);
@@ -1117,17 +1122,16 @@ export function useVyroBand() {
       } else if (op === QCBAND_CMD_SYNC_HRV) {
         const hrv = decodeQcBandHrvHistory(bytes);
         if (hrv != null) {
-          // This is still hardware-origin data from the band. Surface it with
-          // a timestamp so the UI/debug tab can distinguish "watch packet
-          // received" from "firmware is silent" instead of leaving HRV grey.
           setHrvMs(hrv);
           markSignal("hrvAt");
+          tapDecoded("hrv", hrv, bytes);
         }
       } else if (op === QCBAND_CMD_SYNC_STRESS) {
         const stress = decodeQcBandStressHistory(bytes);
         if (stress != null) {
           setStressScore(stress);
           markSignal("stressAt");
+          tapDecoded("stress", stress, bytes);
         }
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
@@ -1147,30 +1151,33 @@ export function useVyroBand() {
           if (ok.hr != null) {
             setHeartRateBpm(ok.hr);
             setHeartRateAt(Date.now());
+            tapDecoded("hr", ok.hr, bytes);
           }
           if (ok.spo2 != null) {
             setSpo2Pct(ok.spo2);
             markSignal("spo2At");
+            tapDecoded("spo2", ok.spo2, bytes);
           }
           if (ok.tempC != null) {
             setSkinTempC(ok.tempC);
             markSignal("skinTempAt");
+            tapDecoded("skinTemp", ok.tempC, bytes);
           }
           if (ok.hrvMs != null && ok.hrvMs >= 5) {
             setHrvMs(ok.hrvMs);
             markSignal("hrvAt");
+            tapDecoded("hrv", ok.hrvMs, bytes);
           }
           if (ok.stress != null) {
             setStressScore(ok.stress);
             markSignal("stressAt");
+            tapDecoded("stress", ok.stress, bytes);
           }
           if (ok.sbp != null && ok.dbp != null) {
             setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
             markSignal("bloodPressureAt");
+            tapDecoded("bp", `${ok.sbp}/${ok.dbp}`, bytes);
           }
-          // Respiratory rate must come from a real SDK signal. The QCBand
-          // One-Key payload does not currently expose a resp-rate field, so
-          // we leave that tile empty rather than estimating it from HR/HRV.
           return true;
         };
         const applyBloodPressure = () => {
@@ -1178,9 +1185,11 @@ export function useVyroBand() {
           if (!bp) return false;
           setBloodPressure({ sbp: bp.sbp, dbp: bp.dbp });
           markSignal("bloodPressureAt");
+          tapDecoded("bp", `${bp.sbp}/${bp.dbp}`, bytes);
           if (bp.hr != null) {
             setHeartRateBpm(bp.hr);
             setHeartRateAt(Date.now());
+            tapDecoded("hr", bp.hr, bytes);
           }
           return true;
         };
@@ -1189,35 +1198,39 @@ export function useVyroBand() {
           if (t == null) return false;
           setSkinTempC(t);
           markSignal("skinTempAt");
+          tapDecoded("skinTemp", t, bytes);
           return true;
         };
         const applySpo2Scalar = () => {
           if (frame.value < 70 || frame.value > 100) return false;
           setSpo2Pct(frame.value);
           markSignal("spo2At");
+          tapDecoded("spo2", frame.value, bytes);
           return true;
         };
         const applyHeartRateScalar = () => {
           if (frame.value <= 30 || frame.value >= 250) return false;
           setHeartRateBpm(frame.value);
           setHeartRateAt(Date.now());
+          tapDecoded("hr", frame.value, bytes);
           return true;
         };
         const applyHrvScalar = () => {
           if (frame.value < 5 || frame.value >= 250) return false;
           setHrvMs(frame.value);
           markSignal("hrvAt");
+          tapDecoded("hrv", frame.value, bytes);
           return true;
         };
         const applyStressScalar = () => {
           if (frame.value <= 0 || frame.value > 100) return false;
           setStressScore(frame.value);
           markSignal("stressAt");
+          tapDecoded("stress", frame.value, bytes);
           return true;
         };
         let handled = false;
         if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(frame.subType)) {
-          // subtype 0x02 is BP on Oudmon/QCBand, but SpO₂ on newer SDKs; prefer BP only when the payload has SBP/DBP bytes.
           handled = applyBloodPressure() || handled;
         }
         if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
@@ -1234,7 +1247,6 @@ export function useVyroBand() {
           frame.data.length >= 2 &&
           applyTemperature()
         ) {
-          // Legacy temp also uses 0x04; require a 2-byte temp payload so single-byte stress=36 is not misread as 36°C.
           handled = true;
         }
         if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
@@ -1244,9 +1256,6 @@ export function useVyroBand() {
           handled = applyTemperature() || handled;
         }
         if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
-          // handled as a composite SDK frame only after exact scalar decoders
-          // had first refusal; this prevents 0x03 SpO₂ frames being misread as
-          // one-key HR frames and leaving SpO₂/temp/HRV grey.
           handled = true;
         }
         void handled;
@@ -1274,11 +1283,13 @@ export function useVyroBand() {
       if (spo2 != null) {
         setSpo2Pct(spo2);
         markSignal("spo2At");
+        tapDecoded("spo2", spo2, bytes);
       }
       const temp = decodeQcBandTemperatureHistory(bytes);
       if (temp != null) {
         setSkinTempC(temp);
         markSignal("skinTempAt");
+        tapDecoded("skinTemp", temp, bytes);
       }
       return;
     }
@@ -1287,6 +1298,7 @@ export function useVyroBand() {
       if (bytes.length >= 1) {
         setBatteryPct(bytes[0]);
         markSignal("batteryAt");
+        tapDecoded("battery", bytes[0], bytes);
       }
       return;
     }
