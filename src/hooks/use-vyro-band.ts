@@ -122,6 +122,13 @@ const HR_SERVICE = "0000180d-0000-1000-8000-00805f9b34fb";
 const HR_MEAS_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
 const BAT_SERVICE = "0000180f-0000-1000-8000-00805f9b34fb";
 const BAT_LVL_CHAR = "00002a19-0000-1000-8000-00805f9b34fb";
+// Standard Device Information Service (DIS). We read these to surface the
+// current firmware/hardware/serial on the Debug + Band panels and drive the
+// "firmware update available" check in BandPanel.
+const DIS_SERVICE = "0000180a-0000-1000-8000-00805f9b34fb";
+const DIS_FIRMWARE_REV_CHAR = "00002a26-0000-1000-8000-00805f9b34fb";
+const DIS_HARDWARE_REV_CHAR = "00002a27-0000-1000-8000-00805f9b34fb";
+const DIS_SERIAL_NUM_CHAR = "00002a25-0000-1000-8000-00805f9b34fb";
 
 function uuidMatches(a: string, b: string): boolean {
   if (!a) return false;
