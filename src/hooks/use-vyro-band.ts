@@ -857,63 +857,62 @@ export function useVyroBand() {
         });
       };
 
-      const runBloodPressureCycle = () => {
-        runMeasureCycle("blood-pressure", QCBAND_MEASURE_BP_TYPES, 45_000);
+      // ---- MEASUREMENT SCHEDULE ---------------------------------------
+      // Armand's firmware only responds with 0x87/0x89 (keep-alive /
+      // feature-unsupported) to the one-key composite. So we can't rely on
+      // one-key; we must fire EVERY sub-type individually and quickly, in
+      // both the legacy (0x01..0x0e) and SDK (0x00..0x08) mappings, so at
+      // least one variant gets an actual 0x69 reply per metric. All bursts
+      // happen inside the first ~30s of connect so the Debug bundle shows
+      // a real per-metric verdict without waiting 5 minutes.
+      const runAllMeasures = () => {
+        // Order matters: HR must arm first on QCBand firmwares before other
+        // sub-types respond. Space them so writes never overlap in flight.
+        runMeasureCycle("hr", QCBAND_MEASURE_HR_TYPES, 15_000);
+        window.setTimeout(() => runMeasureCycle("spo2", QCBAND_MEASURE_SPO2_TYPES, 15_000), 2_000);
+        window.setTimeout(() => runMeasureCycle("temp", QCBAND_MEASURE_TEMP_TYPES, 15_000), 4_500);
+        window.setTimeout(() => runMeasureCycle("hrv", QCBAND_MEASURE_HRV_TYPES, 20_000), 7_000);
+        window.setTimeout(() => runMeasureCycle("stress", QCBAND_MEASURE_STRESS_TYPES, 20_000), 9_500);
+        window.setTimeout(() => runMeasureCycle("blood-pressure", QCBAND_MEASURE_BP_TYPES, 45_000), 12_000);
+        window.setTimeout(() => runMeasureCycle("one-key", QCBAND_MEASURE_ONE_KEY_TYPES, 30_000), 14_500);
       };
-      window.setTimeout(runBloodPressureCycle, 320_000);
-      const bpTimer = window.setInterval(runBloodPressureCycle, 5 * 60_000);
+      window.setTimeout(runAllMeasures, 2_000);
+      oneKeyTimer = window.setInterval(runAllMeasures, 3 * 60_000);
 
-      // SpO₂ standalone cycle — kept as a fallback for firmwares that don't
-      // populate the One-Key payload's SpO₂ field. 5-minute cadence.
-      const runSpo2Cycle = () => {
-        runMeasureCycle("spo2", QCBAND_MEASURE_SPO2_TYPES, 40_000);
-      };
-      window.setTimeout(runSpo2Cycle, 62_000);
-      const spo2Timer = window.setInterval(runSpo2Cycle, 5 * 60_000);
+      // Silence watchdog: if 25s after connect a metric has produced zero
+      // decoded values, re-arm it once with the SAME sub-types. This catches
+      // the case where the first arming write raced the notify subscription
+      // or the firmware dropped it. Every re-arm attempt is logged into the
+      // write log so the Debug tab shows the retry.
+      const watchdog = window.setTimeout(() => {
+        if (cancelled) return;
+        try {
+          const snap = getDecodedSnapshot();
+          const need: Array<[string, readonly number[]]> = [];
+          if (!snap.hr || snap.hr.count === 0) need.push(["hr", QCBAND_MEASURE_HR_TYPES]);
+          if (!snap.spo2 || snap.spo2.count === 0) need.push(["spo2", QCBAND_MEASURE_SPO2_TYPES]);
+          if (!snap.skinTemp || snap.skinTemp.count === 0) need.push(["temp", QCBAND_MEASURE_TEMP_TYPES]);
+          if (!snap.hrv || snap.hrv.count === 0) need.push(["hrv", QCBAND_MEASURE_HRV_TYPES]);
+          if (!snap.stress || snap.stress.count === 0) need.push(["stress", QCBAND_MEASURE_STRESS_TYPES]);
+          if (!snap.bp || snap.bp.count === 0) need.push(["blood-pressure", QCBAND_MEASURE_BP_TYPES]);
+          need.forEach(([label, subs], i) => {
+            window.setTimeout(() => {
+              console.log(`[qcband] watchdog re-arm ${label}`);
+              runMeasureCycle(`${label}-retry`, subs, 20_000);
+            }, i * 2_000);
+          });
+        } catch (err) {
+          console.warn("[qcband] watchdog failed", err);
+        }
+      }, 25_000);
 
-      // Skin temperature — sub-type 0x09. Fire ~3s after connect so the user
-      // sees a value within the first minute, then repeat every 5 min.
-      const runTempCycle = () => {
-        runMeasureCycle("temp", QCBAND_MEASURE_TEMP_TYPES, 45_000);
-      };
-      window.setTimeout(runTempCycle, 125_000);
-      tempTimer = window.setInterval(runTempCycle, 5 * 60_000);
-
-      // One-Key Measure — sub-type 0x05. Returns HR + HRV + Stress + SpO₂ +
-      // Temp + BP in a single frame. Fire immediately (10s after connect)
-      // so the user sees HRV/Stress/Temp inside the first minute, then
-      // repeat every 3 minutes.
-      const runOneKey = () => {
-        runMeasureCycle("one-key", QCBAND_MEASURE_ONE_KEY_TYPES, 50_000);
-      };
-      window.setTimeout(runOneKey, 3_000);
-      oneKeyTimer = window.setInterval(runOneKey, 3 * 60_000);
-
-      // Standalone HRV cycle (sub-type 0x0e) — fallback for firmwares that
-      // ignore the One-Key composite. Fire ~20s in so it overlaps with the
-      // first One-Key, then every 10 min.
-      const runHrvCycle = () => {
-        runMeasureCycle("hrv", QCBAND_MEASURE_HRV_TYPES, 60_000);
-      };
-      window.setTimeout(runHrvCycle, 255_000);
-      const hrvTimer = window.setInterval(runHrvCycle, 10 * 60_000);
-
-      // Standalone Stress cycle (sub-type 0x0d) — fallback. Fire ~30s in.
-      const runStressCycle = () => {
-        runMeasureCycle("stress", QCBAND_MEASURE_STRESS_TYPES, 60_000);
-      };
-      window.setTimeout(runStressCycle, 190_000);
-      const stressTimer = window.setInterval(runStressCycle, 10 * 60_000);
-
-      // Stash extra timers we created locally onto the outer refs via closure.
+      // Stash extra timers so cleanup can clear them.
       const stop = () => {
-        window.clearInterval(spo2Timer);
-        window.clearInterval(bpTimer);
-        window.clearInterval(hrvTimer);
-        window.clearInterval(stressTimer);
+        window.clearTimeout(watchdog);
       };
       cleanupExtras = stop;
     }
+
     let cleanupExtras: (() => void) | null = null;
 
     const off = bluetooth.on("discovered", (tree: BleDiscovered) => {
