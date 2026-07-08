@@ -150,8 +150,8 @@ export function BandPanel({
   // Detect whether the currently connected watch exposes the MCUmgr/SMP
   // service. Without it, `runOtaUpload` cannot flash the device. We surface
   // this so the "Install" button doesn't lie.
-  const smpAvailable = ble.services.some(
-    (s) => s.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
+  const smpAvailable = (inspector.discovered?.services ?? []).some(
+    (s) => s.uuid.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
   );
 
   const downloadUpdate = useCallback(async () => {
