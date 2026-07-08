@@ -10,6 +10,7 @@ import {
   type FirmwareCheckResult,
 } from "@/lib/vyro-ble/firmware-manifest";
 import { useVyroBandCtx } from "./VyroBandProvider";
+import { useBleInspector } from "./use-ble-inspector";
 import type { VyroMotionEvent } from "@/lib/vyro-ble/packets";
 import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
