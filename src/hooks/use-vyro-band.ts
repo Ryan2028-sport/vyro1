@@ -1061,6 +1061,21 @@ export function useVyroBand() {
       }
       return;
     }
+    // Device Information Service: firmware / hardware / serial strings.
+    if (uuidMatches(cuuid, DIS_FIRMWARE_REV_CHAR) || uuidMatches(cuuid, DIS_HARDWARE_REV_CHAR) || uuidMatches(cuuid, DIS_SERIAL_NUM_CHAR)) {
+      try {
+        const bytes = payloadToBytes(data.value);
+        const str = new TextDecoder("utf-8", { fatal: false }).decode(bytes).replace(/\0+$/, "").trim();
+        if (str) {
+          if (uuidMatches(cuuid, DIS_FIRMWARE_REV_CHAR)) setFirmwareRevision(str);
+          else if (uuidMatches(cuuid, DIS_HARDWARE_REV_CHAR)) setHardwareRevision(str);
+          else if (uuidMatches(cuuid, DIS_SERIAL_NUM_CHAR)) setSerialNumber(str);
+        }
+      } catch (err) {
+        console.warn("[vyro] DIS decode failed", err);
+      }
+      return;
+    }
     if (uuidMatches(cuuid, HR_MEAS_CHAR)) {
       const bpm = decodeHeartRate(payloadToBytes(data.value));
       if (bpm != null && bpm > 0 && bpm < 250) {
