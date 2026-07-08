@@ -32,6 +32,12 @@ import {
   type CharStat,
   type OpStat,
 } from "./use-ble-inspector";
+import {
+  getDecodedSnapshot,
+  subscribeDecoded,
+  type DecodedSnapshot,
+  type MetricKey,
+} from "@/lib/vyro-ble/decoder-tap";
 
 type Row = {
   label: string;
