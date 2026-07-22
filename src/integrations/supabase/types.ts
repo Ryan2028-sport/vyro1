@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      daily_metrics: {
+        Row: {
+          avg_value: number | null
+          created_at: string
+          day: string
+          last_recorded_at: string | null
+          last_value: number | null
+          max_value: number | null
+          metric: string
+          min_value: number | null
+          sample_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_value?: number | null
+          created_at?: string
+          day: string
+          last_recorded_at?: string | null
+          last_value?: number | null
+          max_value?: number | null
+          metric: string
+          min_value?: number | null
+          sample_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_value?: number | null
+          created_at?: string
+          day?: string
+          last_recorded_at?: string | null
+          last_value?: number | null
+          max_value?: number | null
+          metric?: string
+          min_value?: number | null
+          sample_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      metric_samples: {
+        Row: {
+          created_at: string
+          extra: Json | null
+          id: number
+          metric: string
+          recorded_at: string
+          unit: string | null
+          user_id: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          extra?: Json | null
+          id?: number
+          metric: string
+          recorded_at?: string
+          unit?: string | null
+          user_id: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          extra?: Json | null
+          id?: number
+          metric?: string
+          recorded_at?: string
+          unit?: string | null
+          user_id?: string
+          value?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -92,6 +167,54 @@ export type Database = {
           swing_count?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      sleep_nights: {
+        Row: {
+          asleep_min: number
+          created_at: string
+          day: string
+          debt_min: number | null
+          end_at: string
+          hypnogram: Json | null
+          id: string
+          in_bed_min: number
+          score: number
+          stages: Json | null
+          updated_at: string
+          user_id: string
+          wakeups: number
+        }
+        Insert: {
+          asleep_min: number
+          created_at?: string
+          day: string
+          debt_min?: number | null
+          end_at: string
+          hypnogram?: Json | null
+          id?: string
+          in_bed_min: number
+          score: number
+          stages?: Json | null
+          updated_at?: string
+          user_id: string
+          wakeups?: number
+        }
+        Update: {
+          asleep_min?: number
+          created_at?: string
+          day?: string
+          debt_min?: number | null
+          end_at?: string
+          hypnogram?: Json | null
+          id?: string
+          in_bed_min?: number
+          score?: number
+          stages?: Json | null
+          updated_at?: string
+          user_id?: string
+          wakeups?: number
         }
         Relationships: []
       }

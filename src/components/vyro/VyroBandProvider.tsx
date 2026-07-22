@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyProfile } from "@/lib/profile.functions";
 import { useVyroBand } from "@/hooks/use-vyro-band";
+import { useMetricsPersistence } from "./useMetricsPersistence";
 import { isNative, location as despiaLocation, run as despiaRun } from "@/lib/despia";
 
 type VyroBandCtx = ReturnType<typeof useVyroBand> & {
@@ -160,6 +161,14 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
   }, [pairedId, ble.connectedId]);
 
   return (
-    <Ctx.Provider value={{ ...vyro, pairedId, pairedName }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ ...vyro, pairedId, pairedName }}>
+      <MetricsPersistence />
+      {children}
+    </Ctx.Provider>
   );
+}
+
+function MetricsPersistence() {
+  useMetricsPersistence();
+  return null;
 }
