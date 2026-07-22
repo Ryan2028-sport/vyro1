@@ -107,10 +107,13 @@ export function useBluetooth() {
       };
       if (!nav.bluetooth?.requestDevice) {
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "");
+        const isAndroid = /Android/i.test(navigator.userAgent || "");
         setError(
           isIOS
             ? "BLE bridge not detected. Reopen the app from the TestFlight build (Despia/Capacitor) — Safari/WKWebView have no Web Bluetooth on iOS."
-            : "Web Bluetooth is not available in this browser. Open this page inside the TestFlight build, or use Chrome/Edge on desktop.",
+            : isAndroid
+              ? "BLE bridge not detected. Open this page from the Android app build (Capacitor) — the Android WebView does not expose Web Bluetooth. Chrome on Android works if you open the site directly."
+              : "Web Bluetooth is not available in this browser. Open this page inside the native app build, or use Chrome/Edge on desktop.",
         );
         return;
       }
