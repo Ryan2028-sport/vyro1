@@ -49,7 +49,7 @@ export function useMetricsPersistence() {
       push("steps", ctx.stepsToday, "count", ctx.signalAt.stepsAt, 5 * 60_000, 50);
       push("distance", ctx.distanceM, "m", ctx.signalAt.distanceAt, 5 * 60_000, 20);
       push("calories", ctx.caloriesKcal, "kcal", ctx.signalAt.caloriesAt, 5 * 60_000, 5);
-      push("respiration", ctx.respRateBrpm, "brpm", ctx.signalAt.respAt ?? null, 5 * 60_000, 1);
+      push("respiration", ctx.respRateBrpm, "brpm", null, 5 * 60_000, 1);
       if (ctx.bloodPressure && ctx.signalAt.bloodPressureAt) {
         const bp = ctx.bloodPressure as { systolic?: number; diastolic?: number };
         push("bp_systolic", bp.systolic ?? null, "mmHg", ctx.signalAt.bloodPressureAt, 5 * 60_000, 1);
