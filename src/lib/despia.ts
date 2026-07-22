@@ -328,8 +328,12 @@ export const bluetooth = {
       // IMPORTANT: on iOS Core Bluetooth, passing `services: []` filters to
       // an empty allow-list and returns ZERO devices. Only include the
       // `services` key when the caller actually supplied UUIDs.
+      // allowDuplicates:true is important on Android — many watches only
+      // advertise their name in a scan-response packet, and with duplicates
+      // filtered out the first (nameless) advert is all we ever see, so the
+      // device never appears in the UI list.
       const scanOpts: Parameters<typeof BleClient.requestLEScan>[0] = {
-        allowDuplicates: false,
+        allowDuplicates: true,
       };
       if (services.length) {
         scanOpts.services = services;
