@@ -242,7 +242,10 @@ async function ensureCapacitorBle(): Promise<boolean> {
   if (!w.Capacitor.isNativePlatform?.()) return false;
   try {
     if (!capacitorBleReady) {
-      await BleClient.initialize();
+      // androidNeverForLocation lets Android 12+ scan without the runtime
+      // ACCESS_FINE_LOCATION prompt; without it many devices silently return
+      // zero scan results even though BLUETOOTH_SCAN was granted.
+      await BleClient.initialize({ androidNeverForLocation: true });
       capacitorBleReady = true;
     }
     const enabled = await BleClient.isEnabled();
