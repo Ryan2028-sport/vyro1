@@ -160,6 +160,14 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
   }, [pairedId, ble.connectedId]);
 
   return (
-    <Ctx.Provider value={{ ...vyro, pairedId, pairedName }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ ...vyro, pairedId, pairedName }}>
+      <MetricsPersistence />
+      {children}
+    </Ctx.Provider>
   );
+}
+
+function MetricsPersistence() {
+  useMetricsPersistence();
+  return null;
 }
