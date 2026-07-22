@@ -37,7 +37,17 @@ function detectNative(): boolean {
     (ua.includes("Mac") &&
       (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! > 1);
   const inAppWebView = !!w?.webkit?.messageHandlers || (isIOS && !/Safari\//.test(ua));
-  return isIOS && inAppWebView;
+  if (isIOS && inAppWebView) return true;
+  // Android inside a Capacitor / Despia wrapper: the Android WebView does not
+  // expose Web Bluetooth, so we must route to the native @capacitor-community
+  // /bluetooth-le plugin. Detect Android WebView (no Chrome token, or the
+  // "; wv" marker) or an explicit Capacitor / Despia bridge on Android.
+  const isAndroid = /Android/i.test(ua);
+  if (isAndroid) {
+    const isWebView = /; wv\)/.test(ua) || !/Chrome\/\d/.test(ua);
+    if (isWebView || w?.Capacitor || w?.despia) return true;
+  }
+  return false;
 }
 
 export const isNative = detectNative();
