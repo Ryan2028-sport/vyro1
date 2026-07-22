@@ -63,16 +63,59 @@ function write(list: SleepNight[]) {
  *  decoded. Safe to call from anywhere. */
 export function recordSleepNight(night: SleepNight) {
   const list = read();
-  // De-dupe by endAt date (one entry per night).
   const day = night.endAt.slice(0, 10);
   const filtered = list.filter((n) => n.endAt.slice(0, 10) !== day);
   filtered.push(night);
   filtered.sort((a, b) => a.endAt.localeCompare(b.endAt));
   write(filtered);
+  // Best-effort persist to DB.
+  try {
+    void saveSleepNight({
+      data: {
+        end_at: new Date(night.endAt).toISOString(),
+        score: Math.round(night.score),
+        asleep_min: Math.round(night.asleepMin),
+        in_bed_min: Math.round(night.inBedMin),
+        wakeups: night.wakeups,
+        stages: night.stages,
+        debt_min: night.debtMin ?? null,
+        hypnogram: night.hypnogram ?? null,
+      },
+    });
+  } catch {
+    /* offline / signed-out — kept in localStorage */
+  }
 }
 
 export function useSleepNights() {
   const [nights, setNights] = useState<SleepNight[]>(() => read());
+  const fetchRemote = useServerFn(listSleepNights);
+  const { data: remote } = useQuery({
+    queryKey: ["sleep-nights"],
+    queryFn: () => fetchRemote(),
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (!remote || !Array.isArray(remote)) return;
+    const merged: SleepNight[] = remote.map((r: any) => ({
+      endAt: r.end_at,
+      score: r.score,
+      asleepMin: r.asleep_min,
+      inBedMin: r.in_bed_min,
+      wakeups: r.wakeups,
+      stages: r.stages ?? { awake: 0, light: 0, deep: 0, rem: 0 },
+      debtMin: r.debt_min ?? undefined,
+      hypnogram: r.hypnogram ?? undefined,
+    }));
+    // Merge with any local unsynced entries.
+    const byDay = new Map<string, SleepNight>();
+    for (const n of merged) byDay.set(n.endAt.slice(0, 10), n);
+    for (const n of read()) if (!byDay.has(n.endAt.slice(0, 10))) byDay.set(n.endAt.slice(0, 10), n);
+    const list = [...byDay.values()].sort((a, b) => a.endAt.localeCompare(b.endAt));
+    setNights(list);
+    write(list);
+  }, [remote]);
 
   useEffect(() => {
     function refresh() {
