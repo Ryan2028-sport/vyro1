@@ -242,7 +242,10 @@ async function ensureCapacitorBle(): Promise<boolean> {
   if (!w.Capacitor.isNativePlatform?.()) return false;
   try {
     if (!capacitorBleReady) {
-      await BleClient.initialize();
+      // androidNeverForLocation lets Android 12+ scan without the runtime
+      // ACCESS_FINE_LOCATION prompt; without it many devices silently return
+      // zero scan results even though BLUETOOTH_SCAN was granted.
+      await BleClient.initialize({ androidNeverForLocation: true });
       capacitorBleReady = true;
     }
     const enabled = await BleClient.isEnabled();
@@ -325,8 +328,12 @@ export const bluetooth = {
       // IMPORTANT: on iOS Core Bluetooth, passing `services: []` filters to
       // an empty allow-list and returns ZERO devices. Only include the
       // `services` key when the caller actually supplied UUIDs.
+      // allowDuplicates:true is important on Android — many watches only
+      // advertise their name in a scan-response packet, and with duplicates
+      // filtered out the first (nameless) advert is all we ever see, so the
+      // device never appears in the UI list.
       const scanOpts: Parameters<typeof BleClient.requestLEScan>[0] = {
-        allowDuplicates: false,
+        allowDuplicates: true,
       };
       if (services.length) {
         scanOpts.services = services;
