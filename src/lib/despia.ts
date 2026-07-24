@@ -273,10 +273,13 @@ async function ensureCapacitorBle(): Promise<boolean> {
   if (!hasNativeCapacitorBridge()) return false;
   try {
     if (!capacitorBleReady) {
-      // androidNeverForLocation lets Android 12+ scan without the runtime
-      // ACCESS_FINE_LOCATION prompt; without it many devices silently return
-      // zero scan results even though BLUETOOTH_SCAN was granted.
-      await BleClient.initialize({ androidNeverForLocation: true });
+      // Do NOT set androidNeverForLocation on Android here. Android can filter
+      // some BLE advertisements when that flag is asserted; this watch may be
+      // one of the filtered devices, which makes nearby headphones appear but
+      // the watch disappear. Let the plugin request the needed permission and
+      // keep Location Services on so the raw watch advertisement is visible.
+      const initOptions = getNativePlatform() === "android" ? undefined : { androidNeverForLocation: true };
+      await BleClient.initialize(initOptions);
       capacitorBleReady = true;
     }
     let enabled = await BleClient.isEnabled();
