@@ -5,6 +5,7 @@
 import despia from "despia-native";
 import {
   BleClient,
+  ScanMode,
   dataViewToHexString,
   hexStringToDataView,
   type ScanResult,
@@ -35,7 +36,7 @@ function detectNative(): boolean {
   const isIOS =
     /iPad|iPhone|iPod/.test(ua) ||
     (ua.includes("Mac") &&
-      (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! > 1);
+      ((navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints ?? 0) > 1);
   const inAppWebView = !!w?.webkit?.messageHandlers || (isIOS && !/Safari\//.test(ua));
   if (isIOS && inAppWebView) return true;
   // Android inside a Capacitor / Despia wrapper: the Android WebView does not
@@ -218,6 +219,41 @@ function emit<K extends keyof BleEventMap>(key: K, payload: BleEventMap[K]) {
 
 let capacitorBleReady = false;
 
+function getNativePlatform(): "android" | "ios" | "web" | "unknown" {
+  if (typeof navigator === "undefined") return "unknown";
+  const w =
+    typeof window !== "undefined"
+      ? (window as unknown as {
+          Capacitor?: {
+            getPlatform?: () => string;
+            isNativePlatform?: () => boolean;
+          };
+        })
+      : undefined;
+  const platform = w?.Capacitor?.getPlatform?.()?.toLowerCase();
+  if (platform === "android" || platform === "ios") return platform;
+  const ua = navigator.userAgent || "";
+  if (/Android/i.test(ua)) return "android";
+  if (/iPad|iPhone|iPod/i.test(ua)) return "ios";
+  return platform === "web" ? "web" : "unknown";
+}
+
+function hasNativeCapacitorBridge(): boolean {
+  const w =
+    typeof window !== "undefined"
+      ? (window as unknown as {
+          Capacitor?: {
+            getPlatform?: () => string;
+            isNativePlatform?: () => boolean;
+          };
+        })
+      : undefined;
+  if (!w?.Capacitor) return false;
+  if (w.Capacitor.isNativePlatform?.()) return true;
+  const platform = w.Capacitor.getPlatform?.()?.toLowerCase();
+  return platform === "android" || platform === "ios";
+}
+
 const KNOWN_WATCH_SERVICES = [
   "6e40fff0-b5a3-f393-e0a9-e50e24dcca9e",
   "de5bf728-d711-4e47-af26-65e3012a5dc7",
@@ -229,17 +265,12 @@ const KNOWN_WATCH_SERVICES = [
 ];
 
 async function ensureCapacitorBle(): Promise<boolean> {
-  const w =
-    typeof window !== "undefined"
-      ? (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
-      : undefined;
-  if (!w?.Capacitor) return false;
   // If Capacitor is only the web shim, @capacitor-community/bluetooth-le
   // delegates scans to navigator.bluetooth.requestLEScan, which iOS/WKWebView
   // does not support. Only use BleClient when the real native runtime is
   // present; otherwise fall back to Despia's native bluetooth:// bridge or the
   // browser Web Bluetooth path handled by useBluetooth.
-  if (!w.Capacitor.isNativePlatform?.()) return false;
+  if (!hasNativeCapacitorBridge()) return false;
   try {
     if (!capacitorBleReady) {
       // androidNeverForLocation lets Android 12+ scan without the runtime
@@ -248,7 +279,25 @@ async function ensureCapacitorBle(): Promise<boolean> {
       await BleClient.initialize({ androidNeverForLocation: true });
       capacitorBleReady = true;
     }
-    const enabled = await BleClient.isEnabled();
+    let enabled = await BleClient.isEnabled();
+    if (!enabled && getNativePlatform() === "android") {
+      try {
+        await BleClient.requestEnable();
+        enabled = await BleClient.isEnabled();
+      } catch (err) {
+        emit("event", { type: "android_ble_enable_failed", message: (err as Error)?.message || String(err) });
+      }
+    }
+    if (getNativePlatform() === "android") {
+      try {
+        const locationEnabled = await BleClient.isLocationEnabled();
+        if (!locationEnabled) {
+          emit("event", { type: "android_location_services_off" });
+        }
+      } catch (err) {
+        emit("event", { type: "android_location_check_failed", message: (err as Error)?.message || String(err) });
+      }
+    }
     emit("state", { state: enabled ? "on" : "off" });
     return true;
   } catch (err) {
@@ -305,6 +354,22 @@ async function emitConnectedCapacitorDevices(services: string[] = []): Promise<B
   return [...seen.values()];
 }
 
+async function emitBondedCapacitorDevices(): Promise<BleDevice[]> {
+  if (getNativePlatform() !== "android") return [];
+  try {
+    const devices = await BleClient.getBondedDevices();
+    const mapped = devices.map(mapCapacitorDevice);
+    for (const device of mapped) emit("device", device);
+    emit("event", { type: "android_bonded_devices", count: mapped.length });
+    return mapped;
+  } catch (err) {
+    const message = (err as Error)?.message || String(err);
+    emit("event", { type: "android_bonded_devices_failed", message });
+    console.warn("[capacitor-ble] getBondedDevices failed", err);
+    return [];
+  }
+}
+
 // Wire up the global callbacks Despia fires from native.
 // These MUST be defined before any despia() BLE command runs — the native
 // side does not buffer foreground events, so late handlers miss events.
@@ -325,6 +390,7 @@ export const bluetooth = {
   scan: async (services: string[] = [], durationMs = 10000) => {
     if (await ensureCapacitorBle()) {
       await emitConnectedCapacitorDevices(services);
+      await emitBondedCapacitorDevices();
       // IMPORTANT: on iOS Core Bluetooth, passing `services: []` filters to
       // an empty allow-list and returns ZERO devices. Only include the
       // `services` key when the caller actually supplied UUIDs.
@@ -335,6 +401,7 @@ export const bluetooth = {
       const scanOpts: Parameters<typeof BleClient.requestLEScan>[0] = {
         allowDuplicates: true,
       };
+      if (getNativePlatform() === "android") scanOpts.scanMode = ScanMode.SCAN_MODE_LOW_LATENCY;
       if (services.length) {
         scanOpts.services = services;
         scanOpts.optionalServices = services;
@@ -384,7 +451,10 @@ export const bluetooth = {
       try {
         const savedDevices = await BleClient.getDevices([id]).catch(() => []);
         for (const device of savedDevices) emit("device", mapCapacitorDevice(device));
-        if (savedDevices.length === 0) await emitConnectedCapacitorDevices();
+        if (savedDevices.length === 0) {
+          await emitConnectedCapacitorDevices();
+          await emitBondedCapacitorDevices();
+        }
         await BleClient.connect(
           id,
           (deviceId) => emit("connect", { id: deviceId, state: "disconnected" }),
