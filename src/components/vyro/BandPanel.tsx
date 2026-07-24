@@ -258,7 +258,7 @@ export function BandPanel({
         </div>
         {ble.powerState !== "on" && ble.isNative && (
           <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Bluetooth state is <span className="font-mono">{ble.powerState}</span>. Tap Scan to trigger the iOS Bluetooth permission prompt, then enable it in Settings → VYRO → Bluetooth if it was previously denied.
+            Bluetooth state is <span className="font-mono">{ble.powerState}</span>. On Android, enable Nearby devices/Bluetooth and Location for VYRO, then tap Scan again. On iOS, enable Bluetooth in Settings → VYRO.
           </div>
         )}
         {ble.error && (
