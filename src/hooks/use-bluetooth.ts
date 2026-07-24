@@ -38,6 +38,23 @@ type BrowserBluetoothDevice = {
 
 const browserDevices = new Map<string, BrowserBluetoothDevice>();
 
+function getAndroidBluetoothMode(): { isAndroid: boolean; hasWebBluetooth: boolean; hasCapacitorBridge: boolean } {
+  const isAndroid = /Android/i.test(navigator.userAgent || "");
+  const nav = navigator as Navigator & {
+    bluetooth?: { requestDevice?: (opts: unknown) => Promise<BrowserBluetoothDevice> };
+  };
+  const w = window as unknown as {
+    Capacitor?: { getPlatform?: () => string; isNativePlatform?: () => boolean };
+  };
+  const platform = w.Capacitor?.getPlatform?.()?.toLowerCase();
+  const hasCapacitorBridge = !!w.Capacitor && (w.Capacitor.isNativePlatform?.() === true || platform === "android");
+  return {
+    isAndroid,
+    hasWebBluetooth: typeof nav.bluetooth?.requestDevice === "function",
+    hasCapacitorBridge,
+  };
+}
+
 function sameDeviceId(a: string | null | undefined, b: string | null | undefined): boolean {
   if (!a || !b) return false;
   if (a === b) return true;
@@ -104,7 +121,22 @@ export function useBluetooth() {
     });
     const offScanEnd = bluetooth.on("scanEnd", () => setScanning(false));
 
-    if (isNative) void bluetooth.state();
+    if (isNative) {
+      void bluetooth.state();
+    } else {
+      const { isAndroid, hasWebBluetooth, hasCapacitorBridge } = getAndroidBluetoothMode();
+      if (hasWebBluetooth) {
+        setPowerState("on");
+        setError(null);
+      } else if (isAndroid && !hasCapacitorBridge) {
+        setPowerState("unsupported");
+        setError(
+          "Android Bluetooth bridge was not detected. Open VYRO in Chrome for Web Bluetooth, or install/open the native Android app build.",
+        );
+      } else {
+        setPowerState("unsupported");
+      }
+    }
 
     return () => {
       offDevice();
@@ -129,6 +161,7 @@ export function useBluetooth() {
       if (!nav.bluetooth?.requestDevice) {
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "");
         const isAndroid = /Android/i.test(navigator.userAgent || "");
+        setPowerState("unsupported");
         setError(
           isIOS
             ? "BLE bridge not detected. Reopen the app from the TestFlight build (Despia/Capacitor) — Safari/WKWebView have no Web Bluetooth on iOS."
@@ -138,6 +171,7 @@ export function useBluetooth() {
         );
         return;
       }
+      setPowerState("on");
       setScanning(true);
       try {
         const d = await nav.bluetooth.requestDevice({
@@ -163,7 +197,12 @@ export function useBluetooth() {
         }));
       } catch (err) {
         const msg = (err as Error)?.message || String(err);
-        if (!/cancell?ed|NotFoundError/i.test(msg)) setError(msg);
+        if (/permission|denied|SecurityError/i.test(msg)) {
+          setPowerState("unauthorized");
+          setError("Android blocked Bluetooth access for this site/app. Allow Nearby devices/Bluetooth for VYRO, then tap Scan again.");
+        } else if (!/cancell?ed|NotFoundError/i.test(msg)) {
+          setError(msg);
+        }
       } finally {
         setScanning(false);
       }
