@@ -87,6 +87,21 @@ export function useBluetooth() {
         setError(null);
       }
     });
+    const offEvent = bluetooth.on("event", (event) => {
+      const isAndroid = /Android/i.test(navigator.userAgent || "");
+      if (!isAndroid) return;
+      if (event.type === "android_location_services_off") {
+        setError("Android Location Services are off. Turn Location on, then tap Scan again so BLE advertisements from the watch are not hidden.");
+      }
+      if (event.type === "capacitor_scan_error" && typeof event.message === "string") {
+        const permissionLike = /permission|location|nearby|scan|denied|unauthori[sz]ed/i.test(event.message);
+        setError(
+          permissionLike
+            ? "Android blocked BLE scanning. Enable Nearby devices/Bluetooth and Location for VYRO, then tap Scan again."
+            : event.message,
+        );
+      }
+    });
     const offScanEnd = bluetooth.on("scanEnd", () => setScanning(false));
 
     if (isNative) void bluetooth.state();
@@ -96,6 +111,7 @@ export function useBluetooth() {
       offConnect();
       offData();
       offState();
+      offEvent();
       offScanEnd();
     };
   }, []);
