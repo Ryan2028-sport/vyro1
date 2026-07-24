@@ -72,10 +72,15 @@ export function useBluetooth() {
     const offData = bluetooth.on("data", (d: BleDataEvent) => setLastData(d));
     const offState = bluetooth.on("state", (s) => {
       setPowerState(s.state);
+      const isAndroid = /Android/i.test(navigator.userAgent || "");
       if (s.state === "unauthorized") {
-        setError("Bluetooth permission denied. Enable it in iOS Settings.");
+        setError(
+          isAndroid
+            ? "Bluetooth permission denied. Enable Nearby devices/Bluetooth for VYRO in Android app settings. If the watch still does not appear, turn Location on too."
+            : "Bluetooth permission denied. Enable it in iOS Settings.",
+        );
       } else if (s.state === "off") {
-        setError("Bluetooth is off. Turn it on in Control Center.");
+        setError(isAndroid ? "Bluetooth is off. Turn it on, then tap Scan again." : "Bluetooth is off. Turn it on in Control Center.");
       } else if (s.state === "unsupported") {
         setError("Bluetooth is not supported on this device.");
       } else {
