@@ -6,7 +6,6 @@ import {
   Bell,
   Brain,
   CalendarDays,
-  Flame,
   Gauge,
   Heart,
   LineChart,
