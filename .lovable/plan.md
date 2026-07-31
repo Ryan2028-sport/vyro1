@@ -1,65 +1,49 @@
-## Heads up: the debug bundle you pasted is the OLD one
-Timestamp is `2026-07-08T03:36:52` — same as the previous turn, taken BEFORE my last changes (compressed measure sweep + 25s watchdog + 0x87/0x89 tap). So it doesn't show whether HR/SpO₂/Temp/BP work now. I'll plan the firmware work AND flag what to look for once you paste a fresh bundle.
+## What I found (verified in code)
 
-## What the (old) bundle proves about firmware capability
+- **Three different recovery formulas exist.** `RecoveryView` and the Sport tab's Readiness lens both call `computeLiveRecovery()`, but the Sport lens *headline* is the average of `rec.score` and `rec.parts.muscle` (`SportView.tsx:310, 318`), so the tile can read far below the Recovery hero. Meanwhile the Athlete home and `AthleteView` show a completely different number from `computeSubScores().recovery` (`App2ReferenceShell.tsx:451`, `AthleteView.tsx:27`). That's the 31 vs 87 split.
+- **Readiness label bug:** `AthleteView` hardcodes the ring label `"Ready"` regardless of score (`AthleteView.tsx:90`), and the Athlete-home pill thresholds (`>=70 Ready`) are applied to *readiness*, not the recovery band, so a low recovery can still sit next to a green tag.
+- **RTP Validator / Muscle Readiness / Recovery Environment** are computed from `localStorage` baselines (`BASELINE_KEY` in `App2ReferenceShell.tsx:43`) and `computeLiveRecovery` parts — never from the `daily_metrics` / `metric_samples` tables that already exist.
+- **Hardcoded Today's Plan:** three literal training blocks in `useState` (`App2ReferenceShell.tsx:416-420`), including "Match practice vs. Alex K.". No plan table exists.
+- **Sport tab has only the overview.** `CourtDbView.tsx`, `SwingView.tsx`, `TendencyView.tsx` exist but are not referenced anywhere — the old `Layout.tsx` shell used them; the current `App2ReferenceShell` renders only `SportView`.
+- **Athlete tab does not render `AthleteView`** at all (it renders the shell's inline `AthleteHome`), so Steps and Resting HR never appear.
+- **Sport bleed:** `SportView` labels are literally "Squash snapshot" and "Six lenses on squash" and no sport-specific filtering is applied to the metric derivations; `SPORT_PROFILES` carries static demo values.
+- **Social tab** is already placeholder-free empty states — but there is **no social/leaderboard schema** in the database, so "connect to the real social database" needs tables created first.
+- **Sleep tab** still derives from a `localStorage` sample buffer (`vyro.sleep.samples.v1`) even though a `sleep_nights` table exists.
 
-The `gatt` section shows exactly three services on Armand's watch:
+## Plan
 
-| Service UUID | What it is |
-|---|---|
-| `6e40fff0-…` (write `…0002`, notify `…0003`) | QCBand Nordic-UART command channel |
-| `de5bf728-…` (write `…72a`, notify `…729`) | QCBand V2 big-data channel |
-| `0000180a-…` Device Information (`2a23` SystemID, `2a25` SerialNumber, `2a26` **FirmwareRevision**, `2a27` HardwareRevision) | Standard BLE DIS |
+### 1. Single source of truth for recovery + readiness
+- Add a `VyroScoresProvider` (inside `VyroBandProvider`) that computes **once**: `recovery` (from `computeLiveRecovery`), its `parts` (cardio, muscle, loadDebt, environment, confidence), `readiness`, `strain`, `fatigue`, `agility`, `sleep`, and the band classification.
+- Expose `useVyroScores()`. Replace every local computation in `App2ReferenceShell`, `RecoveryView`, `SportView`, `AthleteView`, `CoachView`, `HomeView`, `TrendsView` with reads from this hook. Delete the per-view `computeLiveRecovery` / `computeSubScores` calls so divergence is structurally impossible.
+- Sport tab's Readiness lens shows `recovery` directly as the headline (no averaging with muscle).
 
-**Missing:** the MCUmgr/SMP service (`8d53dc1d-1db7-4cd3-868b-8a527460aa84`). That's the transport `src/lib/vyro-ble/ota.ts` uses. **On Armand's firmware there is no SMP endpoint → the existing "Start update" button physically cannot flash this watch.** Any auto-OTA plan has to acknowledge this.
+### 2. Readiness / status labels
+- Derive every status tag from one helper in the provider (`recoveryBand(recovery)` → Ready / Manage / Recover / Calibrating) and use it in the Athlete pill, `AthleteView` ring label (remove the hardcoded "Ready"), Recovery hero, and Coach read. Score below 67 can never render a green "Ready".
 
-## What we can actually build for firmware
+### 3. Real data sources
+- Extend the metrics server functions to read `daily_metrics` / `metric_samples` for 7-day rolling baselines (readiness, resting HR, HRV, reaction).
+- Rewire **RTP Validator** to compare live wearable power against the DB baseline (fall back to "building baseline" when there aren't enough days) instead of `localStorage`.
+- Surface **Muscle Readiness** and **Recovery Environment** as the provider's `parts.muscle` / `parts.environment`, with an explicit source line ("IMU load", "SpO₂ + skin temp + HRV") and "—" when the channel is silent.
 
-### 1. Read + display the current firmware version
-Add a `getFirmwareRevision(connectedId)` helper that reads GATT `0x180a / 0x2a26` on connect and stores it in `useVyroBand`'s context. Surface it in:
-- Debug tab, top section: `Firmware: <string> · Hardware: <string> · Serial: <string>`.
-- Band panel, next to Connected status.
+### 4. Remove placeholder data
+- **Today's Plan:** new `training_plan_items` table (user-scoped, RLS + grants) + server functions; the card fetches and mutates real rows. No seeded blocks.
+- **Sport tabs:** strip static `SPORT_PROFILES` numbers from anything rendered; every card shows live-derived values or "—".
+- **Sleep tab:** read/write through `sleep_nights` via the existing `use-sleep-nights` hook; localStorage becomes only a write-behind buffer, and all fabricated stage/debt values are removed when absent.
+- **Social tab:** create minimal schema (`groups`, `group_members`, `leaderboard_entries` computed from `sessions`) and wire the categories to it. If you'd rather defer social, I'll leave the current empty states untouched.
 
-### 2. Fetch a firmware manifest from a URL
-- Add a `VITE_FIRMWARE_MANIFEST_URL` env variable (you provide the URL). Manifest shape:
-  ```json
-  { "latestVersion": "1.2.3", "downloadUrl": "https://…/qcband_1.2.3.bin", "sha256": "…", "notes": "…" }
-  ```
-- On connect, fetch the manifest, compare `latestVersion` to the DIS reading.
-- If newer, show a banner in Band panel: *"Firmware update available: 1.2.3 (you have 1.2.1)"* + a **Download & Install** button.
+### 5. Restore missing views
+- Add sub-tab navigation inside the Sport tab: **Overview | Court DB | Movement | Motion | Tendencies**, mounting the existing `CourtDbView` (heat-map/route tables), a Movement panel (motion peaks + route agility), `SwingView` for Motion, and `TendencyView`.
+- Mount `AthleteView` in the Athlete tab (or merge its sections into `AthleteHome`), ensuring **Steps** and **Resting HR** tiles read `stepsToday` / `restingHrBpm` from live context.
+- Audit `CoachView` bindings against the scores provider so its assessment reflects live values.
 
-### 3. About actually flashing it — needs your input
-The uploaded firmware image can be handed to `runOtaUpload`, but **only if the watch exposes SMP**. Since Armand's build does not, we have two honest paths:
+### 6. Sport selection correctness
+- Lift selected sport into the provider (seeded from `profiles.sport`), persisted on change.
+- Make all labels and derivations sport-aware: squash-specific text ("Squash snapshot", "six lenses on squash", squash route names) becomes driven by the selected sport, and Tennis renders tennis routes/labels and tennis-tuned thresholds. Session/history queries filter by `sessions.sport`.
 
-- **(a)** Armand adds the SMP service to the firmware (standard MCUmgr — a few kB and one call to `smp_bt_register`) and we ship it as-is. Auto-OTA then Just Works after this plan.
-- **(b)** Armand documents the QCBand-proprietary OTA opcode(s) (some QCBand firmwares use `0xF0`/`0xF1` on the 6e40fff0 write char with 16-byte framed image chunks). We implement a `runQcBandOtaUpload` next to `runOtaUpload`. This can't be done from the debug bundle alone — I need the spec.
+## Technical notes
+- New tables (`training_plan_items`, and social tables if in scope) get `GRANT`s + RLS scoped to `auth.uid()` in the same migration.
+- The scores provider lives in the client (BLE data is browser-side); baselines come from server functions under `_authenticated`.
+- No change to the BLE decode layer — this work is state wiring and UI.
 
-I'll build (1) + (2) now so you always see the version and get a "new firmware available" nudge; (3) can only be finished when you tell me which of (a)/(b) applies. **Do not tell the user auto-flash is working yet — it isn't, and it can't without the SMP service on the watch side.**
-
-## What to check for remaining metrics (needs a fresh debug bundle)
-Reconnect, wait 60s, paste the NEW bundle. Look at the Debug tab's new sections:
-
-- **Decoder output per metric** — `hr`, `spo2`, `skinTemp`, `bp` rows.
-  - If `count > 0` here but tile grey → freshness gate issue (already relaxed once, would relax again).
-  - If `count = 0` but `0x69` count > 0 in per-opcode → decoder sub-type mismatch; the plan's step 4 handles it below.
-  - If both are 0 → firmware still refuses the sub-type after my compressed sweep + watchdog re-arm. Then it's a firmware-side issue.
-- **Motion tap** — should now show `op=0x87 b1=0xee` / `op=0x89 b1=0xee` traffic. Those are the watch replying "feature unsupported / keep-alive" to one-key measure attempts. If we ONLY see 0xee replies for HR/SpO₂/Temp/BP even after all sub-types tried, then Armand's firmware isn't emitting those metrics regardless of app — it's a firmware build issue and we escalate to him.
-
-### 4. If a fresh bundle shows `0x69` frames arriving but decoder = 0 for a specific metric
-Extend `decodeQcBandMeasureFrame` / add sub-type-specific parsers in `src/lib/vyro-ble/packets.ts` for whatever sub-types the watch is actually replying on (visible in the fresh bundle's `perOpcode.0x69.lastHex` byte 1). Route each to `setX + markSignal + tapDecoded`.
-
-### 5. If nothing new arrives, add one more nudge on connect
-Some QCBand firmwares need `0x69 <sub> 0x03` (mode=hold) after `0x69 <sub> 0x01` (mode=start) to keep the sensor on. If step (4) shows the frame stops after ~2s, I'll add a `hold` write per sub-type in the measure loop.
-
-## Files touched (build phase)
-- `src/hooks/use-vyro-band.ts` — read DIS 0x2a26 on connect, expose `firmwareRevision`.
-- `src/lib/vyro-ble/firmware-manifest.ts` (new) — fetch + version-compare helpers.
-- `src/components/vyro/BandPanel.tsx` — show current version + "update available" banner + wire manifest.
-- `src/components/vyro/DebugView.tsx` — new "Device info" section with firmware/hardware/serial.
-- `.env` — add `VITE_FIRMWARE_MANIFEST_URL` placeholder (you fill it in).
-- No touching `src/integrations/supabase/*` (auto-generated), no changes outside `/app2`.
-
-## Out of scope
-- Actually flashing the new firmware end-to-end — blocked on choice (a) or (b) above.
-- UI redesign of tiles.
-- Fake "firmware updated ✓" success states.
+## One open question
+The social leaderboards have no backing schema yet. Do you want me to create the group/leaderboard tables in this pass, or leave Social as empty states for now?

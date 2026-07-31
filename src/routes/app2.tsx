@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { VyroBandProvider } from "@/components/vyro/VyroBandProvider";
+import { VyroScoresProvider } from "@/components/vyro/VyroScoresProvider";
 import { App2ReferenceShell } from "@/components/vyro/App2ReferenceShell";
 
 // /app2 = public mirror of /app. Uses the SAME VyroBandProvider so BLE
@@ -17,7 +18,9 @@ export const Route = createFileRoute("/app2")({
   }),
   component: () => (
     <VyroBandProvider>
-      <App2ReferenceShell />
+      <VyroScoresProvider>
+        <App2ReferenceShell />
+      </VyroScoresProvider>
     </VyroBandProvider>
   ),
 });

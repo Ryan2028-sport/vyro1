@@ -25,74 +25,25 @@ import { SessionView } from "./SessionView";
 import { SleepView } from "./SleepView";
 import { DebugView } from "./DebugView";
 import { SocialView } from "./SocialView";
-import { SportView } from "./SportView";
+import { MovementPanel, SportView } from "./SportView";
+import { CourtDbView } from "./CourtDbView";
+import { SwingView } from "./SwingView";
+import { TendencyView } from "./TendencyView";
 import { TrendsView } from "./TrendsView";
-import { computeReadiness, computeSubScores, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
-import { useSleepNights } from "@/lib/use-sleep-nights";
+import { useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
+import { useVyroScores } from "./VyroScoresProvider";
+import {
+  addTrainingPlanItem,
+  deleteTrainingPlanItem,
+  listTrainingPlan,
+} from "@/lib/training-plan.functions";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import "./app2-reference.css";
 
-// ---------- Baseline persistence (rolling user baselines for divergence/RTP) ----------
-type Baselines = {
-  reactMs?: number;        // fastest rolling reaction (ms)
-  reactSamples?: number[]; // last N samples for median baseline
-  readiness?: number;      // 7d rolling avg readiness
-  readinessSamples?: number[];
-  restingHr?: number;
-  hrv?: number;
-};
-const BASELINE_KEY = "vyro.baselines.v1";
-function loadBaselines(): Baselines {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(window.localStorage.getItem(BASELINE_KEY) || "{}"); } catch { return {}; }
-}
-function saveBaselines(b: Baselines) {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(BASELINE_KEY, JSON.stringify(b)); } catch { /* ignore */ }
-}
-function median(xs: number[]): number | undefined {
-  if (!xs.length) return undefined;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-
-function useBaselines(m: LiveMetrics) {
-  const [base, setBase] = useState<Baselines>(() => loadBaselines());
-  // Throttle writes via ref
-  const lastWrite = useRef(0);
-  useEffect(() => {
-    if (!m.connected) return;
-    setBase((prev) => {
-      const next: Baselines = { ...prev };
-      if (m.reactMin != null) {
-        const samples = [...(prev.reactSamples ?? []), m.reactMin].slice(-50);
-        next.reactSamples = samples;
-        next.reactMs = median(samples);
-      }
-      if (m.restingHrBpm != null) next.restingHr = prev.restingHr
-        ? prev.restingHr * 0.9 + m.restingHrBpm * 0.1 : m.restingHrBpm;
-      if (m.hrvMs != null) next.hrv = prev.hrv
-        ? prev.hrv * 0.9 + m.hrvMs * 0.1 : m.hrvMs;
-      const now = Date.now();
-      if (now - lastWrite.current > 5000) {
-        lastWrite.current = now;
-        saveBaselines(next);
-      }
-      return next;
-    });
-  }, [m.connected, m.reactMin, m.restingHrBpm, m.hrvMs]);
-
-  const recordReadiness = (score: number | null) => {
-    if (score == null) return;
-    setBase((prev) => {
-      const samples = [...(prev.readinessSamples ?? []), score].slice(-7);
-      const next = { ...prev, readinessSamples: samples, readiness: Math.round(samples.reduce((a, b) => a + b, 0) / samples.length) };
-      saveBaselines(next);
-      return next;
-    });
-  };
-  return { base, recordReadiness };
-}
+// Baselines, recovery, readiness, strain and RTP all come from
+// <VyroScoresProvider /> now — see VyroScoresProvider.tsx. This file no longer
+// computes any score of its own, which is what caused the same metric to read
+// 31 on one tab and 87 on another.
 
 type App2View =
   | "athlete"
@@ -329,7 +280,7 @@ function EmbeddedView({
   if (view === "sport") {
     return (
       <div className="app2-scroll-embed">
-        <SportView />
+        <SportTabs />
       </div>
     );
   }
@@ -390,15 +341,57 @@ function BandView({ defaultSport }: { defaultSport: "squash" | "tennis" }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Sport tab — Overview / Court DB / Movement / Motion / Tendencies.
+// These views existed in the codebase but were never reachable from the nav.
+// ---------------------------------------------------------------------------
+type SportTab = "overview" | "court" | "movement" | "motion" | "tendency";
+
+const SPORT_TABS: { id: SportTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "court", label: "Court DB" },
+  { id: "movement", label: "Movement" },
+  { id: "motion", label: "Motion" },
+  { id: "tendency", label: "Tendencies" },
+];
+
+function SportTabs() {
+  const [tab, setTab] = useState<SportTab>("overview");
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {SPORT_TABS.map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
+              tab === id
+                ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
+                : "border-vyro-line bg-vyro-panel text-vyro-mute"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === "overview" && <SportView />}
+      {tab === "court" && <CourtDbView />}
+      {tab === "movement" && <MovementPanel />}
+      {tab === "motion" && <SwingView />}
+      {tab === "tendency" && <TendencyView />}
+    </div>
+  );
+}
+
 function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   const fetchProfile = useServerFn(getMyProfile);
   const { data: profile } = useQuery({
     queryKey: ["profile"],
     queryFn: () => fetchProfile(),
   });
-  const m = useLiveMetrics();
-  const { base, recordReadiness } = useBaselines(m);
-  const firstName = (profile?.display_name || "Ryan").trim().split(/\s+/)[0] || "Ryan";
+  const s = useVyroScores();
+  const m = s.m;
+  const firstName = (profile?.display_name || "athlete").trim().split(/\s+/)[0];
 
   // Live session timer (auto-driven by band.sessionState)
   const [sessionStart, setSessionStart] = useState<number | null>(null);
@@ -413,115 +406,59 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
     return () => window.clearInterval(id);
   }, [m.sessionState]);
 
-  const [items, setItems] = useState<PlanItem[]>([
-    { time: "10:00", title: "Court session — interval ghosting", load: "Hard · 45 min", color: "amber" },
-    { time: "13:30", title: "Match practice vs. Alex K.", load: "Match · ~50 min", color: "green" },
-    { time: "19:00", title: "Mobility + breath work", load: "Recovery · 20 min", color: "green" },
-  ]);
-  const [draft, setDraft] = useState({ time: "", title: "", load: "", color: "green" as PlanItem["color"] });
+  // ---- Today's plan: real, user-owned rows from the database --------------
+  const queryClient = useQueryClient();
+  const fetchPlan = useServerFn(listTrainingPlan);
+  const addItem = useServerFn(addTrainingPlanItem);
+  const removeItem = useServerFn(deleteTrainingPlanItem);
+  const { data: planItems } = useQuery({
+    queryKey: ["training-plan", "today"],
+    queryFn: () => fetchPlan(),
+  });
+  const invalidatePlan = () =>
+    queryClient.invalidateQueries({ queryKey: ["training-plan", "today"] });
+  const addMutation = useMutation({ mutationFn: addItem, onSuccess: invalidatePlan });
+  const deleteMutation = useMutation({ mutationFn: removeItem, onSuccess: invalidatePlan });
+  const items = planItems ?? [];
+  const [draft, setDraft] = useState({ time: "", title: "", load: "", tone: "green" as PlanItem["color"] });
 
-  // Only feed live signals into readiness when the band is actually
-  // streaming. Cached localStorage values from a previous session would
-  // otherwise pin the score to a static number (e.g. RHR alone → 36).
-  const readinessInputs = computeReadiness({
-    connected: m.connected,
-    heartRateBpm: m.connected ? m.heartRateBpm : null,
-    hrvMs: m.connected ? m.hrvMs : null,
-    restingHrBpm: m.connected ? m.restingHrBpm : null,
-    stress: m.connected ? m.stressScore : null,
-    spo2: m.connected ? m.spo2Pct : null,
-    peakJerk: m.connected ? (m.peakJerk ?? null) : null,
-  });
-  // Pull last-night sleep score so the Sleep ring/tile isn't permanently
-  // empty when the watch has any history (the sleep engine writes this
-  // via `recordSleepNight` in use-sleep-nights.ts).
-  const { last: lastNight } = useSleepNights();
-  const subs = computeSubScores({
-    connected: m.connected,
-    hrvMs: m.hrvMs,
-    restingHrBpm: m.restingHrBpm,
-    stress: m.stressScore,
-    peakJerk: m.peakJerk ?? null,
-    peakG: m.peakG ?? null,
-    eventsLastMin: m.eventsLastMin,
-    reactMin: m.reactMin,
-    sleepScore: lastNight?.score ?? null,
-  });
-  const readiness = readinessInputs.score;
-  const recovery = subs.recovery;
-  const sleep = subs.sleep;
-  const fatigue = subs.fatigue;
-  const agility = subs.agility;
+  // Every score below is the GLOBAL value — identical on every other tab.
+  const { readiness, recovery, sleep, fatigue, agility, strain, statusLabel, baselines, rtp } = s;
   const battery = m.batteryPct;
   const status = m.connected ? "BAND CONNECTED" : m.connecting ? "BAND CONNECTING" : "PAIR BAND";
 
-  // Record daily readiness baseline once per ~10 min when present.
-  const lastRecordRef = useRef(0);
-  useEffect(() => {
-    if (readiness == null) return;
-    const now = Date.now();
-    if (now - lastRecordRef.current < 10 * 60_000) return;
-    lastRecordRef.current = now;
-    recordReadiness(readiness);
-  }, [readiness, recordReadiness]);
-
-  // Trend helpers — comparing live value vs baseline.
-  const trend = (cur: number | null | undefined, baseline: number | null | undefined, fmt: (d: number) => string, neutral = "baseline") => {
+  const trend = (
+    cur: number | null | undefined,
+    baseline: number | null | undefined,
+    fmt: (d: number) => string,
+    neutral = "baseline",
+  ) => {
     if (cur == null || baseline == null) return undefined;
     const d = cur - baseline;
     if (Math.abs(d) < 0.5) return neutral;
     return fmt(d);
   };
 
-  // Strain — composite of HR margin over rest, IMU jerk and session events.
-  // We normalize each contributor against a fixed ceiling (so the divisor
-  // never changes) and then EMA-smooth so the tile doesn't whip between
-  // e.g. 75 and 11 sample-to-sample when HR briefly drops back to rest.
-  const strainEmaRef = useRef<number | null>(null);
-  const strainSampleNonce = `${m.heartRateBpm ?? ""}|${m.restingHrBpm ?? ""}|${m.peakJerk ?? ""}|${m.eventsLastMin ?? ""}`;
-  const strain = useMemo(() => {
-    if (!m.connected) { strainEmaRef.current = null; return null; }
-    const hrMargin =
-      m.heartRateBpm != null && m.restingHrBpm != null
-        ? Math.max(0, m.heartRateBpm - m.restingHrBpm)
-        : null;
-    const margin01 = hrMargin != null ? Math.min(1, hrMargin / 60) : null;
-    const jerk01 = (m.peakJerk ?? 0) > 0 ? Math.min(1, (m.peakJerk ?? 0) / 220) : null;
-    const events01 = (m.eventsLastMin ?? 0) > 0 ? Math.min(1, (m.eventsLastMin ?? 0) / 80) : null;
-    // Fixed weights — missing contributors count as 0 against their slot, but
-    // we require at least the HR-margin signal before showing anything to
-    // avoid a meaningless number while idle.
-    if (margin01 == null && jerk01 == null && events01 == null) return null;
-    const wm = 0.5, wj = 0.25, we = 0.25;
-    const inst =
-      ((margin01 ?? 0) * wm + (jerk01 ?? 0) * wj + (events01 ?? 0) * we) * 100;
-    const prev = strainEmaRef.current;
-    const next = prev == null ? inst : prev * 0.8 + inst * 0.2;
-    strainEmaRef.current = next;
-    return Math.round(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [m.connected, strainSampleNonce]);
-
-  const fmtCell = (v: number | string | null | undefined) =>
-    v == null || v === "" ? "—" : v;
-  const liveCell = (v: number | string | null | undefined) =>
-    m.connected ? fmtCell(v) : "—";
-  const liveNumber = (v: number | null | undefined) =>
-    m.connected ? v : null;
+  const fmtCell = (v: number | string | null | undefined) => (v == null || v === "" ? "—" : v);
+  const liveCell = (v: number | string | null | undefined) => (m.connected ? fmtCell(v) : "—");
 
   const vitals = useMemo(
     () => [
       { label: "Current HR", value: liveCell(m.heartRateBpm), unit: "bpm",
         trend: m.connected ? trend(m.heartRateBpm, m.restingHrBpm, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs rest`) : undefined,
         live: m.connected && m.heartRateBpm != null },
+      { label: "Resting HR", value: liveCell(m.restingHrBpm), unit: "bpm",
+        trend: trend(m.restingHrBpm, baselines.restingHr, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs 7d`),
+        live: m.connected && m.restingHrBpm != null },
       { label: "HRV (RMSSD)", value: liveCell(m.hrvMs), unit: "ms",
-        trend: m.connected ? trend(m.hrvMs, base.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`) : undefined,
+        trend: trend(m.hrvMs, baselines.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`),
         live: m.connected && m.hrvMs != null },
-      { label: "Skin Temp", value: liveNumber(m.skinTempC) != null ? liveNumber(m.skinTempC)!.toFixed(1) : "—", unit: "°C",
-        trend: m.connected && m.skinTempC != null ? "watch frame" : undefined,
+      { label: "Steps", value: liveCell(m.stepsToday), unit: "",
+        trend: m.connected && m.distanceM != null ? `${(m.distanceM / 1000).toFixed(2)} km` : undefined,
+        live: m.connected && m.stepsToday != null },
+      { label: "Skin Temp", value: m.connected && m.skinTempC != null ? m.skinTempC.toFixed(1) : "—", unit: "°C",
         live: m.connected && m.skinTempC != null },
       { label: "Blood Pressure", value: m.connected && m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—", unit: "mmHg",
-        trend: m.connected && m.bloodPressure ? "one-key" : undefined,
         live: m.connected && m.bloodPressure != null },
       { label: "Strain", value: fmtCell(strain), unit: "/100",
         trend: strain != null ? (strain > 70 ? "overload" : strain > 40 ? "tempo" : "easy") : undefined,
@@ -530,26 +467,16 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         trend: m.connected && m.spo2Pct != null ? (m.spo2Pct >= 95 ? "stable" : "low") : undefined,
         live: m.connected && m.spo2Pct != null },
       { label: "Resp Rate", value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm",
-        trend: m.connected && m.respRateBrpm != null ? "watch field" : undefined,
         live: m.connected && m.respRateBrpm != null },
       { label: "Stress", value: liveCell(m.stressScore), unit: "/100",
         trend: m.connected && m.stressScore != null ? (m.stressScore < 40 ? "calm" : m.stressScore < 70 ? "alert" : "high") : undefined,
         live: m.connected && m.stressScore != null },
     ],
-    [m.connected, m.heartRateBpm, m.hrvMs, m.restingHrBpm, m.skinTempC, m.bloodPressure, m.spo2Pct, m.respRateBrpm, m.stressScore, strain, base.hrv],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [m.connected, m.heartRateBpm, m.restingHrBpm, m.hrvMs, m.stepsToday, m.distanceM, m.skinTempC, m.bloodPressure, m.spo2Pct, m.respRateBrpm, m.stressScore, strain, baselines.hrv, baselines.restingHr],
   );
 
-  // RTP Validator — derived from real readiness vs 7d baseline (±5% target).
-  const baselineReady = base.readiness ?? null;
-  const wearablePower = readiness;
-  const deviationPct = wearablePower != null && baselineReady != null && baselineReady > 0
-    ? ((wearablePower - baselineReady) / baselineReady) * 100 : null;
-  const withinBaseline = deviationPct != null && Math.abs(deviationPct) <= 5;
-  const clearance = wearablePower != null && baselineReady != null
-    ? Math.round(Math.max(0, 100 - Math.abs(deviationPct!) * 4))
-    : null;
-
-  // Auto-injected live training block (from active session)
+  // Auto-injected live training block (from the active session)
   const liveSessionBlock = useMemo(() => {
     if (m.sessionState === "idle" || sessionStart == null) return null;
     const elapsedMin = Math.max(0, Math.floor((nowTick - sessionStart) / 60_000));
@@ -564,19 +491,18 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
     } satisfies PlanItem;
   }, [m.sessionState, sessionStart, nowTick, strain]);
 
-
   const addPlan = () => {
-    if (!draft.time.trim() && !draft.title.trim() && !draft.load.trim()) return;
-    setItems((prev) => [
-      ...prev,
-      {
-        time: draft.time || "TBD",
+    if (!draft.title.trim() && !draft.time.trim() && !draft.load.trim()) return;
+    addMutation.mutate({
+      data: {
+        time_label: draft.time || "TBD",
         title: draft.title || "New training block",
-        load: draft.load || "Custom",
-        color: draft.color,
+        load_label: draft.load || "Custom",
+        tone: draft.tone,
+        sport: s.sport,
       },
-    ]);
-    setDraft({ time: "", title: "", load: "", color: "green" });
+    });
+    setDraft({ time: "", title: "", load: "", tone: "green" });
   };
 
   return (
@@ -601,14 +527,14 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="app2-mini-row">
-            <span className="app2-label-pill">{readiness == null ? "—" : readiness >= 70 ? "Ready" : readiness >= 50 ? "Manage" : "Recover"}</span>
+            {/* Status text is driven by the canonical recovery band — a low
+                recovery can no longer render a green "Ready" tag. */}
+            <span className="app2-label-pill">{statusLabel}</span>
             <span className="app2-eyebrow">
               Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
             </span>
           </div>
-          <h2 className="app2-card-title">
-            {readiness == null ? "Awaiting band data" : readiness >= 70 ? "You're ready to train." : readiness >= 50 ? "Train moderate today." : "Prioritize recovery."}
-          </h2>
+          <h2 className="app2-card-title">{s.coachRead}</h2>
           <p className="app2-card-copy">
             {m.connected
               ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
@@ -616,13 +542,13 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </p>
           <div className="app2-change-stack">
             <span className="app2-eyebrow">What changed</span>
-            {base.readiness != null && readiness != null
-              ? <span className={`app2-change${readiness < base.readiness ? " warn" : ""}`}>
-                  {readiness >= base.readiness ? "↗" : "↘"} Readiness {readiness - base.readiness > 0 ? "+" : ""}{readiness - base.readiness} vs baseline
+            {baselines.readiness != null && readiness != null
+              ? <span className={`app2-change${readiness < baselines.readiness ? " warn" : ""}`}>
+                  {readiness >= baselines.readiness ? "↗" : "↘"} Readiness {Math.round(readiness - baselines.readiness) > 0 ? "+" : ""}{Math.round(readiness - baselines.readiness)} vs {baselines.days}d baseline
                 </span>
               : <span className="app2-change">Calibrating baseline…</span>}
-            {m.connected && m.hrvMs != null && base.hrv != null && (
-              <span className="app2-change">↗ HRV {m.hrvMs - base.hrv > 0 ? "+" : ""}{Math.round(m.hrvMs - base.hrv)} ms</span>
+            {m.connected && m.hrvMs != null && baselines.hrv != null && (
+              <span className="app2-change">↗ HRV {m.hrvMs - baselines.hrv > 0 ? "+" : ""}{Math.round(m.hrvMs - baselines.hrv)} ms</span>
             )}
             {strain != null && strain > 70 && <span className="app2-change warn">⚠ Strain {strain}/100</span>}
           </div>
@@ -643,7 +569,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         <InfoCard eyebrow="Base readiness" title="Core metrics">
           <div className="app2-metric-grid">
             <MiniMetric label="Fatigue" value={fatigue ?? "—"} unit="/100" trend={fatigue != null ? (fatigue < 40 ? "controlled" : fatigue < 70 ? "elevated" : "overload") : undefined} />
-            <MiniMetric label="Recovery" value={recovery ?? "—"} unit="/100" trend={trend(recovery, base.readiness, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`)} />
+            <MiniMetric label="Recovery" value={recovery ?? "—"} unit="/100" trend={trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`)} />
             <MiniMetric label="Agility" value={agility ?? "—"} unit="/100" trend={agility != null ? (agility >= 75 ? "peaking" : agility >= 50 ? "steady" : "low") : undefined} />
             <MiniMetric label="Sleep" value={sleep ?? "—"} unit="/100" trend={sleep != null ? (sleep >= 80 ? "rested" : "short") : undefined} />
           </div>
@@ -657,19 +583,21 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </div>
         </InfoCard>
 
-        <CognitiveFatigueCard m={m} baselineMs={base.reactMs} />
+        <CognitiveFatigueCard m={m} baselineMs={baselines.reactMs ?? undefined} />
 
-        <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone={withinBaseline ? "ready" : "amber"}>
+        <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone={rtp.withinBaseline ? "ready" : "amber"}>
           <p className="app2-card-copy">
-            {wearablePower == null || baselineReady == null
-              ? "Building 7-day readiness baseline — RTP unlocks once enough data is captured."
-              : withinBaseline
-                ? `Cleared — wearable power within ±5% of baseline (${deviationPct!.toFixed(1)}%).`
-                : `Hold — wearable power ${deviationPct! > 0 ? "above" : "below"} baseline by ${Math.abs(deviationPct!).toFixed(1)}% (target ±5%).`}
+            {rtp.wearablePower == null || rtp.baseline == null
+              ? `Building the readiness baseline from your own history (${baselines.days}/7 days captured) — RTP unlocks once enough data is stored.`
+              : rtp.withinBaseline
+                ? `Cleared — wearable power within ±5% of your ${baselines.days}-day baseline (${rtp.deviationPct!.toFixed(1)}%).`
+                : `Hold — wearable power ${rtp.deviationPct! > 0 ? "above" : "below"} baseline by ${Math.abs(rtp.deviationPct!).toFixed(1)}% (target ±5%).`}
           </p>
           <div className="app2-metric-grid">
-            <MiniMetric label="Wearable power" value={wearablePower ?? "—"} unit="/100" trend={baselineReady != null ? `base ${baselineReady}` : undefined} />
-            <MiniMetric label="Clearance" value={clearance ?? "—"} unit="/100" trend={withinBaseline ? "in range" : deviationPct != null ? "out of range" : undefined} />
+            <MiniMetric label="Wearable power" value={rtp.wearablePower ?? "—"} unit="/100" trend={rtp.baseline != null ? `base ${rtp.baseline}` : undefined} />
+            <MiniMetric label="Clearance" value={rtp.clearance ?? "—"} unit="/100" trend={rtp.withinBaseline ? "in range" : rtp.deviationPct != null ? "out of range" : undefined} />
+            <MiniMetric label="Muscle readiness" value={s.parts.muscle ?? "—"} unit="/100" trend={s.parts.muscle != null ? "IMU load" : undefined} />
+            <MiniMetric label="Recovery environment" value={s.parts.environment ?? "—"} unit="/100" trend={s.parts.environment != null ? "SpO₂ · temp · HRV" : undefined} />
           </div>
         </InfoCard>
 
@@ -685,16 +613,19 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 <span style={{ color: "hsl(var(--app2-live))", fontSize: 10, fontWeight: 700 }}>●</span>
               </div>
             )}
-            {items.map((item, index) => (
-              <div className="app2-plan-row" key={`${item.time}-${index}`}>
-                <div className="app2-plan-time">{item.time}</div>
+            {items.length === 0 && !liveSessionBlock && (
+              <p className="app2-card-copy">No blocks planned for today — add one below.</p>
+            )}
+            {items.map((item) => (
+              <div className="app2-plan-row" key={item.id}>
+                <div className="app2-plan-time">{item.time_label}</div>
                 <div>
                   <div className="app2-plan-title">{item.title}</div>
-                  <div className="app2-plan-sub">{item.load}</div>
+                  <div className="app2-plan-sub">{item.load_label}</div>
                 </div>
                 <button
                   aria-label="Remove plan item"
-                  onClick={() => setItems((prev) => prev.filter((_, i) => i !== index))}
+                  onClick={() => deleteMutation.mutate({ data: { id: item.id } })}
                   style={{ color: "hsl(var(--app2-muted))" }}
                 >
                   ×
@@ -707,42 +638,33 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               className="app2-input"
               placeholder="Time"
               value={draft.time}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, time: event.target.value }))
-              }
+              onChange={(event) => setDraft((current) => ({ ...current, time: event.target.value }))}
             />
             <input
               className="app2-input"
               placeholder="New plan item"
               value={draft.title}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, title: event.target.value }))
-              }
+              onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
             />
             <input
               className="app2-input"
               placeholder="Load"
               value={draft.load}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, load: event.target.value }))
-              }
+              onChange={(event) => setDraft((current) => ({ ...current, load: event.target.value }))}
             />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 58px", gap: 8 }}>
               <select
                 className="app2-select"
-                value={draft.color}
+                value={draft.tone}
                 onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    color: event.target.value as PlanItem["color"],
-                  }))
+                  setDraft((current) => ({ ...current, tone: event.target.value as PlanItem["color"] }))
                 }
               >
                 <option value="green">Optimal</option>
                 <option value="amber">Elevated</option>
                 <option value="red">High</option>
               </select>
-              <button className="app2-add" onClick={addPlan}>
+              <button className="app2-add" onClick={addPlan} disabled={addMutation.isPending}>
                 <Plus size={15} />
               </button>
             </div>
