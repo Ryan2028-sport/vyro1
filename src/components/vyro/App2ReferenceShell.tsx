@@ -1076,11 +1076,12 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               </span>
             }
           >
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="divide-y divide-white/[0.055]">
               {vitals.map((vital) => (
-                <MiniMetric key={vital.label} {...vital} />
+                <VitalRow key={vital.label} {...vital} />
               ))}
             </div>
+
           </InfoCard>
 
           <CognitiveFatigueCard m={m} baselineMs={baselines.reactMs ?? undefined} />
