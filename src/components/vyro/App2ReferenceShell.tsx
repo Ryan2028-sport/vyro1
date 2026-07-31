@@ -574,176 +574,244 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
   return (
     <main className="app2-main">
-      <div className="app2-date">
-        <CalendarDays size={12} />
-        {dateLabel}
-      </div>
-      <h1 className="app2-heading">Good morning, {firstName}.</h1>
-      <p className="app2-subcopy">
-        Your daily readiness command center — synced from your VYRO Band.
-      </p>
-      <button className="app2-live-pill" onClick={() => setView("band")}>
-        <span className={m.connected ? "app2-dot app2-pulse" : "app2-dot"} />
-        {status}
-        {m.connected && battery != null ? ` · ${battery}%` : ""}
-      </button>
-
-      <section className="app2-card app2-readiness">
-        <div className="app2-ring-box">
-          <Ring value={readiness} />
-        </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div className="app2-mini-row">
-            {/* Status text is driven by the canonical recovery band — a low
-                recovery can no longer render a green "Ready" tag. */}
+      <div className="space-y-5 pb-2">
+        {/* ---- Greeting header -------------------------------------------- */}
+        <header className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.18em] text-vyro-mute">
+            <CalendarDays size={11} className="shrink-0" />
+            {dateLabel}
+          </div>
+          <h1 className="mt-2 text-[30px] font-black leading-[1.05] tracking-[-0.045em] text-vyro-text">
+            Good morning, {firstName}.
+          </h1>
+          <p className="mt-2 max-w-[34ch] text-[13px] leading-relaxed text-vyro-mute">
+            Your daily readiness command center — synced from your VYRO Band.
+          </p>
+          <button
+            className="mt-3.5 inline-flex items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.05] px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-vyro-text transition-all duration-200 hover:border-white/20 hover:bg-white/[0.09] active:scale-[0.97]"
+            onClick={() => setView("band")}
+          >
             <span
-              className={`app2-label-pill${
-                s.bandTone === "warn" ? " warn" : s.bandTone === "off" ? " alert" : s.bandTone === "neutral" ? " idle" : ""
+              className={`h-2 w-2 rounded-full ${
+                m.connected
+                  ? "animate-pulse bg-vyro-mint shadow-[0_0_8px_var(--vyro-mint)]"
+                  : "bg-vyro-mute/60"
               }`}
-            >
-              {statusLabel}
-            </span>
+            />
+            {status}
+            {m.connected && battery != null ? ` · ${battery}%` : ""}
+          </button>
+        </header>
 
-            <span className="app2-eyebrow">
-              Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
-            </span>
-          </div>
-          <h2 className="app2-card-title">{s.coachRead}</h2>
-          <p className="app2-card-copy">
-            {m.connected
-              ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
-              : "Pair your VYRO Band to populate live signals."}
-          </p>
-          <div className="app2-change-stack">
-            <span className="app2-eyebrow">What changed</span>
-            {baselines.readiness != null && readiness != null
-              ? <span className={`app2-change${readiness < baselines.readiness ? " warn" : ""}`}>
-                  {readiness >= baselines.readiness ? "↗" : "↘"} Readiness {Math.round(readiness - baselines.readiness) > 0 ? "+" : ""}{Math.round(readiness - baselines.readiness)} vs {baselines.days}d baseline
-                </span>
-              : <span className="app2-change">Calibrating baseline…</span>}
-            {m.connected && m.hrvMs != null && baselines.hrv != null && (
-              <span className="app2-change">↗ HRV {m.hrvMs - baselines.hrv > 0 ? "+" : ""}{Math.round(m.hrvMs - baselines.hrv)} ms</span>
-            )}
-            {strain != null && strain > 70 && <span className="app2-change warn">⚠ Strain {strain}/100</span>}
-          </div>
-        </div>
-      </section>
-
-      <div className="app2-grid">
-        <InfoCard eyebrow="Top opportunity">
-          <p className="app2-card-copy">
-            {agility != null && agility >= 75
-              ? `Agility ${agility}/100 — a good day to push interval ghosting.`
-              : recovery != null && recovery < 50
-                ? "Recovery is low — protect tomorrow with mobility + breath work."
-                : "Train within your zones and reassess after the next session."}
-          </p>
-        </InfoCard>
-
-        <InfoCard eyebrow="Base readiness" title="Core metrics">
-          <div className="app2-metric-grid">
-            <MiniMetric label="Fatigue" value={fatigue ?? "—"} unit="/100" trend={fatigue != null ? (fatigue < 40 ? "controlled" : fatigue < 70 ? "elevated" : "overload") : undefined} />
-            <MiniMetric label="Recovery" value={recovery ?? "—"} unit="/100" trend={trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`)} />
-            <MiniMetric label="Agility" value={agility ?? "—"} unit="/100" trend={agility != null ? (agility >= 75 ? "peaking" : agility >= 50 ? "steady" : "low") : undefined} />
-            <MiniMetric label="Sleep" value={sleep ?? "—"} unit="/100" trend={sleep != null ? (sleep >= 80 ? "rested" : "short") : undefined} />
-          </div>
-        </InfoCard>
-
-        <InfoCard eyebrow="Vitals" title="Live body signals" tone="live">
-          <div className="app2-metric-grid">
-            {vitals.map((vital) => (
-              <MiniMetric key={vital.label} {...vital} />
-            ))}
-          </div>
-        </InfoCard>
-
-        <CognitiveFatigueCard m={m} baselineMs={baselines.reactMs ?? undefined} />
-
-        <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone={rtp.withinBaseline ? "ready" : "amber"}>
-          <p className="app2-card-copy">
-            {rtp.wearablePower == null || rtp.baseline == null
-              ? `Building the readiness baseline from your own history (${baselines.days}/7 days captured) — RTP unlocks once enough data is stored.`
-              : rtp.withinBaseline
-                ? `Cleared — wearable power within ±5% of your ${baselines.days}-day baseline (${rtp.deviationPct!.toFixed(1)}%).`
-                : `Hold — wearable power ${rtp.deviationPct! > 0 ? "above" : "below"} baseline by ${Math.abs(rtp.deviationPct!).toFixed(1)}% (target ±5%).`}
-          </p>
-          <div className="app2-metric-grid">
-            <MiniMetric label="Wearable power" value={rtp.wearablePower ?? "—"} unit="/100" trend={rtp.baseline != null ? `base ${rtp.baseline}` : undefined} />
-            <MiniMetric label="Clearance" value={rtp.clearance ?? "—"} unit="/100" trend={rtp.withinBaseline ? "in range" : rtp.deviationPct != null ? "out of range" : undefined} />
-            <MiniMetric label="Muscle readiness" value={s.parts.muscle ?? "—"} unit="/100" trend={s.parts.muscle != null ? "IMU load" : undefined} />
-            <MiniMetric label="Recovery environment" value={s.parts.environment ?? "—"} unit="/100" trend={s.parts.environment != null ? "SpO₂ · temp · HRV" : undefined} />
-          </div>
-        </InfoCard>
-
-        <InfoCard eyebrow="Today's plan editable" title="Training blocks">
-          <div style={{ marginTop: 10 }}>
-            {liveSessionBlock && (
-              <div className="app2-plan-row" key="live-session" style={{ borderLeft: "2px solid hsl(var(--app2-live))" }}>
-                <div className="app2-plan-time">{liveSessionBlock.time}</div>
-                <div>
-                  <div className="app2-plan-title">{liveSessionBlock.title}</div>
-                  <div className="app2-plan-sub">{liveSessionBlock.load} · LIVE</div>
-                </div>
-                <span style={{ color: "hsl(var(--app2-live))", fontSize: 10, fontWeight: 700 }}>●</span>
-              </div>
-            )}
-            {items.length === 0 && !liveSessionBlock && (
-              <p className="app2-card-copy">No blocks planned for today — add one below.</p>
-            )}
-            {items.map((item) => (
-              <div className="app2-plan-row" key={item.id}>
-                <div className="app2-plan-time">{item.time_label}</div>
-                <div>
-                  <div className="app2-plan-title">{item.title}</div>
-                  <div className="app2-plan-sub">{item.load_label}</div>
-                </div>
-                <button
-                  aria-label="Remove plan item"
-                  onClick={() => deleteMutation.mutate({ data: { id: item.id } })}
-                  style={{ color: "hsl(var(--app2-muted))" }}
+        {/* ---- Readiness hero -------------------------------------------- */}
+        <GlassCard className="animate-in fade-in slide-in-from-bottom-3 p-6 duration-500">
+          <div className="flex flex-col items-center gap-5">
+            <Ring value={readiness} />
+            <div className="w-full min-w-0">
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {/* Status text is driven by the canonical recovery band — a low
+                    recovery can no longer render a green "Ready" tag. */}
+                <span
+                  className={`rounded-full border px-3 py-1 text-[9.5px] font-bold uppercase tracking-[0.14em] ${
+                    s.bandTone === "warn"
+                      ? "border-vyro-amber/25 bg-vyro-amber/10 text-vyro-amber"
+                      : s.bandTone === "off"
+                        ? "border-vyro-rose/25 bg-vyro-rose/10 text-vyro-rose"
+                        : s.bandTone === "neutral"
+                          ? "border-white/10 bg-white/[0.06] text-vyro-mute"
+                          : "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint"
+                  }`}
                 >
-                  ×
-                </button>
+                  {statusLabel}
+                </span>
+                <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-vyro-mute">
+                  Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
+                </span>
               </div>
-            ))}
-          </div>
-          <div className="app2-form-grid">
-            <input
-              className="app2-input"
-              placeholder="Time"
-              value={draft.time}
-              onChange={(event) => setDraft((current) => ({ ...current, time: event.target.value }))}
-            />
-            <input
-              className="app2-input"
-              placeholder="New plan item"
-              value={draft.title}
-              onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-            />
-            <input
-              className="app2-input"
-              placeholder="Load"
-              value={draft.load}
-              onChange={(event) => setDraft((current) => ({ ...current, load: event.target.value }))}
-            />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 58px", gap: 8 }}>
-              <select
-                className="app2-select"
-                value={draft.tone}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, tone: event.target.value as PlanItem["color"] }))
-                }
-              >
-                <option value="green">Optimal</option>
-                <option value="amber">Elevated</option>
-                <option value="red">High</option>
-              </select>
-              <button className="app2-add" onClick={addPlan} disabled={addMutation.isPending}>
-                <Plus size={15} />
-              </button>
+              <h2 className="mt-3 text-balance text-center text-[20px] font-extrabold leading-tight tracking-[-0.035em] text-vyro-text">
+                {s.coachRead}
+              </h2>
+              <p className="mt-2 text-center text-[12.5px] leading-relaxed text-vyro-mute">
+                {m.connected
+                  ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
+                  : "Pair your VYRO Band to populate live signals."}
+              </p>
+              <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3.5">
+                <Eyebrow tone="mute">What changed</Eyebrow>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {baselines.readiness != null && readiness != null ? (
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold ${
+                        readiness < baselines.readiness
+                          ? "bg-vyro-amber/10 text-vyro-amber"
+                          : "bg-vyro-mint/10 text-vyro-mint"
+                      }`}
+                    >
+                      {readiness >= baselines.readiness ? "↗" : "↘"} Readiness{" "}
+                      {Math.round(readiness - baselines.readiness) > 0 ? "+" : ""}
+                      {Math.round(readiness - baselines.readiness)} vs {baselines.days}d baseline
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10.5px] font-semibold text-vyro-mute">
+                      Calibrating baseline…
+                    </span>
+                  )}
+                  {m.connected && m.hrvMs != null && baselines.hrv != null && (
+                    <span className="rounded-full bg-vyro-mint/10 px-2.5 py-1 text-[10.5px] font-semibold text-vyro-mint">
+                      ↗ HRV {m.hrvMs - baselines.hrv > 0 ? "+" : ""}
+                      {Math.round(m.hrvMs - baselines.hrv)} ms
+                    </span>
+                  )}
+                  {strain != null && strain > 70 && (
+                    <span className="rounded-full bg-vyro-rose/10 px-2.5 py-1 text-[10.5px] font-semibold text-vyro-rose">
+                      ⚠ Strain {strain}/100
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </InfoCard>
+        </GlassCard>
+
+        <div className="space-y-4">
+          <InfoCard eyebrow="Top opportunity">
+            <p className="text-[13px] leading-relaxed text-vyro-mute">
+              {agility != null && agility >= 75
+                ? `Agility ${agility}/100 — a good day to push interval ghosting.`
+                : recovery != null && recovery < 50
+                  ? "Recovery is low — protect tomorrow with mobility + breath work."
+                  : "Train within your zones and reassess after the next session."}
+            </p>
+          </InfoCard>
+
+          <InfoCard eyebrow="Base readiness" title="Core metrics">
+            <div className="grid grid-cols-2 gap-2.5">
+              <MiniMetric label="Fatigue" value={fatigue ?? "—"} unit="/100" trend={fatigue != null ? (fatigue < 40 ? "controlled" : fatigue < 70 ? "elevated" : "overload") : undefined} />
+              <MiniMetric label="Recovery" value={recovery ?? "—"} unit="/100" trend={trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`)} />
+              <MiniMetric label="Agility" value={agility ?? "—"} unit="/100" trend={agility != null ? (agility >= 75 ? "peaking" : agility >= 50 ? "steady" : "low") : undefined} />
+              <MiniMetric label="Sleep" value={sleep ?? "—"} unit="/100" trend={sleep != null ? (sleep >= 80 ? "rested" : "short") : undefined} />
+            </div>
+          </InfoCard>
+
+          <InfoCard eyebrow="Vitals" title="Live body signals" tone="live">
+            <div className="grid grid-cols-2 gap-2.5">
+              {vitals.map((vital) => (
+                <MiniMetric key={vital.label} {...vital} />
+              ))}
+            </div>
+          </InfoCard>
+
+          <CognitiveFatigueCard m={m} baselineMs={baselines.reactMs ?? undefined} />
+
+          <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone={rtp.withinBaseline ? "ready" : "amber"}>
+            <p className="text-[12.5px] leading-relaxed text-vyro-mute">
+              {rtp.wearablePower == null || rtp.baseline == null
+                ? `Building the readiness baseline from your own history (${baselines.days}/7 days captured) — RTP unlocks once enough data is stored.`
+                : rtp.withinBaseline
+                  ? `Cleared — wearable power within ±5% of your ${baselines.days}-day baseline (${rtp.deviationPct!.toFixed(1)}%).`
+                  : `Hold — wearable power ${rtp.deviationPct! > 0 ? "above" : "below"} baseline by ${Math.abs(rtp.deviationPct!).toFixed(1)}% (target ±5%).`}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2.5">
+              <MiniMetric label="Wearable power" value={rtp.wearablePower ?? "—"} unit="/100" trend={rtp.baseline != null ? `base ${rtp.baseline}` : undefined} />
+              <MiniMetric label="Clearance" value={rtp.clearance ?? "—"} unit="/100" trend={rtp.withinBaseline ? "in range" : rtp.deviationPct != null ? "out of range" : undefined} />
+              <MiniMetric label="Muscle readiness" value={s.parts.muscle ?? "—"} unit="/100" trend={s.parts.muscle != null ? "IMU load" : undefined} />
+              <MiniMetric label="Recovery environment" value={s.parts.environment ?? "—"} unit="/100" trend={s.parts.environment != null ? "SpO₂ · temp · HRV" : undefined} />
+            </div>
+          </InfoCard>
+
+          <InfoCard eyebrow="Today's plan editable" title="Training blocks">
+            <div className="space-y-2">
+              {liveSessionBlock && (
+                <div
+                  key="live-session"
+                  className="flex items-center gap-3 rounded-2xl border border-vyro-mint/20 bg-vyro-mint/[0.07] p-3.5"
+                >
+                  <div className="w-12 shrink-0 text-[11px] font-extrabold tabular-nums text-vyro-mint">
+                    {liveSessionBlock.time}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-bold tracking-[-0.02em] text-vyro-text">
+                      {liveSessionBlock.title}
+                    </div>
+                    <div className="mt-0.5 text-[10.5px] text-vyro-mute">{liveSessionBlock.load} · LIVE</div>
+                  </div>
+                  <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-vyro-mint shadow-[0_0_8px_var(--vyro-mint)]" />
+                </div>
+              )}
+              {items.length === 0 && !liveSessionBlock && (
+                <p className="text-[12.5px] leading-relaxed text-vyro-mute">
+                  No blocks planned for today — add one below.
+                </p>
+              )}
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="group flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3.5 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.06]"
+                >
+                  <div className="w-12 shrink-0 text-[11px] font-extrabold tabular-nums text-vyro-mute">
+                    {item.time_label}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-bold tracking-[-0.02em] text-vyro-text">
+                      {item.title}
+                    </div>
+                    <div className="mt-0.5 text-[10.5px] text-vyro-mute">{item.load_label}</div>
+                  </div>
+                  <button
+                    aria-label="Remove plan item"
+                    onClick={() => deleteMutation.mutate({ data: { id: item.id } })}
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[15px] text-vyro-mute transition-colors hover:bg-vyro-rose/15 hover:text-vyro-rose"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 grid gap-2.5">
+              <div className="grid grid-cols-[84px_minmax(0,1fr)] gap-2.5">
+                <input
+                  className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[12.5px] text-vyro-text outline-none transition-colors placeholder:text-vyro-mute/60 focus:border-vyro-mint/40 focus:bg-white/[0.07]"
+                  placeholder="Time"
+                  value={draft.time}
+                  onChange={(event) => setDraft((current) => ({ ...current, time: event.target.value }))}
+                />
+                <input
+                  className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[12.5px] text-vyro-text outline-none transition-colors placeholder:text-vyro-mute/60 focus:border-vyro-mint/40 focus:bg-white/[0.07]"
+                  placeholder="New plan item"
+                  value={draft.title}
+                  onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+                />
+              </div>
+              <input
+                className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[12.5px] text-vyro-text outline-none transition-colors placeholder:text-vyro-mute/60 focus:border-vyro-mint/40 focus:bg-white/[0.07]"
+                placeholder="Load"
+                value={draft.load}
+                onChange={(event) => setDraft((current) => ({ ...current, load: event.target.value }))}
+              />
+              <div className="grid grid-cols-[minmax(0,1fr)_46px] gap-2.5">
+                <select
+                  className="appearance-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[12.5px] font-semibold text-vyro-text outline-none transition-colors focus:border-vyro-mint/40"
+                  value={draft.tone}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, tone: event.target.value as PlanItem["color"] }))
+                  }
+                >
+                  <option value="green">Optimal</option>
+                  <option value="amber">Elevated</option>
+                  <option value="red">High</option>
+                </select>
+                <button
+                  className="grid place-items-center rounded-xl bg-vyro-mint text-vyro-ink transition-all duration-200 hover:brightness-110 active:scale-[0.96] disabled:opacity-50"
+                  onClick={addPlan}
+                  disabled={addMutation.isPending}
+                  aria-label="Add plan item"
+                >
+                  <Plus size={16} strokeWidth={2.6} />
+                </button>
+              </div>
+            </div>
+          </InfoCard>
+        </div>
       </div>
     </main>
   );
