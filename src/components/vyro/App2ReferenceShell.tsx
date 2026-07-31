@@ -1167,98 +1167,123 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </InfoCard>
 
 
-          <InfoCard eyebrow="Today's plan · editable" title="Training blocks" icon={ListChecks} accent="purple">
-            <div className="space-y-2">
-              {liveSessionBlock && (
-                <div
-                  key="live-session"
-                  className="flex items-center gap-3 rounded-2xl border border-vyro-mint/20 bg-vyro-mint/[0.07] p-3.5"
-                >
-                  <div className="w-12 shrink-0 text-[11px] font-extrabold tabular-nums text-vyro-mint">
-                    {liveSessionBlock.time}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-bold tracking-[-0.02em] text-vyro-text">
-                      {liveSessionBlock.title}
-                    </div>
-                    <div className="mt-0.5 text-[10.5px] text-vyro-mute">{liveSessionBlock.load} · LIVE</div>
-                  </div>
-                  <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-vyro-mint shadow-[0_0_8px_var(--vyro-mint)]" />
-                </div>
-              )}
-              {items.length === 0 && !liveSessionBlock && (
-                <p className="text-[12.5px] leading-relaxed text-vyro-mute">
-                  No blocks planned for today — add one below.
+          <InfoCard
+            eyebrow="Today's plan"
+            title="Training blocks"
+            icon={ListChecks}
+            accent="purple"
+            trailing={
+              <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-vyro-mute">
+                {items.length + (liveSessionBlock ? 1 : 0)} block{items.length + (liveSessionBlock ? 1 : 0) === 1 ? "" : "s"}
+              </span>
+            }
+          >
+            {items.length === 0 && !liveSessionBlock ? (
+              <div className="rounded-[20px] border border-dashed border-white/[0.12] bg-white/[0.02] px-4 py-6 text-center">
+                <div className="text-[13px] font-bold tracking-[-0.02em] text-vyro-text">Nothing scheduled</div>
+                <p className="mx-auto mt-1 max-w-[240px] text-[11.5px] leading-relaxed text-vyro-mute">
+                  Add your first block below and VYRO will score the load against today's readiness.
                 </p>
-              )}
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="group flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3.5 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.06]"
-                >
-                  <div className="w-12 shrink-0 text-[11px] font-extrabold tabular-nums text-vyro-mute">
-                    {item.time_label}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-bold tracking-[-0.02em] text-vyro-text">
-                      {item.title}
-                    </div>
-                    <div className="mt-0.5 text-[10.5px] text-vyro-mute">{item.load_label}</div>
-                  </div>
-                  <button
-                    aria-label="Remove plan item"
-                    onClick={() => deleteMutation.mutate({ data: { id: item.id } })}
-                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[15px] text-vyro-mute transition-colors hover:bg-vyro-rose/15 hover:text-vyro-rose"
-                  >
-                    ×
-                  </button>
+              </div>
+            ) : (
+              <div className="relative pl-[26px]">
+                <span
+                  aria-hidden
+                  className="absolute left-[7px] top-2 bottom-2 w-px bg-gradient-to-b from-white/[0.16] via-white/[0.09] to-transparent"
+                />
+                <div className="space-y-2">
+                  {liveSessionBlock && (
+                    <PlanRow
+                      time={liveSessionBlock.time}
+                      title={liveSessionBlock.title}
+                      load={`${liveSessionBlock.load} · live now`}
+                      tone="green"
+                      live
+                    />
+                  )}
+                  {items.map((item) => (
+                    <PlanRow
+                      key={item.id}
+                      time={item.time_label}
+                      title={item.title}
+                      load={item.load_label}
+                      tone={(item.tone as PlanItem["color"]) ?? "green"}
+                      onRemove={() => deleteMutation.mutate({ data: { id: item.id } })}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="mt-4 grid gap-2.5">
-              <div className="grid grid-cols-[84px_minmax(0,1fr)] gap-2.5">
+              </div>
+            )}
+
+            <div className="mt-4 rounded-[20px] border border-white/[0.08] bg-white/[0.035] p-3">
+              <div className="flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em] text-vyro-mute">
+                <Plus size={11} strokeWidth={3} />
+                add a block
+              </div>
+
+              <div className="mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-2">
                 <input
-                  className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[12.5px] text-vyro-text outline-none transition-colors placeholder:text-vyro-mute/60 focus:border-vyro-mint/40 focus:bg-white/[0.07]"
-                  placeholder="Time"
+                  className="rounded-[12px] border border-white/[0.08] bg-black/25 px-2.5 py-2.5 text-center text-[12.5px] font-bold tabular-nums text-vyro-text outline-none transition-colors placeholder:font-semibold placeholder:text-vyro-mute/50 focus:border-vyro-mint/45"
+                  placeholder="7:30"
                   value={draft.time}
                   onChange={(event) => setDraft((current) => ({ ...current, time: event.target.value }))}
                 />
                 <input
-                  className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[12.5px] text-vyro-text outline-none transition-colors placeholder:text-vyro-mute/60 focus:border-vyro-mint/40 focus:bg-white/[0.07]"
-                  placeholder="New plan item"
+                  className="rounded-[12px] border border-white/[0.08] bg-black/25 px-3 py-2.5 text-[12.5px] font-semibold text-vyro-text outline-none transition-colors placeholder:font-medium placeholder:text-vyro-mute/50 focus:border-vyro-mint/45"
+                  placeholder="Session name"
                   value={draft.title}
                   onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
                 />
               </div>
+
               <input
-                className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[12.5px] text-vyro-text outline-none transition-colors placeholder:text-vyro-mute/60 focus:border-vyro-mint/40 focus:bg-white/[0.07]"
-                placeholder="Load"
+                className="mt-2 w-full rounded-[12px] border border-white/[0.08] bg-black/25 px-3 py-2.5 text-[12.5px] font-semibold text-vyro-text outline-none transition-colors placeholder:font-medium placeholder:text-vyro-mute/50 focus:border-vyro-mint/45"
+                placeholder="Load — e.g. 45 min · zone 3"
                 value={draft.load}
                 onChange={(event) => setDraft((current) => ({ ...current, load: event.target.value }))}
               />
-              <div className="grid grid-cols-[minmax(0,1fr)_46px] gap-2.5">
-                <select
-                  className="appearance-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-[12.5px] font-semibold text-vyro-text outline-none transition-colors focus:border-vyro-mint/40"
-                  value={draft.tone}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, tone: event.target.value as PlanItem["color"] }))
-                  }
-                >
-                  <option value="green">Optimal</option>
-                  <option value="amber">Elevated</option>
-                  <option value="red">High</option>
-                </select>
+
+              <div className="mt-3 flex items-center gap-2">
+                <div className="flex min-w-0 flex-1 gap-1 rounded-[12px] border border-white/[0.07] bg-black/25 p-1">
+                  {([
+                    { value: "green", label: "Optimal", accent: "green" as Accent },
+                    { value: "amber", label: "Elevated", accent: "amber" as Accent },
+                    { value: "red", label: "High", accent: "red" as Accent },
+                  ] as const).map((tone) => {
+                    const active = draft.tone === tone.value;
+                    const color = ACCENT[tone.accent];
+                    return (
+                      <button
+                        key={tone.value}
+                        onClick={() => setDraft((current) => ({ ...current, tone: tone.value as PlanItem["color"] }))}
+                        className="min-w-0 flex-1 truncate rounded-[9px] px-2 py-[7px] text-[10.5px] font-bold uppercase tracking-[0.08em] transition-all duration-200"
+                        style={
+                          active
+                            ? {
+                                background: `color-mix(in oklab, ${color} 20%, transparent)`,
+                                color,
+                                boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 45%, transparent)`,
+                              }
+                            : { color: "rgba(235,235,245,0.4)" }
+                        }
+                      >
+                        {tone.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <button
-                  className="grid place-items-center rounded-xl bg-vyro-mint text-vyro-ink transition-all duration-200 hover:brightness-110 active:scale-[0.96] disabled:opacity-50"
+                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[12px] bg-vyro-mint text-vyro-ink shadow-[0_6px_18px_-6px_var(--vyro-mint)] transition-all duration-200 hover:brightness-110 active:scale-[0.94] disabled:opacity-40"
                   onClick={addPlan}
-                  disabled={addMutation.isPending}
+                  disabled={addMutation.isPending || !draft.title.trim()}
                   aria-label="Add plan item"
                 >
-                  <Plus size={16} strokeWidth={2.6} />
+                  <Plus size={17} strokeWidth={2.8} />
                 </button>
               </div>
             </div>
           </InfoCard>
+
         </div>
       </div>
     </main>
