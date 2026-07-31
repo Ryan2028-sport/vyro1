@@ -293,23 +293,40 @@ function Ring({
           );
         })}
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="flex items-start gap-1">
-          <span
-            className="font-[family-name:var(--font-display)] text-[54px] font-black leading-[0.9] tracking-[-0.055em] tabular-nums"
-            style={{
-              color: pending ? "rgba(235,235,245,0.32)" : "#fff",
-              textShadow: pending ? "none" : `0 0 26px color-mix(in oklab, ${color} 45%, transparent)`,
-            }}
-          >
-            {pending ? "––" : value}
-          </span>
-          <span className="mt-2.5 text-[11px] font-bold text-vyro-mute">/100</span>
-        </div>
-        <div className="mt-1.5 font-[family-name:var(--font-display)] text-[8.5px] font-bold uppercase tracking-[0.26em] text-vyro-mute">
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+        <div className="font-[family-name:var(--font-display)] text-[9px] font-bold uppercase leading-none tracking-[0.32em] text-vyro-mute">
           Readiness
         </div>
+
+        {pending ? (
+          <div className="mt-3 flex items-center gap-1.5" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="h-1.5 w-1.5 animate-pulse rounded-full bg-white/25"
+                style={{ animationDelay: `${i * 180}ms`, animationDuration: "1400ms" }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-2 flex items-baseline justify-center gap-[3px]">
+            <span
+              className="font-[family-name:var(--font-display)] text-[58px] font-black leading-[0.86] tracking-[-0.06em] tabular-nums text-white"
+              style={{ textShadow: `0 0 30px color-mix(in oklab, ${color} 45%, transparent)` }}
+            >
+              {value}
+            </span>
+            <span className="translate-y-[-6px] font-[family-name:var(--font-display)] text-[13px] font-bold tracking-[-0.02em] text-white/35">
+              /100
+            </span>
+          </div>
+        )}
+
+        <div className="mt-2.5 max-w-[132px] text-[10px] font-semibold leading-tight tracking-[-0.01em] text-vyro-mute">
+          {pending ? "Calibrating baseline" : value >= 75 ? "Primed to perform" : value >= 50 ? "Train with control" : "Prioritise recovery"}
+        </div>
       </div>
+
     </div>
   );
 }
