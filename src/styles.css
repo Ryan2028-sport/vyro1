@@ -121,16 +121,17 @@
   --sidebar-ring: oklch(0.704 0.04 256.788);
 
   /* VYRO dark tokens */
-  --vyro-ink: oklch(0.16 0.012 180);          /* near-black with subtle teal undertone */
-  --vyro-panel: oklch(0.22 0.014 180);        /* card surface */
-  --vyro-elev: oklch(0.27 0.015 180);         /* elevated inner panel */
+  --vyro-ink: oklch(0.155 0.004 250);         /* page base — layered near-black */
+  --vyro-panel: oklch(0.196 0.005 250);       /* card surface */
+  --vyro-elev: oklch(0.235 0.006 250);        /* elevated inner panel */
   --vyro-line: oklch(1 0 0 / 0.08);           /* hairline border */
-  --vyro-text: oklch(0.97 0.005 180);         /* primary text */
-  --vyro-mute: oklch(0.97 0.005 180 / 0.55);  /* muted text */
-  --vyro-mint: oklch(0.79 0.14 175);          /* #17c8a4 accent */
-  --vyro-amber: oklch(0.78 0.16 75);          /* warning */
-  --vyro-rose: oklch(0.7 0.2 20);             /* alert */
-  --vyro-spatial: oklch(0.7 0.16 235);        /* informational blue */
+  --vyro-text: oklch(0.98 0.003 250);         /* primary text */
+  --vyro-mute: oklch(0.98 0.003 250 / 0.6);   /* muted text */
+  --vyro-mint: oklch(0.74 0.13 172);          /* cool signal accent */
+  --vyro-amber: oklch(0.79 0.16 72);          /* manage */
+  --vyro-rose: oklch(0.68 0.2 20);            /* recover / alert */
+  --vyro-spatial: oklch(0.7 0.15 240);        /* informational blue */
+
 }
 
 .dark {

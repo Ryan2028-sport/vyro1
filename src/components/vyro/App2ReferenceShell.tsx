@@ -38,7 +38,9 @@ import {
   listTrainingPlan,
 } from "@/lib/training-plan.functions";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { SegmentedTabs } from "./shared";
 import "./app2-reference.css";
+
 
 // Baselines, recovery, readiness, strain and RTP all come from
 // <VyroScoresProvider /> now — see VyroScoresProvider.tsx. This file no longer
@@ -85,11 +87,19 @@ function Logo() {
   );
 }
 
+function toneVar(value: number | null | undefined) {
+  if (value == null) return "hsl(0 0% 100% / 0.35)";
+  if (value >= 67) return "hsl(var(--app2-ready))";
+  if (value >= 34) return "hsl(var(--app2-amber))";
+  return "hsl(var(--app2-red))";
+}
+
 function Ring({ value }: { value: number | null }) {
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   const v = value ?? 0;
   const offset = circumference - (Math.max(0, Math.min(100, v)) / 100) * circumference;
+  const color = toneVar(value);
 
   return (
     <div>
@@ -100,8 +110,8 @@ function Ring({ value }: { value: number | null }) {
             cy="52"
             r={radius}
             fill="none"
-            stroke="hsl(0 0% 100% / 0.12)"
-            strokeWidth="6"
+            stroke="hsl(0 0% 100% / 0.09)"
+            strokeWidth="7"
           />
           {value != null && (
             <circle
@@ -109,11 +119,12 @@ function Ring({ value }: { value: number | null }) {
               cy="52"
               r={radius}
               fill="none"
-              stroke="hsl(var(--app2-ready))"
+              stroke={color}
               strokeLinecap="round"
-              strokeWidth="6"
+              strokeWidth="7"
               strokeDasharray={circumference}
               strokeDashoffset={offset}
+              style={{ filter: `drop-shadow(0 0 6px ${color})` }}
             />
           )}
         </svg>
@@ -142,20 +153,26 @@ function MiniMetric({
   trend?: string;
   live?: boolean;
 }) {
+  const dim = value === "—" || value == null;
   return (
     <div className="app2-metric">
       <div className="app2-metric-label">
         <span>{label}</span>
-        {live && <span style={{ color: "hsl(var(--app2-live))" }}>LIVE</span>}
+        {live ? (
+          <span className="app2-live-tag">LIVE</span>
+        ) : dim ? (
+          <span className="app2-idle-tag">—</span>
+        ) : null}
       </div>
-      <div className="app2-metric-value">
+      <div className="app2-metric-value" style={dim ? { color: "hsl(var(--app2-faint))" } : undefined}>
         {value}
         <span className="app2-metric-unit">{unit}</span>
       </div>
-      {trend && <div className="app2-trend">↗ {trend}</div>}
+      {trend && <div className="app2-trend">{trend}</div>}
     </div>
   );
 }
+
 
 function InfoCard({
   eyebrow,
@@ -359,29 +376,18 @@ function SportTabs() {
   const [tab, setTab] = useState<SportTab>("overview");
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {SPORT_TABS.map(({ id, label }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
-              tab === id
-                ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
-                : "border-vyro-line bg-vyro-panel text-vyro-mute"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <SegmentedTabs tabs={SPORT_TABS} value={tab} onChange={setTab} />
+      <div key={tab} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {tab === "overview" && <SportView />}
+        {tab === "court" && <CourtDbView />}
+        {tab === "movement" && <MovementPanel />}
+        {tab === "motion" && <SwingView />}
+        {tab === "tendency" && <TendencyView />}
       </div>
-      {tab === "overview" && <SportView />}
-      {tab === "court" && <CourtDbView />}
-      {tab === "movement" && <MovementPanel />}
-      {tab === "motion" && <SwingView />}
-      {tab === "tendency" && <TendencyView />}
     </div>
   );
 }
+
 
 function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   const fetchProfile = useServerFn(getMyProfile);
@@ -529,7 +535,14 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           <div className="app2-mini-row">
             {/* Status text is driven by the canonical recovery band — a low
                 recovery can no longer render a green "Ready" tag. */}
-            <span className="app2-label-pill">{statusLabel}</span>
+            <span
+              className={`app2-label-pill${
+                s.bandTone === "warn" ? " warn" : s.bandTone === "off" ? " alert" : s.bandTone === "neutral" ? " idle" : ""
+              }`}
+            >
+              {statusLabel}
+            </span>
+
             <span className="app2-eyebrow">
               Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
             </span>
