@@ -12,7 +12,7 @@ export function Pill({
   pulse = false,
 }: {
   children: ReactNode;
-  tone?: "neutral" | "live" | "warn" | "off";
+  tone?: "neutral" | "live" | "warn" | "off" | "alert";
   pulse?: boolean;
 }) {
   const cls =
