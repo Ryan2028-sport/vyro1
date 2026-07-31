@@ -60,7 +60,11 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* VYRO design tokens — dark athlete-intelligence theme */
+  /* Typography — Sora display + Manrope body */
+  --font-display: "Sora", system-ui, -apple-system, sans-serif;
+  --font-sans: "Manrope", system-ui, -apple-system, sans-serif;
+
+  /* VYRO design tokens — Apple-inspired dark athlete OS */
   --color-vyro-ink: var(--vyro-ink);
   --color-vyro-panel: var(--vyro-panel);
   --color-vyro-elev: var(--vyro-elev);
@@ -70,6 +74,12 @@
   --color-vyro-mint: var(--vyro-mint);
   --color-vyro-amber: var(--vyro-amber);
   --color-vyro-rose: var(--vyro-rose);
+  --color-vyro-blue: var(--vyro-blue);
+  --color-vyro-teal: var(--vyro-teal);
+  --color-vyro-indigo: var(--vyro-indigo);
+  --color-vyro-pink: var(--vyro-pink);
+  --color-vyro-yellow: var(--vyro-yellow);
+  --color-vyro-purple: var(--vyro-purple);
   --color-vyro-canvas: var(--vyro-ink);
   --color-vyro-surface: var(--vyro-panel);
   --color-vyro-recovery: var(--vyro-mint);
@@ -80,6 +90,7 @@
   --color-vyro-session: var(--vyro-mint);
   --color-vyro-coach: var(--vyro-amber);
 }
+
 
 /* Slim scrollbar for a "thin" feel */
 .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -120,17 +131,26 @@
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
 
-  /* VYRO dark tokens */
-  --vyro-ink: oklch(0.155 0.004 250);         /* page base — layered near-black */
-  --vyro-panel: oklch(0.196 0.005 250);       /* card surface */
-  --vyro-elev: oklch(0.235 0.006 250);        /* elevated inner panel */
-  --vyro-line: oklch(1 0 0 / 0.08);           /* hairline border */
-  --vyro-text: oklch(0.98 0.003 250);         /* primary text */
-  --vyro-mute: oklch(0.98 0.003 250 / 0.6);   /* muted text */
-  --vyro-mint: oklch(0.74 0.13 172);          /* cool signal accent */
-  --vyro-amber: oklch(0.79 0.16 72);          /* manage */
-  --vyro-rose: oklch(0.68 0.2 20);            /* recover / alert */
-  --vyro-spatial: oklch(0.7 0.15 240);        /* informational blue */
+  /* VYRO dark tokens — Apple iOS system colour set (dark appearance) */
+  --vyro-ink: #000000;                        /* true black page base */
+  --vyro-panel: rgba(255, 255, 255, 0.055);   /* card surface */
+  --vyro-elev: rgba(255, 255, 255, 0.085);    /* elevated inner panel */
+  --vyro-line: rgba(255, 255, 255, 0.1);      /* hairline border */
+  --vyro-text: #f5f5f7;                       /* primary text */
+  --vyro-mute: rgba(235, 235, 245, 0.6);      /* secondary label */
+  --vyro-faint: rgba(235, 235, 245, 0.35);    /* tertiary label */
+  --vyro-mint: #30d158;                       /* systemGreen */
+  --vyro-amber: #ff9f0a;                      /* systemOrange */
+  --vyro-rose: #ff453a;                       /* systemRed */
+  --vyro-blue: #0a84ff;                       /* systemBlue */
+  --vyro-teal: #40c8e0;                       /* systemTeal */
+  --vyro-indigo: #5e5ce6;                     /* systemIndigo */
+  --vyro-pink: #ff375f;                       /* systemPink */
+  --vyro-yellow: #ffd60a;                     /* systemYellow */
+  --vyro-purple: #bf5af2;                     /* systemPurple */
+  --vyro-spatial: #0a84ff;                    /* informational blue */
+
+
 
 }
 
