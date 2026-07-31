@@ -94,48 +94,99 @@ function toneVar(value: number | null | undefined) {
   return "hsl(var(--app2-red))";
 }
 
+/* ---------------------------------------------------------------------------
+   Athlete tab presentation primitives — iOS-grade glass cards, bento tiles
+   and a gradient readiness dial. Pure styling: every data point that existed
+   before still renders through these.
+--------------------------------------------------------------------------- */
+
+function GlassCard({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`relative overflow-hidden rounded-[28px] border border-white/[0.07] bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_24px_50px_-30px_rgba(0,0,0,0.9)] backdrop-blur-xl ${className}`}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/25 to-transparent"
+      />
+      {children}
+    </section>
+  );
+}
+
+function Eyebrow({ children, tone = "mint" }: { children: ReactNode; tone?: "mint" | "amber" | "rose" | "mute" }) {
+  const color =
+    tone === "amber"
+      ? "text-vyro-amber"
+      : tone === "rose"
+        ? "text-vyro-rose"
+        : tone === "mute"
+          ? "text-vyro-mute"
+          : "text-vyro-mint";
+  return (
+    <div className={`text-[9.5px] font-bold uppercase tracking-[0.18em] ${color}`}>{children}</div>
+  );
+}
+
 function Ring({ value }: { value: number | null }) {
-  const radius = 40;
+  const radius = 46;
   const circumference = 2 * Math.PI * radius;
   const v = value ?? 0;
-  const offset = circumference - (Math.max(0, Math.min(100, v)) / 100) * circumference;
+  const clamped = Math.max(0, Math.min(100, v));
+  const offset = circumference - (clamped / 100) * circumference;
   const color = toneVar(value);
 
   return (
-    <div>
-      <div className="app2-ring-wrap">
-        <svg viewBox="0 0 104 104" role="img" aria-label={value == null ? "Readiness pending" : `Readiness ${value} out of 100`}>
-          <circle
-            cx="52"
-            cy="52"
-            r={radius}
-            fill="none"
-            stroke="hsl(0 0% 100% / 0.09)"
-            strokeWidth="7"
-          />
+    <div className="flex flex-col items-center">
+      <div className="relative h-[168px] w-[168px]">
+        <div
+          aria-hidden
+          className="absolute inset-3 rounded-full blur-2xl transition-opacity duration-700"
+          style={{ background: color, opacity: value == null ? 0.05 : 0.16 }}
+        />
+        <svg
+          viewBox="0 0 112 112"
+          className="h-full w-full -rotate-90"
+          role="img"
+          aria-label={value == null ? "Readiness pending" : `Readiness ${value} out of 100`}
+        >
+          <circle cx="56" cy="56" r={radius} fill="none" stroke="hsl(0 0% 100% / 0.07)" strokeWidth="9" />
           {value != null && (
             <circle
-              cx="52"
-              cy="52"
+              cx="56"
+              cy="56"
               r={radius}
               fill="none"
               stroke={color}
               strokeLinecap="round"
-              strokeWidth="7"
+              strokeWidth="9"
               strokeDasharray={circumference}
               strokeDashoffset={offset}
-              style={{ filter: `drop-shadow(0 0 6px ${color})` }}
+              style={{
+                filter: `drop-shadow(0 0 10px ${color})`,
+                transition: "stroke-dashoffset 900ms cubic-bezier(0.22,1,0.36,1)",
+              }}
             />
           )}
         </svg>
-        <div className="app2-ring-num">
-          <div>
-            {value == null ? "—" : value}
-            <small>/ 100</small>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="flex items-baseline gap-1">
+            <span className="text-[46px] font-black leading-none tracking-[-0.045em] tabular-nums text-vyro-text">
+              {value == null ? "—" : value}
+            </span>
+            <span className="text-[11px] font-semibold text-vyro-mute">/100</span>
+          </div>
+          <div className="mt-1.5 text-[9.5px] font-bold uppercase tracking-[0.2em] text-vyro-mute">
+            Readiness
           </div>
         </div>
       </div>
-      <div className="app2-ring-label">Readiness</div>
     </div>
   );
 }
@@ -155,24 +206,36 @@ function MiniMetric({
 }) {
   const dim = value === "—" || value == null;
   return (
-    <div className="app2-metric">
-      <div className="app2-metric-label">
-        <span>{label}</span>
+    <div className="group rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3.5 transition-all duration-200 ease-out hover:border-white/[0.12] hover:bg-white/[0.06] active:scale-[0.985]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-[9.5px] font-bold uppercase tracking-[0.13em] text-vyro-mute">
+          {label}
+        </span>
         {live ? (
-          <span className="app2-live-tag">LIVE</span>
+          <span className="flex shrink-0 items-center gap-1 text-[8.5px] font-bold uppercase tracking-[0.12em] text-vyro-mint">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-vyro-mint shadow-[0_0_6px_var(--vyro-mint)]" />
+            live
+          </span>
         ) : dim ? (
-          <span className="app2-idle-tag">—</span>
+          <span className="shrink-0 text-[9px] text-vyro-mute/60">—</span>
         ) : null}
       </div>
-      <div className="app2-metric-value" style={dim ? { color: "hsl(var(--app2-faint))" } : undefined}>
-        {value}
-        <span className="app2-metric-unit">{unit}</span>
+      <div className="mt-2 flex items-baseline gap-1">
+        <span
+          className={`text-[26px] font-extrabold leading-none tracking-[-0.04em] tabular-nums ${
+            dim ? "text-vyro-mute/45" : "text-vyro-text"
+          }`}
+        >
+          {value}
+        </span>
+        {unit && <span className="text-[10px] font-semibold text-vyro-mute">{unit}</span>}
       </div>
-      {trend && <div className="app2-trend">{trend}</div>}
+      {trend && (
+        <div className="mt-1.5 text-[10px] font-medium tracking-[-0.01em] text-vyro-mute">{trend}</div>
+      )}
     </div>
   );
 }
-
 
 function InfoCard({
   eyebrow,
@@ -185,21 +248,14 @@ function InfoCard({
   children: ReactNode;
   tone?: "ready" | "amber" | "live";
 }) {
-  const color =
-    tone === "amber"
-      ? "hsl(var(--app2-amber))"
-      : tone === "live"
-        ? "hsl(var(--app2-live))"
-        : "hsl(var(--app2-ready))";
-
   return (
-    <section className="app2-card app2-info-card">
-      <div className="app2-eyebrow" style={{ color }}>
-        {eyebrow}
-      </div>
-      {title && <h2 className="app2-card-title">{title}</h2>}
-      <div>{children}</div>
-    </section>
+    <GlassCard>
+      <Eyebrow tone={tone === "amber" ? "amber" : "mint"}>{eyebrow}</Eyebrow>
+      {title && (
+        <h2 className="mt-1.5 text-[19px] font-extrabold tracking-[-0.03em] text-vyro-text">{title}</h2>
+      )}
+      <div className="mt-3">{children}</div>
+    </GlassCard>
   );
 }
 
@@ -233,42 +289,47 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
   }, [m.connected, m.heartRateBpm]);
 
   return (
-    <section className="app2-card app2-info-card app2-cog-card">
-      <div className="app2-cog-header">
-        <div className="app2-cog-eyebrow">
-          <Brain size={14} />
-          <span>Cognitive load</span>
+    <GlassCard>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2 text-vyro-spatial">
+          <Brain size={14} className="shrink-0" />
+          <span className="truncate text-[9.5px] font-bold uppercase tracking-[0.18em]">Cognitive load</span>
         </div>
-        <span className="app2-cog-badge">{status.toUpperCase()}</span>
+        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-vyro-text">
+          {status}
+        </span>
       </div>
-      <h2 className="app2-card-title">Cognitive Fatigue Divergence</h2>
-      <p className="app2-card-copy">
+      <h2 className="mt-2 text-[19px] font-extrabold tracking-[-0.03em] text-vyro-text">
+        Cognitive Fatigue Divergence
+      </h2>
+      <p className="mt-1.5 text-[12.5px] leading-relaxed text-vyro-mute">
         Compares your live reaction latency against your personal baseline
         {baselineMs != null ? ` (${Math.round(baselineMs)}ms)` : ""} to flag mental fatigue before physical signs.
       </p>
-      <div className="app2-cog-rows">
-        <div className="app2-cog-row">
-          <span className="app2-cog-row-label">Reaction divergence</span>
-          <span className="app2-cog-row-value">{delay}</span>
-        </div>
-        <div className="app2-cog-row">
-          <span className="app2-cog-row-label">Heart rate status</span>
-          <span className="app2-cog-row-value">{hrStatus}</span>
-        </div>
-        <div className="app2-cog-row">
-          <span className="app2-cog-row-label">VYRO read</span>
-          <span className="app2-cog-row-value">{vyroRead}</span>
-        </div>
+      <div className="mt-3.5 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.03]">
+        {[
+          { label: "Reaction divergence", value: delay },
+          { label: "Heart rate status", value: hrStatus },
+          { label: "VYRO read", value: vyroRead },
+        ].map((row) => (
+          <div
+            key={row.label}
+            className="flex items-center justify-between gap-3 border-b border-white/[0.05] px-3.5 py-2.5 last:border-b-0"
+          >
+            <span className="text-[11px] font-semibold text-vyro-mute">{row.label}</span>
+            <span className="text-[12.5px] font-extrabold tabular-nums text-vyro-text">{row.value}</span>
+          </div>
+        ))}
       </div>
-      <div className="app2-cog-insight">
-        <Activity size={18} />
-        <span>
+      <div className="mt-3 flex items-start gap-2.5 rounded-2xl border border-vyro-mint/15 bg-vyro-mint/[0.06] p-3">
+        <Activity size={16} className="mt-0.5 shrink-0 text-vyro-mint" />
+        <span className="text-[11.5px] leading-relaxed text-vyro-mute">
           {m.connected && baselineMs != null
             ? "Divergence over 200ms = mental fatigue threshold. Best use case: returners, decision makers, late-game scenarios."
             : "Wear the band through a few rallies to seed the cognitive baseline."}
         </span>
       </div>
-    </section>
+    </GlassCard>
   );
 }
 
