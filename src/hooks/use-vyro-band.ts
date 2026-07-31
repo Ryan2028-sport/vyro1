@@ -271,7 +271,9 @@ function shouldKeepNativeBleAliveOnCleanup(): boolean {
   return isNative && typeof document !== "undefined" && document.visibilityState === "hidden";
 }
 
-const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+// globalThis (not window) so this module stays safe to evaluate during SSR.
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 
 /** Heart Rate Measurement (GATT 0x2A37) decoder. */
 function decodeHeartRate(bytes: Uint8Array): number | null {
