@@ -303,7 +303,7 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mb-5 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         {eyebrow && (
           <div className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">
@@ -315,10 +315,11 @@ export function PageHeader({
         </h2>
         {subtitle && <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-vyro-mute">{subtitle}</p>}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
+
 
 // Circular progress ring used for the readiness hero. Pure SVG so it
 // renders crisp at any size and doesn't pull in a charting library.
