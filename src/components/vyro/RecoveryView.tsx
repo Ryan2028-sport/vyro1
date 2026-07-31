@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, PageHeader, Pill, Ring, Stat } from "./shared";
+import { Card, PageHeader, Pill, Ring, SegmentedTabs, Stat } from "./shared";
 import { type LiveMetrics } from "./useLiveMetrics";
 import { useVyroScores } from "./VyroScoresProvider";
 
@@ -58,24 +58,17 @@ export function RecoveryView() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-1.5 overflow-x-auto rounded-2xl border border-vyro-line bg-vyro-panel p-1.5">
-        {[
-          { id: "live", label: "LIVE Recovery" },
-          { id: "game", label: "In-Game" },
-          { id: "fatigue", label: "Total Fatigue" },
-          { id: "overnight", label: "Overnight" },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id as Tab)}
-            className={`whitespace-nowrap rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] transition ${
-              tab === t.id ? "bg-vyro-mint/15 text-vyro-mint border border-vyro-mint/40" : "text-vyro-mute hover:text-vyro-text border border-transparent"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        tabs={[
+          { id: "live" as Tab, label: "LIVE Recovery" },
+          { id: "game" as Tab, label: "In-Game" },
+          { id: "fatigue" as Tab, label: "Total Fatigue" },
+          { id: "overnight" as Tab, label: "Overnight" },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+
 
       {tab === "live" && (
         <>

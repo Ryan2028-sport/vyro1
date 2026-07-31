@@ -56,9 +56,9 @@ export function TrendsView() {
   return (
     <div className="mx-auto max-w-[430px] space-y-7 pb-8 text-vyro-text">
       <header className="space-y-3">
-        <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Player dashboard · Progress</p>
-        <h2 className="text-[28px] font-black leading-tight text-vyro-text">Trend intelligence</h2>
-        <p className="text-[15px] leading-relaxed text-vyro-mute">
+        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">Player dashboard · Progress</p>
+        <h2 className="text-[26px] font-black leading-[1.1] tracking-[-0.035em] text-vyro-text">Trend intelligence</h2>
+        <p className="text-[13px] leading-relaxed text-vyro-mute">
           {hasData
             ? `Computed from ${sessions.length} recorded session${sessions.length === 1 ? "" : "s"} and your live baselines.`
             : "Trends populate once you save your first tracked session."}
@@ -70,9 +70,9 @@ export function TrendsView() {
         <VCard><p className="py-12 text-center text-[14px] text-vyro-mute">Loading session history…</p></VCard>
       ) : !hasData ? (
         <VCard>
-          <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">No data yet</p>
-          <h3 className="mt-4 text-[22px] font-black leading-tight">Run a tracked session.</h3>
-          <p className="mt-3 text-[14px] leading-relaxed text-vyro-mute">
+          <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">No data yet</p>
+          <h3 className="mt-4 text-[19px] font-black leading-tight tracking-[-0.03em]">Run a tracked session.</h3>
+          <p className="mt-3 text-[13px] leading-relaxed text-vyro-mute">
             Open the Session tab, pick a sport, hit Begin tracking, and end the session when you're done. Trends and AI readouts compute themselves from the saved summary.
           </p>
         </VCard>
@@ -103,10 +103,10 @@ function TrajectoryCard({ cards }: { cards: TrendCard[] }) {
   return (
     <VCard className="border-vyro-text/42">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-        <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Performance trajectory</p>
-        <span className="rounded-xl border border-vyro-text/32 bg-vyro-text/8 px-4 py-2 font-mono text-[14px] uppercase tracking-[0.16em] text-vyro-text">Last 14 days</span>
+        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">Performance trajectory</p>
+        <span className="rounded-xl border border-vyro-text/32 bg-vyro-text/8 px-4 py-2 font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-vyro-text">Last 14 days</span>
       </div>
-      <h3 className="mt-5 text-[27px] font-black leading-tight text-vyro-text">
+      <h3 className="mt-5 text-[22px] font-black leading-[1.18] tracking-[-0.03em] text-vyro-text">
         {improving.length > 0
           ? `Improving on ${improving.length} of ${cards.filter((c) => c.deltaPct != null).length} metrics.`
           : "Not enough recent history to score a trend."}
@@ -130,10 +130,10 @@ function FeaturedGraph({ card }: { card: TrendCard }) {
     <VCard className="bg-vyro-elev/75">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <div>
-          <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Featured graph</p>
-          <h3 className="mt-4 text-[24px] font-black leading-none text-vyro-text">{card.label}</h3>
+          <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">Featured graph</p>
+          <h3 className="mt-4 text-[20px] font-black leading-none tracking-[-0.03em] text-vyro-text">{card.label}</h3>
         </div>
-        <span className="rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 py-2 font-mono text-[14px] text-vyro-text">
+        <span className="rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 py-2 font-mono text-[10px] text-vyro-text">
           {card.current ?? "—"}{card.unit}
         </span>
       </div>
@@ -165,7 +165,7 @@ function AiReadout({ cards, sessions }: { cards: TrendCard[]; sessions: RawSessi
   }
   return (
     <VCard className="bg-vyro-elev/75">
-      <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">AI readout</p>
+      <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">AI readout</p>
       <div className="mt-5 space-y-4">
         {insights.slice(0, 4).map((line, i) => <InsightBox key={i}>{line}</InsightBox>)}
       </div>
@@ -178,9 +178,9 @@ function RecoveryTrend({ baselines, sessions }: { baselines: Baselines | null; s
   const recoveryHint = load >= 70 ? "High 7-day load — protect sleep tonight." : load >= 40 ? "Moderate load — typical session OK." : "Low load — fine to push tomorrow.";
   return (
     <VCard className="border-vyro-text/42">
-      <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">7-day training load</p>
-      <p className="mt-6 text-[40px] font-black leading-none text-vyro-text">{load}<span className="text-[20px] text-vyro-mute">/100</span></p>
-      <p className="mt-4 font-mono text-[15px] tracking-[0.12em] text-vyro-mute">
+      <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">7-day training load</p>
+      <p className="mt-6 text-[34px] font-black leading-none tracking-[-0.04em] tabular-nums text-vyro-text">{load}<span className="text-[20px] text-vyro-mute">/100</span></p>
+      <p className="mt-4 font-mono text-[10.5px] tracking-[0.1em] text-vyro-mute">
         {baselines?.hrvMs ? `HRV baseline ${Math.round(baselines.hrvMs)}ms` : "Tracking baselines…"}
       </p>
       <InsightBox>{recoveryHint}</InsightBox>
@@ -211,16 +211,16 @@ function CalendarView({ sessions, lastNight, loadToday }: { sessions: RawSession
     <VCard className="bg-vyro-elev/75">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <div>
-          <p className="flex items-center gap-2 font-mono text-[13px] uppercase tracking-[0.28em] text-vyro-mute">
+          <p className="flex items-center gap-2 font-mono text-[9px] font-medium uppercase tracking-[0.24em] text-vyro-mute">
             <CalendarDays className="h-4 w-4" /> Calendar view
           </p>
-          <h3 className="mt-4 text-[24px] font-black leading-tight text-vyro-text">Recent training history</h3>
-          <p className="mt-3 text-[15px] leading-relaxed text-vyro-mute">
+          <h3 className="mt-4 text-[20px] font-black leading-tight tracking-[-0.03em] text-vyro-text">Recent training history</h3>
+          <p className="mt-3 text-[13px] leading-relaxed text-vyro-mute">
             Daily agility score from your saved sessions. Empty cells = no session that day.
           </p>
         </div>
       </div>
-      <div className="mt-8 grid grid-cols-7 gap-2 text-center font-mono text-[12px] text-vyro-mute">
+      <div className="mt-8 grid grid-cols-7 gap-2 text-center font-mono text-[10px] text-vyro-mute">
         {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <span key={`${d}-${i}`}>{d}</span>)}
       </div>
       <div className="mt-5 grid grid-cols-7 gap-2">
@@ -248,26 +248,26 @@ function MetricTrendCard({ card }: { card: TrendCard }) {
     <VCard className="bg-vyro-elev/75">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-[18px] font-black text-vyro-text">{card.label}</h3>
-          <p className="mt-1 font-mono text-[14px] text-vyro-mute">
+          <h3 className="truncate text-[15px] font-black tracking-[-0.02em] text-vyro-text">{card.label}</h3>
+          <p className="mt-1 font-mono text-[10px] text-vyro-mute">
             {card.previous != null ? `Previous ${card.previous}${card.unit}` : "No prior window"}
           </p>
         </div>
-        <span className="rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 py-1.5 font-mono text-[14px] text-vyro-text">
+        <span className="rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 py-1.5 font-mono text-[10px] text-vyro-text">
           {fmtDelta(card, false)}
         </span>
       </div>
       <div className="mt-7 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.25fr)] items-end gap-4">
         <div className="min-w-0">
-          <span className="text-[40px] font-black leading-none text-vyro-text">
+          <span className="text-[34px] font-black leading-none tracking-[-0.04em] tabular-nums text-vyro-text">
             {card.current ?? "—"}
           </span>
-          <span className="ml-2 text-[18px] font-black text-vyro-mute">{card.unit}</span>
+          <span className="ml-1.5 text-[14px] font-black text-vyro-mute">{card.unit}</span>
         </div>
         {card.spark.length >= 2 ? <SmallSpark data={card.spark} /> : <div className="h-[72px]" />}
       </div>
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-vyro-text/8">
-        <span className="block h-full rounded-full bg-vyro-text" style={{ width: `${Math.max(0, Math.min(100, card.progress))}%` }} />
+        <span className="block h-full rounded-full bg-linear-to-r from-vyro-mint/70 to-vyro-mint transition-[width] duration-500 ease-out" style={{ width: `${Math.max(0, Math.min(100, card.progress))}%` }} />
       </div>
     </VCard>
   );
@@ -281,37 +281,49 @@ function fmtDelta(card: TrendCard, withArrow: boolean): string {
 }
 
 function VCard({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-[26px] border border-vyro-line bg-vyro-panel p-4 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--vyro-text)_8%,transparent)] ${className}`}>{children}</section>;
+  return (
+    <section
+      className={`rounded-[20px] border border-vyro-line bg-vyro-panel bg-[linear-gradient(160deg,rgba(255,255,255,0.04),transparent_40%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_44px_-24px_rgba(0,0,0,0.9)] transition-[border-color,box-shadow] duration-200 ease-out hover:border-vyro-text/[0.12] ${className}`}
+    >
+      {children}
+    </section>
+  );
 }
 
 function Badge({ icon, children }: { icon: ReactNode; children: ReactNode }) {
-  return <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-vyro-text/35 bg-vyro-text/5 px-3 font-mono text-[13px] uppercase tracking-[0.16em] text-vyro-text">{icon}{children}</span>;
+  return (
+    <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-vyro-mint/30 bg-vyro-mint/10 px-3 font-mono text-[9.5px] font-medium uppercase tracking-[0.14em] text-vyro-mint">
+      {icon}
+      {children}
+    </span>
+  );
 }
 
 function TrajectoryMetric({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-[20px] border border-vyro-line bg-vyro-panel/70 p-4">
-      <p className="font-mono text-[13px] uppercase tracking-[0.22em] text-vyro-mute">{label}</p>
-      <p className="mt-3 text-[38px] font-black leading-none text-vyro-text">{value}</p>
-      <p className="mt-3 text-[14px] text-vyro-mute">{hint}</p>
+    <div className="rounded-[16px] border border-vyro-line bg-vyro-text/[0.03] p-4 transition-colors duration-200 hover:bg-vyro-text/[0.055]">
+      <p className="font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-vyro-mute">{label}</p>
+      <p className="mt-2.5 text-[30px] font-black leading-none tracking-[-0.04em] tabular-nums text-vyro-text">{value}</p>
+      <p className="mt-2 text-[11.5px] text-vyro-mute">{hint}</p>
     </div>
   );
 }
 
 function InsightBox({ children }: { children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-[16px] border border-vyro-text/30 bg-vyro-text/12 p-4 text-[16px] leading-relaxed text-vyro-text/90">
-      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-vyro-text" />
+    <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-[14px] border border-vyro-mint/20 bg-vyro-mint/[0.07] p-3.5 text-[12.5px] leading-relaxed text-vyro-text/90">
+      <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-vyro-mint" />
       <span>{children}</span>
     </div>
   );
 }
 
+
 function SmallSpark({ data }: { data: number[] }) {
   return <GraphSvg data={data} height={72} compact />;
 }
 
-function GraphSvg({ data, height, className = "", stroke = "var(--vyro-text)", fill = "var(--vyro-text)", compact = false }: { data: number[]; height: number; className?: string; stroke?: string; fill?: string; compact?: boolean }) {
+function GraphSvg({ data, height, className = "", stroke = "var(--vyro-mint)", fill = "var(--vyro-mint)", compact = false }: { data: number[]; height: number; className?: string; stroke?: string; fill?: string; compact?: boolean }) {
   const width = 300;
   const pad = compact ? 6 : 10;
   const min = Math.min(...data);
@@ -336,19 +348,19 @@ function GraphSvg({ data, height, className = "", stroke = "var(--vyro-text)", f
 function CalendarDay({ day, score, tone, active }: { day: number; score: number; tone: string; active?: boolean }) {
   const dot = tone === "good" ? "bg-vyro-mint" : tone === "bad" ? "bg-vyro-rose" : tone === "warn" ? "bg-vyro-amber" : "bg-vyro-line";
   return (
-    <div className={`relative min-h-[48px] rounded-xl border bg-vyro-panel/70 p-2 text-left ${active ? "border-vyro-text" : "border-vyro-line"}`}>
+    <div className={`relative min-h-[48px] rounded-[12px] border bg-vyro-text/[0.03] p-2 text-left transition-colors duration-200 ${active ? "border-vyro-text" : "border-vyro-line"}`}>
       <span className={`absolute right-3 top-3 h-2.5 w-2.5 rounded-full ${dot}`} />
       <span className="block text-[15px] font-black text-vyro-text">{day}</span>
-      <span className="mt-2 block text-[22px] font-black leading-none text-vyro-text">{score || "—"}</span>
+      <span className="mt-2 block text-[18px] font-black leading-none tabular-nums text-vyro-text">{score || "—"}</span>
     </div>
   );
 }
 
 function CalendarMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-[18px] border border-vyro-line bg-vyro-panel/70 p-4">
-      <p className="flex items-center gap-2 font-mono text-[13px] uppercase tracking-[0.22em] text-vyro-mute">{icon}{label}</p>
-      <p className="mt-4 text-[28px] font-black leading-none text-vyro-text">{value}</p>
+    <div className="rounded-[16px] border border-vyro-line bg-vyro-text/[0.03] p-4 transition-colors duration-200 hover:bg-vyro-text/[0.055]">
+      <p className="flex items-center gap-2 font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-vyro-mute">{icon}{label}</p>
+      <p className="mt-4 text-[24px] font-black leading-none tracking-[-0.035em] tabular-nums text-vyro-text">{value}</p>
     </div>
   );
 }

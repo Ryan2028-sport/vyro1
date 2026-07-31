@@ -25,6 +25,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveMetrics } from "./useLiveMetrics";
 import { useVyroBandCtx } from "./VyroBandProvider";
 import { useSleepNights } from "@/lib/use-sleep-nights";
+import { PageHeader } from "./shared";
+
 import {
   ageLabel,
   shortUuid,
@@ -60,16 +62,9 @@ function durationLabel(ms: number): string {
 function Status({ ok }: { ok: boolean }) {
   return (
     <span
-      style={{
-        display: "inline-block",
-        width: 8,
-        height: 8,
-        borderRadius: 999,
-        background: ok ? "#22c55e" : "#6b7280",
-        boxShadow: ok ? "0 0 8px rgba(34,197,94,0.6)" : "none",
-        marginRight: 8,
-        flex: "0 0 auto",
-      }}
+      className={`mr-2 inline-block h-2 w-2 shrink-0 rounded-full ${
+        ok ? "bg-vyro-mint shadow-[0_0_10px_var(--vyro-mint)]" : "bg-vyro-mute/40"
+      }`}
     />
   );
 }
@@ -85,62 +80,35 @@ function Section({
 }) {
   const live = rows.filter((r) => r.ok).length;
   return (
-    <div
-      style={{
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 12,
-        background: "rgba(255,255,255,0.02)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 10,
-          gap: 8,
-        }}
-      >
-        <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: 0.2 }}>{title}</div>
-        <div style={{ fontSize: 11, opacity: 0.7, display: "flex", alignItems: "center", gap: 8 }}>
+    <div className="mb-3 rounded-[18px] border border-vyro-line bg-vyro-panel bg-[linear-gradient(160deg,rgba(255,255,255,0.04),transparent_40%)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] transition-colors duration-200 hover:border-vyro-text/[0.12]">
+      <div className="mb-2.5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <div className="text-[13.5px] font-extrabold leading-tight tracking-[-0.015em] text-vyro-text">{title}</div>
+        <div className="flex shrink-0 items-center gap-2">
           {rightSlot}
-          <span>
+          <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-vyro-mute">
             {live}/{rows.length} live
           </span>
         </div>
       </div>
-      <div style={{ display: "grid", gap: 6 }}>
+      <div className="grid">
         {rows.map((r) => (
           <div
             key={r.label}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "16px 1fr auto",
-              alignItems: "center",
-              gap: 8,
-              fontSize: 12,
-              padding: "6px 0",
-              borderTop: "1px dashed rgba(255,255,255,0.06)",
-            }}
+            className="grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2 border-t border-dashed border-vyro-line py-2 text-[12px] transition-colors duration-150 hover:bg-vyro-text/[0.025]"
           >
             <Status ok={r.ok} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600 }}>{r.label}</div>
-              <div style={{ opacity: 0.55, fontSize: 11, wordBreak: "break-word" }}>
+            <div className="min-w-0">
+              <div className="font-semibold text-vyro-text">{r.label}</div>
+              <div className="break-words font-mono text-[10px] leading-relaxed text-vyro-mute/80">
                 {r.source}
                 {r.note ? ` · ${r.note}` : ""}
                 {r.ageMs != null ? ` · ${ageLabel(r.ageMs)}` : ""}
               </div>
             </div>
             <div
-              style={{
-                fontVariantNumeric: "tabular-nums",
-                fontWeight: 600,
-                color: r.ok ? "#e5f5e9" : "#9ca3af",
-                whiteSpace: "nowrap",
-              }}
+              className={`whitespace-nowrap font-mono text-[11.5px] font-semibold tabular-nums ${
+                r.ok ? "text-vyro-mint" : "text-vyro-mute"
+              }`}
             >
               {r.value}
             </div>
@@ -150,6 +118,7 @@ function Section({
     </div>
   );
 }
+
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const fmt = (v: number | null | undefined, d = 0, u = "") =>
@@ -825,50 +794,32 @@ export function DebugView() {
   };
 
   return (
-    <div style={{ padding: 14, color: "#e5e7eb", fontFamily: "Satoshi, system-ui, sans-serif" }}>
+    <div className="p-3.5 text-vyro-text">
+      <PageHeader
+        eyebrow="Diagnostics · Raw pipeline"
+        title="Debug console"
+        subtitle={bundleCopied || "Paste the bundle into chat for a one-shot diagnosis."}
+        action={
+          <button
+            type="button"
+            onClick={copyBundle}
+            className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-vyro-spatial/30 bg-vyro-spatial/[0.12] px-3.5 py-2 text-[11.5px] font-bold text-vyro-spatial transition-all duration-200 ease-out hover:bg-vyro-spatial/[0.2] active:scale-[0.97]"
+          >
+            Copy debug bundle
+          </button>
+        }
+      />
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 10,
-        }}
+        className={`mb-3 rounded-[16px] border p-3.5 text-[12px] ${
+          m.connected
+            ? "border-vyro-mint/25 bg-vyro-mint/[0.07]"
+            : "border-vyro-amber/25 bg-vyro-amber/[0.06]"
+        }`}
       >
-        <div style={{ fontSize: 12, opacity: 0.75 }}>
-          {bundleCopied || "Paste the bundle into chat for a one-shot diagnosis."}
-        </div>
-        <button
-          type="button"
-          onClick={copyBundle}
-          style={{
-            border: "1px solid rgba(255,255,255,0.18)",
-            borderRadius: 10,
-            padding: "6px 12px",
-            background: "rgba(59,130,246,0.18)",
-            color: "inherit",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          Copy debug bundle
-        </button>
-      </div>
-      <div
-        style={{
-          padding: "10px 12px",
-          borderRadius: 12,
-          background: m.connected ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)",
-          border: `1px solid ${m.connected ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
-          marginBottom: 12,
-          fontSize: 12,
-        }}
-      >
-        <div style={{ fontWeight: 700, marginBottom: 2 }}>
+        <div className={`mb-1 font-bold ${m.connected ? "text-vyro-mint" : "text-vyro-amber"}`}>
           {m.connected ? "Band live — streaming" : "Band offline"}
         </div>
-        <div style={{ opacity: 0.75 }}>
+        <div className="leading-relaxed text-vyro-mute">
           Green dot = metric flowing right now. Grey = silent. If a metric stays
           grey while the band is connected, check (1) the GATT services list — is
           the characteristic even advertised? (2) the per-characteristic notify
@@ -876,6 +827,7 @@ export function DebugView() {
           decoder. Every value below is real or empty, never demo.
         </div>
       </div>
+
 
       <Section title="Connection" rows={connection} />
       <Section title="Device info (BLE DIS)" rows={deviceInfo} />
