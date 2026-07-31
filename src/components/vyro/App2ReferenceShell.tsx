@@ -1081,15 +1081,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
 
         <div className="space-y-4">
-          <InfoCard eyebrow="Top opportunity" icon={Sparkles} accent="yellow">
-            <p className="text-[13px] leading-relaxed text-vyro-mute">
-              {agility != null && agility >= 75
-                ? `Agility ${agility}/100 — a good day to push interval ghosting.`
-                : recovery != null && recovery < 50
-                  ? "Recovery is low — protect tomorrow with mobility + breath work."
-                  : "Train within your zones and reassess after the next session."}
-            </p>
-          </InfoCard>
+          <OpportunityCard agility={agility} recovery={recovery} />
+
 
           <InfoCard eyebrow="Base readiness" title="Core metrics" icon={Gauge} accent="green">
             <div className="divide-y divide-white/[0.06]">
