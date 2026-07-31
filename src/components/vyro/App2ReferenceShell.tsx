@@ -789,48 +789,67 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         </header>
 
         {/* ---- Readiness hero -------------------------------------------- */}
-        <GlassCard glow={toneVar(readiness)} className="animate-in fade-in slide-in-from-bottom-3 p-6 duration-500">
-          <div className="flex flex-col items-center gap-5">
+        <GlassCard
+          glow={toneVar(readiness)}
+          className="animate-in fade-in slide-in-from-bottom-3 p-5 duration-500 sm:p-6"
+        >
+          {/* status strip */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Status text is driven by the canonical recovery band — a low
+                recovery can no longer render a green "Ready" tag. */}
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[9.5px] font-bold uppercase tracking-[0.16em] ${
+                s.bandTone === "warn"
+                  ? "border-vyro-amber/25 bg-vyro-amber/10 text-vyro-amber"
+                  : s.bandTone === "off"
+                    ? "border-vyro-rose/25 bg-vyro-rose/10 text-vyro-rose"
+                    : s.bandTone === "neutral"
+                      ? "border-white/10 bg-white/[0.06] text-vyro-mute"
+                      : "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full bg-current ${s.bandTone === "neutral" ? "" : "animate-pulse"}`}
+              />
+              {statusLabel}
+            </span>
+            <span className="truncate text-[9.5px] font-bold uppercase tracking-[0.16em] text-vyro-mute">
+              {m.connected ? "Live · VYRO Band" : "Awaiting band"}
+            </span>
+          </div>
+
+          <div className="mt-4 flex flex-col items-center gap-5">
             <Ring value={readiness} recovery={recovery} sleep={sleep} />
 
+            <RingLegend
+              items={[
+                { label: "Readiness", value: readiness, color: toneVar(readiness) },
+                { label: "Recovery", value: recovery, color: "var(--vyro-blue)" },
+                { label: "Sleep", value: sleep, color: "var(--vyro-indigo)" },
+              ]}
+            />
+
             <div className="w-full min-w-0">
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {/* Status text is driven by the canonical recovery band — a low
-                    recovery can no longer render a green "Ready" tag. */}
-                <span
-                  className={`rounded-full border px-3 py-1 text-[9.5px] font-bold uppercase tracking-[0.14em] ${
-                    s.bandTone === "warn"
-                      ? "border-vyro-amber/25 bg-vyro-amber/10 text-vyro-amber"
-                      : s.bandTone === "off"
-                        ? "border-vyro-rose/25 bg-vyro-rose/10 text-vyro-rose"
-                        : s.bandTone === "neutral"
-                          ? "border-white/10 bg-white/[0.06] text-vyro-mute"
-                          : "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint"
-                  }`}
-                >
-                  {statusLabel}
-                </span>
-                <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-vyro-mute">
-                  Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
-                </span>
-              </div>
-              <h2 className="mt-3 text-balance text-center text-[20px] font-extrabold leading-tight tracking-[-0.035em] text-vyro-text">
+              <h2 className="text-balance text-center font-[family-name:var(--font-display)] text-[21px] font-extrabold leading-[1.18] tracking-[-0.04em] text-vyro-text">
                 {s.coachRead}
               </h2>
-              <p className="mt-2 text-center text-[12.5px] leading-relaxed text-vyro-mute">
+              <p className="mx-auto mt-2 max-w-[36ch] text-center text-[12.5px] leading-relaxed text-vyro-mute">
                 {m.connected
                   ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
                   : "Pair your VYRO Band to populate live signals."}
               </p>
-              <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3.5">
+
+              <div className="mt-5 h-px bg-linear-to-r from-transparent via-white/12 to-transparent" />
+
+              <div className="mt-4">
                 <Eyebrow tone="mute">What changed</Eyebrow>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2.5 flex flex-wrap gap-2">
                   {baselines.readiness != null && readiness != null ? (
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold ${
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10.5px] font-semibold ${
                         readiness < baselines.readiness
-                          ? "bg-vyro-amber/10 text-vyro-amber"
-                          : "bg-vyro-mint/10 text-vyro-mint"
+                          ? "border-vyro-amber/20 bg-vyro-amber/10 text-vyro-amber"
+                          : "border-vyro-mint/20 bg-vyro-mint/10 text-vyro-mint"
                       }`}
                     >
                       {readiness >= baselines.readiness ? "↗" : "↘"} Readiness{" "}
@@ -838,26 +857,37 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                       {Math.round(readiness - baselines.readiness)} vs {baselines.days}d baseline
                     </span>
                   ) : (
-                    <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10.5px] font-semibold text-vyro-mute">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.05] px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-mute">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
                       Calibrating baseline…
                     </span>
                   )}
                   {m.connected && m.hrvMs != null && baselines.hrv != null && (
-                    <span className="rounded-full bg-vyro-mint/10 px-2.5 py-1 text-[10.5px] font-semibold text-vyro-mint">
+                    <span className="rounded-full border border-vyro-mint/20 bg-vyro-mint/10 px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-mint">
                       ↗ HRV {m.hrvMs - baselines.hrv > 0 ? "+" : ""}
                       {Math.round(m.hrvMs - baselines.hrv)} ms
                     </span>
                   )}
                   {strain != null && strain > 70 && (
-                    <span className="rounded-full bg-vyro-rose/10 px-2.5 py-1 text-[10.5px] font-semibold text-vyro-rose">
+                    <span className="rounded-full border border-vyro-rose/20 bg-vyro-rose/10 px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-rose">
                       ⚠ Strain {strain}/100
                     </span>
                   )}
                 </div>
               </div>
+
+              {!m.connected && (
+                <button
+                  onClick={() => setView("band")}
+                  className="mt-4 w-full rounded-2xl bg-white px-4 py-3 font-[family-name:var(--font-display)] text-[12px] font-bold uppercase tracking-[0.14em] text-black transition-transform duration-200 ease-out active:scale-[0.98]"
+                >
+                  Pair your band
+                </button>
+              )}
             </div>
           </div>
         </GlassCard>
+
 
         <div className="space-y-4">
           <InfoCard eyebrow="Top opportunity" icon={Sparkles} accent="yellow">
