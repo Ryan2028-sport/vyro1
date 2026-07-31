@@ -632,6 +632,177 @@ function InfoCard({
   );
 }
 
+/** Compact insight banner: icon chip, headline, supporting line. */
+function OpportunityCard({ agility, recovery }: { agility: number | null; recovery: number | null }) {
+  const { headline, detail, accent } = useMemo(() => {
+    if (agility != null && agility >= 75) {
+      return {
+        headline: "Push the intervals today",
+        detail: `Agility is ${agility}/100 — a good day for interval ghosting and speed work.`,
+        accent: "green" as Accent,
+      };
+    }
+    if (recovery != null && recovery < 50) {
+      return {
+        headline: "Protect tomorrow",
+        detail: `Recovery is ${recovery}/100 — keep it to mobility and breath work.`,
+        accent: "red" as Accent,
+      };
+    }
+    return {
+      headline: "Train inside your zones",
+      detail: "Reassess after your next session — VYRO will sharpen this as data lands.",
+      accent: "yellow" as Accent,
+    };
+  }, [agility, recovery]);
+
+  const color = ACCENT[accent];
+
+  return (
+    <GlassCard glow={color}>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3.5">
+        <span
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px]"
+          style={{
+            background: `color-mix(in oklab, ${color} 16%, transparent)`,
+            boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 40%, transparent)`,
+          }}
+        >
+          <Sparkles size={17} strokeWidth={2.4} style={{ color }} />
+        </span>
+        <div className="min-w-0">
+          <div
+            className="text-[9.5px] font-bold uppercase tracking-[0.16em]"
+            style={{ color: `color-mix(in oklab, ${color} 80%, white)` }}
+          >
+            top opportunity
+          </div>
+          <div className="mt-1 text-[15.5px] font-extrabold leading-tight tracking-[-0.03em] text-vyro-text">
+            {headline}
+          </div>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-vyro-mute">{detail}</p>
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
+/** Horizontal gauge row used by RTP: label, note, value and a thin accent track. */
+function GaugeRow({
+  label,
+  value,
+  accent = "green",
+  note,
+}: {
+  label: string;
+  value: number | null | undefined;
+  accent?: Accent;
+  note?: string;
+}) {
+  const has = value != null && Number.isFinite(value);
+  const pct = has ? Math.max(0, Math.min(100, value as number)) : 0;
+  const color = ACCENT[accent];
+  return (
+    <div className="py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="min-w-0 truncate text-[11px] font-bold uppercase tracking-[0.1em] text-white/75">
+          {label}
+        </span>
+        <span className="flex shrink-0 items-baseline gap-[2px]">
+          {has ? (
+            <span className="font-[family-name:var(--font-display)] text-[18px] font-extrabold leading-none tracking-[-0.05em] tabular-nums text-white">
+              {Math.round(value as number)}
+            </span>
+          ) : (
+            <span className="block h-[15px] w-[26px] animate-pulse rounded-md bg-white/[0.08]" aria-hidden />
+          )}
+          <span className="text-[9px] font-bold text-white/30">/100</span>
+        </span>
+      </div>
+      <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/[0.07]">
+        <span
+          className="block h-full rounded-full transition-[width] duration-700 ease-out"
+          style={{
+            width: `${has ? Math.max(2, pct) : 0}%`,
+            background: `linear-gradient(90deg, color-mix(in oklab, ${color} 45%, transparent), ${color})`,
+            boxShadow: has ? `0 0 8px color-mix(in oklab, ${color} 55%, transparent)` : "none",
+          }}
+        />
+      </div>
+      <div
+        className="mt-1.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
+        style={{ color: has ? `color-mix(in oklab, ${color} 65%, white)` : "rgba(235,235,245,0.28)" }}
+      >
+        {has ? (note ?? "live") : "awaiting signal"}
+      </div>
+    </div>
+  );
+}
+
+/** Timeline row for a training block. */
+function PlanRow({
+  time,
+  title,
+  load,
+  tone = "green",
+  live,
+  onRemove,
+}: {
+  time: string;
+  title: string;
+  load?: string;
+  tone?: PlanItem["color"];
+  live?: boolean;
+  onRemove?: () => void;
+}) {
+  const color = tone === "red" ? ACCENT.red : tone === "amber" ? ACCENT.orange : ACCENT.green;
+  return (
+    <div className="relative">
+      <span
+        aria-hidden
+        className="absolute -left-[26px] top-[18px] grid h-[15px] w-[15px] place-items-center rounded-full"
+        style={{ background: "var(--vyro-ink, #000)" }}
+      >
+        <span
+          className={`h-[7px] w-[7px] rounded-full ${live ? "animate-pulse" : ""}`}
+          style={{ background: color, boxShadow: `0 0 8px ${color}` }}
+        />
+      </span>
+      <div
+        className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] border border-white/[0.07] bg-white/[0.035] px-3.5 py-3 transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.06]"
+        style={live ? { boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 32%, transparent)` } : undefined}
+      >
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              className="shrink-0 rounded-full px-2 py-[3px] text-[9.5px] font-extrabold tabular-nums tracking-[0.04em]"
+              style={{ background: `color-mix(in oklab, ${color} 15%, transparent)`, color }}
+            >
+              {time}
+            </span>
+            <span className="truncate text-[13.5px] font-bold tracking-[-0.025em] text-vyro-text">{title}</span>
+          </div>
+          {load && <div className="mt-1 truncate text-[10.5px] font-semibold text-vyro-mute">{load}</div>}
+        </div>
+        {onRemove ? (
+          <button
+            aria-label="Remove plan item"
+            onClick={onRemove}
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[16px] leading-none text-white/30 transition-colors hover:bg-vyro-rose/15 hover:text-vyro-rose"
+          >
+            ×
+          </button>
+        ) : (
+          <span className="shrink-0 text-[9px] font-bold uppercase tracking-[0.12em]" style={{ color }}>
+            live
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: number }) {
   // Divergence = current reaction latency − personal baseline (median of recent samples).
   // If we have no baseline yet, show "calibrating".
