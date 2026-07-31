@@ -1523,7 +1523,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                       <button
                         key={tone.value}
                         onClick={() => setDraft((current) => ({ ...current, tone: tone.value as PlanItem["color"] }))}
-                        className="min-w-0 flex-1 truncate rounded-[9px] px-2 py-[7px] text-[10.5px] font-bold uppercase tracking-[0.08em] transition-all duration-200"
+                        className="min-w-0 flex-1 truncate rounded-[9px] px-1 py-[7px] text-[10px] font-bold uppercase tracking-[0.02em] transition-all duration-200"
                         style={
                           active
                             ? {
