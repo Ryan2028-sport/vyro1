@@ -220,45 +220,72 @@ function Ring({
   sleep?: number | null;
 }) {
   const arcs = [
-    { r: 48, width: 10, v: value, color: toneVar(value) },
-    { r: 36, width: 9, v: recovery ?? null, color: "var(--vyro-blue)" },
-    { r: 25, width: 8, v: sleep ?? null, color: "var(--vyro-indigo)" },
+    { r: 50, width: 11, v: value, color: toneVar(value), id: "readiness" },
+    { r: 37, width: 10, v: recovery ?? null, color: "var(--vyro-blue)", id: "recovery" },
+    { r: 25, width: 9, v: sleep ?? null, color: "var(--vyro-indigo)", id: "sleep" },
   ];
   const color = toneVar(value);
+  const pending = value == null;
 
   return (
-    <div className="relative h-[196px] w-[196px]">
+    <div className="relative h-[212px] w-[212px] shrink-0">
+      {/* ambient bloom */}
       <div
         aria-hidden
-        className="absolute inset-6 rounded-full blur-3xl transition-opacity duration-700"
-        style={{ background: color, opacity: value == null ? 0.06 : 0.22 }}
+        className="absolute inset-8 rounded-full blur-[38px] transition-opacity duration-1000"
+        style={{ background: color, opacity: pending ? 0.05 : 0.28 }}
+      />
+      {/* dial plate */}
+      <div
+        aria-hidden
+        className="absolute inset-0 rounded-full border border-white/[0.06]"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 22%, rgba(255,255,255,0.055), rgba(255,255,255,0.012) 58%, transparent 72%)",
+        }}
       />
       <svg
         viewBox="0 0 112 112"
-        className="h-full w-full -rotate-90"
+        className="relative h-full w-full -rotate-90"
         role="img"
-        aria-label={value == null ? "Readiness pending" : `Readiness ${value} out of 100`}
+        aria-label={pending ? "Readiness pending" : `Readiness ${value} out of 100`}
       >
+        <defs>
+          {arcs.map((arc) => (
+            <linearGradient key={arc.id} id={`vyro-arc-${arc.id}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={arc.color} stopOpacity="0.45" />
+              <stop offset="55%" stopColor={arc.color} stopOpacity="1" />
+              <stop offset="100%" stopColor={arc.color} stopOpacity="0.9" />
+            </linearGradient>
+          ))}
+        </defs>
         {arcs.map((arc) => {
           const c = 2 * Math.PI * arc.r;
           const clamped = Math.max(0, Math.min(100, arc.v ?? 0));
           return (
             <g key={arc.r}>
-              <circle cx="56" cy="56" r={arc.r} fill="none" stroke="hsl(0 0% 100% / 0.07)" strokeWidth={arc.width} />
+              <circle
+                cx="56"
+                cy="56"
+                r={arc.r}
+                fill="none"
+                stroke="hsl(0 0% 100% / 0.055)"
+                strokeWidth={arc.width}
+              />
               {arc.v != null && (
                 <circle
                   cx="56"
                   cy="56"
                   r={arc.r}
                   fill="none"
-                  stroke={arc.color}
+                  stroke={`url(#vyro-arc-${arc.id})`}
                   strokeLinecap="round"
                   strokeWidth={arc.width}
                   strokeDasharray={c}
                   strokeDashoffset={c - (clamped / 100) * c}
                   style={{
-                    filter: `drop-shadow(0 0 8px ${arc.color})`,
-                    transition: "stroke-dashoffset 1000ms cubic-bezier(0.32,0.72,0,1)",
+                    filter: `drop-shadow(0 0 7px color-mix(in oklab, ${arc.color} 65%, transparent))`,
+                    transition: "stroke-dashoffset 1100ms cubic-bezier(0.32,0.72,0,1)",
                   }}
                 />
               )}
@@ -267,22 +294,60 @@ function Ring({
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="flex items-baseline gap-1">
+        <div className="flex items-start gap-1">
           <span
-            className="font-[family-name:var(--font-display)] text-[48px] font-extrabold leading-none tracking-[-0.05em] tabular-nums"
-            style={{ color: value == null ? "rgba(235,235,245,0.4)" : "#fff" }}
+            className="font-[family-name:var(--font-display)] text-[54px] font-black leading-[0.9] tracking-[-0.055em] tabular-nums"
+            style={{
+              color: pending ? "rgba(235,235,245,0.32)" : "#fff",
+              textShadow: pending ? "none" : `0 0 26px color-mix(in oklab, ${color} 45%, transparent)`,
+            }}
           >
-            {value == null ? "—" : value}
+            {pending ? "––" : value}
           </span>
-          <span className="text-[11px] font-semibold text-vyro-mute">/100</span>
+          <span className="mt-2.5 text-[11px] font-bold text-vyro-mute">/100</span>
         </div>
-        <div className="mt-1 font-[family-name:var(--font-display)] text-[8.5px] font-bold uppercase tracking-[0.24em] text-vyro-mute">
+        <div className="mt-1.5 font-[family-name:var(--font-display)] text-[8.5px] font-bold uppercase tracking-[0.26em] text-vyro-mute">
           Readiness
         </div>
       </div>
     </div>
   );
 }
+
+/** Legend row under the hero ring — one dot + label + value per ring. */
+function RingLegend({
+  items,
+}: {
+  items: { label: string; value: number | null; color: string }[];
+}) {
+  return (
+    <div className="grid w-full grid-cols-3 gap-2">
+      {items.map((it) => (
+        <div
+          key={it.label}
+          className="rounded-2xl border border-white/[0.07] bg-white/[0.035] px-2.5 py-2.5 text-center"
+        >
+          <div className="flex items-center justify-center gap-1.5">
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ background: it.color, boxShadow: `0 0 6px ${it.color}` }}
+            />
+            <span className="truncate text-[8.5px] font-bold uppercase tracking-[0.14em] text-vyro-mute">
+              {it.label}
+            </span>
+          </div>
+          <div
+            className="mt-1 font-[family-name:var(--font-display)] text-[19px] font-extrabold leading-none tracking-[-0.04em] tabular-nums"
+            style={{ color: it.value == null ? "rgba(235,235,245,0.35)" : "#fff" }}
+          >
+            {it.value ?? "––"}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 function MiniMetric({
   label,
@@ -724,48 +789,67 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         </header>
 
         {/* ---- Readiness hero -------------------------------------------- */}
-        <GlassCard glow={toneVar(readiness)} className="animate-in fade-in slide-in-from-bottom-3 p-6 duration-500">
-          <div className="flex flex-col items-center gap-5">
+        <GlassCard
+          glow={toneVar(readiness)}
+          className="animate-in fade-in slide-in-from-bottom-3 p-5 duration-500 sm:p-6"
+        >
+          {/* status strip */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Status text is driven by the canonical recovery band — a low
+                recovery can no longer render a green "Ready" tag. */}
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[9.5px] font-bold uppercase tracking-[0.16em] ${
+                s.bandTone === "warn"
+                  ? "border-vyro-amber/25 bg-vyro-amber/10 text-vyro-amber"
+                  : s.bandTone === "off"
+                    ? "border-vyro-rose/25 bg-vyro-rose/10 text-vyro-rose"
+                    : s.bandTone === "neutral"
+                      ? "border-white/10 bg-white/[0.06] text-vyro-mute"
+                      : "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full bg-current ${s.bandTone === "neutral" ? "" : "animate-pulse"}`}
+              />
+              {statusLabel}
+            </span>
+            <span className="truncate text-[9.5px] font-bold uppercase tracking-[0.16em] text-vyro-mute">
+              {m.connected ? "Live · VYRO Band" : "Awaiting band"}
+            </span>
+          </div>
+
+          <div className="mt-4 flex flex-col items-center gap-5">
             <Ring value={readiness} recovery={recovery} sleep={sleep} />
 
+            <RingLegend
+              items={[
+                { label: "Readiness", value: readiness, color: toneVar(readiness) },
+                { label: "Recovery", value: recovery, color: "var(--vyro-blue)" },
+                { label: "Sleep", value: sleep, color: "var(--vyro-indigo)" },
+              ]}
+            />
+
             <div className="w-full min-w-0">
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {/* Status text is driven by the canonical recovery band — a low
-                    recovery can no longer render a green "Ready" tag. */}
-                <span
-                  className={`rounded-full border px-3 py-1 text-[9.5px] font-bold uppercase tracking-[0.14em] ${
-                    s.bandTone === "warn"
-                      ? "border-vyro-amber/25 bg-vyro-amber/10 text-vyro-amber"
-                      : s.bandTone === "off"
-                        ? "border-vyro-rose/25 bg-vyro-rose/10 text-vyro-rose"
-                        : s.bandTone === "neutral"
-                          ? "border-white/10 bg-white/[0.06] text-vyro-mute"
-                          : "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint"
-                  }`}
-                >
-                  {statusLabel}
-                </span>
-                <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-vyro-mute">
-                  Recovery {recovery ?? "—"} · Sleep {sleep ?? "—"}
-                </span>
-              </div>
-              <h2 className="mt-3 text-balance text-center text-[20px] font-extrabold leading-tight tracking-[-0.035em] text-vyro-text">
+              <h2 className="text-balance text-center font-[family-name:var(--font-display)] text-[21px] font-extrabold leading-[1.18] tracking-[-0.04em] text-vyro-text">
                 {s.coachRead}
               </h2>
-              <p className="mt-2 text-center text-[12.5px] leading-relaxed text-vyro-mute">
+              <p className="mx-auto mt-2 max-w-[36ch] text-center text-[12.5px] leading-relaxed text-vyro-mute">
                 {m.connected
                   ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
                   : "Pair your VYRO Band to populate live signals."}
               </p>
-              <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3.5">
+
+              <div className="mt-5 h-px bg-linear-to-r from-transparent via-white/12 to-transparent" />
+
+              <div className="mt-4">
                 <Eyebrow tone="mute">What changed</Eyebrow>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2.5 flex flex-wrap gap-2">
                   {baselines.readiness != null && readiness != null ? (
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold ${
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10.5px] font-semibold ${
                         readiness < baselines.readiness
-                          ? "bg-vyro-amber/10 text-vyro-amber"
-                          : "bg-vyro-mint/10 text-vyro-mint"
+                          ? "border-vyro-amber/20 bg-vyro-amber/10 text-vyro-amber"
+                          : "border-vyro-mint/20 bg-vyro-mint/10 text-vyro-mint"
                       }`}
                     >
                       {readiness >= baselines.readiness ? "↗" : "↘"} Readiness{" "}
@@ -773,26 +857,37 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                       {Math.round(readiness - baselines.readiness)} vs {baselines.days}d baseline
                     </span>
                   ) : (
-                    <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10.5px] font-semibold text-vyro-mute">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.05] px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-mute">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
                       Calibrating baseline…
                     </span>
                   )}
                   {m.connected && m.hrvMs != null && baselines.hrv != null && (
-                    <span className="rounded-full bg-vyro-mint/10 px-2.5 py-1 text-[10.5px] font-semibold text-vyro-mint">
+                    <span className="rounded-full border border-vyro-mint/20 bg-vyro-mint/10 px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-mint">
                       ↗ HRV {m.hrvMs - baselines.hrv > 0 ? "+" : ""}
                       {Math.round(m.hrvMs - baselines.hrv)} ms
                     </span>
                   )}
                   {strain != null && strain > 70 && (
-                    <span className="rounded-full bg-vyro-rose/10 px-2.5 py-1 text-[10.5px] font-semibold text-vyro-rose">
+                    <span className="rounded-full border border-vyro-rose/20 bg-vyro-rose/10 px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-rose">
                       ⚠ Strain {strain}/100
                     </span>
                   )}
                 </div>
               </div>
+
+              {!m.connected && (
+                <button
+                  onClick={() => setView("band")}
+                  className="mt-4 w-full rounded-2xl bg-white px-4 py-3 font-[family-name:var(--font-display)] text-[12px] font-bold uppercase tracking-[0.14em] text-black transition-transform duration-200 ease-out active:scale-[0.98]"
+                >
+                  Pair your band
+                </button>
+              )}
             </div>
           </div>
         </GlassCard>
+
 
         <div className="space-y-4">
           <InfoCard eyebrow="Top opportunity" icon={Sparkles} accent="yellow">
