@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { Card, PageHeader, Pill, Ring, Stat } from "./shared";
-import { computeReadiness, computeSubScores, recoveryBand, useLiveMetrics } from "./useLiveMetrics";
+import { useVyroScores } from "./VyroScoresProvider";
 
-// Athlete tab — mobile-first health hub tuned for squash players.
-// Reorganized into a hero + segmented sub-tabs so the screen never
-// requires excessive scrolling. Live values stream from the band;
-// everything else degrades gracefully to "—".
+// Athlete tab — mobile-first health hub tuned for racket sports.
+// Every score comes from the global <VyroScoresProvider /> so this screen can
+// never disagree with the Recovery or Sport tabs. Live values stream from the
+// band; everything else degrades gracefully to "—".
 
 type Section = "overview" | "cardiac" | "body" | "load" | "risk";
 
@@ -18,55 +18,25 @@ const SECTIONS: { id: Section; label: string }[] = [
 ];
 
 export function AthleteView() {
-  const m = useLiveMetrics();
+  const s = useVyroScores();
+  const m = s.m;
   const [section, setSection] = useState<Section>("overview");
   const live = <T,>(v: T | null | undefined): T | null => (m.connected ? (v ?? null) : null);
 
-  const subs = useMemo(
-    () =>
-      computeSubScores({
-        connected: m.connected,
-        hrvMs: m.hrvMs,
-        restingHrBpm: m.restingHrBpm,
-        stress: m.stressScore,
-        peakJerk: m.peakJerk,
-        peakG: m.peakG,
-        eventsLastMin: m.eventsLastMin,
-        reactMin: m.reactMin,
-      }),
-    [m.connected, m.hrvMs, m.restingHrBpm, m.stressScore, m.peakJerk, m.peakG, m.eventsLastMin, m.reactMin],
-  );
+  const subs = { recovery: s.recovery, agility: s.agility, fatigue: s.fatigue, sleep: s.sleep };
+  const readiness = { score: s.readiness };
+  const sessionLoad = s.sessionLoad;
 
-  const readiness = useMemo(
-    () =>
-      computeReadiness({
-        connected: m.connected,
-        heartRateBpm: m.heartRateBpm,
-        hrvMs: m.hrvMs,
-        restingHrBpm: m.restingHrBpm,
-        stress: m.stressScore,
-        spo2: m.spo2Pct,
-        peakJerk: m.peakJerk,
-      }),
-    [m.connected, m.heartRateBpm, m.hrvMs, m.restingHrBpm, m.stressScore, m.spo2Pct, m.peakJerk],
-  );
-
-  const sessionLoad = useMemo(() => {
-    if (!m.connected) return null;
-    const base = Math.min(100, m.eventsLastMin * 1.4);
-    const intensity = Math.min(40, (m.peakJerk ?? 0) / 5);
-    return Math.round(Math.min(100, base * 0.7 + intensity));
-  }, [m.connected, m.eventsLastMin, m.peakJerk]);
-
-  const band = recoveryBand(readiness.score);
-  const bandTone = band === "green" ? "live" : band === "yellow" ? "warn" : band === "red" ? "off" : "neutral";
-  const bandLabel = band === "green" ? "primed" : band === "yellow" ? "manage" : band === "red" ? "recover" : "calibrating";
+  const band = s.band;
+  const bandTone = s.bandTone;
+  const bandLabel = s.statusLabel.toLowerCase();
 
   const guidance = useMemo(() => {
     if (!m.connected) return "Connect the band to unlock court-ready guidance.";
     if (band === "red") return "Recovery is low. Skip ghosting drills, choose mobility + light hitting.";
     if (band === "yellow") return "Moderate readiness — technique work and 2 short interval blocks max.";
     if (sessionLoad != null && sessionLoad > 70) return "You're already deep in load. Cool down and rehydrate.";
+    if (band === "unknown") return "Wear the band a few more minutes to lock in a reading.";
     return "Green light: full interval ghosting, court sprints and pressure drills are on the table.";
   }, [m.connected, band, sessionLoad]);
 
@@ -75,7 +45,7 @@ export function AthleteView() {
       <PageHeader
         eyebrow="Athlete · 24/7"
         title="Athlete health"
-        subtitle="Live squash-tuned health and load from your VYRO Band."
+        subtitle="Live sport-tuned health and load from your VYRO Band."
         action={
           <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>
             {m.connected ? "live" : "no watch"}
@@ -86,7 +56,8 @@ export function AthleteView() {
       {/* Sticky hero — always visible no matter which section */}
       <Card eyebrow="Court readiness" title="Today's status" action={<Pill tone={bandTone}>{bandLabel}</Pill>}>
         <div className="flex items-center gap-4">
-          <Ring value={readiness.score} label="Ready" sub={m.connected ? "live" : "off"} size={108} stroke={9} />
+          {/* Label follows the canonical recovery band — never a fixed "Ready". */}
+          <Ring value={readiness.score} label={s.statusLabel} sub={m.connected ? "live" : "off"} size={108} stroke={9} />
           <div className="min-w-0 flex-1">
             <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-vyro-mute">Coach read</div>
             <p className="mt-1 text-[13px] leading-snug text-vyro-text">{guidance}</p>
