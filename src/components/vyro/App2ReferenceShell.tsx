@@ -366,7 +366,90 @@ function RingLegend({
 }
 
 
+/** Whoop-style scannable metric row: mini arc, label, status, value, track. */
+function MetricRow({
+  label,
+  value,
+  accent = "mute",
+  status,
+  invert = false,
+}: {
+  label: string;
+  value: number | null | undefined;
+  accent?: Accent;
+  status?: string;
+  invert?: boolean;
+}) {
+  const has = value != null && Number.isFinite(value);
+  const pct = has ? Math.max(0, Math.min(100, value as number)) : 0;
+  const color = ACCENT[accent];
+  const size = 34;
+  const r = (size - 4) / 2;
+  const c = 2 * Math.PI * r;
+
+  return (
+    <div className="flex items-center gap-3.5 py-3 first:pt-0 last:pb-0">
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90 block">
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(0 0% 100% / 0.08)" strokeWidth={3.5} />
+          {has && (
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={r}
+              fill="none"
+              stroke={color}
+              strokeWidth={3.5}
+              strokeLinecap="round"
+              strokeDasharray={c}
+              strokeDashoffset={c - (pct / 100) * c}
+              style={{
+                filter: `drop-shadow(0 0 5px color-mix(in oklab, ${color} 55%, transparent))`,
+                transition: "stroke-dashoffset 800ms cubic-bezier(0.32,0.72,0,1)",
+              }}
+            />
+          )}
+        </svg>
+        {!has && (
+          <span className="absolute inset-0 grid place-items-center text-[9px] font-bold text-white/25">?</span>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[12.5px] font-bold tracking-[-0.015em] text-white">{label}</div>
+        <div
+          className="mt-0.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
+          style={{ color: has ? `color-mix(in oklab, ${color} 70%, white)` : "rgba(235,235,245,0.3)" }}
+        >
+          {has ? (status ?? (invert ? "load index" : "score")) : "awaiting signal"}
+        </div>
+        <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/[0.07]">
+          <span
+            className="block h-full rounded-full transition-[width] duration-700 ease-out"
+            style={{
+              width: `${has ? Math.max(2, pct) : 0}%`,
+              background: `linear-gradient(90deg, color-mix(in oklab, ${color} 45%, transparent), ${color})`,
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-baseline gap-[2px]">
+        {has ? (
+          <span className="font-[family-name:var(--font-display)] text-[22px] font-extrabold leading-none tracking-[-0.05em] tabular-nums text-white">
+            {Math.round(value as number)}
+          </span>
+        ) : (
+          <span className="block h-[18px] w-[34px] animate-pulse rounded-md bg-white/[0.07]" aria-hidden />
+        )}
+        <span className="text-[9.5px] font-bold text-white/30">/100</span>
+      </div>
+    </div>
+  );
+}
+
 function MiniMetric({
+
   label,
   value,
   unit,
@@ -948,13 +1031,38 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </InfoCard>
 
           <InfoCard eyebrow="Base readiness" title="Core metrics" icon={Gauge} accent="green">
-            <div className="grid grid-cols-2 gap-2.5">
-              <MiniMetric label="Fatigue" accent="red" value={fatigue ?? "—"} unit="/100" trend={fatigue != null ? (fatigue < 40 ? "controlled" : fatigue < 70 ? "elevated" : "overload") : undefined} />
-              <MiniMetric label="Recovery" accent="green" value={recovery ?? "—"} unit="/100" trend={trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`)} />
-              <MiniMetric label="Agility" accent="teal" value={agility ?? "—"} unit="/100" trend={agility != null ? (agility >= 75 ? "peaking" : agility >= 50 ? "steady" : "low") : undefined} />
-              <MiniMetric label="Sleep" accent="indigo" value={sleep ?? "—"} unit="/100" trend={sleep != null ? (sleep >= 80 ? "rested" : "short") : undefined} />
+            <div className="divide-y divide-white/[0.06]">
+              <MetricRow
+                label="Fatigue"
+                accent="red"
+                value={fatigue}
+                invert
+                status={fatigue != null ? (fatigue < 40 ? "Controlled" : fatigue < 70 ? "Elevated" : "Overload") : undefined}
+              />
+              <MetricRow
+                label="Recovery"
+                accent="green"
+                value={recovery}
+                status={
+                  trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`) ??
+                  undefined
+                }
+              />
+              <MetricRow
+                label="Agility"
+                accent="teal"
+                value={agility}
+                status={agility != null ? (agility >= 75 ? "Peaking" : agility >= 50 ? "Steady" : "Low") : undefined}
+              />
+              <MetricRow
+                label="Sleep"
+                accent="indigo"
+                value={sleep}
+                status={sleep != null ? (sleep >= 80 ? "Rested" : "Short") : undefined}
+              />
             </div>
           </InfoCard>
+
 
           <InfoCard
             eyebrow="Vitals"
