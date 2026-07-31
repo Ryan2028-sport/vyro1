@@ -25,6 +25,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveMetrics } from "./useLiveMetrics";
 import { useVyroBandCtx } from "./VyroBandProvider";
 import { useSleepNights } from "@/lib/use-sleep-nights";
+import { PageHeader } from "./shared";
+
 import {
   ageLabel,
   shortUuid,
