@@ -220,45 +220,72 @@ function Ring({
   sleep?: number | null;
 }) {
   const arcs = [
-    { r: 48, width: 10, v: value, color: toneVar(value) },
-    { r: 36, width: 9, v: recovery ?? null, color: "var(--vyro-blue)" },
-    { r: 25, width: 8, v: sleep ?? null, color: "var(--vyro-indigo)" },
+    { r: 50, width: 11, v: value, color: toneVar(value), id: "readiness" },
+    { r: 37, width: 10, v: recovery ?? null, color: "var(--vyro-blue)", id: "recovery" },
+    { r: 25, width: 9, v: sleep ?? null, color: "var(--vyro-indigo)", id: "sleep" },
   ];
   const color = toneVar(value);
+  const pending = value == null;
 
   return (
-    <div className="relative h-[196px] w-[196px]">
+    <div className="relative h-[212px] w-[212px] shrink-0">
+      {/* ambient bloom */}
       <div
         aria-hidden
-        className="absolute inset-6 rounded-full blur-3xl transition-opacity duration-700"
-        style={{ background: color, opacity: value == null ? 0.06 : 0.22 }}
+        className="absolute inset-8 rounded-full blur-[38px] transition-opacity duration-1000"
+        style={{ background: color, opacity: pending ? 0.05 : 0.28 }}
+      />
+      {/* dial plate */}
+      <div
+        aria-hidden
+        className="absolute inset-0 rounded-full border border-white/[0.06]"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 22%, rgba(255,255,255,0.055), rgba(255,255,255,0.012) 58%, transparent 72%)",
+        }}
       />
       <svg
         viewBox="0 0 112 112"
-        className="h-full w-full -rotate-90"
+        className="relative h-full w-full -rotate-90"
         role="img"
-        aria-label={value == null ? "Readiness pending" : `Readiness ${value} out of 100`}
+        aria-label={pending ? "Readiness pending" : `Readiness ${value} out of 100`}
       >
+        <defs>
+          {arcs.map((arc) => (
+            <linearGradient key={arc.id} id={`vyro-arc-${arc.id}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={arc.color} stopOpacity="0.45" />
+              <stop offset="55%" stopColor={arc.color} stopOpacity="1" />
+              <stop offset="100%" stopColor={arc.color} stopOpacity="0.9" />
+            </linearGradient>
+          ))}
+        </defs>
         {arcs.map((arc) => {
           const c = 2 * Math.PI * arc.r;
           const clamped = Math.max(0, Math.min(100, arc.v ?? 0));
           return (
             <g key={arc.r}>
-              <circle cx="56" cy="56" r={arc.r} fill="none" stroke="hsl(0 0% 100% / 0.07)" strokeWidth={arc.width} />
+              <circle
+                cx="56"
+                cy="56"
+                r={arc.r}
+                fill="none"
+                stroke="hsl(0 0% 100% / 0.055)"
+                strokeWidth={arc.width}
+              />
               {arc.v != null && (
                 <circle
                   cx="56"
                   cy="56"
                   r={arc.r}
                   fill="none"
-                  stroke={arc.color}
+                  stroke={`url(#vyro-arc-${arc.id})`}
                   strokeLinecap="round"
                   strokeWidth={arc.width}
                   strokeDasharray={c}
                   strokeDashoffset={c - (clamped / 100) * c}
                   style={{
-                    filter: `drop-shadow(0 0 8px ${arc.color})`,
-                    transition: "stroke-dashoffset 1000ms cubic-bezier(0.32,0.72,0,1)",
+                    filter: `drop-shadow(0 0 7px color-mix(in oklab, ${arc.color} 65%, transparent))`,
+                    transition: "stroke-dashoffset 1100ms cubic-bezier(0.32,0.72,0,1)",
                   }}
                 />
               )}
@@ -267,22 +294,60 @@ function Ring({
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="flex items-baseline gap-1">
+        <div className="flex items-start gap-1">
           <span
-            className="font-[family-name:var(--font-display)] text-[48px] font-extrabold leading-none tracking-[-0.05em] tabular-nums"
-            style={{ color: value == null ? "rgba(235,235,245,0.4)" : "#fff" }}
+            className="font-[family-name:var(--font-display)] text-[54px] font-black leading-[0.9] tracking-[-0.055em] tabular-nums"
+            style={{
+              color: pending ? "rgba(235,235,245,0.32)" : "#fff",
+              textShadow: pending ? "none" : `0 0 26px color-mix(in oklab, ${color} 45%, transparent)`,
+            }}
           >
-            {value == null ? "—" : value}
+            {pending ? "––" : value}
           </span>
-          <span className="text-[11px] font-semibold text-vyro-mute">/100</span>
+          <span className="mt-2.5 text-[11px] font-bold text-vyro-mute">/100</span>
         </div>
-        <div className="mt-1 font-[family-name:var(--font-display)] text-[8.5px] font-bold uppercase tracking-[0.24em] text-vyro-mute">
+        <div className="mt-1.5 font-[family-name:var(--font-display)] text-[8.5px] font-bold uppercase tracking-[0.26em] text-vyro-mute">
           Readiness
         </div>
       </div>
     </div>
   );
 }
+
+/** Legend row under the hero ring — one dot + label + value per ring. */
+function RingLegend({
+  items,
+}: {
+  items: { label: string; value: number | null; color: string }[];
+}) {
+  return (
+    <div className="grid w-full grid-cols-3 gap-2">
+      {items.map((it) => (
+        <div
+          key={it.label}
+          className="rounded-2xl border border-white/[0.07] bg-white/[0.035] px-2.5 py-2.5 text-center"
+        >
+          <div className="flex items-center justify-center gap-1.5">
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ background: it.color, boxShadow: `0 0 6px ${it.color}` }}
+            />
+            <span className="truncate text-[8.5px] font-bold uppercase tracking-[0.14em] text-vyro-mute">
+              {it.label}
+            </span>
+          </div>
+          <div
+            className="mt-1 font-[family-name:var(--font-display)] text-[19px] font-extrabold leading-none tracking-[-0.04em] tabular-nums"
+            style={{ color: it.value == null ? "rgba(235,235,245,0.35)" : "#fff" }}
+          >
+            {it.value ?? "––"}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 function MiniMetric({
   label,
