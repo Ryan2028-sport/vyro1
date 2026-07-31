@@ -1168,8 +1168,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                       key={i}
                       className="h-[5px] flex-1 rounded-full transition-colors duration-500"
                       style={{
-                        background: i < baselines.days ? ACCENT.amber : "hsl(0 0% 100% / 0.08)",
-                        boxShadow: i < baselines.days ? `0 0 8px color-mix(in oklab, ${ACCENT.amber} 55%, transparent)` : "none",
+                        background: i < baselines.days ? ACCENT.orange : "hsl(0 0% 100% / 0.08)",
+                        boxShadow: i < baselines.days ? `0 0 8px color-mix(in oklab, ${ACCENT.orange} 55%, transparent)` : "none",
                       }}
                     />
                   ))}
@@ -1291,7 +1291,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 <div className="flex min-w-0 flex-1 gap-1 rounded-[12px] border border-white/[0.07] bg-black/25 p-1">
                   {([
                     { value: "green", label: "Optimal", accent: "green" as Accent },
-                    { value: "amber", label: "Elevated", accent: "amber" as Accent },
+                    { value: "amber", label: "Elevated", accent: "orange" as Accent },
                     { value: "red", label: "High", accent: "red" as Accent },
                   ] as const).map((tone) => {
                     const active = draft.tone === tone.value;
