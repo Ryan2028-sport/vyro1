@@ -20,9 +20,12 @@ export function Pill({
       ? "border-vyro-mint/30 bg-vyro-mint/10 text-vyro-mint"
       : tone === "warn"
         ? "border-vyro-amber/30 bg-vyro-amber/10 text-vyro-amber"
-        : tone === "off"
+        : tone === "alert"
           ? "border-vyro-rose/30 bg-vyro-rose/10 text-vyro-rose"
-          : "border-vyro-line bg-vyro-text/5 text-vyro-mute";
+          : tone === "off"
+            ? "border-vyro-line bg-vyro-text/[0.04] text-vyro-mute/80"
+            : "border-vyro-line bg-vyro-text/5 text-vyro-mute";
+
   return (
     <span
       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[9.5px] font-medium uppercase tracking-[0.16em] transition-colors duration-200 ${cls}`}
