@@ -381,8 +381,10 @@ function MiniMetric({
   live?: boolean;
   accent?: Accent;
 }) {
-  const dim = value === "—" || value == null;
+  const num = typeof value === "number" ? value : Number(value);
+  const dim = value == null || value === "—" || value === "––" || !Number.isFinite(num);
   const color = ACCENT[accent];
+  const showBar = !dim && unit === "/100";
   return (
     <div
       className="group relative overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.045] p-3.5 transition-all duration-200 ease-out hover:border-white/[0.16] hover:bg-white/[0.075] active:scale-[0.985]"
@@ -395,7 +397,7 @@ function MiniMetric({
           style={{ background: color, opacity: 0.2 }}
         />
       )}
-      <div className="relative flex items-center justify-between gap-2">
+      <div className="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
         <span className="min-w-0 truncate text-[9.5px] font-bold uppercase tracking-[0.12em] text-vyro-mute">
           {label}
         </span>
@@ -411,22 +413,49 @@ function MiniMetric({
             live
           </span>
         ) : dim ? (
-          <span className="shrink-0 text-[9px] text-vyro-mute/50">—</span>
+          <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-[3px] text-[7.5px] font-bold uppercase tracking-[0.12em] text-white/35">
+            no data
+          </span>
         ) : null}
       </div>
-      <div className="relative mt-2 flex items-baseline gap-1">
-        <span
-          className="font-[family-name:var(--font-display)] text-[27px] font-extrabold leading-none tracking-[-0.045em] tabular-nums"
-          style={{ color: dim ? "rgba(235,235,245,0.32)" : "#fff" }}
-        >
-          {value}
-        </span>
-        {unit && <span className="text-[10px] font-semibold text-vyro-mute">{unit}</span>}
-      </div>
-      {trend && (
+
+      {dim ? (
+        <div className="relative mt-3 flex items-center gap-2">
+          <span className="block h-[26px] w-[52px] animate-pulse rounded-lg bg-white/[0.07]" aria-hidden />
+          <span className="text-[10px] font-semibold tracking-[-0.01em] text-white/25">awaiting signal</span>
+        </div>
+      ) : (
+        <div className="relative mt-2 flex items-baseline gap-[3px]">
+          <span
+            className="font-[family-name:var(--font-display)] text-[28px] font-extrabold leading-none tracking-[-0.05em] tabular-nums text-white"
+          >
+            {value}
+          </span>
+          {unit && (
+            <span className="translate-y-[-2px] text-[10.5px] font-bold tracking-[-0.01em] text-white/35">
+              {unit}
+            </span>
+          )}
+        </div>
+      )}
+
+      {showBar && (
+        <div className="relative mt-3 h-[3px] overflow-hidden rounded-full bg-white/[0.08]">
+          <span
+            className="block h-full rounded-full transition-[width] duration-700 ease-out"
+            style={{
+              width: `${Math.max(2, Math.min(100, num))}%`,
+              background: `linear-gradient(90deg, color-mix(in oklab, ${color} 55%, transparent), ${color})`,
+              boxShadow: `0 0 8px color-mix(in oklab, ${color} 60%, transparent)`,
+            }}
+          />
+        </div>
+      )}
+
+      {trend && !dim && (
         <div
-          className="relative mt-1.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
-          style={{ color: dim ? "rgba(235,235,245,0.4)" : `color-mix(in oklab, ${color} 72%, white)` }}
+          className="relative mt-2 truncate text-[10px] font-semibold tracking-[-0.01em]"
+          style={{ color: `color-mix(in oklab, ${color} 72%, white)` }}
         >
           {trend}
         </div>
@@ -434,6 +463,7 @@ function MiniMetric({
     </div>
   );
 }
+
 
 function InfoCard({
   eyebrow,
