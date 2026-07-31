@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, PageHeader, Pill, Ring, Stat } from "./shared";
+import { Card, PageHeader, Pill, Ring, SegmentedTabs, Stat } from "./shared";
 import { type LiveMetrics } from "./useLiveMetrics";
 import { useVyroScores } from "./VyroScoresProvider";
 
