@@ -139,14 +139,14 @@ export function SleepView() {
   return (
     <div className="mx-auto max-w-[430px] space-y-5 pb-8 text-vyro-text">
       <header className="space-y-2">
-        <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep · Overnight vitals</p>
-        <h2 className="text-[26px] font-black leading-tight text-vyro-text">Live sleep score</h2>
+        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">Sleep · Overnight vitals</p>
+        <h2 className="text-[26px] font-black leading-[1.06] tracking-[-0.04em] text-vyro-text">Live sleep score</h2>
         <p className="max-w-[390px] text-[13px] leading-relaxed text-vyro-mute">
           Derived only from BLE heart-rate, HRV and skin-temperature samples
           collected between 10pm and 8am. The firmware does not emit sleep
           stages, so no hypnogram, no wakeups, no debt curves are shown.
         </p>
-        <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-vyro-text/35 bg-vyro-text/5 px-3 font-mono text-[12px] uppercase tracking-[0.16em] text-vyro-text">
+        <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-vyro-text/35 bg-vyro-text/5 px-3 font-mono text-[9.5px] font-medium uppercase tracking-[0.14em] text-vyro-text">
           <Moon className="h-4 w-4" />
           {connected ? "Band live · sampling" : samples.length ? "Last overnight window" : "Awaiting overnight data"}
         </span>
@@ -156,7 +156,7 @@ export function SleepView() {
 
       <VCard>
         <div className="flex items-center justify-between">
-          <p className="font-mono text-[12px] uppercase tracking-[0.28em] text-vyro-mute">Overnight window</p>
+          <p className="font-mono text-[9px] font-medium uppercase tracking-[0.24em] text-vyro-mute">Overnight window</p>
           <span className="font-mono text-[11px] text-vyro-mute">{windowLabel}</span>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -171,7 +171,7 @@ export function SleepView() {
       </VCard>
 
       <VCard>
-        <p className="font-mono text-[12px] uppercase tracking-[0.28em] text-vyro-mute">How the score is computed</p>
+        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.24em] text-vyro-mute">How the score is computed</p>
         <ul className="mt-3 space-y-2 text-[12px] leading-relaxed text-vyro-mute">
           <li><span className="text-vyro-text">Cardiac calm (45%):</span> lower min HR overnight scores higher.</li>
           <li><span className="text-vyro-text">Recovery (40%):</span> higher average HRV scores higher.</li>
@@ -188,9 +188,9 @@ function ScoreCard({ score, cardiac, recovery, thermal, samples, bufSize }: {
   samples: number; bufSize: number;
 }) {
   return (
-    <VCard className="border-vyro-text/42">
+    <VCard className="border-vyro-line">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-        <p className="font-mono text-[13px] uppercase tracking-[0.34em] text-vyro-mute">Sleep score</p>
+        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">Sleep score</p>
         <MiniBadge>{score != null ? "Live" : "—"}</MiniBadge>
       </div>
       <div className="mt-6 rounded-[20px] border border-vyro-text/25 bg-vyro-ink/35 p-5 text-center">
@@ -213,22 +213,22 @@ function ScoreCard({ score, cardiac, recovery, thermal, samples, bufSize }: {
 
 function Sub({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="rounded-[14px] border border-vyro-line bg-vyro-panel/70 p-3 text-center">
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-vyro-mute">{label}</div>
-      <div className="mt-1 text-[20px] font-black tabular-nums text-vyro-text">{value != null ? value : "—"}</div>
+    <div className="rounded-[14px] border border-vyro-line bg-vyro-text/[0.03] p-3 transition-colors duration-200 hover:bg-vyro-text/[0.055] text-center">
+      <div className="font-mono text-[8.5px] font-medium uppercase tracking-[0.15em] text-vyro-mute">{label}</div>
+      <div className="mt-1 text-[21px] font-black leading-none tracking-[-0.04em] tabular-nums text-vyro-text">{value != null ? value : "—"}</div>
     </div>
   );
 }
 
 function Metric({ icon, label, value, unit }: { icon: ReactNode; label: string; value: string; unit: string }) {
   return (
-    <div className="rounded-[14px] border border-vyro-line bg-vyro-panel/70 p-3">
-      <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.22em] text-vyro-mute">
+    <div className="rounded-[14px] border border-vyro-line bg-vyro-text/[0.03] p-3 transition-colors duration-200 hover:bg-vyro-text/[0.055]">
+      <div className="flex items-center gap-2 font-mono text-[8.5px] font-medium uppercase tracking-[0.15em] text-vyro-mute">
         <span className="text-vyro-mute">{icon}</span>
         {label}
       </div>
       <div className="mt-2 flex items-baseline gap-1">
-        <span className="text-[20px] font-black tabular-nums text-vyro-text">{value}</span>
+        <span className="text-[21px] font-black leading-none tracking-[-0.04em] tabular-nums text-vyro-text">{value}</span>
         <span className="text-[11px] font-semibold text-vyro-mute">{unit}</span>
       </div>
     </div>
@@ -237,13 +237,13 @@ function Metric({ icon, label, value, unit }: { icon: ReactNode; label: string; 
 
 function VCard({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-[22px] border border-vyro-line bg-vyro-panel p-4 ${className}`}>{children}</section>
+    <section className={`rounded-[20px] border border-vyro-line bg-vyro-panel bg-[linear-gradient(160deg,rgba(255,255,255,0.045),transparent_40%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_44px_-24px_rgba(0,0,0,0.9)] transition-[border-color,box-shadow] duration-200 ease-out hover:border-vyro-text/[0.12] ${className}`}>{children}</section>
   );
 }
 
 function MiniBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex min-h-8 shrink-0 items-center rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 font-mono text-[12px] uppercase tracking-[0.16em] text-vyro-text">
+    <span className="inline-flex min-h-8 shrink-0 items-center rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 font-mono text-[9.5px] font-medium uppercase tracking-[0.14em] text-vyro-text">
       {children}
     </span>
   );
@@ -265,10 +265,10 @@ function SleepRing({ value }: { value: number | null }) {
         />
       </svg>
       <div className="pointer-events-none -mt-[118px] flex h-[118px] flex-col items-center justify-start text-center">
-        <span className="text-[34px] font-black leading-none tabular-nums text-vyro-text">{value ?? "—"}</span>
-        <span className="mt-3 font-mono text-[14px] text-vyro-mute">/ 100</span>
+        <span className="text-[36px] font-black leading-none tracking-[-0.045em] tabular-nums text-vyro-text">{value ?? "—"}</span>
+        <span className="mt-2.5 font-mono text-[11px] text-vyro-mute">/ 100</span>
       </div>
-      <p className="mt-2 text-center font-mono text-[12px] uppercase tracking-[0.34em] text-vyro-mute">Sleep</p>
+      <p className="mt-2 text-center font-mono text-[8.5px] font-medium uppercase tracking-[0.24em] text-vyro-mute">Sleep</p>
     </div>
   );
 }
