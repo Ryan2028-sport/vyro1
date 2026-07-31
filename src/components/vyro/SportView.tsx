@@ -93,23 +93,29 @@ export function SportView() {
 export function SportSwitcher() {
   const { sport, setSport } = useVyroScores();
   return (
-    <div className="flex gap-2">
-      {(Object.keys(SPORT_META) as SportId[]).map((id) => (
-        <button
-          key={id}
-          onClick={() => setSport(id)}
-          className={`rounded-full border px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] ${
-            sport === id
-              ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
-              : "border-vyro-line bg-vyro-panel text-vyro-mute"
-          }`}
-        >
-          {SPORT_META[id].label}
-        </button>
-      ))}
+    <div className="flex gap-1 rounded-full border border-vyro-line bg-vyro-text/[0.035] p-1">
+      {(Object.keys(SPORT_META) as SportId[]).map((id) => {
+        const active = sport === id;
+        return (
+          <button
+            key={id}
+            onClick={() => setSport(id)}
+            aria-pressed={active}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[11.5px] transition-all duration-200 ease-out active:scale-[0.97] ${
+              active
+                ? "bg-vyro-mint/[0.14] font-extrabold text-vyro-mint shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                : "font-semibold text-vyro-mute hover:bg-vyro-text/[0.05] hover:text-vyro-text"
+            }`}
+          >
+            <span aria-hidden="true" className="text-[12px] leading-none">{SPORT_META[id].emoji}</span>
+            {SPORT_META[id].label}
+          </button>
+        );
+      })}
     </div>
   );
 }
+
 
 function EventCountsCard({ m }: { m: LiveMetrics }) {
   return (
