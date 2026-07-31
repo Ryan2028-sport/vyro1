@@ -62,16 +62,9 @@ function durationLabel(ms: number): string {
 function Status({ ok }: { ok: boolean }) {
   return (
     <span
-      style={{
-        display: "inline-block",
-        width: 8,
-        height: 8,
-        borderRadius: 999,
-        background: ok ? "#22c55e" : "#6b7280",
-        boxShadow: ok ? "0 0 8px rgba(34,197,94,0.6)" : "none",
-        marginRight: 8,
-        flex: "0 0 auto",
-      }}
+      className={`mr-2 inline-block h-2 w-2 shrink-0 rounded-full ${
+        ok ? "bg-vyro-mint shadow-[0_0_10px_var(--vyro-mint)]" : "bg-vyro-mute/40"
+      }`}
     />
   );
 }
@@ -87,62 +80,35 @@ function Section({
 }) {
   const live = rows.filter((r) => r.ok).length;
   return (
-    <div
-      style={{
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 12,
-        background: "rgba(255,255,255,0.02)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 10,
-          gap: 8,
-        }}
-      >
-        <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: 0.2 }}>{title}</div>
-        <div style={{ fontSize: 11, opacity: 0.7, display: "flex", alignItems: "center", gap: 8 }}>
+    <div className="mb-3 rounded-[18px] border border-vyro-line bg-vyro-panel bg-[linear-gradient(160deg,rgba(255,255,255,0.04),transparent_40%)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] transition-colors duration-200 hover:border-vyro-text/[0.12]">
+      <div className="mb-2.5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <div className="truncate text-[13.5px] font-extrabold tracking-[-0.015em] text-vyro-text">{title}</div>
+        <div className="flex shrink-0 items-center gap-2">
           {rightSlot}
-          <span>
+          <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-vyro-mute">
             {live}/{rows.length} live
           </span>
         </div>
       </div>
-      <div style={{ display: "grid", gap: 6 }}>
+      <div className="grid">
         {rows.map((r) => (
           <div
             key={r.label}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "16px 1fr auto",
-              alignItems: "center",
-              gap: 8,
-              fontSize: 12,
-              padding: "6px 0",
-              borderTop: "1px dashed rgba(255,255,255,0.06)",
-            }}
+            className="grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2 border-t border-dashed border-vyro-line py-2 text-[12px] transition-colors duration-150 hover:bg-vyro-text/[0.025]"
           >
             <Status ok={r.ok} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600 }}>{r.label}</div>
-              <div style={{ opacity: 0.55, fontSize: 11, wordBreak: "break-word" }}>
+            <div className="min-w-0">
+              <div className="font-semibold text-vyro-text">{r.label}</div>
+              <div className="break-words font-mono text-[10px] leading-relaxed text-vyro-mute/80">
                 {r.source}
                 {r.note ? ` · ${r.note}` : ""}
                 {r.ageMs != null ? ` · ${ageLabel(r.ageMs)}` : ""}
               </div>
             </div>
             <div
-              style={{
-                fontVariantNumeric: "tabular-nums",
-                fontWeight: 600,
-                color: r.ok ? "#e5f5e9" : "#9ca3af",
-                whiteSpace: "nowrap",
-              }}
+              className={`whitespace-nowrap font-mono text-[11.5px] font-semibold tabular-nums ${
+                r.ok ? "text-vyro-mint" : "text-vyro-mute"
+              }`}
             >
               {r.value}
             </div>
@@ -152,6 +118,7 @@ function Section({
     </div>
   );
 }
+
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const fmt = (v: number | null | undefined, d = 0, u = "") =>
