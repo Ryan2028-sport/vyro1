@@ -948,13 +948,38 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </InfoCard>
 
           <InfoCard eyebrow="Base readiness" title="Core metrics" icon={Gauge} accent="green">
-            <div className="grid grid-cols-2 gap-2.5">
-              <MiniMetric label="Fatigue" accent="red" value={fatigue ?? "—"} unit="/100" trend={fatigue != null ? (fatigue < 40 ? "controlled" : fatigue < 70 ? "elevated" : "overload") : undefined} />
-              <MiniMetric label="Recovery" accent="green" value={recovery ?? "—"} unit="/100" trend={trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`)} />
-              <MiniMetric label="Agility" accent="teal" value={agility ?? "—"} unit="/100" trend={agility != null ? (agility >= 75 ? "peaking" : agility >= 50 ? "steady" : "low") : undefined} />
-              <MiniMetric label="Sleep" accent="indigo" value={sleep ?? "—"} unit="/100" trend={sleep != null ? (sleep >= 80 ? "rested" : "short") : undefined} />
+            <div className="divide-y divide-white/[0.06]">
+              <MetricRow
+                label="Fatigue"
+                accent="red"
+                value={fatigue}
+                invert
+                status={fatigue != null ? (fatigue < 40 ? "Controlled" : fatigue < 70 ? "Elevated" : "Overload") : undefined}
+              />
+              <MetricRow
+                label="Recovery"
+                accent="green"
+                value={recovery}
+                status={
+                  trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`) ??
+                  undefined
+                }
+              />
+              <MetricRow
+                label="Agility"
+                accent="teal"
+                value={agility}
+                status={agility != null ? (agility >= 75 ? "Peaking" : agility >= 50 ? "Steady" : "Low") : undefined}
+              />
+              <MetricRow
+                label="Sleep"
+                accent="indigo"
+                value={sleep}
+                status={sleep != null ? (sleep >= 80 ? "Rested" : "Short") : undefined}
+              />
             </div>
           </InfoCard>
+
 
           <InfoCard
             eyebrow="Vitals"
