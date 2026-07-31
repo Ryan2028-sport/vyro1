@@ -82,7 +82,7 @@ function Section({
   return (
     <div className="mb-3 rounded-[18px] border border-vyro-line bg-vyro-panel bg-[linear-gradient(160deg,rgba(255,255,255,0.04),transparent_40%)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] transition-colors duration-200 hover:border-vyro-text/[0.12]">
       <div className="mb-2.5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <div className="truncate text-[13.5px] font-extrabold tracking-[-0.015em] text-vyro-text">{title}</div>
+        <div className="text-[13.5px] font-extrabold leading-tight tracking-[-0.015em] text-vyro-text">{title}</div>
         <div className="flex shrink-0 items-center gap-2">
           {rightSlot}
           <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-vyro-mute">
