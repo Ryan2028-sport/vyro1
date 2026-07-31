@@ -832,50 +832,102 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
     return "Normal";
   }, [m.connected, m.heartRateBpm]);
 
+  const hasDelay = delay !== "—";
+  // Divergence meter: 0ms → 0%, 300ms+ → 100%.
+  const meterPct = useMemo(() => {
+    if (!m.connected || m.reactMin == null || baselineMs == null) return null;
+    return Math.max(0, Math.min(100, ((m.reactMin - baselineMs) / 300) * 100));
+  }, [m.connected, m.reactMin, baselineMs]);
+  const indigo = ACCENT.indigo;
+
   return (
-    <GlassCard glow={ACCENT.indigo}>
+    <GlassCard glow={indigo}>
       <SectionHeader
         icon={Brain}
         eyebrow="Cognitive load"
-        title="Cognitive Fatigue Divergence"
+        title="Fatigue divergence"
         accent="indigo"
         trailing={
-          <span className="rounded-full border border-white/12 bg-white/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-vyro-text">
+          <span
+            className="rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em]"
+            style={{
+              background: `color-mix(in oklab, ${indigo} 16%, transparent)`,
+              color: `color-mix(in oklab, ${indigo} 75%, white)`,
+              boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${indigo} 38%, transparent)`,
+            }}
+          >
             {status}
           </span>
         }
       />
-      <p className="mt-3 text-[12.5px] leading-relaxed text-vyro-mute">
-        Compares your live reaction latency against your personal baseline
-        {baselineMs != null ? ` (${Math.round(baselineMs)}ms)` : ""} to flag mental fatigue before physical signs.
-      </p>
-      <div className="mt-3.5 overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.04]">
-        {[
-          { label: "Reaction divergence", value: delay },
-          { label: "Heart rate status", value: hrStatus },
-          { label: "VYRO read", value: vyroRead },
-        ].map((row) => (
-          <div
-            key={row.label}
-            className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-3.5 py-3 last:border-b-0"
-          >
-            <span className="text-[11.5px] font-semibold text-vyro-mute">{row.label}</span>
-            <span className="font-[family-name:var(--font-display)] text-[12.5px] font-bold tabular-nums text-vyro-text">
-              {row.value}
-            </span>
+
+      <div className="mt-4 rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3.5">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[9.5px] font-bold uppercase tracking-[0.15em] text-vyro-mute">
+              reaction vs baseline
+            </div>
+            <div className="mt-1 flex items-baseline gap-1">
+              {hasDelay ? (
+                <span className="font-[family-name:var(--font-display)] text-[34px] font-extrabold leading-none tracking-[-0.05em] tabular-nums text-white">
+                  {delay}
+                </span>
+              ) : (
+                <span className="block h-[26px] w-[74px] animate-pulse rounded-lg bg-white/[0.07]" aria-hidden />
+              )}
+            </div>
           </div>
-        ))}
+          <div className="shrink-0 text-right">
+            <div className="text-[9.5px] font-bold uppercase tracking-[0.13em] text-vyro-mute">baseline</div>
+            <div className="mt-1 font-[family-name:var(--font-display)] text-[14px] font-extrabold tabular-nums text-white/80">
+              {baselineMs != null ? `${Math.round(baselineMs)}ms` : "—"}
+            </div>
+          </div>
+        </div>
+
+        <div className="relative mt-3.5 h-[6px] overflow-hidden rounded-full bg-white/[0.07]">
+          <span
+            className="block h-full rounded-full transition-[width] duration-700 ease-out"
+            style={{
+              width: `${meterPct != null ? Math.max(3, meterPct) : 0}%`,
+              background: `linear-gradient(90deg, ${ACCENT.green}, ${ACCENT.orange} 70%, ${ACCENT.red})`,
+            }}
+          />
+          <span
+            aria-hidden
+            className="absolute inset-y-[-3px] w-px bg-white/25"
+            style={{ left: "66.6%" }}
+          />
+        </div>
+        <div className="mt-1.5 flex justify-between text-[9px] font-bold uppercase tracking-[0.1em] text-white/25">
+          <span>sharp</span>
+          <span>200ms threshold</span>
+          <span>fried</span>
+        </div>
       </div>
-      <div className="mt-3 flex items-start gap-2.5 rounded-[18px] border border-vyro-indigo/20 bg-vyro-indigo/[0.09] p-3">
-        <Activity size={16} className="mt-0.5 shrink-0 text-vyro-indigo" />
+
+      <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+        <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.03] p-3">
+          <div className="text-[9px] font-bold uppercase tracking-[0.13em] text-vyro-mute">heart rate</div>
+          <div className="mt-1.5 text-[13.5px] font-bold tracking-[-0.02em] text-vyro-text">{hrStatus}</div>
+        </div>
+        <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.03] p-3">
+          <div className="text-[9px] font-bold uppercase tracking-[0.13em] text-vyro-mute">vyro read</div>
+          <div className="mt-1.5 truncate text-[13.5px] font-bold tracking-[-0.02em] text-vyro-text">{vyroRead}</div>
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex items-start gap-2.5 rounded-[16px] border border-vyro-indigo/18 bg-vyro-indigo/[0.07] p-3">
+        <Activity size={15} className="mt-[1px] shrink-0 text-vyro-indigo" />
         <span className="text-[11.5px] leading-relaxed text-vyro-mute">
           {m.connected && baselineMs != null
-            ? "Divergence over 200ms = mental fatigue threshold. Best use case: returners, decision makers, late-game scenarios."
+            ? "Past 200ms of divergence, decision speed drops before your body feels tired — ease off late-game intensity."
             : "Wear the band through a few rallies to seed the cognitive baseline."}
         </span>
       </div>
     </GlassCard>
   );
+
 }
 
 
