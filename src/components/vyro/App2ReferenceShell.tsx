@@ -448,7 +448,68 @@ function MetricRow({
   );
 }
 
+/** Apple Health-style dense vitals row: accent bar, label, trend, value + unit. */
+function VitalRow({
+  label,
+  value,
+  unit,
+  trend,
+  live,
+  accent = "mute",
+}: {
+  label: string;
+  value: string | number;
+  unit?: string;
+  trend?: string;
+  live?: boolean;
+  accent?: Accent;
+}) {
+  const dim = value == null || value === "—" || value === "––" || value === "";
+  const color = ACCENT[accent];
+  return (
+    <div className="grid grid-cols-[3px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+      <span
+        aria-hidden
+        className="h-7 w-[3px] rounded-full"
+        style={{
+          background: dim ? "hsl(0 0% 100% / 0.09)" : color,
+          boxShadow: dim ? "none" : `0 0 8px color-mix(in oklab, ${color} 60%, transparent)`,
+        }}
+      />
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-[11.5px] font-bold uppercase tracking-[0.09em] text-white/80">{label}</span>
+          {live && (
+            <span
+              aria-label="live"
+              className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full"
+              style={{ background: color, boxShadow: `0 0 6px ${color}` }}
+            />
+          )}
+        </div>
+        <div
+          className="mt-0.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
+          style={{ color: dim ? "rgba(235,235,245,0.28)" : `color-mix(in oklab, ${color} 65%, white)` }}
+        >
+          {dim ? "awaiting signal" : (trend ?? "live")}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-baseline gap-[3px]">
+        {dim ? (
+          <span className="block h-[16px] w-[30px] animate-pulse rounded-md bg-white/[0.07]" aria-hidden />
+        ) : (
+          <span className="font-[family-name:var(--font-display)] text-[21px] font-extrabold leading-none tracking-[-0.05em] tabular-nums text-white">
+            {value}
+          </span>
+        )}
+        {unit && <span className="text-[9.5px] font-bold text-white/30">{unit}</span>}
+      </div>
+    </div>
+  );
+}
+
 function MiniMetric({
+
 
   label,
   value,
@@ -1076,11 +1137,12 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               </span>
             }
           >
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="divide-y divide-white/[0.055]">
               {vitals.map((vital) => (
-                <MiniMetric key={vital.label} {...vital} />
+                <VitalRow key={vital.label} {...vital} />
               ))}
             </div>
+
           </InfoCard>
 
           <CognitiveFatigueCard m={m} baselineMs={baselines.reactMs ?? undefined} />
