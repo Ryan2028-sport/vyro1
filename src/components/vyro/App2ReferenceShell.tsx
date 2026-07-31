@@ -1151,20 +1151,64 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               </span>
             }
           >
-            <p className="text-[12.5px] leading-relaxed text-vyro-mute">
-              {rtp.wearablePower == null || rtp.baseline == null
-                ? `Building the readiness baseline from your own history (${baselines.days}/7 days captured) — RTP unlocks once enough data is stored.`
-                : rtp.withinBaseline
+            {rtp.wearablePower == null || rtp.baseline == null ? (
+              <div className="rounded-[20px] border border-vyro-amber/18 bg-vyro-amber/[0.06] p-3.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-vyro-amber">
+                    baseline capture
+                  </span>
+                  <span className="font-[family-name:var(--font-display)] text-[13px] font-extrabold tabular-nums text-vyro-text">
+                    {baselines.days}
+                    <span className="text-[10px] font-bold text-white/35">/7 days</span>
+                  </span>
+                </div>
+                <div className="mt-2.5 flex gap-1">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <span
+                      key={i}
+                      className="h-[5px] flex-1 rounded-full transition-colors duration-500"
+                      style={{
+                        background: i < baselines.days ? ACCENT.amber : "hsl(0 0% 100% / 0.08)",
+                        boxShadow: i < baselines.days ? `0 0 8px color-mix(in oklab, ${ACCENT.amber} 55%, transparent)` : "none",
+                      }}
+                    />
+                  ))}
+                </div>
+                <p className="mt-2.5 text-[11.5px] leading-relaxed text-vyro-mute">
+                  RTP clearance unlocks once a full week of your own readiness history is stored.
+                </p>
+              </div>
+            ) : (
+              <p className="text-[12.5px] leading-relaxed text-vyro-mute">
+                {rtp.withinBaseline
                   ? `Cleared — wearable power within ±5% of your ${baselines.days}-day baseline (${rtp.deviationPct!.toFixed(1)}%).`
                   : `Hold — wearable power ${rtp.deviationPct! > 0 ? "above" : "below"} baseline by ${Math.abs(rtp.deviationPct!).toFixed(1)}% (target ±5%).`}
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
-              <MiniMetric label="Wearable power" accent="green" value={rtp.wearablePower ?? "—"} unit="/100" trend={rtp.baseline != null ? `base ${rtp.baseline}` : undefined} />
-              <MiniMetric label="Clearance" accent="blue" value={rtp.clearance ?? "—"} unit="/100" trend={rtp.withinBaseline ? "in range" : rtp.deviationPct != null ? "out of range" : undefined} />
-              <MiniMetric label="Muscle readiness" accent="orange" value={s.parts.muscle ?? "—"} unit="/100" trend={s.parts.muscle != null ? "IMU load" : undefined} />
-              <MiniMetric label="Recovery environment" accent="teal" value={s.parts.environment ?? "—"} unit="/100" trend={s.parts.environment != null ? "SpO₂ · temp · HRV" : undefined} />
+              </p>
+            )}
+
+            <div className="mt-3.5 divide-y divide-white/[0.06] overflow-hidden rounded-[20px] border border-white/[0.07] bg-white/[0.03] px-3.5">
+              <GaugeRow
+                label="Wearable power"
+                accent="green"
+                value={rtp.wearablePower}
+                note={rtp.baseline != null ? `baseline ${rtp.baseline}` : undefined}
+              />
+              <GaugeRow
+                label="Clearance"
+                accent="blue"
+                value={rtp.clearance}
+                note={rtp.withinBaseline ? "in range" : rtp.deviationPct != null ? "out of range" : undefined}
+              />
+              <GaugeRow label="Muscle readiness" accent="orange" value={s.parts.muscle} note="IMU load" />
+              <GaugeRow
+                label="Recovery environment"
+                accent="teal"
+                value={s.parts.environment}
+                note="SpO₂ · temp · HRV"
+              />
             </div>
           </InfoCard>
+
 
 
           <InfoCard
