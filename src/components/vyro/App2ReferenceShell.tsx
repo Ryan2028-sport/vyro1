@@ -6,17 +6,22 @@ import {
   Bell,
   Brain,
   CalendarDays,
+  Gauge,
   Heart,
   LineChart,
+  ListChecks,
   MessageCircle,
   Moon,
   Plus,
   Radio,
+  ShieldCheck,
   Settings2,
+  Sparkles,
   Stethoscope,
   Trophy,
   UserRound,
 } from "lucide-react";
+
 import { getMyProfile } from "@/lib/profile.functions";
 import { BandPanel } from "./BandPanel";
 import { CoachView } from "./CoachView";
@@ -88,35 +93,103 @@ function Logo() {
 }
 
 function toneVar(value: number | null | undefined) {
-  if (value == null) return "hsl(0 0% 100% / 0.35)";
-  if (value >= 67) return "hsl(var(--app2-ready))";
-  if (value >= 34) return "hsl(var(--app2-amber))";
-  return "hsl(var(--app2-red))";
+  if (value == null) return "hsl(0 0% 100% / 0.28)";
+  if (value >= 67) return "var(--vyro-mint)";
+  if (value >= 34) return "var(--vyro-amber)";
+  return "var(--vyro-rose)";
 }
 
 /* ---------------------------------------------------------------------------
-   Athlete tab presentation primitives — iOS-grade glass cards, bento tiles
-   and a gradient readiness dial. Pure styling: every data point that existed
-   before still renders through these.
+   Home presentation primitives — Apple-inspired material cards, Activity-style
+   rings, colour-coded metric tiles. Pure styling: every data point that
+   existed before still renders through these.
 --------------------------------------------------------------------------- */
+
+type Accent = "green" | "blue" | "teal" | "orange" | "red" | "indigo" | "pink" | "yellow" | "purple" | "mute";
+
+const ACCENT: Record<Accent, string> = {
+  green: "var(--vyro-mint)",
+  blue: "var(--vyro-blue)",
+  teal: "var(--vyro-teal)",
+  orange: "var(--vyro-amber)",
+  red: "var(--vyro-rose)",
+  indigo: "var(--vyro-indigo)",
+  pink: "var(--vyro-pink)",
+  yellow: "var(--vyro-yellow)",
+  purple: "var(--vyro-purple)",
+  mute: "rgba(235,235,245,0.45)",
+};
 
 function GlassCard({
   children,
   className = "",
+  glow,
 }: {
   children: ReactNode;
   className?: string;
+  glow?: string;
 }) {
   return (
     <section
-      className={`relative overflow-hidden rounded-[28px] border border-white/[0.07] bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_24px_50px_-30px_rgba(0,0,0,0.9)] backdrop-blur-xl ${className}`}
+      className={`relative overflow-hidden rounded-[26px] border border-white/[0.09] bg-white/[0.055] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_28px_60px_-34px_rgba(0,0,0,1)] backdrop-blur-2xl ${className}`}
     >
+      {glow && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-24 left-1/2 h-48 w-[130%] -translate-x-1/2 rounded-full blur-[64px]"
+          style={{ background: glow, opacity: 0.14 }}
+        />
+      )}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/25 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/30 to-transparent"
       />
-      {children}
+      <div className="relative">{children}</div>
     </section>
+  );
+}
+
+function SectionHeader({
+  icon: Icon,
+  eyebrow,
+  title,
+  accent = "green",
+  trailing,
+}: {
+  icon?: typeof Activity;
+  eyebrow: string;
+  title?: string;
+  accent?: Accent;
+  trailing?: ReactNode;
+}) {
+  const color = ACCENT[accent];
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-2.5">
+        {Icon && (
+          <span
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-[11px] border"
+            style={{ background: `color-mix(in oklab, ${color} 16%, transparent)`, borderColor: `color-mix(in oklab, ${color} 26%, transparent)`, color }}
+          >
+            <Icon size={15} strokeWidth={2.4} />
+          </span>
+        )}
+        <div className="min-w-0">
+          <div
+            className="truncate font-[family-name:var(--font-display)] text-[9px] font-bold uppercase tracking-[0.2em]"
+            style={{ color }}
+          >
+            {eyebrow}
+          </div>
+          {title && (
+            <h2 className="mt-0.5 truncate font-[family-name:var(--font-display)] text-[18px] font-bold tracking-[-0.03em] text-vyro-text">
+              {title}
+            </h2>
+          )}
+        </div>
+      </div>
+      {trailing && <div className="shrink-0">{trailing}</div>}
+    </div>
   );
 }
 
@@ -130,61 +203,81 @@ function Eyebrow({ children, tone = "mint" }: { children: ReactNode; tone?: "min
           ? "text-vyro-mute"
           : "text-vyro-mint";
   return (
-    <div className={`text-[9.5px] font-bold uppercase tracking-[0.18em] ${color}`}>{children}</div>
+    <div className={`font-[family-name:var(--font-display)] text-[9px] font-bold uppercase tracking-[0.2em] ${color}`}>
+      {children}
+    </div>
   );
 }
 
-function Ring({ value }: { value: number | null }) {
-  const radius = 46;
-  const circumference = 2 * Math.PI * radius;
-  const v = value ?? 0;
-  const clamped = Math.max(0, Math.min(100, v));
-  const offset = circumference - (clamped / 100) * circumference;
+/** Apple Activity-style concentric rings: readiness (outer), recovery, sleep. */
+function Ring({
+  value,
+  recovery,
+  sleep,
+}: {
+  value: number | null;
+  recovery?: number | null;
+  sleep?: number | null;
+}) {
+  const arcs = [
+    { r: 48, width: 10, v: value, color: toneVar(value) },
+    { r: 36, width: 9, v: recovery ?? null, color: "var(--vyro-blue)" },
+    { r: 25, width: 8, v: sleep ?? null, color: "var(--vyro-indigo)" },
+  ];
   const color = toneVar(value);
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative h-[168px] w-[168px]">
-        <div
-          aria-hidden
-          className="absolute inset-3 rounded-full blur-2xl transition-opacity duration-700"
-          style={{ background: color, opacity: value == null ? 0.05 : 0.16 }}
-        />
-        <svg
-          viewBox="0 0 112 112"
-          className="h-full w-full -rotate-90"
-          role="img"
-          aria-label={value == null ? "Readiness pending" : `Readiness ${value} out of 100`}
-        >
-          <circle cx="56" cy="56" r={radius} fill="none" stroke="hsl(0 0% 100% / 0.07)" strokeWidth="9" />
-          {value != null && (
-            <circle
-              cx="56"
-              cy="56"
-              r={radius}
-              fill="none"
-              stroke={color}
-              strokeLinecap="round"
-              strokeWidth="9"
-              strokeDasharray={circumference}
-              strokeDashoffset={offset}
-              style={{
-                filter: `drop-shadow(0 0 10px ${color})`,
-                transition: "stroke-dashoffset 900ms cubic-bezier(0.22,1,0.36,1)",
-              }}
-            />
-          )}
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="flex items-baseline gap-1">
-            <span className="text-[46px] font-black leading-none tracking-[-0.045em] tabular-nums text-vyro-text">
-              {value == null ? "—" : value}
-            </span>
-            <span className="text-[11px] font-semibold text-vyro-mute">/100</span>
-          </div>
-          <div className="mt-1.5 text-[9.5px] font-bold uppercase tracking-[0.2em] text-vyro-mute">
-            Readiness
-          </div>
+    <div className="relative h-[196px] w-[196px]">
+      <div
+        aria-hidden
+        className="absolute inset-6 rounded-full blur-3xl transition-opacity duration-700"
+        style={{ background: color, opacity: value == null ? 0.06 : 0.22 }}
+      />
+      <svg
+        viewBox="0 0 112 112"
+        className="h-full w-full -rotate-90"
+        role="img"
+        aria-label={value == null ? "Readiness pending" : `Readiness ${value} out of 100`}
+      >
+        {arcs.map((arc) => {
+          const c = 2 * Math.PI * arc.r;
+          const clamped = Math.max(0, Math.min(100, arc.v ?? 0));
+          return (
+            <g key={arc.r}>
+              <circle cx="56" cy="56" r={arc.r} fill="none" stroke="hsl(0 0% 100% / 0.07)" strokeWidth={arc.width} />
+              {arc.v != null && (
+                <circle
+                  cx="56"
+                  cy="56"
+                  r={arc.r}
+                  fill="none"
+                  stroke={arc.color}
+                  strokeLinecap="round"
+                  strokeWidth={arc.width}
+                  strokeDasharray={c}
+                  strokeDashoffset={c - (clamped / 100) * c}
+                  style={{
+                    filter: `drop-shadow(0 0 8px ${arc.color})`,
+                    transition: "stroke-dashoffset 1000ms cubic-bezier(0.32,0.72,0,1)",
+                  }}
+                />
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="flex items-baseline gap-1">
+          <span
+            className="font-[family-name:var(--font-display)] text-[48px] font-extrabold leading-none tracking-[-0.05em] tabular-nums"
+            style={{ color: value == null ? "rgba(235,235,245,0.4)" : "#fff" }}
+          >
+            {value == null ? "—" : value}
+          </span>
+          <span className="text-[11px] font-semibold text-vyro-mute">/100</span>
+        </div>
+        <div className="mt-1 font-[family-name:var(--font-display)] text-[8.5px] font-bold uppercase tracking-[0.24em] text-vyro-mute">
+          Readiness
         </div>
       </div>
     </div>
@@ -197,41 +290,64 @@ function MiniMetric({
   unit,
   trend,
   live,
+  accent = "mute",
 }: {
   label: string;
   value: string | number;
   unit?: string;
   trend?: string;
   live?: boolean;
+  accent?: Accent;
 }) {
   const dim = value === "—" || value == null;
+  const color = ACCENT[accent];
   return (
-    <div className="group rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3.5 transition-all duration-200 ease-out hover:border-white/[0.12] hover:bg-white/[0.06] active:scale-[0.985]">
-      <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[9.5px] font-bold uppercase tracking-[0.13em] text-vyro-mute">
+    <div
+      className="group relative overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.045] p-3.5 transition-all duration-200 ease-out hover:border-white/[0.16] hover:bg-white/[0.075] active:scale-[0.985]"
+      style={!dim ? { boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 12%, transparent)` } : undefined}
+    >
+      {!dim && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full blur-2xl"
+          style={{ background: color, opacity: 0.2 }}
+        />
+      )}
+      <div className="relative flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-[9.5px] font-bold uppercase tracking-[0.12em] text-vyro-mute">
           {label}
         </span>
         {live ? (
-          <span className="flex shrink-0 items-center gap-1 text-[8.5px] font-bold uppercase tracking-[0.12em] text-vyro-mint">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-vyro-mint shadow-[0_0_6px_var(--vyro-mint)]" />
+          <span
+            className="flex shrink-0 items-center gap-1 text-[8px] font-bold uppercase tracking-[0.1em]"
+            style={{ color }}
+          >
+            <span
+              className="h-1.5 w-1.5 animate-pulse rounded-full"
+              style={{ background: color, boxShadow: `0 0 7px ${color}` }}
+            />
             live
           </span>
         ) : dim ? (
-          <span className="shrink-0 text-[9px] text-vyro-mute/60">—</span>
+          <span className="shrink-0 text-[9px] text-vyro-mute/50">—</span>
         ) : null}
       </div>
-      <div className="mt-2 flex items-baseline gap-1">
+      <div className="relative mt-2 flex items-baseline gap-1">
         <span
-          className={`text-[26px] font-extrabold leading-none tracking-[-0.04em] tabular-nums ${
-            dim ? "text-vyro-mute/45" : "text-vyro-text"
-          }`}
+          className="font-[family-name:var(--font-display)] text-[27px] font-extrabold leading-none tracking-[-0.045em] tabular-nums"
+          style={{ color: dim ? "rgba(235,235,245,0.32)" : "#fff" }}
         >
           {value}
         </span>
         {unit && <span className="text-[10px] font-semibold text-vyro-mute">{unit}</span>}
       </div>
       {trend && (
-        <div className="mt-1.5 text-[10px] font-medium tracking-[-0.01em] text-vyro-mute">{trend}</div>
+        <div
+          className="relative mt-1.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
+          style={{ color: dim ? "rgba(235,235,245,0.4)" : `color-mix(in oklab, ${color} 72%, white)` }}
+        >
+          {trend}
+        </div>
       )}
     </div>
   );
@@ -241,20 +357,21 @@ function InfoCard({
   eyebrow,
   title,
   children,
-  tone = "ready",
+  icon,
+  accent = "green",
+  trailing,
 }: {
   eyebrow: string;
   title?: string;
   children: ReactNode;
-  tone?: "ready" | "amber" | "live";
+  icon?: typeof Activity;
+  accent?: Accent;
+  trailing?: ReactNode;
 }) {
   return (
-    <GlassCard>
-      <Eyebrow tone={tone === "amber" ? "amber" : "mint"}>{eyebrow}</Eyebrow>
-      {title && (
-        <h2 className="mt-1.5 text-[19px] font-extrabold tracking-[-0.03em] text-vyro-text">{title}</h2>
-      )}
-      <div className="mt-3">{children}</div>
+    <GlassCard glow={ACCENT[accent]}>
+      <SectionHeader icon={icon} eyebrow={eyebrow} title={title} accent={accent} trailing={trailing} />
+      <div className="mt-4">{children}</div>
     </GlassCard>
   );
 }
@@ -289,24 +406,23 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
   }, [m.connected, m.heartRateBpm]);
 
   return (
-    <GlassCard>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2 text-vyro-spatial">
-          <Brain size={14} className="shrink-0" />
-          <span className="truncate text-[9.5px] font-bold uppercase tracking-[0.18em]">Cognitive load</span>
-        </div>
-        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-vyro-text">
-          {status}
-        </span>
-      </div>
-      <h2 className="mt-2 text-[19px] font-extrabold tracking-[-0.03em] text-vyro-text">
-        Cognitive Fatigue Divergence
-      </h2>
-      <p className="mt-1.5 text-[12.5px] leading-relaxed text-vyro-mute">
+    <GlassCard glow={ACCENT.indigo}>
+      <SectionHeader
+        icon={Brain}
+        eyebrow="Cognitive load"
+        title="Cognitive Fatigue Divergence"
+        accent="indigo"
+        trailing={
+          <span className="rounded-full border border-white/12 bg-white/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-vyro-text">
+            {status}
+          </span>
+        }
+      />
+      <p className="mt-3 text-[12.5px] leading-relaxed text-vyro-mute">
         Compares your live reaction latency against your personal baseline
         {baselineMs != null ? ` (${Math.round(baselineMs)}ms)` : ""} to flag mental fatigue before physical signs.
       </p>
-      <div className="mt-3.5 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.03]">
+      <div className="mt-3.5 overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.04]">
         {[
           { label: "Reaction divergence", value: delay },
           { label: "Heart rate status", value: hrStatus },
@@ -314,15 +430,17 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
         ].map((row) => (
           <div
             key={row.label}
-            className="flex items-center justify-between gap-3 border-b border-white/[0.05] px-3.5 py-2.5 last:border-b-0"
+            className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-3.5 py-3 last:border-b-0"
           >
-            <span className="text-[11px] font-semibold text-vyro-mute">{row.label}</span>
-            <span className="text-[12.5px] font-extrabold tabular-nums text-vyro-text">{row.value}</span>
+            <span className="text-[11.5px] font-semibold text-vyro-mute">{row.label}</span>
+            <span className="font-[family-name:var(--font-display)] text-[12.5px] font-bold tabular-nums text-vyro-text">
+              {row.value}
+            </span>
           </div>
         ))}
       </div>
-      <div className="mt-3 flex items-start gap-2.5 rounded-2xl border border-vyro-mint/15 bg-vyro-mint/[0.06] p-3">
-        <Activity size={16} className="mt-0.5 shrink-0 text-vyro-mint" />
+      <div className="mt-3 flex items-start gap-2.5 rounded-[18px] border border-vyro-indigo/20 bg-vyro-indigo/[0.09] p-3">
+        <Activity size={16} className="mt-0.5 shrink-0 text-vyro-indigo" />
         <span className="text-[11.5px] leading-relaxed text-vyro-mute">
           {m.connected && baselineMs != null
             ? "Divergence over 200ms = mental fatigue threshold. Best use case: returners, decision makers, late-game scenarios."
@@ -332,6 +450,7 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
     </GlassCard>
   );
 }
+
 
 
 function EmbeddedView({
@@ -511,34 +630,35 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
   const vitals = useMemo(
     () => [
-      { label: "Current HR", value: liveCell(m.heartRateBpm), unit: "bpm",
+      { label: "Current HR", value: liveCell(m.heartRateBpm), unit: "bpm", accent: "red" as Accent,
         trend: m.connected ? trend(m.heartRateBpm, m.restingHrBpm, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs rest`) : undefined,
         live: m.connected && m.heartRateBpm != null },
-      { label: "Resting HR", value: liveCell(m.restingHrBpm), unit: "bpm",
+      { label: "Resting HR", value: liveCell(m.restingHrBpm), unit: "bpm", accent: "pink" as Accent,
         trend: trend(m.restingHrBpm, baselines.restingHr, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs 7d`),
         live: m.connected && m.restingHrBpm != null },
-      { label: "HRV (RMSSD)", value: liveCell(m.hrvMs), unit: "ms",
+      { label: "HRV (RMSSD)", value: liveCell(m.hrvMs), unit: "ms", accent: "green" as Accent,
         trend: trend(m.hrvMs, baselines.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`),
         live: m.connected && m.hrvMs != null },
-      { label: "Steps", value: liveCell(m.stepsToday), unit: "",
+      { label: "Steps", value: liveCell(m.stepsToday), unit: "", accent: "teal" as Accent,
         trend: m.connected && m.distanceM != null ? `${(m.distanceM / 1000).toFixed(2)} km` : undefined,
         live: m.connected && m.stepsToday != null },
-      { label: "Skin Temp", value: m.connected && m.skinTempC != null ? m.skinTempC.toFixed(1) : "—", unit: "°C",
+      { label: "Skin Temp", value: m.connected && m.skinTempC != null ? m.skinTempC.toFixed(1) : "—", unit: "°C", accent: "orange" as Accent,
         live: m.connected && m.skinTempC != null },
-      { label: "Blood Pressure", value: m.connected && m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—", unit: "mmHg",
+      { label: "Blood Pressure", value: m.connected && m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—", unit: "mmHg", accent: "purple" as Accent,
         live: m.connected && m.bloodPressure != null },
-      { label: "Strain", value: fmtCell(strain), unit: "/100",
+      { label: "Strain", value: fmtCell(strain), unit: "/100", accent: "yellow" as Accent,
         trend: strain != null ? (strain > 70 ? "overload" : strain > 40 ? "tempo" : "easy") : undefined,
         live: m.connected && strain != null },
-      { label: "SpO₂", value: liveCell(m.spo2Pct), unit: "%",
+      { label: "SpO₂", value: liveCell(m.spo2Pct), unit: "%", accent: "blue" as Accent,
         trend: m.connected && m.spo2Pct != null ? (m.spo2Pct >= 95 ? "stable" : "low") : undefined,
         live: m.connected && m.spo2Pct != null },
-      { label: "Resp Rate", value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm",
+      { label: "Resp Rate", value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm", accent: "indigo" as Accent,
         live: m.connected && m.respRateBrpm != null },
-      { label: "Stress", value: liveCell(m.stressScore), unit: "/100",
+      { label: "Stress", value: liveCell(m.stressScore), unit: "/100", accent: "orange" as Accent,
         trend: m.connected && m.stressScore != null ? (m.stressScore < 40 ? "calm" : m.stressScore < 70 ? "alert" : "high") : undefined,
         live: m.connected && m.stressScore != null },
     ],
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [m.connected, m.heartRateBpm, m.restingHrBpm, m.hrvMs, m.stepsToday, m.distanceM, m.skinTempC, m.bloodPressure, m.spo2Pct, m.respRateBrpm, m.stressScore, strain, baselines.hrv, baselines.restingHr],
   );
@@ -604,9 +724,10 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         </header>
 
         {/* ---- Readiness hero -------------------------------------------- */}
-        <GlassCard className="animate-in fade-in slide-in-from-bottom-3 p-6 duration-500">
+        <GlassCard glow={toneVar(readiness)} className="animate-in fade-in slide-in-from-bottom-3 p-6 duration-500">
           <div className="flex flex-col items-center gap-5">
-            <Ring value={readiness} />
+            <Ring value={readiness} recovery={recovery} sleep={sleep} />
+
             <div className="w-full min-w-0">
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {/* Status text is driven by the canonical recovery band — a low
@@ -674,7 +795,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         </GlassCard>
 
         <div className="space-y-4">
-          <InfoCard eyebrow="Top opportunity">
+          <InfoCard eyebrow="Top opportunity" icon={Sparkles} accent="yellow">
             <p className="text-[13px] leading-relaxed text-vyro-mute">
               {agility != null && agility >= 75
                 ? `Agility ${agility}/100 — a good day to push interval ghosting.`
@@ -684,16 +805,27 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             </p>
           </InfoCard>
 
-          <InfoCard eyebrow="Base readiness" title="Core metrics">
+          <InfoCard eyebrow="Base readiness" title="Core metrics" icon={Gauge} accent="green">
             <div className="grid grid-cols-2 gap-2.5">
-              <MiniMetric label="Fatigue" value={fatigue ?? "—"} unit="/100" trend={fatigue != null ? (fatigue < 40 ? "controlled" : fatigue < 70 ? "elevated" : "overload") : undefined} />
-              <MiniMetric label="Recovery" value={recovery ?? "—"} unit="/100" trend={trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`)} />
-              <MiniMetric label="Agility" value={agility ?? "—"} unit="/100" trend={agility != null ? (agility >= 75 ? "peaking" : agility >= 50 ? "steady" : "low") : undefined} />
-              <MiniMetric label="Sleep" value={sleep ?? "—"} unit="/100" trend={sleep != null ? (sleep >= 80 ? "rested" : "short") : undefined} />
+              <MiniMetric label="Fatigue" accent="red" value={fatigue ?? "—"} unit="/100" trend={fatigue != null ? (fatigue < 40 ? "controlled" : fatigue < 70 ? "elevated" : "overload") : undefined} />
+              <MiniMetric label="Recovery" accent="green" value={recovery ?? "—"} unit="/100" trend={trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`)} />
+              <MiniMetric label="Agility" accent="teal" value={agility ?? "—"} unit="/100" trend={agility != null ? (agility >= 75 ? "peaking" : agility >= 50 ? "steady" : "low") : undefined} />
+              <MiniMetric label="Sleep" accent="indigo" value={sleep ?? "—"} unit="/100" trend={sleep != null ? (sleep >= 80 ? "rested" : "short") : undefined} />
             </div>
           </InfoCard>
 
-          <InfoCard eyebrow="Vitals" title="Live body signals" tone="live">
+          <InfoCard
+            eyebrow="Vitals"
+            title="Live body signals"
+            icon={Heart}
+            accent="blue"
+            trailing={
+              <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${m.connected ? "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint" : "border-white/10 bg-white/[0.06] text-vyro-mute"}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${m.connected ? "animate-pulse bg-vyro-mint" : "bg-vyro-mute/60"}`} />
+                {m.connected ? "streaming" : "offline"}
+              </span>
+            }
+          >
             <div className="grid grid-cols-2 gap-2.5">
               {vitals.map((vital) => (
                 <MiniMetric key={vital.label} {...vital} />
@@ -703,7 +835,17 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
           <CognitiveFatigueCard m={m} baselineMs={baselines.reactMs ?? undefined} />
 
-          <InfoCard eyebrow="Return-to-play" title="RTP Validator" tone={rtp.withinBaseline ? "ready" : "amber"}>
+          <InfoCard
+            eyebrow="Return-to-play"
+            title="RTP Validator"
+            icon={ShieldCheck}
+            accent={rtp.withinBaseline ? "green" : "orange"}
+            trailing={
+              <span className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${rtp.withinBaseline ? "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint" : "border-vyro-amber/25 bg-vyro-amber/10 text-vyro-amber"}`}>
+                {rtp.wearablePower == null || rtp.baseline == null ? "calibrating" : rtp.withinBaseline ? "cleared" : "hold"}
+              </span>
+            }
+          >
             <p className="text-[12.5px] leading-relaxed text-vyro-mute">
               {rtp.wearablePower == null || rtp.baseline == null
                 ? `Building the readiness baseline from your own history (${baselines.days}/7 days captured) — RTP unlocks once enough data is stored.`
@@ -712,14 +854,15 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                   : `Hold — wearable power ${rtp.deviationPct! > 0 ? "above" : "below"} baseline by ${Math.abs(rtp.deviationPct!).toFixed(1)}% (target ±5%).`}
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2.5">
-              <MiniMetric label="Wearable power" value={rtp.wearablePower ?? "—"} unit="/100" trend={rtp.baseline != null ? `base ${rtp.baseline}` : undefined} />
-              <MiniMetric label="Clearance" value={rtp.clearance ?? "—"} unit="/100" trend={rtp.withinBaseline ? "in range" : rtp.deviationPct != null ? "out of range" : undefined} />
-              <MiniMetric label="Muscle readiness" value={s.parts.muscle ?? "—"} unit="/100" trend={s.parts.muscle != null ? "IMU load" : undefined} />
-              <MiniMetric label="Recovery environment" value={s.parts.environment ?? "—"} unit="/100" trend={s.parts.environment != null ? "SpO₂ · temp · HRV" : undefined} />
+              <MiniMetric label="Wearable power" accent="green" value={rtp.wearablePower ?? "—"} unit="/100" trend={rtp.baseline != null ? `base ${rtp.baseline}` : undefined} />
+              <MiniMetric label="Clearance" accent="blue" value={rtp.clearance ?? "—"} unit="/100" trend={rtp.withinBaseline ? "in range" : rtp.deviationPct != null ? "out of range" : undefined} />
+              <MiniMetric label="Muscle readiness" accent="orange" value={s.parts.muscle ?? "—"} unit="/100" trend={s.parts.muscle != null ? "IMU load" : undefined} />
+              <MiniMetric label="Recovery environment" accent="teal" value={s.parts.environment ?? "—"} unit="/100" trend={s.parts.environment != null ? "SpO₂ · temp · HRV" : undefined} />
             </div>
           </InfoCard>
 
-          <InfoCard eyebrow="Today's plan editable" title="Training blocks">
+
+          <InfoCard eyebrow="Today's plan · editable" title="Training blocks" icon={ListChecks} accent="purple">
             <div className="space-y-2">
               {liveSessionBlock && (
                 <div

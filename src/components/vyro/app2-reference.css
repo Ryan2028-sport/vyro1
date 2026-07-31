@@ -5,56 +5,64 @@
    ========================================================================== */
 
 .app2-ref {
-  /* Surfaces — layered near-black */
-  --app2-bg: 220 12% 4%;          /* page base            #08090B */
-  --app2-bg-2: 220 10% 6%;        /* phone frame          */
-  --app2-card: 220 9% 8%;         /* card surface         #101215 */
-  --app2-card-2: 220 8% 11%;      /* elevated inner tile  #16191D */
-  --app2-card-3: 220 8% 14%;      /* pressed / hover      */
+  /* Surfaces — true-black iOS canvas with translucent material layers */
+  --app2-bg: 0 0% 0%;             /* page base            #000 */
+  --app2-bg-2: 0 0% 2%;           /* phone frame          */
+  --app2-card: 0 0% 100%;         /* material, used with alpha */
+  --app2-card-2: 0 0% 100%;
+  --app2-card-3: 0 0% 100%;
 
-  /* Ink */
-  --app2-fg: 210 20% 98%;
-  --app2-muted: 215 12% 62%;
-  --app2-faint: 215 10% 44%;
+  /* Ink — Apple label hierarchy */
+  --app2-fg: 240 6% 96%;
+  --app2-muted: 240 12% 92%;
+  --app2-faint: 240 8% 74%;
 
   /* Lines */
-  --app2-border: 210 20% 98%;     /* used with alpha       */
-  --app2-hairline: hsl(210 20% 98% / 0.08);
-  --app2-hairline-strong: hsl(210 20% 98% / 0.14);
+  --app2-border: 0 0% 100%;
+  --app2-hairline: hsl(0 0% 100% / 0.09);
+  --app2-hairline-strong: hsl(0 0% 100% / 0.16);
 
-  /* Signal colors — one cool accent, amber for manage, rose for recover */
-  --app2-ready: 165 62% 48%;
-  --app2-amber: 36 94% 58%;
-  --app2-red: 6 78% 60%;
-  --app2-live: 205 90% 62%;
+  /* Signal colors — Apple system palette (dark appearance) */
+  --app2-ready: 142 70% 51%;      /* systemGreen  #30D158 */
+  --app2-amber: 37 100% 52%;      /* systemOrange #FF9F0A */
+  --app2-red: 3 100% 61%;         /* systemRed    #FF453A */
+  --app2-live: 210 100% 52%;      /* systemBlue   #0A84FF */
+  --app2-teal: 191 71% 56%;       /* systemTeal   */
+  --app2-indigo: 241 72% 63%;     /* systemIndigo */
 
-  /* Radii */
-  --app2-r-sm: 10px;
-  --app2-r-md: 14px;
-  --app2-r-lg: 20px;
-  --app2-r-xl: 26px;
+  /* Radii — iOS continuous-corner scale */
+  --app2-r-sm: 12px;
+  --app2-r-md: 16px;
+  --app2-r-lg: 22px;
+  --app2-r-xl: 28px;
 
   /* Elevation */
-  --app2-shadow-card: 0 1px 0 hsl(210 20% 98% / 0.05) inset, 0 18px 44px -24px hsl(220 30% 2% / 0.9);
-  --app2-shadow-raise: 0 1px 0 hsl(210 20% 98% / 0.07) inset, 0 28px 64px -28px hsl(220 30% 2% / 0.95);
+  --app2-shadow-card: 0 1px 0 hsl(0 0% 100% / 0.06) inset, 0 20px 48px -26px hsl(0 0% 0% / 0.95);
+  --app2-shadow-raise: 0 1px 0 hsl(0 0% 100% / 0.08) inset, 0 30px 70px -30px hsl(0 0% 0% / 1);
 
-  /* Motion */
+  /* Motion — iOS spring-ish ease */
   --app2-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  --app2-dur: 220ms;
+  --app2-dur: 260ms;
 
-  --app2-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --app2-mono: "Sora", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   min-height: 100svh;
   background:
-    radial-gradient(120% 60% at 50% -10%, hsl(165 62% 48% / 0.07), transparent 62%),
-    radial-gradient(90% 45% at 12% 4%, hsl(205 90% 62% / 0.05), transparent 60%),
+    radial-gradient(110% 55% at 50% -8%, hsl(var(--app2-ready) / 0.1), transparent 62%),
+    radial-gradient(90% 45% at 8% 6%, hsl(var(--app2-live) / 0.09), transparent 60%),
+    radial-gradient(80% 40% at 96% 12%, hsl(var(--app2-indigo) / 0.07), transparent 60%),
     hsl(var(--app2-bg));
   color: hsl(var(--app2-fg));
-  font-family: "Satoshi", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   letter-spacing: -0.011em;
 }
+
+.app2-ref :where(h1, h2, h3, .app2-title, .app2-heading) {
+  font-family: "Sora", system-ui, -apple-system, sans-serif;
+}
+
 
 .app2-ref * { box-sizing: border-box; }
 .app2-ref button, .app2-ref input, .app2-ref select { font: inherit; }
@@ -115,38 +123,51 @@
 
 /* --------------------------------------------------------------- top bar -- */
 
+.app2-ref header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: linear-gradient(180deg, hsl(0 0% 0% / 0.92) 0%, hsl(0 0% 0% / 0.72) 62%, hsl(0 0% 0% / 0) 100%);
+  backdrop-filter: blur(28px) saturate(180%);
+}
+
 .app2-topbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: center;
-  padding: 16px 18px 12px;
+  align-items: start;
+  padding: 14px 20px 10px;
 }
 
 .app2-logo { display: inline-flex; align-items: center; }
 .app2-logo-img {
   display: block;
-  height: 26px;
+  height: 24px;
   width: auto;
-  filter: drop-shadow(0 2px 10px hsl(165 62% 48% / 0.25));
+  filter: drop-shadow(0 2px 12px hsl(var(--app2-ready) / 0.28));
 }
 
 .app2-kicker {
-  margin-top: 9px;
+  margin-top: 10px;
   font-family: var(--app2-mono);
   text-transform: uppercase;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.3em;
   font-size: 8.5px;
-  font-weight: 500;
+  font-weight: 600;
   color: hsl(var(--app2-faint));
 }
 
 .app2-title {
-  margin-top: 4px;
-  font-size: 27px;
-  line-height: 1.02;
-  font-weight: 900;
-  letter-spacing: -0.035em;
+  margin-top: 2px;
+  font-size: 32px;
+  line-height: 1.04;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  background: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 100% / 0.7));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .app2-actions {
@@ -161,28 +182,29 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--app2-hairline-strong);
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid hsl(var(--app2-ready) / 0.28);
   border-radius: 999px;
-  background: hsl(210 20% 98% / 0.06);
-  color: hsl(var(--app2-fg));
+  background: hsl(var(--app2-ready) / 0.14);
+  color: hsl(var(--app2-ready));
   font-family: var(--app2-mono);
   font-size: 9px;
+  font-weight: 700;
   line-height: 1;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
 }
-.app2-sync:hover { background: hsl(210 20% 98% / 0.11); border-color: hsl(210 20% 98% / 0.24); }
+.app2-sync:hover { background: hsl(var(--app2-ready) / 0.22); }
 
 .app2-dot {
   width: 6px;
   height: 6px;
   border-radius: 999px;
   background: hsl(var(--app2-ready));
-  box-shadow: 0 0 0 3px hsl(var(--app2-ready) / 0.18), 0 0 14px hsl(var(--app2-ready) / 0.9);
+  box-shadow: 0 0 0 3px hsl(var(--app2-ready) / 0.16), 0 0 12px hsl(var(--app2-ready) / 0.95);
   flex: 0 0 auto;
 }
 
@@ -191,29 +213,30 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
   border: 1px solid var(--app2-hairline);
-  background: hsl(210 20% 98% / 0.045);
+  background: hsl(0 0% 100% / 0.07);
   color: hsl(var(--app2-fg));
   flex: 0 0 auto;
+  backdrop-filter: blur(14px);
 }
-.app2-icon-btn:hover { background: hsl(210 20% 98% / 0.1); }
+.app2-icon-btn:hover { background: hsl(0 0% 100% / 0.13); }
 
 .app2-avatar {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   margin-left: auto;
   margin-top: 10px;
-  background:
-    linear-gradient(140deg, hsl(var(--app2-ready) / 0.9), hsl(var(--app2-live) / 0.75));
-  border-color: transparent;
-  color: hsl(220 30% 6%);
+  background: linear-gradient(150deg, hsl(var(--app2-live)), hsl(var(--app2-indigo)));
+  border-color: hsl(0 0% 100% / 0.18);
+  color: hsl(0 0% 100%);
+  font-family: var(--app2-mono);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.02em;
-  box-shadow: 0 6px 20px -8px hsl(var(--app2-ready) / 0.6);
+  box-shadow: 0 8px 22px -10px hsl(var(--app2-live) / 0.8);
 }
 
 .app2-badge {
@@ -227,10 +250,10 @@
   place-items: center;
   border-radius: 999px;
   background: hsl(var(--app2-red));
-  border: 2px solid hsl(var(--app2-bg-2));
+  border: 2px solid hsl(0 0% 0%);
   color: hsl(0 0% 100%);
   font-size: 9px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 /* ------------------------------------------------------ module (top) nav -- */
@@ -238,13 +261,14 @@
 .app2-module-nav {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  padding: 5px;
-  margin: 2px 14px 16px;
-  border: 1px solid var(--app2-hairline);
+  gap: 3px;
+  padding: 3px;
+  margin: 10px 16px 14px;
+  border: 1px solid hsl(0 0% 100% / 0.07);
   border-radius: 999px;
-  background: hsl(210 20% 98% / 0.035);
-  box-shadow: var(--app2-shadow-card);
+  background: hsl(0 0% 100% / 0.06);
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.05) inset;
+  backdrop-filter: blur(20px) saturate(180%);
   scrollbar-width: none;
 }
 
@@ -256,26 +280,28 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 34px;
+  min-height: 32px;
   border-radius: 999px;
   border: 1px solid transparent;
   background: transparent;
   padding: 0 6px;
-  color: hsl(var(--app2-muted));
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  color: hsl(var(--app2-faint));
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
   white-space: nowrap;
 }
-.app2-chip:hover { color: hsl(var(--app2-fg)); background: hsl(210 20% 98% / 0.05); }
+.app2-chip:hover { color: hsl(var(--app2-fg)); }
 
 .app2-chip.active {
-  border-color: hsl(210 20% 98% / 0.1);
-  background: hsl(210 20% 98% / 0.13);
-  color: hsl(var(--app2-fg));
-  font-weight: 800;
-  box-shadow: 0 1px 0 hsl(210 20% 98% / 0.1) inset, 0 6px 16px -10px hsl(220 40% 0% / 0.9);
+  border-color: hsl(0 0% 100% / 0.1);
+  background: hsl(0 0% 100% / 0.16);
+  color: hsl(0 0% 100%);
+  font-weight: 700;
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.16) inset, 0 6px 14px -8px hsl(0 0% 0% / 0.9);
 }
+.app2-chip.active svg { color: hsl(var(--app2-live)); }
+
 
 /* ----------------------------------------------------------------- main --- */
 
@@ -688,44 +714,58 @@
   flex-wrap: nowrap;
   gap: 2px;
   overflow-x: auto;
-  border-top: 1px solid var(--app2-hairline);
-  background: hsl(220 12% 5% / 0.72);
-  padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
-  backdrop-filter: blur(24px) saturate(180%);
+  border-top: 1px solid hsl(0 0% 100% / 0.08);
+  background: hsl(0 0% 0% / 0.6);
+  padding: 7px 10px calc(env(safe-area-inset-bottom, 0px) + 9px);
+  backdrop-filter: blur(30px) saturate(180%);
   scrollbar-width: none;
 }
 .app2-bottom-nav::-webkit-scrollbar { display: none; }
 
 .app2-tab {
+  position: relative;
   flex: 1 1 0;
-  min-width: 60px;
+  min-width: 58px;
   min-height: 46px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 4px;
-  border-radius: var(--app2-r-md);
+  gap: 3px;
+  border-radius: 14px;
   border: 1px solid transparent;
   background: transparent;
   color: hsl(var(--app2-faint));
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: -0.005em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
-.app2-tab svg { transition: transform 200ms var(--app2-ease); }
-.app2-tab:hover { color: hsl(var(--app2-muted)); background: hsl(210 20% 98% / 0.04); }
+.app2-tab svg { transition: transform 260ms var(--app2-ease); }
+.app2-tab:hover { color: hsl(var(--app2-muted)); }
 .app2-tab.active {
-  color: hsl(var(--app2-fg));
-  border-color: hsl(210 20% 98% / 0.1);
-  background: hsl(210 20% 98% / 0.1);
-  font-weight: 800;
+  color: hsl(0 0% 100%);
+  font-weight: 700;
 }
-.app2-tab.active svg { color: hsl(var(--app2-ready)); transform: translateY(-1px); }
+.app2-tab.active::before {
+  content: "";
+  position: absolute;
+  inset: 2px 6px;
+  border-radius: 14px;
+  background: hsl(0 0% 100% / 0.09);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+}
+.app2-tab.active svg {
+  position: relative;
+  color: hsl(var(--app2-live));
+  transform: translateY(-1px) scale(1.06);
+  filter: drop-shadow(0 0 10px hsl(var(--app2-live) / 0.55));
+}
+.app2-tab.active span, .app2-tab.active { z-index: 1; }
 
 /* ------------------------------------------------------- embedded views --- */
 
 .app2-scroll-embed { margin: 0; }
-.app2-scroll-embed > * { font-family: "Satoshi", system-ui, sans-serif; }
+.app2-scroll-embed > * { font-family: "Manrope", system-ui, sans-serif; }
+
 
 @keyframes app2-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
