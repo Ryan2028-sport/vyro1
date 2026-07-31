@@ -825,50 +825,32 @@ export function DebugView() {
   };
 
   return (
-    <div style={{ padding: 14, color: "#e5e7eb", fontFamily: "Satoshi, system-ui, sans-serif" }}>
+    <div className="p-3.5 text-vyro-text">
+      <PageHeader
+        eyebrow="Diagnostics · Raw pipeline"
+        title="Debug console"
+        subtitle={bundleCopied || "Paste the bundle into chat for a one-shot diagnosis."}
+        action={
+          <button
+            type="button"
+            onClick={copyBundle}
+            className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-vyro-spatial/30 bg-vyro-spatial/[0.12] px-3.5 py-2 text-[11.5px] font-bold text-vyro-spatial transition-all duration-200 ease-out hover:bg-vyro-spatial/[0.2] active:scale-[0.97]"
+          >
+            Copy debug bundle
+          </button>
+        }
+      />
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 10,
-        }}
+        className={`mb-3 rounded-[16px] border p-3.5 text-[12px] ${
+          m.connected
+            ? "border-vyro-mint/25 bg-vyro-mint/[0.07]"
+            : "border-vyro-amber/25 bg-vyro-amber/[0.06]"
+        }`}
       >
-        <div style={{ fontSize: 12, opacity: 0.75 }}>
-          {bundleCopied || "Paste the bundle into chat for a one-shot diagnosis."}
-        </div>
-        <button
-          type="button"
-          onClick={copyBundle}
-          style={{
-            border: "1px solid rgba(255,255,255,0.18)",
-            borderRadius: 10,
-            padding: "6px 12px",
-            background: "rgba(59,130,246,0.18)",
-            color: "inherit",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          Copy debug bundle
-        </button>
-      </div>
-      <div
-        style={{
-          padding: "10px 12px",
-          borderRadius: 12,
-          background: m.connected ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)",
-          border: `1px solid ${m.connected ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
-          marginBottom: 12,
-          fontSize: 12,
-        }}
-      >
-        <div style={{ fontWeight: 700, marginBottom: 2 }}>
+        <div className={`mb-1 font-bold ${m.connected ? "text-vyro-mint" : "text-vyro-amber"}`}>
           {m.connected ? "Band live — streaming" : "Band offline"}
         </div>
-        <div style={{ opacity: 0.75 }}>
+        <div className="leading-relaxed text-vyro-mute">
           Green dot = metric flowing right now. Grey = silent. If a metric stays
           grey while the band is connected, check (1) the GATT services list — is
           the characteristic even advertised? (2) the per-characteristic notify
@@ -876,6 +858,7 @@ export function DebugView() {
           decoder. Every value below is real or empty, never demo.
         </div>
       </div>
+
 
       <Section title="Connection" rows={connection} />
       <Section title="Device info (BLE DIS)" rows={deviceInfo} />
