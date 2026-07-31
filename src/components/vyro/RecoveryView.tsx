@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, PageHeader, Pill, Ring, Stat } from "./shared";
-import { computeLiveRecovery, recoveryBand, useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
+import { type LiveMetrics } from "./useLiveMetrics";
+import { useVyroScores } from "./VyroScoresProvider";
 
 // Recovery & fatigue intelligence.
 // Mobile-first, WHOOP/Nike-style. Streams everything possible from the
@@ -10,55 +11,26 @@ import { computeLiveRecovery, recoveryBand, useLiveMetrics, type LiveMetrics } f
 type Tab = "live" | "game" | "fatigue" | "overnight";
 
 export function RecoveryView() {
-  const m = useLiveMetrics();
+  const s = useVyroScores();
+  const m = s.m;
   const [tab, setTab] = useState<Tab>("live");
 
   // --- Subscores -----------------------------------------------------------
-  // All recovery math lives in one place (useLiveMetrics > computeLiveRecovery)
-  // so the Recovery view's hero ring and the Sport view's "Live recovery" lens
-  // always show the IDENTICAL number from the watch — no divergence, no demo.
-  const { score: recovery, parts } = useMemo(
-    () => computeLiveRecovery({
-      connected: m.connected,
-      heartRateBpm: m.heartRateBpm,
-      restingHrBpm: m.restingHrBpm,
-      hrvMs: m.hrvMs,
-      spo2Pct: m.spo2Pct,
-      skinTempC: m.skinTempC,
-      stepsToday: m.stepsToday,
-      batteryPct: m.batteryPct,
-      peakJerk: m.peakJerk ?? null,
-      eventsLastMin: m.eventsLastMin,
-    }),
-    [m.connected, m.heartRateBpm, m.restingHrBpm, m.hrvMs, m.spo2Pct, m.skinTempC, m.stepsToday, m.batteryPct, m.peakJerk, m.eventsLastMin],
-  );
+  // Read STRAIGHT from the global provider, so the hero ring here and the
+  // "Live recovery" lens on the Sport tab are always the identical number.
+  const recovery = s.recovery;
+  const parts = s.parts;
   const cardio = parts.cardio;
   const muscle = parts.muscle;
   const loadDebt = parts.loadDebt;
   const environment = parts.environment;
   const confidence = parts.confidence;
+  const timeToReady = s.timeToReady;
 
-  // Time-to-ready (min): rough estimate from cardio + muscle deficit.
-  const timeToReady = useMemo(() => {
-    if (cardio == null || muscle == null) return null;
-    const deficit = (100 - cardio) * 0.4 + (100 - muscle) * 0.6;
-    return Math.round(deficit * 0.6);
-  }, [cardio, muscle]);
-
-
-  const band = recoveryBand(recovery);
-  const bandTone = band === "green" ? "live" : band === "yellow" ? "warn" : band === "red" ? "off" : "neutral";
-  const bandLabel =
-    band === "green" ? "Green — Ready"
-    : band === "yellow" ? "Yellow — Caution"
-    : band === "red" ? "Red — Hold"
-    : "Calibrating";
-
-  const coachRead =
-    band === "green" ? "Cleared for a hard session."
-    : band === "yellow" ? "Train, but manage load."
-    : band === "red" ? "Hold today. Mobility, breath work, light hitting only."
-    : "Wear the band a few more minutes to lock in a reading.";
+  const band = s.band;
+  const bandTone = s.bandTone;
+  const bandLabel = s.bandLabel;
+  const coachRead = s.coachRead;
 
   // Trap detector — HR says ready, but muscle/load says be smart.
   const hrTrap = cardio != null && muscle != null && cardio - muscle >= 20;
