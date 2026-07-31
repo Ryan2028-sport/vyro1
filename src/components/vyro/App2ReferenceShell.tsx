@@ -863,7 +863,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           </InfoCard>
 
 
-          <InfoCard eyebrow="Today's plan editable" title="Training blocks">
+          <InfoCard eyebrow="Today's plan · editable" title="Training blocks" icon={ListChecks} accent="purple">
             <div className="space-y-2">
               {liveSessionBlock && (
                 <div
