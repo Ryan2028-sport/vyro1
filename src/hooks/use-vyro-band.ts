@@ -854,8 +854,6 @@ export function useVyroBand() {
       measurementLoopTimer = window.setTimeout(() => void runAllMeasures(), 3_000);
     }
 
-    let cleanupExtras: (() => void) | null = null;
-
     const off = bluetooth.on("discovered", (tree: BleDiscovered) => {
       if (tree.id !== connectedId) return;
       for (const svc of tree.services) {
@@ -954,7 +952,6 @@ export function useVyroBand() {
       if (historyTimer != null) window.clearInterval(historyTimer);
       if (measurementLoopTimer != null) window.clearTimeout(measurementLoopTimer);
       activeMeasureRef.current = null;
-      cleanupExtras?.();
       if (qcBandService) {
         void bluetooth
           .unsubscribe(connectedId, qcBandService.service, qcBandService.notify)
