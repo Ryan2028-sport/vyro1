@@ -1445,7 +1445,11 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
           </InfoCard>
 
-          <CognitiveFatigueCard m={m} baselineMs={baselines.reactMs ?? undefined} />
+          <CognitiveFatigueCard
+            m={m}
+            baselineMs={baselines.reactMs ?? undefined}
+            hrvBaselineMs={baselines.hrv ?? undefined}
+          />
 
           <InfoCard
             eyebrow="Return-to-play"
