@@ -262,6 +262,57 @@ export function encodeQcBandSpo2IntervalHistoryRequest(daysAgo = 0, pocketIndex 
   return bigDataV2Request(QCBAND_BIG_DATA_TYPE_SPO2_INTERVAL, [daysAgo & 0xff, pocketIndex & 0xff]);
 }
 
+// ---- Protocol discovery ------------------------------------------------
+// QCBand/Oudmon firmwares ship different opcode maps per OEM build. When the
+// documented temperature / blood-pressure requests answer 0xee (unsupported)
+// we probe the neighbouring type space instead of giving up: any frame whose
+// payload decodes to a physiologically plausible value is adopted.
+export const QCBAND_BIG_DATA_PROBE_TYPES = [
+  0x25, 0x26, 0x27, 0x28, 0x29, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+  0x30, 0x31, 0x32, 0x33, 0x60, 0x61, 0x62, 0x63, 0x74, 0x75,
+] as const;
+
+// Sub-types under 0x69 that are not already part of a named family.
+export const QCBAND_MEASURE_PROBE_TYPES = [
+  0x06, 0x07, 0x08, 0x0a, 0x0b, 0x0c, 0x0f, 0x10, 0x11, 0x12,
+] as const;
+
+export function encodeQcBandBigDataProbe(type: number, payload: number[] = [0x00, 0x00]): Uint8Array {
+  return bigDataV2Request(type, payload);
+}
+
+/**
+ * Temperature scan for an unknown big-data frame. Only used for probe frames,
+ * and only accepts wrist-plausible values, so a random counter byte cannot
+ * masquerade as a skin temperature.
+ */
+export function scanBigDataTemperature(bytes: Uint8Array): number | null {
+  if (bytes.length < 6) return null;
+  const body = bytes[0] === QCBAND_CMD_BIG_DATA_V2 ? bytes.slice(6) : bytes.slice(1);
+  const temp = latestPlausibleTemperature(body);
+  return temp != null && temp >= 28 && temp <= 42 ? temp : null;
+}
+
+/**
+ * Blood-pressure scan: look for an adjacent systolic/diastolic byte pair with
+ * a realistic spread. Requires both values and the gap between them to be
+ * physiological, which random payload bytes rarely satisfy.
+ */
+export function scanBloodPressurePair(
+  bytes: Uint8Array,
+  start = 0,
+): { sbp: number; dbp: number } | null {
+  for (let i = Math.max(0, start); i + 1 < bytes.length; i++) {
+    const sbp = bytes[i] & 0xff;
+    const dbp = bytes[i + 1] & 0xff;
+    if (sbp >= 80 && sbp <= 200 && dbp >= 45 && dbp <= 130 && sbp - dbp >= 20 && sbp - dbp <= 90) {
+      return { sbp, dbp };
+    }
+  }
+  return null;
+}
+
+
 function bcdByte(v: number): number {
   return ((v >> 4) & 0x0f) * 10 + (v & 0x0f);
 }

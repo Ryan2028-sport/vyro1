@@ -68,6 +68,12 @@ import {
   encodeQcBandTemperatureLegacyHistoryRequest,
   encodeQcBandTemperatureManualHistoryRequest,
   encodeQcBandTodaySportsRequest,
+  encodeQcBandBigDataProbe,
+  scanBigDataTemperature,
+  scanBloodPressurePair,
+  QCBAND_BIG_DATA_PROBE_TYPES,
+  QCBAND_MEASURE_PROBE_TYPES,
+
   QCBAND_CMD_BATTERY,
   QCBAND_CMD_BIG_DATA_V2,
   QCBAND_CMD_NOTIFICATION,
@@ -440,6 +446,13 @@ export function useVyroBand() {
   const metricBackoffUntilRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 });
   const unsupportedHitRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 });
   const measureCursorRef = useRef(0);
+  // Protocol discovery: which undocumented channel is currently being probed,
+  // plus a two-hit confirmation buffer so a random byte pair can never be
+  // adopted as a blood-pressure reading.
+  const probeBigDataRef = useRef<number | null>(null);
+  const probeSubTypeRef = useRef<number | null>(null);
+  const bpCandidateRef = useRef<{ sbp: number; dbp: number; hits: number } | null>(null);
+
   const signalAtRef = useRef<VyroBandSignalTimestamps>(emptySignalTimestamps());
   const sleepSamplesRef = useRef<SleepDerivedSample[]>(loadSleepSamples());
   const lastSleepSampleAtRef = useRef(0);
@@ -711,6 +724,8 @@ export function useVyroBand() {
     let stepsTimer: number | null = null;
     let measurementLoopTimer: number | null = null;
     let historyTimer: number | null = null;
+    let probeTimer: number | null = null;
+
     let writeChain = Promise.resolve();
 
     // iOS may freeze JavaScript immediately after visibility becomes hidden.
@@ -912,6 +927,61 @@ export function useVyroBand() {
       window.setTimeout(pollHistory, 6_000);
       historyTimer = window.setInterval(pollHistory, 60_000);
 
+      // ---- PROTOCOL DISCOVERY -----------------------------------------
+      // OEM firmwares (this one reports RFH59Pro_1.00.21) do not all use the
+      // documented temperature / blood-pressure opcodes. When the documented
+      // requests answer 0xee "unsupported", sweep the neighbouring type space
+      // and adopt any frame that decodes to a physiologically plausible value.
+      // The big-data sweep is passive (no optical sensor conflict); the 0x69
+      // sub-type sweep runs only while the sensor is explicitly held.
+      const runProtocolProbe = async () => {
+        if (cancelled || document.visibilityState !== "visible") return;
+        const needTemp = () => signalAtRef.current.skinTempAt == null;
+        const needBp = () => signalAtRef.current.bloodPressureAt == null;
+        if (!needTemp() && !needBp()) return;
+
+        if (qcBandV2Service) {
+          for (const type of QCBAND_BIG_DATA_PROBE_TYPES) {
+            if (cancelled || (!needTemp() && !needBp())) break;
+            probeBigDataRef.current = type;
+            await writeQcBandV2(encodeQcBandBigDataProbe(type)).catch(() => undefined);
+            await wait(450);
+          }
+          probeBigDataRef.current = null;
+          if (needTemp()) {
+            updateMetricPipeline("skinTemp", {
+              detail: `Scanned ${QCBAND_BIG_DATA_PROBE_TYPES.length} history channels — no temperature payload yet`,
+            });
+          }
+        }
+
+        if ((needTemp() || needBp()) && !activeMeasureRef.current) {
+          setSensorHold(true);
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
+          for (const subType of QCBAND_MEASURE_PROBE_TYPES) {
+            if (cancelled || (!needTemp() && !needBp())) break;
+            probeSubTypeRef.current = subType;
+            updateMetricPipeline(needTemp() ? "skinTemp" : "bloodPressure", {
+              status: "measuring",
+              subType,
+              requestedAt: Date.now(),
+              detail: `Protocol discovery · probing 0x69 subtype 0x${subType.toString(16)}`,
+            });
+            await writeQcBand(service, write, encodeQcBandMeasureStart(subType)).catch(() => undefined);
+            await wait(3_000);
+            await writeQcBand(service, write, encodeQcBandMeasureStop(subType)).catch(() => undefined);
+            await wait(400);
+          }
+          probeSubTypeRef.current = null;
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
+          setSensorHold(false);
+        }
+      };
+      window.setTimeout(() => void runProtocolProbe(), 100_000);
+      probeTimer = window.setInterval(() => void runProtocolProbe(), 15 * 60_000);
+
+
+
       // ---- DETERMINISTIC MEASUREMENT SCHEDULE --------------------------
       // Rules learned from real device traces:
       //  * Realtime HR and manual optical measurements compete for the same
@@ -960,12 +1030,12 @@ export function useVyroBand() {
         measureFailStreakRef.current[metric] = streak;
         if (streak >= 2) {
           // Firmware clearly isn't answering. Stop stealing the sensor.
-          metricBackoffUntilRef.current[metric] = Date.now() + 30 * 60_000;
+          metricBackoffUntilRef.current[metric] = Date.now() + 15 * 60_000;
           updateMetricPipeline(metric, {
             status: sawUnsupported ? "unsupported" : "no_response",
             detail: sawUnsupported
-              ? "Not available on this watch firmware"
-              : "Watch never answered — rechecking in 30 min",
+              ? "Documented opcodes unsupported — protocol discovery running"
+              : "Watch never answered — rechecking in 15 min",
 
           });
         } else {
@@ -1132,6 +1202,7 @@ export function useVyroBand() {
       if (batteryTimer != null) window.clearInterval(batteryTimer);
       if (stepsTimer != null) window.clearInterval(stepsTimer);
       if (historyTimer != null) window.clearInterval(historyTimer);
+      if (probeTimer != null) window.clearInterval(probeTimer);
       if (measurementLoopTimer != null) window.clearTimeout(measurementLoopTimer);
       activeMeasureRef.current = null;
       if (qcBandService) {
@@ -1304,9 +1375,59 @@ export function useVyroBand() {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame) return;
         const active = activeMeasureRef.current;
+        // Protocol discovery: while probing undocumented sub-types there is no
+        // "owning" metric, so accept temperature / blood pressure from any
+        // frame whose payload decodes to a physiologically plausible value.
+        if (frame.errorCode === 0 && (probeSubTypeRef.current != null || !active)) {
+          const now = Date.now();
+          if (signalAtRef.current.skinTempAt == null) {
+            const composite = decodeQcBandOneKeyPayload(frame.data);
+            const probeTemp = composite?.tempC ?? decodeQcBandTempPayload(frame.data);
+            if (probeTemp != null && probeTemp >= 28 && probeTemp <= 42) {
+              setSkinTempC(probeTemp);
+              markSignal("skinTempAt", now);
+              tapDecoded("skinTemp", probeTemp, bytes);
+              metricBackoffUntilRef.current.skinTemp = 0;
+              updateMetricPipeline("skinTemp", {
+                status: "received",
+                respondedAt: now,
+                detail: `Discovered on 0x69 subtype 0x${frame.subType.toString(16)}`,
+              });
+            }
+          }
+          if (signalAtRef.current.bloodPressureAt == null) {
+            const composite = decodeQcBandOneKeyPayload(frame.data);
+            const probeBp =
+              decodeQcBandBloodPressurePayload(frame.data) ??
+              (composite?.sbp != null && composite.dbp != null
+                ? { sbp: composite.sbp, dbp: composite.dbp }
+                : scanBloodPressurePair(frame.data));
+            if (probeBp) {
+              const prev = bpCandidateRef.current;
+              const hits = prev && prev.sbp === probeBp.sbp && prev.dbp === probeBp.dbp ? prev.hits + 1 : 1;
+              bpCandidateRef.current = { ...probeBp, hits };
+              if (hits >= 2) {
+                setBloodPressure(probeBp);
+                markSignal("bloodPressureAt", now);
+                tapDecoded("bp", `${probeBp.sbp}/${probeBp.dbp}`, bytes);
+                metricBackoffUntilRef.current.bloodPressure = 0;
+                updateMetricPipeline("bloodPressure", {
+                  status: "received",
+                  respondedAt: now,
+                  detail: `Discovered on 0x69 subtype 0x${frame.subType.toString(16)}`,
+                });
+              } else {
+                updateMetricPipeline("bloodPressure", {
+                  detail: `Candidate ${probeBp.sbp}/${probeBp.dbp} on subtype 0x${frame.subType.toString(16)} — confirming`,
+                });
+              }
+            }
+          }
+        }
         // Overlapping subtype enums make an uncorrelated frame ambiguous. Only
         // the metric that currently owns the optical sensor may decode it.
         if (!active || active.subType !== frame.subType || frame.errorCode !== 0) return;
+
         const receivedAt = Date.now();
         let accepted = false;
         if (active.metric === "spo2" && frame.value >= 70 && frame.value <= 100) {
@@ -1367,8 +1488,43 @@ export function useVyroBand() {
         markSignal("skinTempAt");
         tapDecoded("skinTemp", temp, bytes);
         updateMetricPipeline("skinTemp", { status: "received", respondedAt: Date.now(), detail: "V2 history response" });
+      } else if (probeBigDataRef.current != null) {
+        // Protocol discovery on an undocumented big-data channel.
+        const probeType = probeBigDataRef.current;
+        const probeTemp = signalAtRef.current.skinTempAt == null ? scanBigDataTemperature(bytes) : null;
+        if (probeTemp != null) {
+          setSkinTempC(probeTemp);
+          markSignal("skinTempAt");
+          tapDecoded("skinTemp", probeTemp, bytes);
+          metricBackoffUntilRef.current.skinTemp = 0;
+          updateMetricPipeline("skinTemp", {
+            status: "received",
+            respondedAt: Date.now(),
+            detail: `Discovered on big-data channel 0x${probeType.toString(16)}`,
+          });
+        }
+        if (signalAtRef.current.bloodPressureAt == null && bytes.length >= 8) {
+          const probeBp = scanBloodPressurePair(bytes, 6);
+          if (probeBp) {
+            const prev = bpCandidateRef.current;
+            const hits = prev && prev.sbp === probeBp.sbp && prev.dbp === probeBp.dbp ? prev.hits + 1 : 1;
+            bpCandidateRef.current = { ...probeBp, hits };
+            if (hits >= 2) {
+              setBloodPressure(probeBp);
+              markSignal("bloodPressureAt");
+              tapDecoded("bp", `${probeBp.sbp}/${probeBp.dbp}`, bytes);
+              metricBackoffUntilRef.current.bloodPressure = 0;
+              updateMetricPipeline("bloodPressure", {
+                status: "received",
+                respondedAt: Date.now(),
+                detail: `Discovered on big-data channel 0x${probeType.toString(16)}`,
+              });
+            }
+          }
+        }
       }
       return;
+
     }
     if (uuidMatches(cuuid, BAT_LVL_CHAR)) {
       const bytes = payloadToBytes(data.value);
