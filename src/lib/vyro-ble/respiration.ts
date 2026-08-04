@@ -155,7 +155,7 @@ export function estimateRespirationFromHeartRate(
   const meanHalfPeriod = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
   if (meanHalfPeriod <= 0) return null;
   const brpm = 60 / (meanHalfPeriod * 2);
-  if (brpm < 6 || brpm > 30) return null;
+  if (brpm < 8 || brpm > 28) return null;
   // Regularity of the half-periods is the confidence proxy here.
   const spread =
     Math.sqrt(
