@@ -104,6 +104,7 @@ import {
 } from "@/lib/vyro-ble/qcband";
 import { recordSleepNight, type SleepNight } from "@/lib/use-sleep-nights";
 import { tapDecoded, getDecodedSnapshot } from "@/lib/vyro-ble/decoder-tap";
+import { estimateRespirationFromHeartRate } from "@/lib/vyro-ble/respiration";
 
 import { bluetooth, isNative, type BleDataEvent, type BleDiscovered } from "@/lib/despia";
 
@@ -196,6 +197,7 @@ export type VyroBandSignalTimestamps = {
   caloriesAt: number | null;
   restingHrAt: number | null;
   hrvAt: number | null;
+  respirationAt: number | null;
   stressAt: number | null;
   bloodPressureAt: number | null;
 };
@@ -210,12 +212,13 @@ export type MetricPipelineEntry = {
   detail: string;
 };
 
-export type MetricPipeline = Record<"spo2" | "skinTemp" | "hrv" | "stress" | "bloodPressure", MetricPipelineEntry>;
+export type MetricPipeline = Record<"spo2" | "skinTemp" | "hrv" | "respiration" | "stress" | "bloodPressure", MetricPipelineEntry>;
 
 const emptyMetricPipeline = (): MetricPipeline => ({
   spo2: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
   skinTemp: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
   hrv: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
+  respiration: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Collecting live PPG samples" },
   stress: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
   bloodPressure: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
 });
@@ -229,6 +232,7 @@ const emptySignalTimestamps = (): VyroBandSignalTimestamps => ({
   caloriesAt: null,
   restingHrAt: null,
   hrvAt: null,
+  respirationAt: null,
   stressAt: null,
   bloodPressureAt: null,
 });
@@ -418,6 +422,7 @@ export function useVyroBand() {
     spo2: null,
     skinTemp: null,
     hrv: null,
+    respiration: null,
     stress: null,
     bloodPressure: null,
   });
@@ -431,9 +436,9 @@ export function useVyroBand() {
   // measurement owns the PPG, so the UI can keep showing the last HR-derived
   // values instead of blanking them.
   const [sensorHold, setSensorHold] = useState(false);
-  const measureFailStreakRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 });
-  const metricBackoffUntilRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 });
-  const unsupportedHitRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 });
+  const measureFailStreakRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 });
+  const metricBackoffUntilRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 });
+  const unsupportedHitRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 });
   const measureCursorRef = useRef(0);
   const signalAtRef = useRef<VyroBandSignalTimestamps>(emptySignalTimestamps());
   const sleepSamplesRef = useRef<SleepDerivedSample[]>(loadSleepSamples());
@@ -541,14 +546,14 @@ export function useVyroBand() {
     activityBucketsRef.current.clear();
     activityTotalRef.current = null;
     activeMeasureRef.current = null;
-    measureFailStreakRef.current = { spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 };
-    metricBackoffUntilRef.current = { spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 };
-    unsupportedHitRef.current = { spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 };
+    measureFailStreakRef.current = { spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 };
+    metricBackoffUntilRef.current = { spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 };
+    unsupportedHitRef.current = { spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 };
     measureCursorRef.current = 0;
     signalAtRef.current = emptySignalTimestamps();
     setSensorHold(false);
 
-    metricReceivedAtRef.current = { spo2: null, skinTemp: null, hrv: null, stress: null, bloodPressure: null };
+    metricReceivedAtRef.current = { spo2: null, skinTemp: null, hrv: null, respiration: null, stress: null, bloodPressure: null };
     setEvents([]);
     setHeartRateBpm(null);
     setHeartRateAt(null);
@@ -629,6 +634,32 @@ export function useVyroBand() {
       tapDecoded("restingHr", rhr);
     }
   }, [heartRateBpm, heartRateAt]);
+
+  // RFH59 Pro has no dedicated respiration opcode. Its continuously streaming
+  // Goodix PPG HR channel still carries respiratory sinus arrhythmia, which is
+  // how optical wearables estimate breathing rate. Require at least a minute
+  // of recent, well-covered samples and a strong spectral peak before exposing
+  // the value; low-quality windows stay blank instead of being fabricated.
+  useEffect(() => {
+    if (heartRateBpm == null || heartRateAt == null || sensorHold) return;
+    const estimate = estimateRespirationFromHeartRate(hrSamplesRef.current);
+    if (!estimate) {
+      updateMetricPipeline("respiration", {
+        status: "measuring",
+        requestedAt: hrSamplesRef.current[0]?.t ?? heartRateAt,
+        detail: `PPG calibration · ${hrSamplesRef.current.length}/45 samples`,
+      });
+      return;
+    }
+    setRespRateBrpm(estimate.brpm);
+    markSignal("respirationAt", heartRateAt);
+    tapDecoded("respiration", estimate.brpm);
+    updateMetricPipeline("respiration", {
+      status: "received",
+      respondedAt: heartRateAt,
+      detail: `PPG RSA · ${estimate.windowSeconds}s · ${Math.round(estimate.confidence * 100)}% confidence`,
+    });
+  }, [heartRateBpm, heartRateAt, sensorHold]);
 
   // Sleep pipeline: when the firmware does not expose a finalized sleep-stage
   // opcode, still persist a real-data nightly sleep summary from overnight HR,

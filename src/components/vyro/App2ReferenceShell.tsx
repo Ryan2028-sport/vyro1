@@ -1136,7 +1136,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
       { label: "SpO₂", value: liveCell(m.spo2Pct), unit: "%", accent: "blue" as Accent,
         trend: m.connected && m.spo2Pct != null ? (m.spo2Pct >= 95 ? "stable" : "low") : m.metricPipeline.spo2.detail,
         live: m.connected && m.spo2Pct != null },
-      { label: "Resp Rate", value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm", accent: "indigo" as Accent, trend: m.respRateBrpm == null ? "Unsupported by connected firmware" : undefined,
+      { label: "Resp Rate", value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm", accent: "indigo" as Accent, trend: m.respRateBrpm == null ? m.metricPipeline.respiration.detail : undefined,
         live: m.connected && m.respRateBrpm != null },
       { label: "Stress", value: liveCell(m.stressScore), unit: "/100", accent: "orange" as Accent,
         trend: m.connected && m.stressScore != null ? (m.stressScore < 40 ? "calm" : m.stressScore < 70 ? "alert" : "high") : m.metricPipeline.stress.detail,

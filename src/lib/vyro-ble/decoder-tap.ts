@@ -17,6 +17,7 @@ export type MetricKey =
   | "spo2"
   | "skinTemp"
   | "hrv"
+  | "respiration"
   | "stress"
   | "bp"
   | "battery"
