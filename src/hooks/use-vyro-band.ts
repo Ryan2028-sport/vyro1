@@ -964,8 +964,9 @@ export function useVyroBand() {
           updateMetricPipeline(metric, {
             status: sawUnsupported ? "unsupported" : "no_response",
             detail: sawUnsupported
-              ? "Not supported by this firmware — retrying in 30 min"
-              : "No response from watch — retrying in 30 min",
+              ? "Not available on this watch firmware"
+              : "Watch never answered — rechecking in 30 min",
+
           });
         } else {
           updateMetricPipeline(metric, {
