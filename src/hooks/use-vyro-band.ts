@@ -1270,6 +1270,7 @@ export function useVyroBand() {
       if (stepsTimer != null) window.clearInterval(stepsTimer);
       if (historyTimer != null) window.clearInterval(historyTimer);
       if (probeTimer != null) window.clearInterval(probeTimer);
+      if (hrWatchdogTimer != null) window.clearInterval(hrWatchdogTimer);
       if (measurementLoopTimer != null) window.clearTimeout(measurementLoopTimer);
       activeMeasureRef.current = null;
       if (qcBandService) {
