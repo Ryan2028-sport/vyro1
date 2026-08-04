@@ -481,7 +481,9 @@ function latestPlausibleTemperature(bytes: Uint8Array, start = 0): number | null
   };
   for (let i = Math.max(0, start); i < bytes.length; i++) {
     const b = bytes[i] & 0xff;
-    if (b > 0) accept(b / 10 + 20);
+    // Offset-byte encoding uses 50..220 => 25.0..42.0°C. Header/index bytes
+    // such as 0x01 must not become a fake 20.1°C reading.
+    if (b >= 50 && b <= 220) accept(b / 10 + 20);
     if (i + 1 < bytes.length) {
       const le = b | (bytes[i + 1] << 8);
       const be = (b << 8) | bytes[i + 1];
