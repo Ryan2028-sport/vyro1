@@ -22,6 +22,11 @@ export function useLiveMetrics() {
   // though the value is right there in context. Fix: if the band is
   // connected and we have a value, show it. Use the timestamp only to
   // hide truly stale readings (older than `maxAgeMs`).
+  //
+  // While `sensorHold` is true a manual optical measurement owns the PPG, so
+  // the realtime HR stream is intentionally paused. Values must NOT blank out
+  // during that window — we extend every gate by a hold grace period.
+  const holdGrace = sensorHold ? 3 * 60_000 : 0;
   const isFresh = (
     at: number | null | undefined,
     value: number | null | undefined,
@@ -31,7 +36,7 @@ export function useLiveMetrics() {
     if (at == null) return true; // value present, timestamp not yet wired — trust it
     const age = currentTime - at;
     if (age < 0) return true;
-    return age <= maxAgeMs;
+    return age <= maxAgeMs + holdGrace;
   };
 
   const liveHeartRateBpm = isFresh(heartRateAt, heartRateBpm, 30_000) ? heartRateBpm : null;
@@ -44,9 +49,12 @@ export function useLiveMetrics() {
   const liveDistanceM = isFresh(signalAt.distanceAt, distanceM, 5 * 60_000) ? distanceM : null;
   const liveCaloriesKcal = isFresh(signalAt.caloriesAt, caloriesKcal, 5 * 60_000) ? caloriesKcal : null;
   const liveBloodPressure = isFresh(signalAt.bloodPressureAt, bloodPressure ? 1 : null, 30 * 60_000) ? bloodPressure : null;
-  const liveRestingHrBpm = isFresh(signalAt.restingHrAt, restingHrBpm, 10 * 60_000) ? restingHrBpm : null;
+  // Resting HR is derived from the rolling HR buffer, so it legitimately holds
+  // its value across a measurement pause.
+  const liveRestingHrBpm = isFresh(signalAt.restingHrAt, restingHrBpm, 15 * 60_000) ? restingHrBpm : null;
   const liveHrvMs = isFresh(signalAt.hrvAt, hrvMs, 30 * 60_000) ? hrvMs : null;
   const liveStressScore = isFresh(signalAt.stressAt, stressScore, 30 * 60_000) ? stressScore : null;
+
 
 
   const derived = useMemo(() => {
