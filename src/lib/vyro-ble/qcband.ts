@@ -290,6 +290,7 @@ export function scanBigDataTemperature(bytes: Uint8Array): number | null {
   if (bytes.length < 6) return null;
   const body = bytes[0] === QCBAND_CMD_BIG_DATA_V2 ? bytes.slice(6) : bytes.slice(1);
   const temp = latestPlausibleTemperature(body);
+
   return temp != null && temp >= 28 && temp <= 42 ? temp : null;
 }
 
@@ -525,16 +526,16 @@ export function decodeQcBandStressHistory(bytes: Uint8Array): number | null {
 function latestPlausibleTemperature(bytes: Uint8Array, start = 0): number | null {
   let latest: number | null = null;
   const accept = (t: number) => {
-    // This is wrist/skin temperature, not core body temperature. A cool wrist
-    // can legitimately read in the mid-20s, especially just after putting the
-    // band on. Rejecting everything below 30°C discarded valid RFH59 samples.
-    if (Number.isFinite(t) && t >= 20 && t <= 42) latest = Math.round(t * 10) / 10;
+    // Worn wrist/skin temperature. Anything below 28°C is a decode artefact
+    // (header bytes, counters, zero-padding) rather than a real reading — the
+    // firmware only reports skin temp while the band is on the wrist.
+    if (Number.isFinite(t) && t >= 28 && t <= 42) latest = Math.round(t * 10) / 10;
   };
   for (let i = Math.max(0, start); i < bytes.length; i++) {
     const b = bytes[i] & 0xff;
-    // Offset-byte encoding uses 50..220 => 25.0..42.0°C. Header/index bytes
-    // such as 0x01 must not become a fake 20.1°C reading.
-    if (b >= 50 && b <= 220) accept(b / 10 + 20);
+    // Offset-byte encoding uses 80..220 => 28.0..42.0°C. Header/index bytes
+    // must not become a fake reading.
+    if (b >= 80 && b <= 220) accept(b / 10 + 20);
     if (i + 1 < bytes.length) {
       const le = b | (bytes[i + 1] << 8);
       const be = (b << 8) | bytes[i + 1];
@@ -546,6 +547,7 @@ function latestPlausibleTemperature(bytes: Uint8Array, start = 0): number | null
   }
   return latest;
 }
+
 
 export function decodeQcBandTemperatureHistory(bytes: Uint8Array): number | null {
   const tempTypes = [
@@ -835,7 +837,8 @@ export function decodeQcBandTempPayload(data: Uint8Array): number | null {
     u16be / 100,
   ];
   for (const t of candidates) {
-    if (t >= 20 && t <= 42) return t;
+    if (t >= 28 && t <= 42) return t;
   }
+
   return null;
 }
