@@ -446,6 +446,13 @@ export function useVyroBand() {
   const metricBackoffUntilRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 });
   const unsupportedHitRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, respiration: 0, stress: 0, bloodPressure: 0 });
   const measureCursorRef = useRef(0);
+  // Protocol discovery: which undocumented channel is currently being probed,
+  // plus a two-hit confirmation buffer so a random byte pair can never be
+  // adopted as a blood-pressure reading.
+  const probeBigDataRef = useRef<number | null>(null);
+  const probeSubTypeRef = useRef<number | null>(null);
+  const bpCandidateRef = useRef<{ sbp: number; dbp: number; hits: number } | null>(null);
+
   const signalAtRef = useRef<VyroBandSignalTimestamps>(emptySignalTimestamps());
   const sleepSamplesRef = useRef<SleepDerivedSample[]>(loadSleepSamples());
   const lastSleepSampleAtRef = useRef(0);
