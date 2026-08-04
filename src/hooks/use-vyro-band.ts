@@ -1117,7 +1117,17 @@ export function useVyroBand() {
         if (entry) {
           setSensorHold(true);
           await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
+          if (entry.metric === "bloodPressure") {
+            // This firmware family only answers the wrist BP request once
+            // "private mode" has been unlocked with reference cuff values.
+            updateMetricPipeline("bloodPressure", { status: "measuring", detail: "Unlocking private BP mode" });
+            for (const cmd of encodeQcBandBpCalibrations(120, 80)) {
+              await writeQcBand(service, write, cmd).catch(() => undefined);
+              await new Promise((resolve) => window.setTimeout(resolve, 250));
+            }
+          }
           await measureMetric(entry.metric, entry.subTypes, entry.durationMs);
+
           // Give the PPG straight back to heart rate.
           await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
           setSensorHold(false);
