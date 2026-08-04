@@ -1407,18 +1407,9 @@ export function useVyroBand() {
           if (signalAtRef.current.skinTempAt == null) {
             const composite = decodeQcBandOneKeyPayload(frame.data);
             const probeTemp = composite?.tempC ?? decodeQcBandTempPayload(frame.data);
-            if (probeTemp != null && probeTemp >= 28 && probeTemp <= 42) {
-              setSkinTempC(probeTemp);
-              markSignal("skinTempAt", now);
-              tapDecoded("skinTemp", probeTemp, bytes);
-              metricBackoffUntilRef.current.skinTemp = 0;
-              updateMetricPipeline("skinTemp", {
-                status: "received",
-                respondedAt: now,
-                detail: `Discovered on 0x69 subtype 0x${frame.subType.toString(16)}`,
-              });
-            }
+            applySkinTemp(probeTemp, `Discovered on 0x69 subtype 0x${frame.subType.toString(16)}`, now);
           }
+
           if (signalAtRef.current.bloodPressureAt == null) {
             const composite = decodeQcBandOneKeyPayload(frame.data);
             const probeBp =
