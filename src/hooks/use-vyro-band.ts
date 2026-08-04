@@ -456,6 +456,10 @@ export function useVyroBand() {
   const probeSubTypeRef = useRef<number | null>(null);
   const bpCandidateRef = useRef<{ sbp: number; dbp: number; hits: number } | null>(null);
 
+  // Last time any live heart-rate frame arrived from the band. Used by the
+  // stream watchdog to detect a silently dead optical stream.
+  const lastHrFrameAtRef = useRef(0);
+
   const signalAtRef = useRef<VyroBandSignalTimestamps>(emptySignalTimestamps());
   const sleepSamplesRef = useRef<SleepDerivedSample[]>(loadSleepSamples());
   const lastSleepSampleAtRef = useRef(0);
