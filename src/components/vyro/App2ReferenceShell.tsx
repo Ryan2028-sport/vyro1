@@ -1563,7 +1563,32 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   );
 }
 
+// Shows whether the band keeps streaming while the app is off-screen.
+function AlwaysOnPill({ connected }: { connected: boolean }) {
+  const [ka, setKa] = useState(() => getKeepAliveStatus());
+  useEffect(() => subscribeKeepAlive(setKa), []);
+  const on = connected && ka.active && (ka.audio || ka.native);
+  const label = !connected ? "Always-on off" : on ? "Always on" : "Tap to arm";
+  return (
+    <button
+      type="button"
+      className="app2-live-pill"
+      title={
+        on
+          ? "Background session active — the band keeps streaming when the app is minimized."
+          : "Tap anywhere once to arm the background session so the band keeps streaming off-screen."
+      }
+      onClick={() => pokeKeepAlive()}
+      aria-live="polite"
+    >
+      <span className={on ? "app2-dot app2-pulse" : "app2-dot"} />
+      {label}
+    </button>
+  );
+}
+
 export function App2ReferenceShell() {
+
   const [view, setView] = useState<App2View>("athlete");
   const fetchProfile = useServerFn(getMyProfile);
   const { data: profile } = useQuery({
