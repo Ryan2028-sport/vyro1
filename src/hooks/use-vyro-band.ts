@@ -690,6 +690,16 @@ export function useVyroBand() {
     const estimate = estimateRespirationFromHeartRate(hrSamplesRef.current);
     if (!estimate) {
       const count = hrSamplesRef.current.length;
+      // Never leave an old low-confidence estimate pinned on screen while the
+      // current PPG window no longer has a valid respiratory lock.
+      if (
+        signalAtRef.current.respirationAt != null &&
+        heartRateAt - signalAtRef.current.respirationAt > 90_000
+      ) {
+        setRespRateBrpm(null);
+        signalAtRef.current = { ...signalAtRef.current, respirationAt: null };
+        setSignalAt((prev) => ({ ...prev, respirationAt: null }));
+      }
       updateMetricPipeline("respiration", {
         status: "measuring",
         requestedAt: hrSamplesRef.current[0]?.t ?? heartRateAt,
@@ -938,6 +948,9 @@ export function useVyroBand() {
       // commands plus the Colmi/Yawell hourly activity sync. Do not use 0x15
       // here — on these firmwares it is HR history, not steps.
       const pollSteps = () => {
+        // All commands share one firmware command parser. Never inject an
+        // activity request into a manual measurement/protocol-probe window.
+        if (activeMeasureRef.current || probeSubTypeRef.current != null || probeBigDataRef.current != null) return;
         void writeQcBand(service, write, encodeQcBandStepsRequest()).catch(() => undefined);
         window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandStepsRequestAlt1()).catch(() => undefined);
@@ -958,6 +971,7 @@ export function useVyroBand() {
       // and SpO₂ when that service is present. Fire fast after connect, then
       // repeat so values survive app background/minimize/reconnect.
       const pollHistory = () => {
+        if (activeMeasureRef.current || probeSubTypeRef.current != null || probeBigDataRef.current != null) return;
         void writeQcBand(service, write, encodeQcBandStressRequest()).catch(() => undefined);
         window.setTimeout(() => {
           void writeQcBand(service, write, encodeQcBandHrvRequest(0)).catch(() => undefined);
@@ -1000,8 +1014,7 @@ export function useVyroBand() {
         // Stop sweeping after three full rounds: this firmware build has been
         // proven to answer 0xee on every temperature/BP subtype, and endless
         // probing steals the PPG sensor from HR, HRV and respiration.
-        probeRounds += 1;
-        if (probeRounds > 3) {
+        if (probeRounds >= 3) {
           if (needTemp()) {
             updateMetricPipeline("skinTemp", {
               status: "unsupported",
@@ -1034,7 +1047,20 @@ export function useVyroBand() {
           }
         }
 
+        // The active subtype sweep owns the optical sensor for an extended
+        // period. Do not starve HR/RHR/strain/respiration before a trustworthy
+        // breathing window has locked; passive history discovery above remains
+        // safe and continues to run.
+        const respirationAt = signalAtRef.current.respirationAt;
+        if (respirationAt == null || Date.now() - respirationAt > 10 * 60_000) {
+          updateMetricPipeline("skinTemp", {
+            detail: "Passive protocol scan complete · waiting for stable PPG before active probe",
+          });
+          return;
+        }
+
         if ((needTemp() || needBp()) && !activeMeasureRef.current) {
+          probeRounds += 1;
           setSensorHold(true);
           await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
           for (const subType of QCBAND_MEASURE_PROBE_TYPES) {

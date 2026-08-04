@@ -4,15 +4,19 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const SnapshotInput = z.object({
-  kind: z.enum(["full", "live"]).default("full"),
-  payload: z.unknown(),
-});
-
 export const saveDebugSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => SnapshotInput.parse(input))
+  .inputValidator((input: unknown) => z.object({
+    kind: z.enum(["full", "live"]).default("full"),
+    payload: z.unknown(),
+  }).parse(input))
   .handler(async ({ data, context }) => {
+    // Raw diagnostics are intentionally bounded. This protects storage if a
+    // future bridge accidentally supplies an unbounded notification history.
+    const payloadJson = JSON.stringify(data.payload);
+    if (payloadJson.length > 200_000) {
+      throw new Error("Debug snapshot exceeds 200 KB limit");
+    }
     const { error } = await context.supabase.from("band_debug_snapshots").insert({
       user_id: context.userId,
       kind: data.kind,
