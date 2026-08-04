@@ -936,7 +936,7 @@ function CognitiveFatigueCard({
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[9.5px] font-bold uppercase tracking-[0.15em] text-vyro-mute">
-              reaction vs baseline
+              {caption}
             </div>
             <div className="mt-1 flex items-baseline gap-1">
               {hasDelay ? (
