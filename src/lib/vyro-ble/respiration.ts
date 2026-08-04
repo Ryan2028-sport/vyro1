@@ -16,23 +16,23 @@ export type RespirationEstimate = {
 export function estimateRespirationFromHeartRate(
   samples: readonly HeartRateSample[],
 ): RespirationEstimate | null {
-  if (samples.length < 45) return null;
+  if (samples.length < 30) return null;
   const end = samples[samples.length - 1]?.t;
   if (end == null) return null;
   const recent = samples
     .filter((sample) => end - sample.t <= 3 * 60_000 && sample.bpm >= 35 && sample.bpm <= 220)
     .sort((a, b) => a.t - b.t);
-  if (recent.length < 45) return null;
+  if (recent.length < 30) return null;
   const start = recent[0]?.t;
   if (start == null) return null;
   const spanSeconds = (end - start) / 1000;
-  if (spanSeconds < 60) return null;
+  if (spanSeconds < 45) return null;
 
   const gaps: number[] = [];
   for (let i = 1; i < recent.length; i++) gaps.push((recent[i].t - recent[i - 1].t) / 1000);
   gaps.sort((a, b) => a - b);
   const medianGap = gaps[Math.floor(gaps.length / 2)] ?? Infinity;
-  if (medianGap > 3.5 || gaps.some((gap) => gap > 15)) return null;
+  if (medianGap > 6 || gaps.some((gap) => gap > 15)) return null;
 
   // Remove the linear HR trend before testing respiratory frequencies. A
   // Lomb-style projection works directly on the bridge's irregular timestamps.
@@ -49,7 +49,7 @@ export function estimateRespirationFromHeartRate(
   const slope = timeVariance > 0 ? covariance / timeVariance : 0;
   const residuals = values.map((value, index) => value - (meanY + slope * (times[index] - meanT)));
   const residualVariance = residuals.reduce((sum, value) => sum + value * value, 0) / residuals.length;
-  if (residualVariance < 0.04) return null;
+  if (residualVariance < 0.02) return null;
 
   const powers: Array<{ frequency: number; power: number }> = [];
   for (let frequency = 0.1; frequency <= 0.5; frequency += 0.0025) {
@@ -84,8 +84,8 @@ export function estimateRespirationFromHeartRate(
   const floor = floorPowers[Math.floor(floorPowers.length / 2)] ?? 0;
   const peakRatio = peak.power / Math.max(floor, 0.0001);
   const explained = peak.power / Math.max(residualVariance * recent.length, 0.0001);
-  const confidence = Math.min(1, Math.min(peakRatio / 6, explained / 0.35));
-  if (peakRatio < 4 || explained < 0.18 || confidence < 0.5) return null;
+  const confidence = Math.min(1, Math.min(peakRatio / 4, explained / 0.25));
+  if (peakRatio < 2.2 || explained < 0.07 || confidence < 0.28) return null;
 
   return {
     brpm: Math.round(peak.frequency * 600) / 10,
