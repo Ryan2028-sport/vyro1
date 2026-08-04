@@ -17,7 +17,7 @@ import { getMyProfile } from "@/lib/profile.functions";
 import { saveDebugSnapshot } from "@/lib/debug-snapshot.functions";
 import { useVyroBand } from "@/hooks/use-vyro-band";
 import { useMetricsPersistence } from "./useMetricsPersistence";
-import { isNative, location as despiaLocation, run as despiaRun } from "@/lib/despia";
+import { startKeepAlive, pokeKeepAlive } from "@/lib/keep-alive";
 
 type VyroBandCtx = ReturnType<typeof useVyroBand> & {
   pairedId: string | null;
