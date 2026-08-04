@@ -414,6 +414,13 @@ export function useVyroBand() {
   const [serialNumber, setSerialNumber] = useState<string | null>(null);
   const [signalAt, setSignalAt] = useState<VyroBandSignalTimestamps>(() => emptySignalTimestamps());
   const [metricPipeline, setMetricPipeline] = useState<MetricPipeline>(() => emptyMetricPipeline());
+  const metricReceivedAtRef = useRef<Record<keyof MetricPipeline, number | null>>({
+    spo2: null,
+    skinTemp: null,
+    hrv: null,
+    stress: null,
+    bloodPressure: null,
+  });
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
   const activeConnectionRef = useRef<string | null>(null);
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
@@ -425,6 +432,19 @@ export function useVyroBand() {
 
   const markSignal = (key: keyof VyroBandSignalTimestamps, at = Date.now()) => {
     setSignalAt((prev) => ({ ...prev, [key]: at }));
+  };
+
+  const updateMetricPipeline = (
+    metric: keyof MetricPipeline,
+    patch: Partial<MetricPipelineEntry>,
+  ) => {
+    if (patch.status === "received" && patch.respondedAt != null) {
+      metricReceivedAtRef.current[metric] = patch.respondedAt;
+    }
+    setMetricPipeline((prev) => ({
+      ...prev,
+      [metric]: { ...prev[metric], ...patch },
+    }));
   };
 
   const applyActivity = (
@@ -510,6 +530,7 @@ export function useVyroBand() {
     activityBucketsRef.current.clear();
     activityTotalRef.current = null;
     activeMeasureRef.current = null;
+    metricReceivedAtRef.current = { spo2: null, skinTemp: null, hrv: null, stress: null, bloodPressure: null };
     setEvents([]);
     setHeartRateBpm(null);
     setHeartRateAt(null);
