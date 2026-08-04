@@ -54,7 +54,11 @@ export type VyroScores = {
   /** Composite readiness (HR + independent live channels). */
   readiness: number | null;
   fatigue: number | null;
+  /** How fatigue was derived: motion load or autonomic (HRV/RHR/stress). */
+  fatigueSource: "motion" | "autonomic" | null;
   agility: number | null;
+  /** Why agility is unavailable, when it is. */
+  agilityReason: string | null;
   sleep: number | null;
   strain: number | null;
   sessionLoad: number | null;
