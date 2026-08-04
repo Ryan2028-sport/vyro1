@@ -264,35 +264,39 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
   );
 
 
-  // ---- Strain (EMA-smoothed so the tile can't whip 75 → 11) ---------------
-  const strainEmaRef = useRef<number | null>(null);
+  // ---- Strain (accumulated cardiovascular load, TRIMP-style) --------------
+  // Instantaneous HR margin made the tile read ~8/100 while resting and whip
+  // around with every beat. Strain is a *load* metric: integrate heart-rate
+  // reserve over time so it climbs while you're elevated, holds while you rest,
+  // and only resets on disconnect.
+  const strainAccRef = useRef<{ acc: number; at: number } | null>(null);
   const strainNonce = `${m.heartRateBpm ?? ""}|${m.restingHrBpm ?? ""}|${m.peakJerk ?? ""}|${m.eventsLastMin ?? ""}`;
   const strain = useMemo(() => {
     if (!m.connected) {
-      strainEmaRef.current = null;
+      strainAccRef.current = null;
       return null;
     }
-    const hrMargin =
-      m.heartRateBpm != null && m.restingHrBpm != null
-        ? Math.max(0, m.heartRateBpm - m.restingHrBpm)
-        : null;
-    const hasVerifiedMotion = (m.peakJerk ?? 0) > 0 || (m.eventsLastMin ?? 0) > 0;
-    // The RFH59 firmware currently exposes no IMU notifications. Cardiovascular
-    // strain can still be computed from two real watch channels (live HR and the
-    // rolling resting-HR baseline); motion only increases confidence/intensity.
-    if (!hasVerifiedMotion && hrMargin == null) return null;
-    const margin01 = hrMargin != null ? Math.min(1, hrMargin / 60) : null;
-    const jerk01 = (m.peakJerk ?? 0) > 0 ? Math.min(1, (m.peakJerk ?? 0) / 220) : null;
-    const events01 = (m.eventsLastMin ?? 0) > 0 ? Math.min(1, (m.eventsLastMin ?? 0) / 80) : null;
-    const inst = hasVerifiedMotion
-      ? ((margin01 ?? 0) * 0.6 + (jerk01 ?? 0) * 0.2 + (events01 ?? 0) * 0.2) * 100
-      : (margin01 ?? 0) * 100;
-    const prev = strainEmaRef.current;
-    const next = prev == null ? inst : prev * 0.8 + inst * 0.2;
-    strainEmaRef.current = next;
-    return Math.round(next);
+    const hr = m.heartRateBpm;
+    const rhr = m.restingHrBpm;
+    if (hr == null || rhr == null) return strainAccRef.current ? Math.round(strainAccRef.current.acc) : null;
+    const maxHr = Math.max(rhr + 60, 190);
+    const reserve = Math.min(1, Math.max(0, (hr - rhr) / (maxHr - rhr)));
+    const now = Date.now();
+    const prev = strainAccRef.current;
+    const dtMin = prev ? Math.min(2, Math.max(0, (now - prev.at) / 60_000)) : 0;
+    // Banister TRIMP weighting: higher zones cost disproportionately more.
+    const trimp = dtMin * reserve * 0.64 * Math.exp(1.92 * reserve);
+    // Motion frames, when the firmware provides them, add session intensity.
+    const motionBoost =
+      (m.peakJerk ?? 0) > 0 || (m.eventsLastMin ?? 0) > 0
+        ? dtMin * Math.min(1, (m.eventsLastMin ?? 0) / 80 + (m.peakJerk ?? 0) / 220) * 0.4
+        : 0;
+    const acc = Math.min(100, (prev?.acc ?? 0) + (trimp + motionBoost) * (100 / 120));
+    strainAccRef.current = { acc, at: now };
+    return Math.round(acc);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.connected, strainNonce]);
+
 
   const sessionLoad = useMemo(() => {
     if (!m.connected) return null;

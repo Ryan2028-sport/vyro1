@@ -19,20 +19,41 @@ export function estimateRespirationFromHeartRate(
   if (samples.length < 30) return null;
   const end = samples[samples.length - 1]?.t;
   if (end == null) return null;
-  const recent = samples
+  const windowed = samples
     .filter((sample) => end - sample.t <= 3 * 60_000 && sample.bpm >= 35 && sample.bpm <= 220)
     .sort((a, b) => a.t - b.t);
-  if (recent.length < 30) return null;
+  if (windowed.length < 30) return null;
+
+  // The optical HR stream is paused whenever another measurement owns the
+  // sensor, which leaves multi-second holes. Analyse the longest continuous
+  // run instead of discarding the whole window because of a hold.
+  const segments: HeartRateSample[][] = [];
+  let current: HeartRateSample[] = [];
+  for (const sample of windowed) {
+    const prev = current[current.length - 1];
+    if (prev && sample.t - prev.t > 12_000) {
+      segments.push(current);
+      current = [];
+    }
+    current.push(sample);
+  }
+  if (current.length) segments.push(current);
+  const recent = segments
+    .slice()
+    .sort((a, b) => (b[b.length - 1].t - b[0].t) - (a[a.length - 1].t - a[0].t))[0];
+  if (!recent || recent.length < 30) return null;
   const start = recent[0]?.t;
-  if (start == null) return null;
-  const spanSeconds = (end - start) / 1000;
+  const segmentEnd = recent[recent.length - 1]?.t;
+  if (start == null || segmentEnd == null) return null;
+  const spanSeconds = (segmentEnd - start) / 1000;
   if (spanSeconds < 45) return null;
 
   const gaps: number[] = [];
   for (let i = 1; i < recent.length; i++) gaps.push((recent[i].t - recent[i - 1].t) / 1000);
   gaps.sort((a, b) => a - b);
   const medianGap = gaps[Math.floor(gaps.length / 2)] ?? Infinity;
-  if (medianGap > 6 || gaps.some((gap) => gap > 15)) return null;
+  if (medianGap > 6) return null;
+
 
   // Remove the linear HR trend before testing respiratory frequencies. A
   // Lomb-style projection works directly on the bridge's irregular timestamps.
@@ -85,7 +106,7 @@ export function estimateRespirationFromHeartRate(
   const peakRatio = peak.power / Math.max(floor, 0.0001);
   const explained = peak.power / Math.max(residualVariance * recent.length, 0.0001);
   const confidence = Math.min(1, Math.min(peakRatio / 4, explained / 0.25));
-  if (peakRatio < 2.2 || explained < 0.07 || confidence < 0.28) return null;
+  if (peakRatio < 1.8 || explained < 0.05 || confidence < 0.2) return null;
 
   return {
     brpm: Math.round(peak.frequency * 600) / 10,
