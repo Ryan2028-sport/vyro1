@@ -951,7 +951,7 @@ function CognitiveFatigueCard({
           <div className="shrink-0 text-right">
             <div className="text-[9.5px] font-bold uppercase tracking-[0.13em] text-vyro-mute">baseline</div>
             <div className="mt-1 font-[family-name:var(--font-display)] text-[14px] font-extrabold tabular-nums text-white/80">
-              {baselineMs != null ? `${Math.round(baselineMs)}ms` : "—"}
+              {baselineText}
             </div>
           </div>
         </div>
