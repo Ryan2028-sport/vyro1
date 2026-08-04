@@ -40,6 +40,9 @@ import {
   decodeQcBandStressHistory,
   decodeQcBandRealtimeHeartRate,
   decodeQcBandTempPayload,
+  isPlausibleSkinTempC,
+  encodeQcBandBpCalibrations,
+
   decodeQcBandTemperatureHistory,
   decodeQcBandTemperatureNotification,
   decodeQcBandTodaySports,
@@ -462,6 +465,29 @@ export function useVyroBand() {
     setSignalAt((prev) => ({ ...prev, [key]: at }));
   };
 
+  // Skin temperature is published through one guarded path so no decoder
+  // variant can leak an implausible value (e.g. a 20.0°C header byte). A value
+  // must also be confirmed twice within 1.5°C before it reaches the UI.
+  const skinTempCandidateRef = useRef<{ value: number; hits: number } | null>(null);
+  const applySkinTemp = (temp: number | null, detail: string, at = Date.now()) => {
+    if (!isPlausibleSkinTempC(temp)) return false;
+    const prev = skinTempCandidateRef.current;
+    const consistent = prev != null && Math.abs(prev.value - temp) <= 1.5;
+    skinTempCandidateRef.current = { value: temp, hits: consistent ? prev!.hits + 1 : 1 };
+    const confirmed = skinTempCandidateRef.current.hits >= 2 || signalAtRef.current.skinTempAt != null;
+    if (!confirmed) {
+      updateMetricPipeline("skinTemp", { status: "measuring", detail: `${detail} · confirming ${temp.toFixed(1)}°C` });
+      return false;
+    }
+    setSkinTempC(temp);
+    markSignal("skinTempAt", at);
+    tapDecoded("skinTemp", temp);
+    metricBackoffUntilRef.current.skinTemp = 0;
+    updateMetricPipeline("skinTemp", { status: "received", respondedAt: at, detail });
+    return true;
+  };
+
+
 
   const updateMetricPipeline = (
     metric: keyof MetricPipeline,
@@ -574,6 +600,8 @@ export function useVyroBand() {
     setBatteryCharging(false);
     setSpo2Pct(null);
     setSkinTempC(null);
+    skinTempCandidateRef.current = null;
+
     setStepsToday(null);
     setDistanceM(null);
     setCaloriesKcal(null);
@@ -1089,7 +1117,17 @@ export function useVyroBand() {
         if (entry) {
           setSensorHold(true);
           await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
+          if (entry.metric === "bloodPressure") {
+            // This firmware family only answers the wrist BP request once
+            // "private mode" has been unlocked with reference cuff values.
+            updateMetricPipeline("bloodPressure", { status: "measuring", detail: "Unlocking private BP mode" });
+            for (const cmd of encodeQcBandBpCalibrations(120, 80)) {
+              await writeQcBand(service, write, cmd).catch(() => undefined);
+              await new Promise((resolve) => window.setTimeout(resolve, 250));
+            }
+          }
           await measureMetric(entry.metric, entry.subTypes, entry.durationMs);
+
           // Give the PPG straight back to heart rate.
           await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
           setSensorHold(false);
@@ -1320,11 +1358,9 @@ export function useVyroBand() {
         }
         const temp = decodeQcBandTemperatureNotification(bytes);
         if (temp != null) {
-          setSkinTempC(temp);
-          markSignal("skinTempAt");
-          tapDecoded("skinTemp", temp, bytes);
-          updateMetricPipeline("skinTemp", { status: "received", respondedAt: Date.now(), detail: "Live notification 0x73" });
+          applySkinTemp(temp, "Live notification 0x73");
         }
+
         const spo2 = decodeQcBandSpo2Notification(bytes);
         if (spo2 != null) {
           setSpo2Pct(spo2);
@@ -1383,18 +1419,9 @@ export function useVyroBand() {
           if (signalAtRef.current.skinTempAt == null) {
             const composite = decodeQcBandOneKeyPayload(frame.data);
             const probeTemp = composite?.tempC ?? decodeQcBandTempPayload(frame.data);
-            if (probeTemp != null && probeTemp >= 28 && probeTemp <= 42) {
-              setSkinTempC(probeTemp);
-              markSignal("skinTempAt", now);
-              tapDecoded("skinTemp", probeTemp, bytes);
-              metricBackoffUntilRef.current.skinTemp = 0;
-              updateMetricPipeline("skinTemp", {
-                status: "received",
-                respondedAt: now,
-                detail: `Discovered on 0x69 subtype 0x${frame.subType.toString(16)}`,
-              });
-            }
+            applySkinTemp(probeTemp, `Discovered on 0x69 subtype 0x${frame.subType.toString(16)}`, now);
           }
+
           if (signalAtRef.current.bloodPressureAt == null) {
             const composite = decodeQcBandOneKeyPayload(frame.data);
             const probeBp =
@@ -1435,7 +1462,8 @@ export function useVyroBand() {
         } else if (active.metric === "skinTemp") {
           const composite = decodeQcBandOneKeyPayload(frame.data);
           const temp = composite?.tempC ?? decodeQcBandTempPayload(frame.data);
-          if (temp != null) { setSkinTempC(temp); markSignal("skinTempAt", receivedAt); tapDecoded("skinTemp", temp, bytes); accepted = true; }
+          accepted = applySkinTemp(temp, `Measurement 0x${active.subType.toString(16)}`, receivedAt);
+
         } else if (active.metric === "hrv" && frame.value >= 5 && frame.value < 250) {
           setHrvMs(frame.value); markSignal("hrvAt", receivedAt); tapDecoded("hrv", frame.value, bytes); accepted = true;
         } else if (active.metric === "stress" && frame.value > 0 && frame.value <= 100) {
@@ -1484,25 +1512,15 @@ export function useVyroBand() {
       }
       const temp = decodeQcBandTemperatureHistory(bytes);
       if (temp != null) {
-        setSkinTempC(temp);
-        markSignal("skinTempAt");
-        tapDecoded("skinTemp", temp, bytes);
-        updateMetricPipeline("skinTemp", { status: "received", respondedAt: Date.now(), detail: "V2 history response" });
+        applySkinTemp(temp, "V2 history response");
       } else if (probeBigDataRef.current != null) {
         // Protocol discovery on an undocumented big-data channel.
         const probeType = probeBigDataRef.current;
         const probeTemp = signalAtRef.current.skinTempAt == null ? scanBigDataTemperature(bytes) : null;
         if (probeTemp != null) {
-          setSkinTempC(probeTemp);
-          markSignal("skinTempAt");
-          tapDecoded("skinTemp", probeTemp, bytes);
-          metricBackoffUntilRef.current.skinTemp = 0;
-          updateMetricPipeline("skinTemp", {
-            status: "received",
-            respondedAt: Date.now(),
-            detail: `Discovered on big-data channel 0x${probeType.toString(16)}`,
-          });
+          applySkinTemp(probeTemp, `Discovered on big-data channel 0x${probeType.toString(16)}`);
         }
+
         if (signalAtRef.current.bloodPressureAt == null && bytes.length >= 8) {
           const probeBp = scanBloodPressurePair(bytes, 6);
           if (probeBp) {

@@ -818,6 +818,15 @@ export function decodeQcBandBloodPressurePayload(data: Uint8Array): {
   return null;
 }
 
+/**
+ * Worn-wrist skin temperature sanity gate. The RFH59 sensor reports 30–42°C
+ * while the band is on the wrist; anything outside that is a decode artefact
+ * (header byte, counter, zero padding) and must never reach the UI.
+ */
+export function isPlausibleSkinTempC(t: number | null | undefined): t is number {
+  return typeof t === "number" && Number.isFinite(t) && t >= 30 && t <= 42;
+}
+
 /** Decode a temperature payload. Handles both `[int, frac]` and
  *  `[frac, int]` byte orders seen across QCBand firmwares, and also a
  *  little-endian fixed-point 16-bit value (×100). */
@@ -826,19 +835,35 @@ export function decodeQcBandTempPayload(data: Uint8Array): number | null {
   const u16le = data.length >= 2 ? data[0] | (data[1] << 8) : NaN;
   const u16be = data.length >= 2 ? (data[0] << 8) | data[1] : NaN;
   const candidates = [
-    data[0],
-    data[0] / 10,
-    data[0] / 10 + 20,
+    // 0.1°C fixed point is what this firmware family actually uses; try it
+    // before the ambiguous single-byte forms so a zero/low byte can no longer
+    // decode to a nonsense 20.0°C.
+    u16le / 10,
+    u16be / 10,
+    u16le / 100,
+    u16be / 100,
     data.length >= 2 ? data[0] + data[1] / 100 : NaN,
     data.length >= 2 ? data[1] + data[0] / 100 : NaN,
-    u16le / 10,
-    u16le / 100,
-    u16be / 10,
-    u16be / 100,
+    data[0] / 10 + 20,
+    data[0],
   ];
   for (const t of candidates) {
-    if (t >= 28 && t <= 42) return t;
+    if (isPlausibleSkinTempC(t)) return Math.round(t * 10) / 10;
   }
 
   return null;
+}
+
+// ---- Blood-pressure private / calibrated mode ---------------------------
+// QCBand-family firmwares gate wrist blood pressure behind a "private mode"
+// unlock that carries the wearer's reference cuff values. Without it the
+// 0x69/0x02 measurement request is silently dropped, which is exactly what
+// this watch does. OEM builds disagree on the opcode, so we send the known
+// variants; unsupported opcodes are simply ignored by the firmware.
+export const QCBAND_BP_CALIBRATE_OPCODES = [0x22, 0x2a, 0x35] as const;
+
+export function encodeQcBandBpCalibrations(sbp: number, dbp: number): Uint8Array[] {
+  const s = Math.max(70, Math.min(220, Math.round(sbp))) & 0xff;
+  const d = Math.max(40, Math.min(160, Math.round(dbp))) & 0xff;
+  return QCBAND_BP_CALIBRATE_OPCODES.map((op) => sdkCommand([op, 0x01, s, d]));
 }
