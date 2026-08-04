@@ -1,56 +1,63 @@
-Rules accepted — zero feature deletion, componentize rather than rewrite, styling upgrade, and every static number replaced with live state.
+# Fix Watch Metrics and Base Readiness
 
-## What's actually there today
+## Confirmed problems
 
-Both `/app` (signed-in) and `/app2` (public mirror) render the same `App2ReferenceShell`. The shell and all sub-views are already React components (`AthleteView`, `SportView`, `RecoveryView`, `SleepView`, `DebugView`, `TrendsView`, `SessionView`, `CoachView`, `SocialView`, `CourtDbView`, `TendencyView`, `SwingView`, `DietView`, `HistoryView`, `ProfileView`, `MoreView`, `BandPanel`). Styling comes from two places that fight each other:
+- **Base Readiness is not a value sent directly by the watch.** It is calculated in the app from validated watch signals. It should therefore be labeled and treated as a watch-derived score, with no score shown until enough real inputs exist.
+- The measurement scheduler queues roughly **6.4 minutes of work every 3 minutes**, so cycles overlap. Heart-rate keep-alives and frequent activity requests also compete with HRV, SpO₂, temperature, stress, and blood-pressure measurements.
+- Measurement subtype values overlap between firmware families. The current decoder can route one `0x69` frame through multiple decoders—for example subtype `0x04` can be treated as both temperature and stress—creating incorrect values.
+- Current Fatigue, Agility, and Strain can consume “motion” synthesized from changing health-command packets (`0x69`, `0x73`, `0x87`, `0x89`). Those packets are not verified IMU samples, so the Base Readiness values shown in the screenshots are not sufficiently trustworthy.
+- Respiration has state/UI but **no implemented firmware decoder or command**. Sleep opcode `0x32` is also explicitly marked as awaiting a finalized firmware layout. These must remain unavailable unless the connected firmware actually provides a documented field.
 
-- `app2-reference.css` — hand-written CSS with its own `--app2-*` variables (the "static HTML" look: flat cards, hairline borders, monospace labels)
-- `shared.tsx` Tailwind primitives (`Card`, `Stat`, `Pill`) using `vyro-*` tokens
+## Implementation plan
 
-That split is why styling edits appear not to land: a view restyled with Tailwind still sits inside `.app2-*` containers whose CSS wins. The fix is one design system that both paths read from.
+### 1. Make BLE collection deterministic
 
-## The design direction
+- Replace the overlapping timers with one connection-owned, cancellable command scheduler.
+- Complete setup and notification subscriptions first, then execute one biometric measurement at a time.
+- Pause conflicting optical HR hold/start commands while another optical measurement is active, then resume HR afterward.
+- Prevent a new cycle from starting until the current cycle finishes; reduce overly frequent activity polling and prioritize missing health signals.
+- Track every request by metric, subtype, start time, response, timeout, and unsupported/error result.
 
-Dark, Apple-grade, restrained — matching the existing Apple-minimal direction:
+### 2. Decode each frame exactly once
 
-- **Surfaces**: layered near-black (`#08090B` base → `#101215` card → `#16191D` elevated), 1px hairline borders at 8% white, large radii (16/20/28px), soft ambient shadow instead of hard outlines
-- **Accent**: a single cool signal color for live/ready states, amber for manage, rose for recover — no rainbow, no purple gradients
-- **Typography**: Satoshi display for numbers/headings with tight tracking and true optical scale (metric hero 44px, card title 15px, label 11px), JetBrains Mono reserved only for unit/uppercase labels
-- **Motion**: 150–250ms ease-out on tab switch, card press scale, number tick transitions, ring/bar fills animate from 0 on mount
+- Add an explicit firmware/protocol profile selected from firmware revision, discovered services, and observed response layout.
+- Route `0x69` frames exclusively by profile + payload shape instead of trying every overlapping subtype interpretation.
+- Treat `0x87`, `0x89`, `0xee`, empty history packets, and command echoes as status/unsupported responses—not metric values or motion.
+- Keep strict physiological range checks and attach source metadata to every accepted sample: opcode, subtype, characteristic, timestamp, and decoder.
 
-## Plan
+### 3. Remove synthetic motion from health packets
 
-**1. Unify the token layer**
-Move every `--app2-*` value into semantic tokens in `src/styles.css` (`--surface`, `--surface-2`, `--hairline`, `--ready`, `--manage`, `--recover`, radii, shadows). Rewrite `app2-reference.css` to consume those same tokens so CSS-styled and Tailwind-styled parts render identically.
+- Stop converting generic QCBand packet byte changes into swings, jerk, acceleration, or reaction events.
+- Accept motion only from the real VYRO motion characteristic or a documented raw IMU packet layout.
+- Keep Fatigue, Agility, Strain, Muscle Readiness, and Load Debt unavailable when their required real motion inputs are absent rather than generating plausible-looking numbers.
 
-**2. Upgrade the shared primitives** (`shared.tsx`)
-Rebuild `Card`, `Stat`, `Pill` plus new `MetricTile`, `Ring`, `SectionHeader`, `Sparkline`, `SegmentedTabs`, `EmptyState`, `SkeletonTile`. Every existing view keeps its current imports, so upgrading these lifts all screens at once.
+### 4. Rebuild Base Readiness as an auditable watch-derived score
 
-**3. Shell chrome** (`App2ReferenceShell.tsx`)
-Restyle the status bar, top bar, the top scrollable tab rail (Trends / Session / Coach / Social / etc.) as a proper segmented control with an animated indicator, and the 4-item bottom bar with glass blur, safe-area padding, and active-state weight. Same tabs, same order, same routing.
+- Keep `VyroScoresProvider` as the single global source for Readiness, Recovery, Fatigue, Agility, Sleep, Strain, and RTP.
+- Define the required inputs for each subscore and require fresh, source-verified samples.
+- Publish Base Readiness only when the minimum independent signal set is present; otherwise show exactly which inputs are still missing.
+- Do not count derived Resting HR as an independent sensor channel when it comes from the same live HR stream.
+- Ensure the hero ring, Base Readiness rows, Recovery tab, Sport tab, Coach tab, and RTP all consume the same canonical score and confidence state.
 
-**4. Tab-by-tab pass — every top and bottom tab, nothing skipped**
+### 5. Make unsupported vs broken metrics clear
 
-| Tab | Work |
-|---|---|
-| Athlete (home) | Hero readiness ring, vitals grid incl. Steps + Resting HR, Today's Plan blocks |
-| Sport | Sport switcher, Overview, Court DB (heat maps), Movement, Motion, Tendencies |
-| Recovery | Recovery hero, RTP validator, muscle readiness, recovery environment |
-| Sleep | Nightly summary, stages, sleep debt, history rows |
-| Debug | Keep every counter/log verbatim; restyle into collapsible instrumented panels + monospace log surface |
-| Trends / Session / Coach / Social / Swing / Diet / History / Profile / More / Band panel | Same treatment: header, card rhythm, tiles, charts, states |
+- Keep every existing metric visible.
+- Replace the generic “awaiting signal” state with precise states: `measuring`, `received`, `no response`, `unsupported by firmware`, `decoder rejected`, or `stale`.
+- For respiration and sleep, only add decoding if the current firmware packets prove a real documented field; otherwise display “unsupported by connected firmware” without fabricating a value.
 
-Each pass is styling + state binding only: no metric, chart area, button, or label removed.
+### 6. Upgrade Debug evidence
 
-**5. Bind every number to live state**
-Audit each view for literals. Anything hardcoded gets replaced by `useVyroScores()` / `useLiveMetrics()` / `useSleepNights()` / the training-plan query. Where a value genuinely has no live source yet, render a dimmed `—` with a "no signal" hint through `EmptyState`/`SkeletonTile` rather than a fake number — the metric stays visible.
+- Add a per-metric pipeline table: command sent → write result → response opcode/subtype → decode result → context value → score usage.
+- Add active protocol profile, discovered capabilities, scheduler queue/current command, timeout reason, and unsupported response bytes.
+- Reset diagnostic counters per connection and include all of this in the existing copied debug bundle.
 
-**6. Verify**
-Typecheck, production build, and a scripted browser pass that visits all 4 bottom tabs and every top tab at 390px and 862px, capturing screenshots to confirm nothing is missing or clipped, with console clean.
+### 7. Tests and verification
 
-## Technical notes
+- Add packet fixtures for both legacy and new SDK layouts, ambiguous subtype collisions, unsupported/error replies, V2 chunked history, and malformed values.
+- Add score tests proving HR-only or HR + derived Resting HR cannot produce Base Readiness, and proving unverified health packets cannot produce motion scores.
+- Add scheduler tests proving cycles do not overlap and commands stop cleanly on disconnect.
+- Verify `/app2` and the Athlete, Recovery, Sport, Coach, and Debug views with simulated valid, missing, stale, and unsupported watch traffic.
 
-- No layout, navigation, or data-flow restructuring; component boundaries stay as they are.
-- Tailwind v4 here means tokens live in `src/styles.css` under `@theme inline` — no `tailwind.config.js`.
-- Responsive rule for every header row: `grid-cols-[minmax(0,1fr)_auto]` + `min-w-0` + `shrink-0` so nothing clips at 390px.
-- Work order: tokens → primitives → shell → tabs, so each stage is visible in preview as it lands.
+## Expected result
+
+Heart rate will continue streaming, other supported sensors will be measured without command collisions, and Base Readiness will either reflect traceable real watch data or remain honestly unavailable with a specific reason. Metrics the connected firmware does not emit will no longer appear as misleading scores.
