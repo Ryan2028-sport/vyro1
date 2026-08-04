@@ -1328,6 +1328,8 @@ export function useVyroBand() {
     stressScore,
     signalAt,
     metricPipeline,
+    sensorHold,
+
     firmwareRevision,
     hardwareRevision,
     serialNumber,
