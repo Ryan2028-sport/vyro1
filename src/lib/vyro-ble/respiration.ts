@@ -72,8 +72,14 @@ export function estimateRespirationFromHeartRate(
   const residualVariance = residuals.reduce((sum, value) => sum + value * value, 0) / residuals.length;
   if (residualVariance < 0.02) return null;
 
+  // Search 0.12–0.5 Hz (7.2–30 brpm). The band edges are excluded from peak
+  // selection: a peak pinned to the lowest bin is residual HR drift, not
+  // breathing, which is what produced the bogus flat 6.0 brpm reading.
+  const FREQ_MIN = 0.12;
+  const FREQ_MAX = 0.5;
+  const FREQ_STEP = 0.0025;
   const powers: Array<{ frequency: number; power: number }> = [];
-  for (let frequency = 0.1; frequency <= 0.5; frequency += 0.0025) {
+  for (let frequency = FREQ_MIN; frequency <= FREQ_MAX; frequency += FREQ_STEP) {
     let sinProjection = 0;
     let cosProjection = 0;
     let sinNorm = 0;
@@ -92,9 +98,16 @@ export function estimateRespirationFromHeartRate(
       (cosNorm > 0 ? (cosProjection * cosProjection) / cosNorm : 0);
     powers.push({ frequency, power });
   }
-  powers.sort((a, b) => b.power - a.power);
-  const peak = powers[0];
+  // Only accept interior peaks — at least one bin-width away from either edge.
+  const interior = powers.filter(
+    (entry) => entry.frequency > FREQ_MIN + FREQ_STEP * 2 && entry.frequency < FREQ_MAX - FREQ_STEP * 2,
+  );
+  const sortedInterior = [...interior].sort((a, b) => b.power - a.power);
+  const peak = sortedInterior[0];
   if (!peak) return null;
+  // A genuine respiratory peak also needs at least one Nyquist-safe sample per
+  // half breath; reject frequencies the sampling rate cannot resolve.
+  if (peak.frequency > 0.5 / Math.max(medianGap, 0.001)) return null;
   // Compare the peak to the median spectral floor, excluding neighbouring
   // bins. Motion and quantisation produce broad/noisy spectra rather than one
   // stable respiratory peak.
@@ -107,6 +120,7 @@ export function estimateRespirationFromHeartRate(
   const explained = peak.power / Math.max(residualVariance * recent.length, 0.0001);
   const confidence = Math.min(1, Math.min(peakRatio / 4, explained / 0.25));
   if (peakRatio >= 1.8 && explained >= 0.05 && confidence >= 0.2) {
+
     return {
       brpm: Math.round(peak.frequency * 600) / 10,
       confidence: Math.round(confidence * 100) / 100,
@@ -141,7 +155,7 @@ export function estimateRespirationFromHeartRate(
   const meanHalfPeriod = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
   if (meanHalfPeriod <= 0) return null;
   const brpm = 60 / (meanHalfPeriod * 2);
-  if (brpm < 6 || brpm > 30) return null;
+  if (brpm < 8 || brpm > 28) return null;
   // Regularity of the half-periods is the confidence proxy here.
   const spread =
     Math.sqrt(

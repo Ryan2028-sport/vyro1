@@ -991,11 +991,33 @@ export function useVyroBand() {
       // and adopt any frame that decodes to a physiologically plausible value.
       // The big-data sweep is passive (no optical sensor conflict); the 0x69
       // sub-type sweep runs only while the sensor is explicitly held.
+      let probeRounds = 0;
       const runProtocolProbe = async () => {
         if (cancelled || document.visibilityState !== "visible") return;
         const needTemp = () => signalAtRef.current.skinTempAt == null;
         const needBp = () => signalAtRef.current.bloodPressureAt == null;
         if (!needTemp() && !needBp()) return;
+        // Stop sweeping after three full rounds: this firmware build has been
+        // proven to answer 0xee on every temperature/BP subtype, and endless
+        // probing steals the PPG sensor from HR, HRV and respiration.
+        probeRounds += 1;
+        if (probeRounds > 3) {
+          if (needTemp()) {
+            updateMetricPipeline("skinTemp", {
+              status: "unsupported",
+              detail: "Not reported by this watch firmware (no temperature sensor channel)",
+            });
+          }
+          if (needBp()) {
+            updateMetricPipeline("bloodPressure", {
+              status: "unsupported",
+              detail: "Not reported by this watch firmware (no blood-pressure channel)",
+            });
+          }
+          if (probeTimer) window.clearInterval(probeTimer);
+          return;
+        }
+
 
         if (qcBandV2Service) {
           for (const type of QCBAND_BIG_DATA_PROBE_TYPES) {

@@ -270,15 +270,23 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
   // reserve over time so it climbs while you're elevated, holds while you rest,
   // and only resets on disconnect.
   const strainAccRef = useRef<{ acc: number; at: number } | null>(null);
-  const strainNonce = `${m.heartRateBpm ?? ""}|${m.restingHrBpm ?? ""}|${m.peakJerk ?? ""}|${m.eventsLastMin ?? ""}`;
+  const hrFloorRef = useRef<number | null>(null);
+  const stepBaseRef = useRef<number | null>(null);
+  const strainNonce = `${m.heartRateBpm ?? ""}|${m.restingHrBpm ?? ""}|${m.stepsToday ?? ""}|${m.peakJerk ?? ""}|${m.eventsLastMin ?? ""}`;
   const strain = useMemo(() => {
     if (!m.connected) {
       strainAccRef.current = null;
+      hrFloorRef.current = null;
+      stepBaseRef.current = null;
       return null;
     }
     const hr = m.heartRateBpm;
-    const rhr = m.restingHrBpm;
-    if (hr == null || rhr == null) return strainAccRef.current ? Math.round(strainAccRef.current.acc) : null;
+    if (hr == null) return strainAccRef.current ? Math.round(strainAccRef.current.acc) : null;
+    // Track the lowest HR actually observed. The firmware's "resting HR" field
+    // is a daily average and can read HIGHER than the live HR, which pinned the
+    // heart-rate reserve at 0 and left strain stuck at ~1/100.
+    hrFloorRef.current = hrFloorRef.current == null ? hr : Math.min(hrFloorRef.current, hr);
+    const rhr = Math.min(m.restingHrBpm ?? hrFloorRef.current, hrFloorRef.current);
     const maxHr = Math.max(rhr + 60, 190);
     const reserve = Math.min(1, Math.max(0, (hr - rhr) / (maxHr - rhr)));
     const now = Date.now();
@@ -291,11 +299,21 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
       (m.peakJerk ?? 0) > 0 || (m.eventsLastMin ?? 0) > 0
         ? dtMin * Math.min(1, (m.eventsLastMin ?? 0) / 80 + (m.peakJerk ?? 0) / 220) * 0.4
         : 0;
+    // Step-derived load: this firmware always reports the daily step counter,
+    // so ambulatory work still accrues strain even with no IMU stream.
+    let stepBoost = 0;
+    const steps = m.stepsToday;
+    if (steps != null) {
+      if (stepBaseRef.current == null || steps < stepBaseRef.current) stepBaseRef.current = steps;
+      // ~10k steps of walking ≈ 30 strain points.
+      stepBoost = Math.min(30, Math.max(0, (steps - stepBaseRef.current) / 10_000) * 30);
+    }
     const acc = Math.min(100, (prev?.acc ?? 0) + (trimp + motionBoost) * (100 / 120));
     strainAccRef.current = { acc, at: now };
-    return Math.round(acc);
+    return Math.round(Math.min(100, acc + stepBoost));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.connected, strainNonce]);
+
 
 
   const sessionLoad = useMemo(() => {
