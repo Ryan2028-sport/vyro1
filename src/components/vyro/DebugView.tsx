@@ -22,6 +22,8 @@
 //      it into app state, with a "last updated" age.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { saveDebugSnapshot } from "@/lib/debug-snapshot.functions";
 import { useLiveMetrics } from "./useLiveMetrics";
 import { useVyroBandCtx } from "./VyroBandProvider";
 import { useSleepNights } from "@/lib/use-sleep-nights";
@@ -819,12 +821,45 @@ export function DebugView() {
     window.setTimeout(() => setBundleCopied(null), 2500);
   };
 
+  // Auto-sync the bundle to the backend so diagnostics can be inspected
+  // remotely (no copy/paste needed). Fires when the band comes online and
+  // then every 60s while this tab is open and the band is connected.
+  const uploadSnapshot = useServerFn(saveDebugSnapshot);
+  const bundleRef = useRef(buildDebugBundle);
+  bundleRef.current = buildDebugBundle;
+  const [syncedAt, setSyncedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (!m.connected) return;
+    let cancelled = false;
+    const push = async () => {
+      try {
+        await uploadSnapshot({ data: { kind: "full", payload: bundleRef.current() } });
+        if (!cancelled) setSyncedAt(Date.now());
+      } catch {
+        /* offline / not signed in — retry on next tick */
+      }
+    };
+    void push();
+    const id = window.setInterval(push, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [m.connected, uploadSnapshot]);
+
   return (
     <div className="p-3.5 text-vyro-text">
       <PageHeader
         eyebrow="Diagnostics · Raw pipeline"
         title="Debug console"
-        subtitle={bundleCopied || "Paste the bundle into chat for a one-shot diagnosis."}
+        subtitle={
+          bundleCopied ||
+          (m.connected
+            ? syncedAt
+              ? `Diagnostics auto-synced ${ageLabel(now - syncedAt)} ago — no copy/paste needed.`
+              : "Syncing diagnostics to your account…"
+            : "Connect the band to auto-sync diagnostics.")
+        }
         action={
           <button
             type="button"

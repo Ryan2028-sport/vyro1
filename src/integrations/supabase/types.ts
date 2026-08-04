@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      band_debug_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          payload: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_metrics: {
         Row: {
           avg_value: number | null
