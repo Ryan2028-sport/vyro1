@@ -917,7 +917,7 @@ export function useVyroBand() {
         const last = lastHrFrameAtRef.current;
         if (last !== 0 && Date.now() - last < 45_000) return;
         void (async () => {
-          await bluetooth.subscribe(connectedId, service, notify).catch(() => undefined);
+          if (connectedId) await bluetooth.subscribe(connectedId, service, notify).catch(() => undefined);
           await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
           await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
         })();
