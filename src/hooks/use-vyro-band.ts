@@ -491,6 +491,49 @@ export function useVyroBand() {
     return true;
   };
 
+  // HRV / stress / SpO2 arrive as *day history* replies, so every poll replays
+  // the same stored sample. Advancing the freshness clock on an unchanged value
+  // makes a hours-old reading look live. Only a changed sample refreshes the
+  // clock; an unchanged one is held for HISTORY_HOLD_MS and then allowed to go
+  // stale honestly so the UI/readiness gates stop trusting it.
+  const HISTORY_HOLD_MS = 20 * 60_000;
+  const historyValueRef = useRef<Record<"hrv" | "stress" | "spo2", { value: number; changedAt: number } | null>>({
+    hrv: null,
+    stress: null,
+    spo2: null,
+  });
+  const applyHistoryMetric = (
+    metric: "hrv" | "stress" | "spo2",
+    value: number,
+    setter: (value: number) => void,
+    signalKey: keyof VyroBandSignalTimestamps,
+    label: string,
+    bytes?: Uint8Array,
+  ) => {
+    const now = Date.now();
+    const prev = historyValueRef.current[metric];
+    const changed = prev == null || prev.value !== value;
+    const changedAt = changed ? now : prev!.changedAt;
+    historyValueRef.current[metric] = { value, changedAt };
+    setter(value);
+    tapDecoded(metric === "spo2" ? "spo2" : metric, value, bytes);
+    const heldMs = now - changedAt;
+    if (changed || heldMs < HISTORY_HOLD_MS) {
+      markSignal(signalKey, changed ? now : changedAt);
+      updateMetricPipeline(metric, {
+        status: "received",
+        respondedAt: now,
+        detail: changed ? `${label} · new sample` : `${label} · unchanged for ${Math.round(heldMs / 60_000)}m`,
+      });
+      return;
+    }
+    updateMetricPipeline(metric, {
+      status: "measuring",
+      respondedAt: now,
+      detail: `${label} · stored sample is ${Math.round(heldMs / 60_000)}m old — waiting for a new one`,
+    });
+  };
+
 
 
   const updateMetricPipeline = (
@@ -1475,19 +1518,14 @@ export function useVyroBand() {
       } else if (op === QCBAND_CMD_SYNC_HRV) {
         const hrv = decodeQcBandHrvHistory(bytes);
         if (hrv != null) {
-          setHrvMs(hrv);
-          markSignal("hrvAt");
-          tapDecoded("hrv", hrv, bytes);
-          updateMetricPipeline("hrv", { status: "received", respondedAt: Date.now(), detail: "History response 0x39" });
+          applyHistoryMetric("hrv", hrv, setHrvMs, "hrvAt", "History response 0x39", bytes);
         }
       } else if (op === QCBAND_CMD_SYNC_STRESS) {
         const stress = decodeQcBandStressHistory(bytes);
         if (stress != null) {
-          setStressScore(stress);
-          markSignal("stressAt");
-          tapDecoded("stress", stress, bytes);
-          updateMetricPipeline("stress", { status: "received", respondedAt: Date.now(), detail: "History response 0x37" });
+          applyHistoryMetric("stress", stress, setStressScore, "stressAt", "History response 0x37", bytes);
         }
+
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame) return;
@@ -1586,11 +1624,9 @@ export function useVyroBand() {
       console.log("[qcband] notify-v2 op=0x" + bytes[0].toString(16).padStart(2, "0"), bytesToHex(bytes));
       const spo2 = decodeQcBandSpo2History(bytes);
       if (spo2 != null) {
-        setSpo2Pct(spo2);
-        markSignal("spo2At");
-        tapDecoded("spo2", spo2, bytes);
-        updateMetricPipeline("spo2", { status: "received", respondedAt: Date.now(), detail: "V2 history response" });
+        applyHistoryMetric("spo2", spo2, setSpo2Pct, "spo2At", "V2 history response", bytes);
       }
+
       const temp = decodeQcBandTemperatureHistory(bytes);
       if (temp != null) {
         applySkinTemp(temp, "V2 history response");
