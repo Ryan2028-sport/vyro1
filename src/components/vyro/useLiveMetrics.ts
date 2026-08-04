@@ -402,12 +402,17 @@ export type SubScores = {
   recovery: number | null;  // 0-100
   agility: number | null;   // 0-100
   sleep: number | null;     // 0-100
+  /** Where the fatigue number came from, so the UI can be honest about it. */
+  fatigueSource: "motion" | "autonomic" | null;
+  /** Why agility is missing, when it is. */
+  agilityReason: string | null;
 };
 
 export type SubScoreInputs = {
   connected: boolean;
   hrvMs?: number | null;
   restingHrBpm?: number | null;
+  heartRateBpm?: number | null;
   sleepScore?: number | null;
   stress?: number | null;
   peakJerk?: number | null;
@@ -415,10 +420,15 @@ export type SubScoreInputs = {
   eventsLastMin?: number | null;
   reactMin?: number | null;       // ms — lower = sharper
   recentSessionLoad?: number | null; // 0-200
+  /** Personal 7-day baselines, when available. */
+  hrvBaselineMs?: number | null;
+  restingHrBaseline?: number | null;
 };
 
 export function computeSubScores(i: SubScoreInputs): SubScores {
-  if (!i.connected) return { fatigue: null, recovery: null, agility: null, sleep: null };
+  if (!i.connected) {
+    return { fatigue: null, recovery: null, agility: null, sleep: null, fatigueSource: null, agilityReason: "Band not connected" };
+  }
 
   // Fatigue — accumulated load + stress, capped so a single big spike
   // doesn't pin the bar.
@@ -427,15 +437,39 @@ export function computeSubScores(i: SubScoreInputs): SubScores {
     (i.peakJerk != null && i.peakJerk > 0) ||
     (i.eventsLastMin != null && i.eventsLastMin > 0) ||
     (i.recentSessionLoad != null && i.recentSessionLoad > 0);
-  if (i.connected && i.peakJerk != null && i.peakJerk > 0) loadParts.push(clamp01(i.peakJerk / 200));
-  if (i.connected && i.eventsLastMin != null && i.eventsLastMin > 0) loadParts.push(clamp01(i.eventsLastMin / 90));
-  if (i.connected && i.recentSessionLoad != null && i.recentSessionLoad > 0) loadParts.push(clamp01(i.recentSessionLoad / 120));
+  if (i.peakJerk != null && i.peakJerk > 0) loadParts.push(clamp01(i.peakJerk / 200));
+  if (i.eventsLastMin != null && i.eventsLastMin > 0) loadParts.push(clamp01(i.eventsLastMin / 90));
+  if (i.recentSessionLoad != null && i.recentSessionLoad > 0) loadParts.push(clamp01(i.recentSessionLoad / 120));
   if (i.stress != null) loadParts.push(clamp01(i.stress / 100));
-  // Stress without verified motion/load is not physical fatigue. Publishing it
-  // as Fatigue made a health scalar look like a complete readiness subscore.
-  const fatigue = hasVerifiedLoad && loadParts.length
-    ? Math.round((loadParts.reduce((a, b) => a + b, 0) / loadParts.length) * 100)
-    : null;
+
+  let fatigue: number | null = null;
+  let fatigueSource: SubScores["fatigueSource"] = null;
+  if (hasVerifiedLoad && loadParts.length) {
+    fatigue = Math.round((loadParts.reduce((a, b) => a + b, 0) / loadParts.length) * 100);
+    fatigueSource = "motion";
+  } else {
+    // Autonomic fatigue: HRV suppression + resting-HR elevation + stress.
+    // Bands that never stream IMU frames still expose all three, and these
+    // are the same signals sports-science fatigue models use at rest.
+    const auto: { v: number; w: number }[] = [];
+    if (i.hrvMs != null) {
+      const hb = i.hrvBaselineMs != null && i.hrvBaselineMs > 0 ? i.hrvBaselineMs : 55;
+      // 25% below baseline → fully fatigued; at/above baseline → 0.
+      auto.push({ v: clamp01((hb - i.hrvMs) / (hb * 0.25)), w: 0.45 });
+    }
+    if (i.restingHrBpm != null) {
+      const rb = i.restingHrBaseline != null && i.restingHrBaseline > 0 ? i.restingHrBaseline : 60;
+      // +10bpm over baseline → fully fatigued.
+      auto.push({ v: clamp01((i.restingHrBpm - rb) / 10), w: 0.3 });
+    }
+    if (i.stress != null) auto.push({ v: clamp01(i.stress / 100), w: 0.25 });
+    // Need at least two independent autonomic channels to publish.
+    if (auto.length >= 2) {
+      const w = auto.reduce((a, b) => a + b.w, 0);
+      fatigue = Math.round((auto.reduce((a, b) => a + b.v * b.w, 0) / w) * 100);
+      fatigueSource = "autonomic";
+    }
+  }
 
   // Recovery — HRV + resting HR + (1 - stress). Sleep folds into its own
   // ring rather than double-counting here.
@@ -448,16 +482,19 @@ export function computeSubScores(i: SubScoreInputs): SubScores {
     ? Math.round((recParts.reduce((a, b) => a + b.v * b.w, 0) / recW) * 100)
     : null;
 
-  // Agility — IMU explosiveness (peak g) + reaction speed.
+  // Agility — IMU explosiveness (peak g) + reaction speed. No physiological
+  // substitute exists, so it stays null with an explicit reason.
   const agParts: number[] = [];
-  if (i.connected && i.peakG != null && i.peakG > 0) agParts.push(clamp01(i.peakG / 6));
-  if (i.connected && i.reactMin != null) agParts.push(clamp01(1 - Math.min(i.reactMin, 400) / 400));
+  if (i.peakG != null && i.peakG > 0) agParts.push(clamp01(i.peakG / 6));
+  if (i.reactMin != null) agParts.push(clamp01(1 - Math.min(i.reactMin, 400) / 400));
   const agility = agParts.length
     ? Math.round((agParts.reduce((a, b) => a + b, 0) / agParts.length) * 100)
     : null;
+  const agilityReason = agility == null ? "Needs motion data — start a session" : null;
 
   // Sleep — passed through from the sleep engine when present.
   const sleep = i.sleepScore != null ? Math.round(clamp01(i.sleepScore / 100) * 100) : null;
 
-  return { fatigue, recovery, agility, sleep };
+  return { fatigue, recovery, agility, sleep, fatigueSource, agilityReason };
 }
+

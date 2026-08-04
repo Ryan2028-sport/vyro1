@@ -378,12 +378,14 @@ function MetricRow({
   accent = "mute",
   status,
   invert = false,
+  emptyHint,
 }: {
   label: string;
   value: number | null | undefined;
   accent?: Accent;
   status?: string;
   invert?: boolean;
+  emptyHint?: string;
 }) {
   const has = value != null && Number.isFinite(value);
   const pct = has ? Math.max(0, Math.min(100, value as number)) : 0;
@@ -426,7 +428,7 @@ function MetricRow({
           className="mt-0.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
           style={{ color: has ? `color-mix(in oklab, ${color} 70%, white)` : "rgba(235,235,245,0.3)" }}
         >
-          {has ? (status ?? (invert ? "load index" : "score")) : "awaiting signal"}
+          {has ? (status ?? (invert ? "load index" : "score")) : (emptyHint ?? "awaiting signal")}
         </div>
         <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/[0.07]">
           <span
@@ -808,27 +810,95 @@ function PlanRow({
 }
 
 
-function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: number }) {
-  // Divergence = current reaction latency − personal baseline (median of recent samples).
-  // If we have no baseline yet, show "calibrating".
-  const { delay, status, vyroRead } = useMemo(() => {
-    if (!m.connected || m.reactMin == null) {
-      return { delay: "—", status: "Offline", vyroRead: "Awaiting band" };
+function CognitiveFatigueCard({
+  m,
+  baselineMs,
+  hrvBaselineMs,
+}: {
+  m: LiveMetrics;
+  baselineMs?: number;
+  hrvBaselineMs?: number;
+}) {
+  // Primary signal is reaction latency vs personal baseline. When the band
+  // streams no motion/reaction frames we fall back to autonomic divergence:
+  // HRV suppression vs the 7-day HRV baseline, which is the standard
+  // physiological proxy for cognitive load.
+  const { delay, status, vyroRead, caption, baselineText, meterPct } = useMemo(() => {
+    const off = {
+      delay: "—",
+      status: "Offline",
+      vyroRead: "Awaiting band",
+      caption: "reaction vs baseline",
+      baselineText: "—",
+      meterPct: null as number | null,
+    };
+    if (!m.connected) return off;
+
+    // --- Reaction-time mode -------------------------------------------------
+    if (m.reactMin != null) {
+      const caption = "reaction vs baseline";
+      if (baselineMs == null) {
+        return {
+          delay: `${Math.round(m.reactMin)}ms`,
+          status: "Calibrating",
+          vyroRead: "Building baseline",
+          caption,
+          baselineText: "—",
+          meterPct: null,
+        };
+      }
+      const diff = m.reactMin - baselineMs;
+      const sign = diff >= 0 ? "+" : "−";
+      let status: string;
+      let vyroRead: string;
+      if (diff < 60) { status = "Normal"; vyroRead = "Sharp"; }
+      else if (diff < 150) { status = "Slowing"; vyroRead = "Mild fatigue"; }
+      else if (diff < 250) { status = "Elevated"; vyroRead = "Watch decision speed"; }
+      else { status = "Diverged"; vyroRead = "Cognitively fried"; }
+      return {
+        delay: `${sign}${Math.abs(Math.round(diff))}ms`,
+        status,
+        vyroRead,
+        caption,
+        baselineText: `${Math.round(baselineMs)}ms`,
+        meterPct: Math.max(0, Math.min(100, (diff / 300) * 100)),
+      };
     }
-    if (baselineMs == null) {
-      return { delay: `${Math.round(m.reactMin)}ms`, status: "Calibrating", vyroRead: "Building baseline" };
+
+    // --- Autonomic (HRV) mode ----------------------------------------------
+    if (m.hrvMs != null) {
+      const caption = "hrv vs baseline";
+      if (hrvBaselineMs == null || hrvBaselineMs <= 0) {
+        return {
+          delay: `${Math.round(m.hrvMs)}ms`,
+          status: "Calibrating",
+          vyroRead: "Building HRV baseline",
+          caption,
+          baselineText: "—",
+          meterPct: null,
+        };
+      }
+      const pct = ((m.hrvMs - hrvBaselineMs) / hrvBaselineMs) * 100; // negative = suppressed
+      const sign = pct >= 0 ? "+" : "−";
+      const drop = -pct; // positive = suppression
+      let status: string;
+      let vyroRead: string;
+      if (drop < 5) { status = "Normal"; vyroRead = "Sharp"; }
+      else if (drop < 12) { status = "Slowing"; vyroRead = "Mild cognitive load"; }
+      else if (drop < 20) { status = "Elevated"; vyroRead = "Watch decision speed"; }
+      else { status = "Diverged"; vyroRead = "Cognitively fried"; }
+      return {
+        delay: `${sign}${Math.abs(Math.round(pct))}%`,
+        status,
+        vyroRead,
+        caption,
+        baselineText: `${Math.round(hrvBaselineMs)}ms`,
+        meterPct: Math.max(0, Math.min(100, (drop / 25) * 100)),
+      };
     }
-    const diff = m.reactMin - baselineMs;
-    const sign = diff >= 0 ? "+" : "−";
-    const delay = `${sign}${Math.abs(Math.round(diff))}ms`;
-    let status: string;
-    let vyroRead: string;
-    if (diff < 60) { status = "Normal"; vyroRead = "Sharp"; }
-    else if (diff < 150) { status = "Slowing"; vyroRead = "Mild fatigue"; }
-    else if (diff < 250) { status = "Elevated"; vyroRead = "Watch decision speed"; }
-    else { status = "Diverged"; vyroRead = "Cognitively fried"; }
-    return { delay, status, vyroRead };
-  }, [m.connected, m.reactMin, baselineMs]);
+
+    return { ...off, status: "Waiting", vyroRead: "No HRV yet" };
+  }, [m.connected, m.reactMin, m.hrvMs, baselineMs, hrvBaselineMs]);
 
   const hrStatus = useMemo(() => {
     if (!m.connected || m.heartRateBpm == null) return "—";
@@ -838,12 +908,8 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
   }, [m.connected, m.heartRateBpm]);
 
   const hasDelay = delay !== "—";
-  // Divergence meter: 0ms → 0%, 300ms+ → 100%.
-  const meterPct = useMemo(() => {
-    if (!m.connected || m.reactMin == null || baselineMs == null) return null;
-    return Math.max(0, Math.min(100, ((m.reactMin - baselineMs) / 300) * 100));
-  }, [m.connected, m.reactMin, baselineMs]);
   const indigo = ACCENT.indigo;
+
 
   return (
     <GlassCard glow={indigo}>
@@ -870,7 +936,7 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[9.5px] font-bold uppercase tracking-[0.15em] text-vyro-mute">
-              reaction vs baseline
+              {caption}
             </div>
             <div className="mt-1 flex items-baseline gap-1">
               {hasDelay ? (
@@ -885,7 +951,7 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
           <div className="shrink-0 text-right">
             <div className="text-[9.5px] font-bold uppercase tracking-[0.13em] text-vyro-mute">baseline</div>
             <div className="mt-1 font-[family-name:var(--font-display)] text-[14px] font-extrabold tabular-nums text-white/80">
-              {baselineMs != null ? `${Math.round(baselineMs)}ms` : "—"}
+              {baselineText}
             </div>
           </div>
         </div>
@@ -906,10 +972,11 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
         </div>
         <div className="mt-1.5 flex justify-between text-[9px] font-bold uppercase tracking-[0.1em] text-white/25">
           <span>sharp</span>
-          <span>200ms threshold</span>
+          <span>{caption.startsWith("hrv") ? "17% threshold" : "200ms threshold"}</span>
           <span>fried</span>
         </div>
       </div>
+
 
       <div className="mt-2.5 grid grid-cols-2 gap-2.5">
         <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.03] p-3">
@@ -925,9 +992,11 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
       <div className="mt-2.5 flex items-start gap-2.5 rounded-[16px] border border-vyro-indigo/18 bg-vyro-indigo/[0.07] p-3">
         <Activity size={15} className="mt-[1px] shrink-0 text-vyro-indigo" />
         <span className="text-[11.5px] leading-relaxed text-vyro-mute">
-          {m.connected && baselineMs != null
-            ? "Past 200ms of divergence, decision speed drops before your body feels tired — ease off late-game intensity."
-            : "Wear the band through a few rallies to seed the cognitive baseline."}
+          {meterPct != null
+            ? caption.startsWith("hrv")
+              ? "HRV suppressed more than ~17% below your baseline means decision speed drops before your body feels tired — ease off late-game intensity."
+              : "Past 200ms of divergence, decision speed drops before your body feels tired — ease off late-game intensity."
+            : "Keep wearing the band — a few days of HRV (or a logged session) seeds the cognitive baseline."}
         </span>
       </div>
     </GlassCard>
@@ -1093,7 +1162,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   const [draft, setDraft] = useState({ time: "", title: "", load: "", tone: "green" as PlanItem["color"] });
 
   // Every score below is the GLOBAL value — identical on every other tab.
-  const { readiness, recovery, sleep, fatigue, agility, strain, statusLabel, baselines, rtp } = s;
+  const { readiness, recovery, sleep, fatigue, fatigueSource, agility, agilityReason, strain, statusLabel, baselines, rtp } = s;
   const battery = m.batteryPct;
   const status = m.connected ? "BAND CONNECTED" : m.connecting ? "BAND CONNECTING" : "PAIR BAND";
 
@@ -1321,7 +1390,12 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 accent="red"
                 value={fatigue}
                 invert
-                status={fatigue != null ? (fatigue < 40 ? "Controlled" : fatigue < 70 ? "Elevated" : "Overload") : undefined}
+                emptyHint="needs HRV + resting HR"
+                status={
+                  fatigue != null
+                    ? `${fatigue < 40 ? "Controlled" : fatigue < 70 ? "Elevated" : "Overload"}${fatigueSource === "autonomic" ? " · autonomic" : fatigueSource === "motion" ? " · motion load" : ""}`
+                    : undefined
+                }
               />
               <MetricRow
                 label="Recovery"
@@ -1336,14 +1410,17 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 label="Agility"
                 accent="teal"
                 value={agility}
+                emptyHint={agilityReason ?? undefined}
                 status={agility != null ? (agility >= 75 ? "Peaking" : agility >= 50 ? "Steady" : "Low") : undefined}
               />
               <MetricRow
                 label="Sleep"
                 accent="indigo"
                 value={sleep}
+                emptyHint="wear the band overnight"
                 status={sleep != null ? (sleep >= 80 ? "Rested" : "Short") : undefined}
               />
+
             </div>
           </InfoCard>
 
@@ -1368,7 +1445,11 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
           </InfoCard>
 
-          <CognitiveFatigueCard m={m} baselineMs={baselines.reactMs ?? undefined} />
+          <CognitiveFatigueCard
+            m={m}
+            baselineMs={baselines.reactMs ?? undefined}
+            hrvBaselineMs={baselines.hrv ?? undefined}
+          />
 
           <InfoCard
             eyebrow="Return-to-play"
