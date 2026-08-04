@@ -125,11 +125,11 @@
 
 /* --------------------------------------------------------------- top bar -- */
 
-.app2-ref header {
+.app2-shell-header {
   position: sticky;
   top: 0;
   z-index: 40;
-  padding-top: max(env(safe-area-inset-top, 0px), 6px);
+  padding-top: clamp(6px, env(safe-area-inset-top, 0px), 54px);
   background: linear-gradient(180deg, hsl(0 0% 0% / 0.92) 0%, hsl(0 0% 0% / 0.72) 62%, hsl(0 0% 0% / 0) 100%);
   backdrop-filter: blur(28px) saturate(180%);
 }
