@@ -600,6 +600,8 @@ export function useVyroBand() {
     setBatteryCharging(false);
     setSpo2Pct(null);
     setSkinTempC(null);
+    skinTempCandidateRef.current = null;
+
     setStepsToday(null);
     setDistanceM(null);
     setCaloriesKcal(null);
