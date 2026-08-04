@@ -541,6 +541,13 @@ export function useVyroBand() {
     activityBucketsRef.current.clear();
     activityTotalRef.current = null;
     activeMeasureRef.current = null;
+    measureFailStreakRef.current = { spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 };
+    metricBackoffUntilRef.current = { spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 };
+    unsupportedHitRef.current = { spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 };
+    measureCursorRef.current = 0;
+    signalAtRef.current = emptySignalTimestamps();
+    setSensorHold(false);
+
     metricReceivedAtRef.current = { spo2: null, skinTemp: null, hrv: null, stress: null, bloodPressure: null };
     setEvents([]);
     setHeartRateBpm(null);
