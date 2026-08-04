@@ -972,10 +972,11 @@ function CognitiveFatigueCard({
         </div>
         <div className="mt-1.5 flex justify-between text-[9px] font-bold uppercase tracking-[0.1em] text-white/25">
           <span>sharp</span>
-          <span>200ms threshold</span>
+          <span>{caption.startsWith("hrv") ? "17% threshold" : "200ms threshold"}</span>
           <span>fried</span>
         </div>
       </div>
+
 
       <div className="mt-2.5 grid grid-cols-2 gap-2.5">
         <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.03] p-3">
