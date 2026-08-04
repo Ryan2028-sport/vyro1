@@ -1346,11 +1346,9 @@ export function useVyroBand() {
         }
         const temp = decodeQcBandTemperatureNotification(bytes);
         if (temp != null) {
-          setSkinTempC(temp);
-          markSignal("skinTempAt");
-          tapDecoded("skinTemp", temp, bytes);
-          updateMetricPipeline("skinTemp", { status: "received", respondedAt: Date.now(), detail: "Live notification 0x73" });
+          applySkinTemp(temp, "Live notification 0x73");
         }
+
         const spo2 = decodeQcBandSpo2Notification(bytes);
         if (spo2 != null) {
           setSpo2Pct(spo2);
