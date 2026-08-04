@@ -754,12 +754,22 @@ export function DebugView() {
   }, [decoded, now]);
 
   const buildDebugBundle = () => ({
+    schemaVersion: 2,
     capturedAt: new Date().toISOString(),
     connected: m.connected,
     pairedId: m.pairedId,
     connectedId: ctx.ble.connectedId,
     powerState: ctx.ble.powerState,
     lastError: ctx.ble.error || null,
+    device: {
+      firmwareRevision: ctx.firmwareRevision,
+      hardwareRevision: ctx.hardwareRevision,
+      serialNumber: ctx.serialNumber,
+      otaTransport: ctx.ble.isNative ? "native-bridge-required" : "web",
+      smpServiceAvailable: (inspector.discovered?.services ?? []).some(
+        (service) => service.uuid.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
+      ),
+    },
     totalNotifications: inspector.totalNotifications,
     writes: inspector.writes,
     decoder: {
@@ -768,7 +778,12 @@ export function DebugView() {
       unknownOpcodes: inspector.unknownOpcodes,
     },
     perOpcode: Object.fromEntries(
-      Object.entries(inspector.perOpcode).map(([k, v]) => [k, { count: v.count, lastAt: v.lastAt, lastHex: v.lastHex }]),
+      Object.entries(inspector.perOpcode).map(([k, v]) => [k, {
+        count: v.count,
+        lastAt: v.lastAt,
+        lastHex: v.lastHex,
+        intervalsMs: v.recentAt.slice(1).map((at, index) => at - v.recentAt[index]),
+      }]),
     ),
     perChar: Object.fromEntries(
       Object.entries(inspector.perChar).map(([k, v]) => [k, { count: v.count, lastAt: v.lastAt, lastOpcode: v.lastOpcode, lastHex: v.lastHex }]),

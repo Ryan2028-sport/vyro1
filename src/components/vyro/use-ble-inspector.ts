@@ -25,6 +25,8 @@ export type OpStat = {
   lastHex: string;
   service: string;
   characteristic: string;
+  /** Last notification timestamps, bounded for cadence/latency diagnosis. */
+  recentAt: number[];
 };
 
 export type WriteLogEntry = {
@@ -192,6 +194,7 @@ export function ensureBleInspectorInitialized(): void {
               lastHex: hex,
               service: e.service,
               characteristic: e.characteristic,
+              recentAt: [...(prevOp?.recentAt ?? []), now].slice(-10),
             },
           }
         : s.state.perOpcode,

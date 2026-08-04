@@ -150,11 +150,15 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
       const age = (t: number | null | undefined) => (t ? Math.round((now - t) / 1000) : null);
       const inspector = getBleInspectorSnapshot();
       const decoded = getDecodedSnapshot();
+      const smpServiceAvailable = (inspector.discovered?.services ?? []).some(
+        (service) => service.uuid.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
+      );
       try {
         await pushSnapshot({
           data: {
             kind: "live",
             payload: {
+              schemaVersion: 2,
               capturedAt: new Date().toISOString(),
               connection: {
                 connectedId: v.ble.connectedId,
@@ -168,6 +172,10 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
                 firmwareRevision: v.firmwareRevision ?? null,
                 hardwareRevision: v.hardwareRevision ?? null,
                 serialNumber: v.serialNumber ?? null,
+                smpServiceAvailable,
+                otaTransport: smpServiceAvailable
+                  ? v.ble.isNative ? "native-bridge-required" : "web"
+                  : "none",
               },
               vitals: {
                 heartRateBpm: v.heartRateBpm ?? null,
@@ -208,6 +216,7 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
                     lastHex: stat.lastHex,
                     service: stat.service,
                     characteristic: stat.characteristic,
+                    intervalsMs: stat.recentAt.slice(1).map((at, index) => at - stat.recentAt[index]),
                   }]),
                 ),
                 perCharacteristic: Object.fromEntries(
