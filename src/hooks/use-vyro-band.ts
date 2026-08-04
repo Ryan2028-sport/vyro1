@@ -901,6 +901,30 @@ export function useVyroBand() {
         );
       }, 60_000);
 
+      // Stream watchdog. The firmware can stop pushing optical frames without
+      // dropping the GATT link (e.g. after a backgrounded metric cycle, or when
+      // a manual measurement lock is never released). If no live HR frame has
+      // arrived for 45s, release any stale lock, re-subscribe to the notify
+      // characteristic and re-arm realtime HR from scratch.
+      hrWatchdogTimer = window.setInterval(() => {
+        if (cancelled) return;
+        const active = activeMeasureRef.current;
+        if (active && Date.now() - active.startedAt > 60_000) {
+          activeMeasureRef.current = null;
+          setSensorHold(false);
+        }
+        if (activeMeasureRef.current) return;
+        const last = lastHrFrameAtRef.current;
+        if (last !== 0 && Date.now() - last < 45_000) return;
+        void (async () => {
+          await bluetooth.subscribe(connectedId, service, notify).catch(() => undefined);
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
+        })();
+      }, 20_000);
+
+
+
       // Battery: query immediately and every 60s. Response arrives on the
       // same notify char (opcode 0x03).
       const pollBattery = () =>
