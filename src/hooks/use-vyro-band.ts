@@ -1100,7 +1100,7 @@ export function useVyroBand() {
             respondedAt: Date.now(),
             detail: `Firmware returned unsupported status 0xee on opcode 0x${op.toString(16)}`,
           });
-          metricReceivedAtRef.current[active.metric] = Date.now();
+          unsupportedHitRef.current[active.metric] = active.startedAt;
         }
       }
 
