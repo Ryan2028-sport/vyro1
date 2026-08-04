@@ -428,7 +428,7 @@ function MetricRow({
           className="mt-0.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
           style={{ color: has ? `color-mix(in oklab, ${color} 70%, white)` : "rgba(235,235,245,0.3)" }}
         >
-          {has ? (status ?? (invert ? "load index" : "score")) : "awaiting signal"}
+          {has ? (status ?? (invert ? "load index" : "score")) : (emptyHint ?? "awaiting signal")}
         </div>
         <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/[0.07]">
           <span
