@@ -35,6 +35,7 @@ import { CourtDbView } from "./CourtDbView";
 import { SwingView } from "./SwingView";
 import { TendencyView } from "./TendencyView";
 import { TrendsView } from "./TrendsView";
+import { getKeepAliveStatus, subscribeKeepAlive, pokeKeepAlive } from "@/lib/keep-alive";
 import { useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
 import { useVyroScores } from "./VyroScoresProvider";
 import {
