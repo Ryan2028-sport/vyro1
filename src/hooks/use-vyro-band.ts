@@ -920,6 +920,61 @@ export function useVyroBand() {
       window.setTimeout(pollHistory, 6_000);
       historyTimer = window.setInterval(pollHistory, 60_000);
 
+      // ---- PROTOCOL DISCOVERY -----------------------------------------
+      // OEM firmwares (this one reports RFH59Pro_1.00.21) do not all use the
+      // documented temperature / blood-pressure opcodes. When the documented
+      // requests answer 0xee "unsupported", sweep the neighbouring type space
+      // and adopt any frame that decodes to a physiologically plausible value.
+      // The big-data sweep is passive (no optical sensor conflict); the 0x69
+      // sub-type sweep runs only while the sensor is explicitly held.
+      const runProtocolProbe = async () => {
+        if (cancelled || document.visibilityState !== "visible") return;
+        const needTemp = () => signalAtRef.current.skinTempAt == null;
+        const needBp = () => signalAtRef.current.bloodPressureAt == null;
+        if (!needTemp() && !needBp()) return;
+
+        if (qcBandV2Service) {
+          for (const type of QCBAND_BIG_DATA_PROBE_TYPES) {
+            if (cancelled || (!needTemp() && !needBp())) break;
+            probeBigDataRef.current = type;
+            await writeQcBandV2(encodeQcBandBigDataProbe(type)).catch(() => undefined);
+            await wait(450);
+          }
+          probeBigDataRef.current = null;
+          if (needTemp()) {
+            updateMetricPipeline("skinTemp", {
+              detail: `Scanned ${QCBAND_BIG_DATA_PROBE_TYPES.length} history channels — no temperature payload yet`,
+            });
+          }
+        }
+
+        if ((needTemp() || needBp()) && !activeMeasureRef.current) {
+          setSensorHold(true);
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
+          for (const subType of QCBAND_MEASURE_PROBE_TYPES) {
+            if (cancelled || (!needTemp() && !needBp())) break;
+            probeSubTypeRef.current = subType;
+            updateMetricPipeline(needTemp() ? "skinTemp" : "bloodPressure", {
+              status: "measuring",
+              subType,
+              requestedAt: Date.now(),
+              detail: `Protocol discovery · probing 0x69 subtype 0x${subType.toString(16)}`,
+            });
+            await writeQcBand(service, write, encodeQcBandMeasureStart(subType)).catch(() => undefined);
+            await wait(3_000);
+            await writeQcBand(service, write, encodeQcBandMeasureStop(subType)).catch(() => undefined);
+            await wait(400);
+          }
+          probeSubTypeRef.current = null;
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
+          setSensorHold(false);
+        }
+      };
+      window.setTimeout(() => void runProtocolProbe(), 100_000);
+      probeTimer = window.setInterval(() => void runProtocolProbe(), 15 * 60_000);
+
+
+
       // ---- DETERMINISTIC MEASUREMENT SCHEDULE --------------------------
       // Rules learned from real device traces:
       //  * Realtime HR and manual optical measurements compete for the same
