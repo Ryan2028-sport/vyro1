@@ -1624,11 +1624,9 @@ export function useVyroBand() {
       console.log("[qcband] notify-v2 op=0x" + bytes[0].toString(16).padStart(2, "0"), bytesToHex(bytes));
       const spo2 = decodeQcBandSpo2History(bytes);
       if (spo2 != null) {
-        setSpo2Pct(spo2);
-        markSignal("spo2At");
-        tapDecoded("spo2", spo2, bytes);
-        updateMetricPipeline("spo2", { status: "received", respondedAt: Date.now(), detail: "V2 history response" });
+        applyHistoryMetric("spo2", spo2, setSpo2Pct, "spo2At", "V2 history response", bytes);
       }
+
       const temp = decodeQcBandTemperatureHistory(bytes);
       if (temp != null) {
         applySkinTemp(temp, "V2 history response");
