@@ -53,6 +53,7 @@ export function useLiveMetrics() {
   // its value across a measurement pause.
   const liveRestingHrBpm = isFresh(signalAt.restingHrAt, restingHrBpm, 15 * 60_000) ? restingHrBpm : null;
   const liveHrvMs = isFresh(signalAt.hrvAt, hrvMs, 30 * 60_000) ? hrvMs : null;
+  const liveRespRateBrpm = isFresh(signalAt.respirationAt, respRateBrpm, 10 * 60_000) ? respRateBrpm : null;
   const liveStressScore = isFresh(signalAt.stressAt, stressScore, 30 * 60_000) ? stressScore : null;
 
 
@@ -120,7 +121,7 @@ export function useLiveMetrics() {
     bloodPressure: liveBloodPressure,
     restingHrBpm: liveRestingHrBpm,
     hrvMs: liveHrvMs,
-    respRateBrpm,
+    respRateBrpm: liveRespRateBrpm,
     stressScore: liveStressScore,
     signalAt,
     metricPipeline,

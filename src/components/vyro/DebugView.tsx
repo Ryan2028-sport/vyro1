@@ -311,7 +311,7 @@ export function DebugView() {
     { label: "HRV (RMSSD)", value: fmt(ctx.hrvMs, 0, " ms"), ok: hardwareSeen(ctx.hrvMs, ctx.signalAt.hrvAt), source: "QCBand hardware · 0x39 history / 0x69 measure", ageMs: signalAge(ctx.signalAt.hrvAt) },
     { label: "SpO₂", value: fmt(ctx.spo2Pct, 0, " %"), ok: hardwareSeen(ctx.spo2Pct, ctx.signalAt.spo2At), source: "QCBand hardware · 0x69 / V2 0xbc / notify", ageMs: signalAge(ctx.signalAt.spo2At) },
     { label: "Skin temp", value: fmt(ctx.skinTempC, 1, " °C"), ok: hardwareSeen(ctx.skinTempC, ctx.signalAt.skinTempAt), source: "QCBand hardware · 0x69 / V2 0xbc / notify", ageMs: signalAge(ctx.signalAt.skinTempAt) },
-    { label: "Respiration", value: fmt(ctx.respRateBrpm, 1, " brpm"), ok: isNum(ctx.respRateBrpm), source: "Awaiting real resp-rate field from firmware", ageMs: fresh.respRateBrpm },
+    { label: "Respiration", value: fmt(ctx.respRateBrpm, 1, " brpm"), ok: hardwareSeen(ctx.respRateBrpm, ctx.signalAt.respirationAt), source: `Goodix PPG · respiratory sinus arrhythmia · ${ctx.metricPipeline.respiration.detail}`, ageMs: signalAge(ctx.signalAt.respirationAt) },
     { label: "Stress", value: fmt(ctx.stressScore, 0, "/100"), ok: hardwareSeen(ctx.stressScore, ctx.signalAt.stressAt), source: "QCBand hardware · 0x37 history / 0x69 measure", ageMs: signalAge(ctx.signalAt.stressAt) },
     {
       label: "Blood pressure",
