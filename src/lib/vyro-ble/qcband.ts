@@ -474,11 +474,16 @@ export function decodeQcBandStressHistory(bytes: Uint8Array): number | null {
 function latestPlausibleTemperature(bytes: Uint8Array, start = 0): number | null {
   let latest: number | null = null;
   const accept = (t: number) => {
-    if (Number.isFinite(t) && t >= 30 && t <= 42) latest = Math.round(t * 10) / 10;
+    // This is wrist/skin temperature, not core body temperature. A cool wrist
+    // can legitimately read in the mid-20s, especially just after putting the
+    // band on. Rejecting everything below 30°C discarded valid RFH59 samples.
+    if (Number.isFinite(t) && t >= 20 && t <= 42) latest = Math.round(t * 10) / 10;
   };
   for (let i = Math.max(0, start); i < bytes.length; i++) {
     const b = bytes[i] & 0xff;
-    if (b > 0) accept(b / 10 + 20);
+    // Offset-byte encoding uses 50..220 => 25.0..42.0°C. Header/index bytes
+    // such as 0x01 must not become a fake 20.1°C reading.
+    if (b >= 50 && b <= 220) accept(b / 10 + 20);
     if (i + 1 < bytes.length) {
       const le = b | (bytes[i + 1] << 8);
       const be = (b << 8) | bytes[i + 1];
@@ -779,7 +784,7 @@ export function decodeQcBandTempPayload(data: Uint8Array): number | null {
     u16be / 100,
   ];
   for (const t of candidates) {
-    if (t >= 30 && t <= 42) return t;
+    if (t >= 20 && t <= 42) return t;
   }
   return null;
 }

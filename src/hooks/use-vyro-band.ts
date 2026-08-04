@@ -892,8 +892,11 @@ export function useVyroBand() {
         durationMs: number;
         passiveKey: keyof VyroBandSignalTimestamps | null;
       }[] = [
-        { metric: "skinTemp", subTypes: QCBAND_MEASURE_TEMP_TYPES, durationMs: 8_000, passiveKey: "skinTempAt" },
-        { metric: "bloodPressure", subTypes: QCBAND_MEASURE_BP_TYPES, durationMs: 12_000, passiveKey: "bloodPressureAt" },
+        // RFH59 Pro reports temperature/BP inside its composite one-key frame
+        // even when the dedicated 0x07/0x09/0x04 and 0x02 requests answer
+        // unsupported. Try the dedicated family first, then the SDK composite.
+        { metric: "skinTemp", subTypes: [...QCBAND_MEASURE_TEMP_TYPES, ...QCBAND_MEASURE_ONE_KEY_TYPES], durationMs: 8_000, passiveKey: "skinTempAt" },
+        { metric: "bloodPressure", subTypes: [...QCBAND_MEASURE_BP_TYPES, ...QCBAND_MEASURE_ONE_KEY_TYPES], durationMs: 12_000, passiveKey: "bloodPressureAt" },
         { metric: "spo2", subTypes: QCBAND_MEASURE_SPO2_TYPES, durationMs: 10_000, passiveKey: "spo2At" },
         { metric: "hrv", subTypes: QCBAND_MEASURE_HRV_TYPES, durationMs: 12_000, passiveKey: "hrvAt" },
         { metric: "stress", subTypes: QCBAND_MEASURE_STRESS_TYPES, durationMs: 10_000, passiveKey: "stressAt" },
@@ -1209,7 +1212,8 @@ export function useVyroBand() {
         if (active.metric === "spo2" && frame.value >= 70 && frame.value <= 100) {
           setSpo2Pct(frame.value); markSignal("spo2At", receivedAt); tapDecoded("spo2", frame.value, bytes); accepted = true;
         } else if (active.metric === "skinTemp") {
-          const temp = decodeQcBandTempPayload(frame.data);
+          const composite = decodeQcBandOneKeyPayload(frame.data);
+          const temp = composite?.tempC ?? decodeQcBandTempPayload(frame.data);
           if (temp != null) { setSkinTempC(temp); markSignal("skinTempAt", receivedAt); tapDecoded("skinTemp", temp, bytes); accepted = true; }
         } else if (active.metric === "hrv" && frame.value >= 5 && frame.value < 250) {
           setHrvMs(frame.value); markSignal("hrvAt", receivedAt); tapDecoded("hrv", frame.value, bytes); accepted = true;
@@ -1217,7 +1221,11 @@ export function useVyroBand() {
           setStressScore(frame.value); markSignal("stressAt", receivedAt); tapDecoded("stress", frame.value, bytes); accepted = true;
         } else if (active.metric === "bloodPressure") {
           const bp = decodeQcBandBloodPressurePayload(frame.data);
-          if (bp) { setBloodPressure({ sbp: bp.sbp, dbp: bp.dbp }); markSignal("bloodPressureAt", receivedAt); tapDecoded("bp", `${bp.sbp}/${bp.dbp}`, bytes); accepted = true; }
+          const composite = decodeQcBandOneKeyPayload(frame.data);
+          const resolved = bp ?? (composite?.sbp != null && composite.dbp != null
+            ? { sbp: composite.sbp, dbp: composite.dbp, hr: composite.hr }
+            : null);
+          if (resolved) { setBloodPressure({ sbp: resolved.sbp, dbp: resolved.dbp }); markSignal("bloodPressureAt", receivedAt); tapDecoded("bp", `${resolved.sbp}/${resolved.dbp}`, bytes); accepted = true; }
         }
         if (accepted) {
           updateMetricPipeline(active.metric, {
