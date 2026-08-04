@@ -17,7 +17,7 @@ import { getMyProfile } from "@/lib/profile.functions";
 import { saveDebugSnapshot } from "@/lib/debug-snapshot.functions";
 import { useVyroBand } from "@/hooks/use-vyro-band";
 import { useMetricsPersistence } from "./useMetricsPersistence";
-import { isNative, location as despiaLocation, run as despiaRun } from "@/lib/despia";
+import { startKeepAlive, pokeKeepAlive } from "@/lib/keep-alive";
 
 type VyroBandCtx = ReturnType<typeof useVyroBand> & {
   pairedId: string | null;
@@ -106,60 +106,26 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [pairedId, ble.connectedId, ble.connect, ble.devices, ble.scan]);
 
-  // Native: enable background location so iOS keeps the app + Core
-  // Bluetooth alive while backgrounded. We re-fire `backgroundOn` on every
-  // visibility change (and on connect) because iOS will silently drop the
-  // keep-alive if the app gets suspended without it being re-asserted.
-  // Browser: request a Screen Wake Lock so the tab isn't aggressively
-  // suspended while the user is on another tab with the screen on.
+  // Always-on: keep the JS runtime scheduled (silent audio session + native
+  // background asserts + wake lock) so the band link and decoders keep running
+  // while the app is minimized or sitting on the home screen. Never torn down
+  // once a band is paired — stopping it is what kills background streaming.
   useEffect(() => {
     const hasBand = !!pairedId || !!ble.connectedId;
     if (!hasBand) return;
-    if (isNative) {
-      const keepAlive = () => {
-        void despiaLocation.backgroundOn();
-        void despiaRun("scanningmode://on");
-      };
-      keepAlive();
-      const onVis = () => {
-        // Re-assert on both hide AND show so iOS keeps the central alive.
-        keepAlive();
-      };
-      document.addEventListener("visibilitychange", onVis);
-      window.addEventListener("pagehide", onVis);
-      window.addEventListener("pageshow", onVis);
-      return () => {
-        document.removeEventListener("visibilitychange", onVis);
-        window.removeEventListener("pagehide", onVis);
-        window.removeEventListener("pageshow", onVis);
-        // Do not disable native keep-alive from React cleanup. iOS can tear
-        // down the WebView while minimized / on the home screen, and turning
-        // it off here is exactly what breaks always-on watch streaming.
-      };
-    }
-    let wakeLock: { release: () => Promise<void> } | null = null;
-    const nav = navigator as Navigator & {
-      wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> };
-    };
-    async function acquire() {
-      try {
-        if (nav.wakeLock?.request) {
-          wakeLock = await nav.wakeLock.request("screen");
-        }
-      } catch {
-        /* user gesture or permission missing — ignore */
-      }
-    }
-    void acquire();
-    const onVis = () => {
-      if (document.visibilityState === "visible") void acquire();
-    };
-    document.addEventListener("visibilitychange", onVis);
+    const stop = startKeepAlive();
     return () => {
-      document.removeEventListener("visibilitychange", onVis);
-      void wakeLock?.release().catch(() => undefined);
+      // Only detach listeners; the audio session and native asserts stay live.
+      stop();
     };
   }, [pairedId, ble.connectedId]);
+
+  // Re-poke the keep-alive whenever a fresh frame or state change happens, so
+  // a resumed app immediately re-asserts background permission.
+  useEffect(() => {
+    pokeKeepAlive();
+  }, [ble.connectionState, ble.connectedId]);
+
 
   // Remote diagnostics: as soon as a band is live, push a full pipeline
   // snapshot to the account (and refresh it every 30s) so the whole picture —
