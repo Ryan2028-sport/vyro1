@@ -411,11 +411,17 @@ export function computeSubScores(i: SubScoreInputs): SubScores {
   // Fatigue — accumulated load + stress, capped so a single big spike
   // doesn't pin the bar.
   const loadParts: number[] = [];
-  if (i.connected && i.peakJerk != null) loadParts.push(clamp01(i.peakJerk / 200));
-  if (i.connected && i.eventsLastMin != null) loadParts.push(clamp01(i.eventsLastMin / 90));
-  if (i.connected && i.recentSessionLoad != null) loadParts.push(clamp01(i.recentSessionLoad / 120));
+  const hasVerifiedLoad =
+    (i.peakJerk != null && i.peakJerk > 0) ||
+    (i.eventsLastMin != null && i.eventsLastMin > 0) ||
+    (i.recentSessionLoad != null && i.recentSessionLoad > 0);
+  if (i.connected && i.peakJerk != null && i.peakJerk > 0) loadParts.push(clamp01(i.peakJerk / 200));
+  if (i.connected && i.eventsLastMin != null && i.eventsLastMin > 0) loadParts.push(clamp01(i.eventsLastMin / 90));
+  if (i.connected && i.recentSessionLoad != null && i.recentSessionLoad > 0) loadParts.push(clamp01(i.recentSessionLoad / 120));
   if (i.stress != null) loadParts.push(clamp01(i.stress / 100));
-  const fatigue = loadParts.length
+  // Stress without verified motion/load is not physical fatigue. Publishing it
+  // as Fatigue made a health scalar look like a complete readiness subscore.
+  const fatigue = hasVerifiedLoad && loadParts.length
     ? Math.round((loadParts.reduce((a, b) => a + b, 0) / loadParts.length) * 100)
     : null;
 

@@ -261,6 +261,8 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
       strainEmaRef.current = null;
       return null;
     }
+    const hasVerifiedMotion = (m.peakJerk ?? 0) > 0 || (m.eventsLastMin ?? 0) > 0;
+    if (!hasVerifiedMotion) return null;
     const hrMargin =
       m.heartRateBpm != null && m.restingHrBpm != null
         ? Math.max(0, m.heartRateBpm - m.restingHrBpm)
@@ -268,7 +270,7 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
     const margin01 = hrMargin != null ? Math.min(1, hrMargin / 60) : null;
     const jerk01 = (m.peakJerk ?? 0) > 0 ? Math.min(1, (m.peakJerk ?? 0) / 220) : null;
     const events01 = (m.eventsLastMin ?? 0) > 0 ? Math.min(1, (m.eventsLastMin ?? 0) / 80) : null;
-    if (margin01 == null && jerk01 == null && events01 == null) return null;
+    if (jerk01 == null && events01 == null) return null;
     const inst = ((margin01 ?? 0) * 0.5 + (jerk01 ?? 0) * 0.25 + (events01 ?? 0) * 0.25) * 100;
     const prev = strainEmaRef.current;
     const next = prev == null ? inst : prev * 0.8 + inst * 0.2;
