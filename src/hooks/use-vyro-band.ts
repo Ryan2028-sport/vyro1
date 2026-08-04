@@ -644,13 +644,18 @@ export function useVyroBand() {
     if (heartRateBpm == null || heartRateAt == null || sensorHold) return;
     const estimate = estimateRespirationFromHeartRate(hrSamplesRef.current);
     if (!estimate) {
+      const count = hrSamplesRef.current.length;
       updateMetricPipeline("respiration", {
         status: "measuring",
         requestedAt: hrSamplesRef.current[0]?.t ?? heartRateAt,
-        detail: `PPG calibration · ${hrSamplesRef.current.length}/45 samples`,
+        detail:
+          count < 30
+            ? `PPG calibration · ${count}/30 samples`
+            : "PPG signal too noisy for a breathing lock — keep the band still",
       });
       return;
     }
+
     setRespRateBrpm(estimate.brpm);
     markSignal("respirationAt", heartRateAt);
     tapDecoded("respiration", estimate.brpm);
