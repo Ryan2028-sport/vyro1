@@ -1323,7 +1323,12 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 accent="red"
                 value={fatigue}
                 invert
-                status={fatigue != null ? (fatigue < 40 ? "Controlled" : fatigue < 70 ? "Elevated" : "Overload") : undefined}
+                emptyHint="needs HRV + resting HR"
+                status={
+                  fatigue != null
+                    ? `${fatigue < 40 ? "Controlled" : fatigue < 70 ? "Elevated" : "Overload"}${fatigueSource === "autonomic" ? " · autonomic" : fatigueSource === "motion" ? " · motion load" : ""}`
+                    : undefined
+                }
               />
               <MetricRow
                 label="Recovery"
@@ -1338,14 +1343,17 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 label="Agility"
                 accent="teal"
                 value={agility}
+                emptyHint={agilityReason ?? undefined}
                 status={agility != null ? (agility >= 75 ? "Peaking" : agility >= 50 ? "Steady" : "Low") : undefined}
               />
               <MetricRow
                 label="Sleep"
                 accent="indigo"
                 value={sleep}
+                emptyHint="wear the band overnight"
                 status={sleep != null ? (sleep >= 80 ? "Rested" : "Short") : undefined}
               />
+
             </div>
           </InfoCard>
 
