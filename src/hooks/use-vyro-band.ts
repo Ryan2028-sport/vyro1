@@ -1450,7 +1450,8 @@ export function useVyroBand() {
         } else if (active.metric === "skinTemp") {
           const composite = decodeQcBandOneKeyPayload(frame.data);
           const temp = composite?.tempC ?? decodeQcBandTempPayload(frame.data);
-          if (temp != null) { setSkinTempC(temp); markSignal("skinTempAt", receivedAt); tapDecoded("skinTemp", temp, bytes); accepted = true; }
+          accepted = applySkinTemp(temp, `Measurement 0x${active.subType.toString(16)}`, receivedAt);
+
         } else if (active.metric === "hrv" && frame.value >= 5 && frame.value < 250) {
           setHrvMs(frame.value); markSignal("hrvAt", receivedAt); tapDecoded("hrv", frame.value, bytes); accepted = true;
         } else if (active.metric === "stress" && frame.value > 0 && frame.value <= 100) {
@@ -1499,25 +1500,15 @@ export function useVyroBand() {
       }
       const temp = decodeQcBandTemperatureHistory(bytes);
       if (temp != null) {
-        setSkinTempC(temp);
-        markSignal("skinTempAt");
-        tapDecoded("skinTemp", temp, bytes);
-        updateMetricPipeline("skinTemp", { status: "received", respondedAt: Date.now(), detail: "V2 history response" });
+        applySkinTemp(temp, "V2 history response");
       } else if (probeBigDataRef.current != null) {
         // Protocol discovery on an undocumented big-data channel.
         const probeType = probeBigDataRef.current;
         const probeTemp = signalAtRef.current.skinTempAt == null ? scanBigDataTemperature(bytes) : null;
         if (probeTemp != null) {
-          setSkinTempC(probeTemp);
-          markSignal("skinTempAt");
-          tapDecoded("skinTemp", probeTemp, bytes);
-          metricBackoffUntilRef.current.skinTemp = 0;
-          updateMetricPipeline("skinTemp", {
-            status: "received",
-            respondedAt: Date.now(),
-            detail: `Discovered on big-data channel 0x${probeType.toString(16)}`,
-          });
+          applySkinTemp(probeTemp, `Discovered on big-data channel 0x${probeType.toString(16)}`);
         }
+
         if (signalAtRef.current.bloodPressureAt == null && bytes.length >= 8) {
           const probeBp = scanBloodPressurePair(bytes, 6);
           if (probeBp) {
