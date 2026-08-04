@@ -1021,6 +1021,15 @@ export function useVyroBand() {
       // section shows exactly what the watch is echoing.
       if (op === 0x87 || op === 0x89 || op === 0x73) {
         tapDecoded("motion", `op=0x${op.toString(16)} b1=0x${(bytes[1] ?? 0).toString(16)}`, bytes);
+        if ((op === 0x87 || op === 0x89) && bytes[1] === 0xee && activeMeasureRef.current) {
+          const active = activeMeasureRef.current;
+          updateMetricPipeline(active.metric, {
+            status: "unsupported",
+            respondedAt: Date.now(),
+            detail: `Firmware returned unsupported status 0xee on opcode 0x${op.toString(16)}`,
+          });
+          metricReceivedAtRef.current[active.metric] = Date.now();
+        }
       }
 
       if (op === QCBAND_CMD_REALTIME_HR) {
@@ -1061,12 +1070,14 @@ export function useVyroBand() {
           setSkinTempC(temp);
           markSignal("skinTempAt");
           tapDecoded("skinTemp", temp, bytes);
+          updateMetricPipeline("skinTemp", { status: "received", respondedAt: Date.now(), detail: "Live notification 0x73" });
         }
         const spo2 = decodeQcBandSpo2Notification(bytes);
         if (spo2 != null) {
           setSpo2Pct(spo2);
           markSignal("spo2At");
           tapDecoded("spo2", spo2, bytes);
+          updateMetricPipeline("spo2", { status: "received", respondedAt: Date.now(), detail: "Live notification 0x73" });
         }
         if (bytes[1] === 0x01 && bytes[2] > 30 && bytes[2] < 250) {
           setHeartRateBpm(bytes[2]);
@@ -1097,6 +1108,7 @@ export function useVyroBand() {
           setHrvMs(hrv);
           markSignal("hrvAt");
           tapDecoded("hrv", hrv, bytes);
+          updateMetricPipeline("hrv", { status: "received", respondedAt: Date.now(), detail: "History response 0x39" });
         }
       } else if (op === QCBAND_CMD_SYNC_STRESS) {
         const stress = decodeQcBandStressHistory(bytes);
@@ -1104,133 +1116,37 @@ export function useVyroBand() {
           setStressScore(stress);
           markSignal("stressAt");
           tapDecoded("stress", stress, bytes);
+          updateMetricPipeline("stress", { status: "received", respondedAt: Date.now(), detail: "History response 0x37" });
         }
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame) return;
-        const applyOneKey = () => {
-          const ok = decodeQcBandOneKeyPayload(frame.data);
-          if (!ok) return false;
-          const hasAnyValue =
-            ok.hr != null ||
-            ok.spo2 != null ||
-            ok.tempC != null ||
-            ok.hrvMs != null ||
-            ok.stress != null ||
-            ok.rriMs != null ||
-            (ok.sbp != null && ok.dbp != null);
-          if (!hasAnyValue) return false;
-          if (ok.hr != null) {
-            setHeartRateBpm(ok.hr);
-            setHeartRateAt(Date.now());
-            tapDecoded("hr", ok.hr, bytes);
-          }
-          if (ok.spo2 != null) {
-            setSpo2Pct(ok.spo2);
-            markSignal("spo2At");
-            tapDecoded("spo2", ok.spo2, bytes);
-          }
-          if (ok.tempC != null) {
-            setSkinTempC(ok.tempC);
-            markSignal("skinTempAt");
-            tapDecoded("skinTemp", ok.tempC, bytes);
-          }
-          if (ok.hrvMs != null && ok.hrvMs >= 5) {
-            setHrvMs(ok.hrvMs);
-            markSignal("hrvAt");
-            tapDecoded("hrv", ok.hrvMs, bytes);
-          }
-          if (ok.stress != null) {
-            setStressScore(ok.stress);
-            markSignal("stressAt");
-            tapDecoded("stress", ok.stress, bytes);
-          }
-          if (ok.sbp != null && ok.dbp != null) {
-            setBloodPressure({ sbp: ok.sbp, dbp: ok.dbp });
-            markSignal("bloodPressureAt");
-            tapDecoded("bp", `${ok.sbp}/${ok.dbp}`, bytes);
-          }
-          return true;
-        };
-        const applyBloodPressure = () => {
+        const active = activeMeasureRef.current;
+        // Overlapping subtype enums make an uncorrelated frame ambiguous. Only
+        // the metric that currently owns the optical sensor may decode it.
+        if (!active || active.subType !== frame.subType || frame.errorCode !== 0) return;
+        const receivedAt = Date.now();
+        let accepted = false;
+        if (active.metric === "spo2" && frame.value >= 70 && frame.value <= 100) {
+          setSpo2Pct(frame.value); markSignal("spo2At", receivedAt); tapDecoded("spo2", frame.value, bytes); accepted = true;
+        } else if (active.metric === "skinTemp") {
+          const temp = decodeQcBandTempPayload(frame.data);
+          if (temp != null) { setSkinTempC(temp); markSignal("skinTempAt", receivedAt); tapDecoded("skinTemp", temp, bytes); accepted = true; }
+        } else if (active.metric === "hrv" && frame.value >= 5 && frame.value < 250) {
+          setHrvMs(frame.value); markSignal("hrvAt", receivedAt); tapDecoded("hrv", frame.value, bytes); accepted = true;
+        } else if (active.metric === "stress" && frame.value > 0 && frame.value <= 100) {
+          setStressScore(frame.value); markSignal("stressAt", receivedAt); tapDecoded("stress", frame.value, bytes); accepted = true;
+        } else if (active.metric === "bloodPressure") {
           const bp = decodeQcBandBloodPressurePayload(frame.data);
-          if (!bp) return false;
-          setBloodPressure({ sbp: bp.sbp, dbp: bp.dbp });
-          markSignal("bloodPressureAt");
-          tapDecoded("bp", `${bp.sbp}/${bp.dbp}`, bytes);
-          if (bp.hr != null) {
-            setHeartRateBpm(bp.hr);
-            setHeartRateAt(Date.now());
-            tapDecoded("hr", bp.hr, bytes);
-          }
-          return true;
-        };
-        const applyTemperature = () => {
-          const t = decodeQcBandTempPayload(frame.data);
-          if (t == null) return false;
-          setSkinTempC(t);
-          markSignal("skinTempAt");
-          tapDecoded("skinTemp", t, bytes);
-          return true;
-        };
-        const applySpo2Scalar = () => {
-          if (frame.value < 70 || frame.value > 100) return false;
-          setSpo2Pct(frame.value);
-          markSignal("spo2At");
-          tapDecoded("spo2", frame.value, bytes);
-          return true;
-        };
-        const applyHeartRateScalar = () => {
-          if (frame.value <= 30 || frame.value >= 250) return false;
-          setHeartRateBpm(frame.value);
-          setHeartRateAt(Date.now());
-          tapDecoded("hr", frame.value, bytes);
-          return true;
-        };
-        const applyHrvScalar = () => {
-          if (frame.value < 5 || frame.value >= 250) return false;
-          setHrvMs(frame.value);
-          markSignal("hrvAt");
-          tapDecoded("hrv", frame.value, bytes);
-          return true;
-        };
-        const applyStressScalar = () => {
-          if (frame.value <= 0 || frame.value > 100) return false;
-          setStressScore(frame.value);
-          markSignal("stressAt");
-          tapDecoded("stress", frame.value, bytes);
-          return true;
-        };
-        let handled = false;
-        if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(frame.subType)) {
-          handled = applyBloodPressure() || handled;
+          if (bp) { setBloodPressure({ sbp: bp.sbp, dbp: bp.dbp }); markSignal("bloodPressureAt", receivedAt); tapDecoded("bp", `${bp.sbp}/${bp.dbp}`, bytes); accepted = true; }
         }
-        if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(frame.subType)) {
-          handled = applySpo2Scalar() || handled;
+        if (accepted) {
+          updateMetricPipeline(active.metric, {
+            status: "received",
+            respondedAt: receivedAt,
+            detail: `Validated 0x69 subtype 0x${frame.subType.toString(16)}`,
+          });
         }
-        if ((QCBAND_MEASURE_HR_TYPES as readonly number[]).includes(frame.subType)) {
-          handled = applyHeartRateScalar() || handled;
-        }
-        if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(frame.subType)) {
-          handled = applyHrvScalar() || handled;
-        }
-        if (
-          frame.subType === 0x04 &&
-          frame.data.length >= 2 &&
-          applyTemperature()
-        ) {
-          handled = true;
-        }
-        if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(frame.subType)) {
-          handled = applyStressScalar() || handled;
-        }
-        if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(frame.subType)) {
-          handled = applyTemperature() || handled;
-        }
-        if ((QCBAND_MEASURE_ONE_KEY_TYPES as readonly number[]).includes(frame.subType) && applyOneKey()) {
-          handled = true;
-        }
-        void handled;
       }
       return;
     }
@@ -1256,12 +1172,14 @@ export function useVyroBand() {
         setSpo2Pct(spo2);
         markSignal("spo2At");
         tapDecoded("spo2", spo2, bytes);
+        updateMetricPipeline("spo2", { status: "received", respondedAt: Date.now(), detail: "V2 history response" });
       }
       const temp = decodeQcBandTemperatureHistory(bytes);
       if (temp != null) {
         setSkinTempC(temp);
         markSignal("skinTempAt");
         tapDecoded("skinTemp", temp, bytes);
+        updateMetricPipeline("skinTemp", { status: "received", respondedAt: Date.now(), detail: "V2 history response" });
       }
       return;
     }
