@@ -106,7 +106,7 @@ export function estimateRespirationFromHeartRate(
   const peakRatio = peak.power / Math.max(floor, 0.0001);
   const explained = peak.power / Math.max(residualVariance * recent.length, 0.0001);
   const confidence = Math.min(1, Math.min(peakRatio / 4, explained / 0.25));
-  if (peakRatio < 2.2 || explained < 0.07 || confidence < 0.28) return null;
+  if (peakRatio < 1.8 || explained < 0.05 || confidence < 0.2) return null;
 
   return {
     brpm: Math.round(peak.frequency * 600) / 10,
