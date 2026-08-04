@@ -1030,12 +1030,12 @@ export function useVyroBand() {
         measureFailStreakRef.current[metric] = streak;
         if (streak >= 2) {
           // Firmware clearly isn't answering. Stop stealing the sensor.
-          metricBackoffUntilRef.current[metric] = Date.now() + 30 * 60_000;
+          metricBackoffUntilRef.current[metric] = Date.now() + 15 * 60_000;
           updateMetricPipeline(metric, {
             status: sawUnsupported ? "unsupported" : "no_response",
             detail: sawUnsupported
-              ? "Not available on this watch firmware"
-              : "Watch never answered — rechecking in 30 min",
+              ? "Documented opcodes unsupported — protocol discovery running"
+              : "Watch never answered — rechecking in 15 min",
 
           });
         } else {
@@ -1202,6 +1202,7 @@ export function useVyroBand() {
       if (batteryTimer != null) window.clearInterval(batteryTimer);
       if (stepsTimer != null) window.clearInterval(stepsTimer);
       if (historyTimer != null) window.clearInterval(historyTimer);
+      if (probeTimer != null) window.clearInterval(probeTimer);
       if (measurementLoopTimer != null) window.clearTimeout(measurementLoopTimer);
       activeMeasureRef.current = null;
       if (qcBandService) {
