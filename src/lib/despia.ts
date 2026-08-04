@@ -385,7 +385,43 @@ if (typeof window !== "undefined") {
   w.onBleScanEnd = (e: { count?: number } = {}) => emit("scanEnd", e);
   w.onBleDiscovered = (t: BleDiscovered) => emit("discovered", t);
   w.onBleWriteComplete = (e: BleWriteComplete) => emit("writeComplete", e);
-  w.onBleEvent = (e: { type: string; [k: string]: unknown }) => emit("event", e);
+  // The native BLE addon records notifications/connection changes while iOS
+  // has suspended the WebView, then replays them here on activation. Route a
+  // replay through the same typed channels as a foreground callback so metric
+  // decoders and connection state do not miss everything collected off-screen.
+  w.onBleEvent = (e: { event?: string; type?: string; [k: string]: unknown }) => {
+    if (e.event === "onBleData") {
+      const id = typeof e.id === "string" ? e.id : typeof e.deviceId === "string" ? e.deviceId : "";
+      const service = typeof e.service === "string" ? e.service : "";
+      const characteristic =
+        typeof e.characteristic === "string"
+          ? e.characteristic
+          : typeof e.char === "string"
+            ? e.char
+            : "";
+      const value =
+        typeof e.valueHex === "string"
+          ? e.valueHex
+          : typeof e.value === "string"
+            ? e.value
+            : "";
+      if (id && characteristic && value) emit("data", { id, service, characteristic, value });
+      return;
+    }
+    if (e.event === "onBleConnect") {
+      const id = typeof e.id === "string" ? e.id : typeof e.deviceId === "string" ? e.deviceId : "";
+      const state = e.state;
+      if (id && (state === "connected" || state === "disconnected" || state === "failed")) {
+        emit("connect", {
+          id,
+          state,
+          error: typeof e.error === "string" ? e.error : undefined,
+        });
+      }
+      return;
+    }
+    emit("event", { ...e, type: e.type ?? "background_ble_replay" });
+  };
 }
 
 export const bluetooth = {

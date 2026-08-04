@@ -708,6 +708,61 @@ export function useVyroBand() {
     let historyTimer: number | null = null;
     let writeChain = Promise.resolve();
 
+    // iOS may freeze JavaScript immediately after visibility becomes hidden.
+    // A manual metric cycle temporarily ends realtime HR; if suspension lands
+    // in that window, its delayed restart never runs and the optical LED stays
+    // off for the entire background period. Restore HR with direct bridge
+    // writes (not the paced queue) before the WebView is suspended.
+    const restoreOpticalStream = async () => {
+      if (!qcBandService || cancelled) return;
+      const active = activeMeasureRef.current;
+      setSensorHold(false);
+      activeMeasureRef.current = null;
+      if (active) {
+        await bluetooth
+          .write(
+            connectedId,
+            qcBandService.service,
+            qcBandService.write,
+            bytesToHex(encodeQcBandMeasureStop(active.subType)),
+            true,
+          )
+          .catch(() => undefined);
+      }
+      await bluetooth
+        .write(
+          connectedId,
+          qcBandService.service,
+          qcBandService.write,
+          bytesToHex(encodeQcBandRealtimeHeartRate("start")),
+          true,
+        )
+        .catch(async () => {
+          await bluetooth
+            .write(
+              connectedId,
+              qcBandService?.service ?? QCBAND_SERVICE_UUID,
+              qcBandService?.write ?? QCBAND_WRITE_CHAR_UUID,
+              bytesToHex(encodeQcBandRealtimeHeartRate("start")),
+              false,
+            )
+            .catch(() => undefined);
+        });
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        void restoreOpticalStream();
+        return;
+      }
+      // Re-arm immediately after iOS resumes and re-request buffered values
+      // rather than waiting for minute-based foreground timers.
+      void restoreOpticalStream();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", onVisibilityChange);
+    window.addEventListener("pageshow", onVisibilityChange);
+
     function enqueueWrite(task: () => Promise<void>) {
       const run = writeChain
         .catch(() => undefined)
@@ -948,7 +1003,12 @@ export function useVyroBand() {
       };
 
       const runMeasureCycle = async () => {
-        if (cancelled || activeMeasureRef.current) return;
+        if (cancelled || activeMeasureRef.current || document.visibilityState !== "visible") {
+          if (!cancelled) {
+            measurementLoopTimer = window.setTimeout(() => void runMeasureCycle(), 60_000);
+          }
+          return;
+        }
         const entry = nextMetric();
         if (entry) {
           setSensorHold(true);
@@ -1056,6 +1116,9 @@ export function useVyroBand() {
     return () => {
       if (shouldKeepNativeBleAliveOnCleanup()) return;
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", onVisibilityChange);
+      window.removeEventListener("pageshow", onVisibilityChange);
       off();
       window.clearTimeout(fallback);
       if (holdTimer != null) window.clearInterval(holdTimer);
