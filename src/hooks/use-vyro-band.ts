@@ -1032,7 +1032,6 @@ export function useVyroBand() {
       if (bytes.length === 0) return;
       const op = bytes[0];
       console.log("[qcband] notify op=0x" + op.toString(16).padStart(2, "0"), bytesToHex(bytes));
-      ingestRawMotionSignal(bytes);
       // Tap 0x87 / 0x89 / 0x73 raw — Armand's firmware answers one-key/measure
       // attempts on these opcodes with status bytes (0xee = feature unsupported
       // / keep-alive). Recording them here means the Debug "Decoder output"
