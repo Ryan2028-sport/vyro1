@@ -106,11 +106,53 @@ export function estimateRespirationFromHeartRate(
   const peakRatio = peak.power / Math.max(floor, 0.0001);
   const explained = peak.power / Math.max(residualVariance * recent.length, 0.0001);
   const confidence = Math.min(1, Math.min(peakRatio / 4, explained / 0.25));
-  if (peakRatio < 1.8 || explained < 0.05 || confidence < 0.2) return null;
+  if (peakRatio >= 1.8 && explained >= 0.05 && confidence >= 0.2) {
+    return {
+      brpm: Math.round(peak.frequency * 600) / 10,
+      confidence: Math.round(confidence * 100) / 100,
+      sampleCount: recent.length,
+      windowSeconds: Math.round(spanSeconds),
+    };
+  }
+
+  // Time-domain fallback. When the PPG stream is noisy or coarsely quantised
+  // the spectrum smears, but the respiratory oscillation is still visible as
+  // slow zero crossings of the smoothed, detrended HR signal. Count them and
+  // report with reduced confidence rather than showing nothing.
+  const smoothed: number[] = [];
+  for (let i = 0; i < residuals.length; i++) {
+    const window = residuals.slice(Math.max(0, i - 2), i + 3);
+    smoothed.push(window.reduce((sum, value) => sum + value, 0) / window.length);
+  }
+  let crossings = 0;
+  let lastCrossingTime: number | null = null;
+  const intervals: number[] = [];
+  for (let i = 1; i < smoothed.length; i++) {
+    const a = smoothed[i - 1];
+    const b = smoothed[i];
+    if ((a <= 0 && b > 0) || (a >= 0 && b < 0)) {
+      crossings++;
+      const t = times[i];
+      if (lastCrossingTime != null) intervals.push(t - lastCrossingTime);
+      lastCrossingTime = t;
+    }
+  }
+  if (crossings < 6 || intervals.length < 4) return null;
+  const meanHalfPeriod = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
+  if (meanHalfPeriod <= 0) return null;
+  const brpm = 60 / (meanHalfPeriod * 2);
+  if (brpm < 6 || brpm > 30) return null;
+  // Regularity of the half-periods is the confidence proxy here.
+  const spread =
+    Math.sqrt(
+      intervals.reduce((sum, value) => sum + (value - meanHalfPeriod) ** 2, 0) / intervals.length,
+    ) / meanHalfPeriod;
+  const fallbackConfidence = Math.max(0.15, Math.min(0.55, 0.6 - spread));
+  if (spread > 0.85) return null;
 
   return {
-    brpm: Math.round(peak.frequency * 600) / 10,
-    confidence: Math.round(confidence * 100) / 100,
+    brpm: Math.round(brpm * 10) / 10,
+    confidence: Math.round(fallbackConfidence * 100) / 100,
     sampleCount: recent.length,
     windowSeconds: Math.round(spanSeconds),
   };
