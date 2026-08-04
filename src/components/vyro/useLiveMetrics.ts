@@ -124,6 +124,8 @@ export function useLiveMetrics() {
     stressScore: liveStressScore,
     signalAt,
     metricPipeline,
+    sensorHold,
+
     ...derived,
   };
 }
