@@ -321,22 +321,31 @@ export function DebugView() {
     { label: "Battery", value: fmt(ctx.batteryPct, 0, " %"), ok: hardwareSeen(ctx.batteryPct, ctx.signalAt.batteryAt), source: "GATT 0x2A19 · QCBand 0x03", ageMs: signalAge(ctx.signalAt.batteryAt) },
   ];
 
-  const measurementPipeline: Row[] = ([
-    ["SpO₂", "spo2"],
-    ["Skin temperature", "skinTemp"],
-    ["HRV", "hrv"],
-    ["Stress", "stress"],
-    ["Blood pressure", "bloodPressure"],
-  ] as const).map(([label, key]) => {
-    const entry = ctx.metricPipeline[key];
-    return {
-      label,
-      value: entry.status,
-      ok: entry.status === "received",
-      source: entry.subType == null ? entry.detail : `0x${entry.subType.toString(16)} · ${entry.detail}`,
-      ageMs: signalAge(entry.respondedAt ?? entry.requestedAt),
-    };
-  });
+  const measurementPipeline: Row[] = [
+    {
+      label: "Sensor owner",
+      value: ctx.sensorHold ? "manual measurement" : "realtime HR",
+      ok: !ctx.sensorHold,
+      source: "One optical metric at a time; HR resumes right after each measurement",
+    },
+    ...([
+      ["SpO₂", "spo2"],
+      ["Skin temperature", "skinTemp"],
+      ["HRV", "hrv"],
+      ["Stress", "stress"],
+      ["Blood pressure", "bloodPressure"],
+    ] as const).map(([label, key]) => {
+      const entry = ctx.metricPipeline[key];
+      return {
+        label,
+        value: entry.status,
+        ok: entry.status === "received",
+        source: entry.subType == null ? entry.detail : `0x${entry.subType.toString(16)} · ${entry.detail}`,
+        ageMs: signalAge(entry.respondedAt ?? entry.requestedAt),
+      };
+    }),
+  ];
+
 
   const activity: Row[] = [
     { label: "Steps today", value: fmt(ctx.stepsToday, 0), ok: hardwareSeen(ctx.stepsToday, ctx.signalAt.stepsAt), source: "QCBand summary / live / history packet", ageMs: signalAge(ctx.signalAt.stepsAt) },
