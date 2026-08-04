@@ -22,6 +22,8 @@
 //      it into app state, with a "last updated" age.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { saveDebugSnapshot } from "@/lib/debug-snapshot.functions";
 import { useLiveMetrics } from "./useLiveMetrics";
 import { useVyroBandCtx } from "./VyroBandProvider";
 import { useSleepNights } from "@/lib/use-sleep-nights";
