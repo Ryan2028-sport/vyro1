@@ -456,6 +456,10 @@ export function useVyroBand() {
   const probeSubTypeRef = useRef<number | null>(null);
   const bpCandidateRef = useRef<{ sbp: number; dbp: number; hits: number } | null>(null);
 
+  // Last time any live heart-rate frame arrived from the band. Used by the
+  // stream watchdog to detect a silently dead optical stream.
+  const lastHrFrameAtRef = useRef(0);
+
   const signalAtRef = useRef<VyroBandSignalTimestamps>(emptySignalTimestamps());
   const sleepSamplesRef = useRef<SleepDerivedSample[]>(loadSleepSamples());
   const lastSleepSampleAtRef = useRef(0);
@@ -753,6 +757,7 @@ export function useVyroBand() {
     let measurementLoopTimer: number | null = null;
     let historyTimer: number | null = null;
     let probeTimer: number | null = null;
+    let hrWatchdogTimer: number | null = null;
 
     let writeChain = Promise.resolve();
 
@@ -895,6 +900,30 @@ export function useVyroBand() {
           () => undefined,
         );
       }, 60_000);
+
+      // Stream watchdog. The firmware can stop pushing optical frames without
+      // dropping the GATT link (e.g. after a backgrounded metric cycle, or when
+      // a manual measurement lock is never released). If no live HR frame has
+      // arrived for 45s, release any stale lock, re-subscribe to the notify
+      // characteristic and re-arm realtime HR from scratch.
+      hrWatchdogTimer = window.setInterval(() => {
+        if (cancelled) return;
+        const active = activeMeasureRef.current;
+        if (active && Date.now() - active.startedAt > 60_000) {
+          activeMeasureRef.current = null;
+          setSensorHold(false);
+        }
+        if (activeMeasureRef.current) return;
+        const last = lastHrFrameAtRef.current;
+        if (last !== 0 && Date.now() - last < 45_000) return;
+        void (async () => {
+          if (connectedId) await bluetooth.subscribe(connectedId, service, notify).catch(() => undefined);
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
+        })();
+      }, 20_000);
+
+
 
       // Battery: query immediately and every 60s. Response arrives on the
       // same notify char (opcode 0x03).
@@ -1241,6 +1270,7 @@ export function useVyroBand() {
       if (stepsTimer != null) window.clearInterval(stepsTimer);
       if (historyTimer != null) window.clearInterval(historyTimer);
       if (probeTimer != null) window.clearInterval(probeTimer);
+      if (hrWatchdogTimer != null) window.clearInterval(hrWatchdogTimer);
       if (measurementLoopTimer != null) window.clearTimeout(measurementLoopTimer);
       activeMeasureRef.current = null;
       if (qcBandService) {
@@ -1297,6 +1327,7 @@ export function useVyroBand() {
       if (bpm != null && bpm > 0 && bpm < 250) {
         setHeartRateBpm(bpm);
         setHeartRateAt(Date.now());
+          lastHrFrameAtRef.current = Date.now();
         tapDecoded("hr", bpm, payloadToBytes(data.value));
       }
       return;
@@ -1328,6 +1359,7 @@ export function useVyroBand() {
         if (bpm != null) {
           setHeartRateBpm(bpm);
           setHeartRateAt(Date.now());
+          lastHrFrameAtRef.current = Date.now();
           tapDecoded("hr", bpm, bytes);
         }
       } else if (op === QCBAND_CMD_BATTERY) {
@@ -1371,6 +1403,7 @@ export function useVyroBand() {
         if (bytes[1] === 0x01 && bytes[2] > 30 && bytes[2] < 250) {
           setHeartRateBpm(bytes[2]);
           setHeartRateAt(Date.now());
+          lastHrFrameAtRef.current = Date.now();
           tapDecoded("hr", bytes[2], bytes);
         }
       } else if (op === QCBAND_CMD_SYNC_ACTIVITY) {
