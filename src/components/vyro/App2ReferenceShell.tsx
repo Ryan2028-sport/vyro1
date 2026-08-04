@@ -810,27 +810,95 @@ function PlanRow({
 }
 
 
-function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: number }) {
-  // Divergence = current reaction latency − personal baseline (median of recent samples).
-  // If we have no baseline yet, show "calibrating".
-  const { delay, status, vyroRead } = useMemo(() => {
-    if (!m.connected || m.reactMin == null) {
-      return { delay: "—", status: "Offline", vyroRead: "Awaiting band" };
+function CognitiveFatigueCard({
+  m,
+  baselineMs,
+  hrvBaselineMs,
+}: {
+  m: LiveMetrics;
+  baselineMs?: number;
+  hrvBaselineMs?: number;
+}) {
+  // Primary signal is reaction latency vs personal baseline. When the band
+  // streams no motion/reaction frames we fall back to autonomic divergence:
+  // HRV suppression vs the 7-day HRV baseline, which is the standard
+  // physiological proxy for cognitive load.
+  const { delay, status, vyroRead, caption, baselineText, meterPct } = useMemo(() => {
+    const off = {
+      delay: "—",
+      status: "Offline",
+      vyroRead: "Awaiting band",
+      caption: "reaction vs baseline",
+      baselineText: "—",
+      meterPct: null as number | null,
+    };
+    if (!m.connected) return off;
+
+    // --- Reaction-time mode -------------------------------------------------
+    if (m.reactMin != null) {
+      const caption = "reaction vs baseline";
+      if (baselineMs == null) {
+        return {
+          delay: `${Math.round(m.reactMin)}ms`,
+          status: "Calibrating",
+          vyroRead: "Building baseline",
+          caption,
+          baselineText: "—",
+          meterPct: null,
+        };
+      }
+      const diff = m.reactMin - baselineMs;
+      const sign = diff >= 0 ? "+" : "−";
+      let status: string;
+      let vyroRead: string;
+      if (diff < 60) { status = "Normal"; vyroRead = "Sharp"; }
+      else if (diff < 150) { status = "Slowing"; vyroRead = "Mild fatigue"; }
+      else if (diff < 250) { status = "Elevated"; vyroRead = "Watch decision speed"; }
+      else { status = "Diverged"; vyroRead = "Cognitively fried"; }
+      return {
+        delay: `${sign}${Math.abs(Math.round(diff))}ms`,
+        status,
+        vyroRead,
+        caption,
+        baselineText: `${Math.round(baselineMs)}ms`,
+        meterPct: Math.max(0, Math.min(100, (diff / 300) * 100)),
+      };
     }
-    if (baselineMs == null) {
-      return { delay: `${Math.round(m.reactMin)}ms`, status: "Calibrating", vyroRead: "Building baseline" };
+
+    // --- Autonomic (HRV) mode ----------------------------------------------
+    if (m.hrvMs != null) {
+      const caption = "hrv vs baseline";
+      if (hrvBaselineMs == null || hrvBaselineMs <= 0) {
+        return {
+          delay: `${Math.round(m.hrvMs)}ms`,
+          status: "Calibrating",
+          vyroRead: "Building HRV baseline",
+          caption,
+          baselineText: "—",
+          meterPct: null,
+        };
+      }
+      const pct = ((m.hrvMs - hrvBaselineMs) / hrvBaselineMs) * 100; // negative = suppressed
+      const sign = pct >= 0 ? "+" : "−";
+      const drop = -pct; // positive = suppression
+      let status: string;
+      let vyroRead: string;
+      if (drop < 5) { status = "Normal"; vyroRead = "Sharp"; }
+      else if (drop < 12) { status = "Slowing"; vyroRead = "Mild cognitive load"; }
+      else if (drop < 20) { status = "Elevated"; vyroRead = "Watch decision speed"; }
+      else { status = "Diverged"; vyroRead = "Cognitively fried"; }
+      return {
+        delay: `${sign}${Math.abs(Math.round(pct))}%`,
+        status,
+        vyroRead,
+        caption,
+        baselineText: `${Math.round(hrvBaselineMs)}ms`,
+        meterPct: Math.max(0, Math.min(100, (drop / 25) * 100)),
+      };
     }
-    const diff = m.reactMin - baselineMs;
-    const sign = diff >= 0 ? "+" : "−";
-    const delay = `${sign}${Math.abs(Math.round(diff))}ms`;
-    let status: string;
-    let vyroRead: string;
-    if (diff < 60) { status = "Normal"; vyroRead = "Sharp"; }
-    else if (diff < 150) { status = "Slowing"; vyroRead = "Mild fatigue"; }
-    else if (diff < 250) { status = "Elevated"; vyroRead = "Watch decision speed"; }
-    else { status = "Diverged"; vyroRead = "Cognitively fried"; }
-    return { delay, status, vyroRead };
-  }, [m.connected, m.reactMin, baselineMs]);
+
+    return { ...off, status: "Waiting", vyroRead: "No HRV yet" };
+  }, [m.connected, m.reactMin, m.hrvMs, baselineMs, hrvBaselineMs]);
 
   const hrStatus = useMemo(() => {
     if (!m.connected || m.heartRateBpm == null) return "—";
@@ -840,12 +908,8 @@ function CognitiveFatigueCard({ m, baselineMs }: { m: LiveMetrics; baselineMs?: 
   }, [m.connected, m.heartRateBpm]);
 
   const hasDelay = delay !== "—";
-  // Divergence meter: 0ms → 0%, 300ms+ → 100%.
-  const meterPct = useMemo(() => {
-    if (!m.connected || m.reactMin == null || baselineMs == null) return null;
-    return Math.max(0, Math.min(100, ((m.reactMin - baselineMs) / 300) * 100));
-  }, [m.connected, m.reactMin, baselineMs]);
   const indigo = ACCENT.indigo;
+
 
   return (
     <GlassCard glow={indigo}>
