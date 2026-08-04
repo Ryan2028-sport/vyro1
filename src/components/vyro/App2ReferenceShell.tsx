@@ -219,13 +219,17 @@ function Ring({
   recovery?: number | null;
   sleep?: number | null;
 }) {
+  // This is the Readiness dial. Never paint secondary score arcs while the
+  // canonical readiness score is unavailable: doing so made a lone Recovery
+  // value look like a completed readiness measurement during calibration.
+  const hasReadiness = value != null && Number.isFinite(value);
   const arcs = [
     { r: 50, width: 11, v: value, color: toneVar(value), id: "readiness" },
-    { r: 37, width: 10, v: recovery ?? null, color: "var(--vyro-blue)", id: "recovery" },
-    { r: 25, width: 9, v: sleep ?? null, color: "var(--vyro-indigo)", id: "sleep" },
+    { r: 37, width: 10, v: hasReadiness ? recovery ?? null : null, color: "var(--vyro-blue)", id: "recovery" },
+    { r: 25, width: 9, v: hasReadiness ? sleep ?? null : null, color: "var(--vyro-indigo)", id: "sleep" },
   ];
   const color = toneVar(value);
-  const pending = value == null;
+  const pending = !hasReadiness;
 
   return (
     <div className="relative h-[212px] w-[212px] shrink-0">
@@ -272,7 +276,7 @@ function Ring({
                 stroke="hsl(0 0% 100% / 0.055)"
                 strokeWidth={arc.width}
               />
-              {arc.v != null && (
+              {arc.v != null && Number.isFinite(arc.v) && (
                 <circle
                   cx="56"
                   cy="56"
@@ -1228,7 +1232,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               {statusLabel}
             </span>
             <span className="truncate text-[9.5px] font-bold uppercase tracking-[0.16em] text-vyro-mute">
-              {m.connected ? "Live · VYRO Band" : "Awaiting band"}
+              {m.connected && readiness != null ? "Live · VYRO Band" : m.connected ? "Collecting signals" : "Awaiting band"}
             </span>
           </div>
 
@@ -1238,8 +1242,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             <RingLegend
               items={[
                 { label: "Readiness", value: readiness, color: toneVar(readiness) },
-                { label: "Recovery", value: recovery, color: "var(--vyro-blue)" },
-                { label: "Sleep", value: sleep, color: "var(--vyro-indigo)" },
+                { label: "Recovery", value: readiness == null ? null : recovery, color: "var(--vyro-blue)" },
+                { label: "Sleep", value: readiness == null ? null : sleep, color: "var(--vyro-indigo)" },
               ]}
             />
 
@@ -1248,8 +1252,10 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 {s.coachRead}
               </h2>
               <p className="mx-auto mt-2 max-w-[36ch] text-center text-[12.5px] leading-relaxed text-vyro-mute">
-                {m.connected
+                {m.connected && readiness != null
                   ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
+                  : m.connected
+                    ? "Connected. Waiting for enough independent body signals to calculate a trusted score."
                   : "Pair your VYRO Band to populate live signals."}
               </p>
 

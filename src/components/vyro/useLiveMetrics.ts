@@ -232,19 +232,28 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
 
   const parts: LiveRecoveryParts = { cardio, muscle, loadDebt, environment, confidence };
 
-  // Per-spec weights. Renormalised over present subscores.
+  // A connected flag or one easy-to-read channel must never produce a
+  // convincing recovery number. Require cardio plus two independent evidence
+  // groups before publishing. This prevents HR/SpO₂-only firmware traffic from
+  // being presented as a complete recovery assessment.
+  const independentEvidence = [
+    i.hrvMs != null,
+    i.spo2Pct != null,
+    i.skinTempC != null,
+    i.sleepScore != null,
+    hasImuLoad,
+  ].filter(Boolean).length;
+  if (cardio == null || independentEvidence < 2) return { score: null, parts };
+
+  // Per-spec fatigue weights. Confidence remains visible as data quality, but
+  // is deliberately not averaged into physiology (being connected is not
+  // evidence that the athlete is recovered).
   const weighted: { v: number | null; w: number }[] = [
     { v: cardio, w: 0.25 },
     { v: muscle, w: 0.25 },
     { v: loadDebt, w: 0.20 },
     { v: environment, w: 0.15 },
-    { v: confidence, w: 0.15 },
   ];
-  // Confidence is the trust layer — it must NOT drive the score on its own.
-  // Require at least one real fatigue subscore (cardio / muscle / loadDebt /
-  // environment) before publishing a number; otherwise the ring shows "—".
-  const fatigueScores = [cardio, muscle, loadDebt, environment].filter((v) => v != null);
-  if (fatigueScores.length === 0) return { score: null, parts };
   const presentScores = weighted.filter((p) => p.v != null);
   const totalW = presentScores.reduce((a, b) => a + b.w, 0);
   const sum = presentScores.reduce((a, b) => a + (b.v as number) * b.w, 0);
