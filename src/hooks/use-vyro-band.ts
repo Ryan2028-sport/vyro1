@@ -717,6 +717,8 @@ export function useVyroBand() {
     let stepsTimer: number | null = null;
     let measurementLoopTimer: number | null = null;
     let historyTimer: number | null = null;
+    let probeTimer: number | null = null;
+
     let writeChain = Promise.resolve();
 
     // iOS may freeze JavaScript immediately after visibility becomes hidden.
