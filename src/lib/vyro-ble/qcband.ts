@@ -867,7 +867,3 @@ export function encodeQcBandBpCalibrations(sbp: number, dbp: number): Uint8Array
   const d = Math.max(40, Math.min(160, Math.round(dbp))) & 0xff;
   return QCBAND_BP_CALIBRATE_OPCODES.map((op) => sdkCommand([op, 0x01, s, d]));
 }
-
-
-  return null;
-}
