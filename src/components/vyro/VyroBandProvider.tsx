@@ -161,9 +161,10 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
     };
   }, [pairedId, ble.connectedId]);
 
-  // Lightweight remote diagnostics: while a band is live, push a compact
-  // metric snapshot to the account every 2 minutes so the pipeline can be
-  // inspected even when the Debug tab is not open.
+  // Remote diagnostics: as soon as a band is live, push a full pipeline
+  // snapshot to the account (and refresh it every 30s) so the whole picture —
+  // metric pipeline states, decoder counts, freshness, firmware — can be read
+  // remotely without opening the Debug tab or copy/pasting anything.
   const pushSnapshot = useServerFn(saveDebugSnapshot);
   const liveRef = useRef(vyro);
   liveRef.current = vyro;
@@ -171,25 +172,53 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
     if (!ble.connectedId) return;
     const send = async () => {
       const v = liveRef.current;
+      const now = Date.now();
+      const age = (t: number | null | undefined) => (t ? Math.round((now - t) / 1000) : null);
       try {
         await pushSnapshot({
           data: {
             kind: "live",
             payload: {
               capturedAt: new Date().toISOString(),
-              connectedId: v.ble.connectedId,
-              powerState: v.ble.powerState,
-              lastError: v.ble.error ?? null,
-              heartRateBpm: v.heartRateBpm ?? null,
-              spo2Pct: v.spo2Pct ?? null,
-              skinTempC: v.skinTempC ?? null,
-              hrvMs: v.hrvMs ?? null,
-              stressScore: v.stressScore ?? null,
-              bloodPressure: v.bloodPressure ?? null,
-              stepsToday: v.stepsToday ?? null,
-              caloriesKcal: v.caloriesKcal ?? null,
-              distanceM: v.distanceM ?? null,
-              batteryPct: v.batteryPct ?? null,
+              connection: {
+                connectedId: v.ble.connectedId,
+                connectionState: v.ble.connectionState,
+                powerState: v.ble.powerState,
+                isNative: v.ble.isNative,
+                lastError: v.ble.error ?? null,
+                sensorHold: v.sensorHold ?? null,
+              },
+              firmware: {
+                firmwareRevision: v.firmwareRevision ?? null,
+                hardwareRevision: v.hardwareRevision ?? null,
+                serialNumber: v.serialNumber ?? null,
+              },
+              vitals: {
+                heartRateBpm: v.heartRateBpm ?? null,
+                heartRateAgeS: age(v.heartRateAt),
+                restingHrBpm: v.restingHrBpm ?? null,
+                spo2Pct: v.spo2Pct ?? null,
+                skinTempC: v.skinTempC ?? null,
+                hrvMs: v.hrvMs ?? null,
+                respRateBrpm: v.respRateBrpm ?? null,
+                stressScore: v.stressScore ?? null,
+                bloodPressure: v.bloodPressure ?? null,
+                batteryPct: v.batteryPct ?? null,
+                batteryCharging: v.batteryCharging ?? null,
+              },
+              activity: {
+                stepsToday: v.stepsToday ?? null,
+                distanceM: v.distanceM ?? null,
+                caloriesKcal: v.caloriesKcal ?? null,
+                sessionState: v.sessionState ?? null,
+                sport: v.sport ?? null,
+                counts: v.counts ?? null,
+              },
+              signalAgeS: Object.fromEntries(
+                Object.entries(v.signalAt ?? {}).map(([k, t]) => [k, age(t as number)]),
+              ),
+              metricPipeline: v.metricPipeline ?? null,
+              recentEvents: (v.events ?? []).slice(-40),
             },
           },
         });
@@ -198,9 +227,10 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
       }
     };
     void send();
-    const id = window.setInterval(send, 120_000);
+    const id = window.setInterval(send, 30_000);
     return () => window.clearInterval(id);
   }, [ble.connectedId, pushSnapshot]);
+
 
   return (
     <Ctx.Provider value={{ ...vyro, pairedId, pairedName }}>
