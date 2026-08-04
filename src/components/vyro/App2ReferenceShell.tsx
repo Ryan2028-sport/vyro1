@@ -1607,10 +1607,12 @@ export function App2ReferenceShell() {
             </div>
             <div>
               <div className="app2-actions">
+                <AlwaysOnPill connected={m.connected} />
                 <button className="app2-sync" onClick={() => setView("band")}>
                   <span className={m.connected ? "app2-dot app2-pulse" : "app2-dot"} />
                   Sync now
                 </button>
+
                 <button
                   className="app2-icon-btn"
                   aria-label="Device settings"
