@@ -1301,6 +1301,7 @@ export function useVyroBand() {
       if (bpm != null && bpm > 0 && bpm < 250) {
         setHeartRateBpm(bpm);
         setHeartRateAt(Date.now());
+          lastHrFrameAtRef.current = Date.now();
         tapDecoded("hr", bpm, payloadToBytes(data.value));
       }
       return;
@@ -1332,6 +1333,7 @@ export function useVyroBand() {
         if (bpm != null) {
           setHeartRateBpm(bpm);
           setHeartRateAt(Date.now());
+          lastHrFrameAtRef.current = Date.now();
           tapDecoded("hr", bpm, bytes);
         }
       } else if (op === QCBAND_CMD_BATTERY) {
@@ -1375,6 +1377,7 @@ export function useVyroBand() {
         if (bytes[1] === 0x01 && bytes[2] > 30 && bytes[2] < 250) {
           setHeartRateBpm(bytes[2]);
           setHeartRateAt(Date.now());
+          lastHrFrameAtRef.current = Date.now();
           tapDecoded("hr", bytes[2], bytes);
         }
       } else if (op === QCBAND_CMD_SYNC_ACTIVITY) {
