@@ -655,12 +655,9 @@ export function useVyroBand() {
     let restartTimer: number | null = null;
     let batteryTimer: number | null = null;
     let stepsTimer: number | null = null;
-    let oneKeyTimer: number | null = null;
-    let tempTimer: number | null = null;
+    let measurementLoopTimer: number | null = null;
     let historyTimer: number | null = null;
     let writeChain = Promise.resolve();
-    let measureChain = Promise.resolve();
-    const pendingMeasures = new Set<string>();
 
     function enqueueWrite(task: () => Promise<void>) {
       const run = writeChain
@@ -770,7 +767,7 @@ export function useVyroBand() {
         }, 1_200);
       };
       window.setTimeout(pollSteps, 1_200);
-      stepsTimer = window.setInterval(pollSteps, 2_000);
+      stepsTimer = window.setInterval(pollSteps, 30_000);
 
       // Buffered/native history sync. These are the commands used by the
       // QRing/Gadgetbridge stack for the exact missing metrics: HRV/RMSSD
@@ -804,89 +801,57 @@ export function useVyroBand() {
       window.setTimeout(pollHistory, 6_000);
       historyTimer = window.setInterval(pollHistory, 60_000);
 
-      const enqueueMeasure = (label: string, subType: number, durationMs: number) => {
-        const key = `${label}:0x${subType.toString(16)}`;
-        if (pendingMeasures.has(key)) return;
-        pendingMeasures.add(key);
-        measureChain = measureChain
-          .catch(() => undefined)
-          .then(async () => {
-            try {
-              if (cancelled) return;
-              console.log(`[qcband] ${label} measure start 0x${subType.toString(16)}`);
-              await writeQcBand(service, write, encodeQcBandMeasureStart(subType));
-              await wait(durationMs);
-              if (cancelled) return;
-              await writeQcBand(service, write, encodeQcBandMeasureStop(subType));
-              await wait(1500);
-            } finally {
-              pendingMeasures.delete(key);
-            }
+      // ---- DETERMINISTIC MEASUREMENT SCHEDULE --------------------------
+      // Only one optical measurement may own the sensor at a time. Previous
+      // code queued ~6.4 minutes of work every 3 minutes, so cycles overlapped
+      // and the watch mostly answered HR while dropping every other request.
+      const measureMetric = async (
+        metric: keyof MetricPipeline,
+        subTypes: readonly number[],
+        durationMs: number,
+      ) => {
+        for (const subType of subTypes) {
+          if (cancelled) return;
+          const startedAt = Date.now();
+          activeMeasureRef.current = { metric, subType, startedAt };
+          updateMetricPipeline(metric, {
+            status: "measuring",
+            subType,
+            requestedAt: startedAt,
+            detail: `Waiting for 0x69 subtype 0x${subType.toString(16)}`,
           });
-      };
-
-      const runMeasureCycle = (label: string, subTypes: readonly number[], durationMs: number) => {
-        subTypes.forEach((subType, index) => {
-          window.setTimeout(() => {
-            enqueueMeasure(label, subType, durationMs);
-          }, index * 250);
+          await writeQcBand(service, write, encodeQcBandMeasureStart(subType)).catch(() => undefined);
+          await wait(durationMs);
+          await writeQcBand(service, write, encodeQcBandMeasureStop(subType)).catch(() => undefined);
+          await wait(900);
+          if ((metricReceivedAtRef.current[metric] ?? 0) >= startedAt) {
+            activeMeasureRef.current = null;
+            return;
+          }
+        }
+        activeMeasureRef.current = null;
+        updateMetricPipeline(metric, {
+          status: "no_response",
+          detail: "All supported subtype requests completed without a valid value",
         });
       };
 
-      // ---- MEASUREMENT SCHEDULE ---------------------------------------
-      // Armand's firmware only responds with 0x87/0x89 (keep-alive /
-      // feature-unsupported) to the one-key composite. So we can't rely on
-      // one-key; we must fire EVERY sub-type individually and quickly, in
-      // both the legacy (0x01..0x0e) and SDK (0x00..0x08) mappings, so at
-      // least one variant gets an actual 0x69 reply per metric. All bursts
-      // happen inside the first ~30s of connect so the Debug bundle shows
-      // a real per-metric verdict without waiting 5 minutes.
-      const runAllMeasures = () => {
-        // Order matters: HR must arm first on QCBand firmwares before other
-        // sub-types respond. Space them so writes never overlap in flight.
-        runMeasureCycle("hr", QCBAND_MEASURE_HR_TYPES, 15_000);
-        window.setTimeout(() => runMeasureCycle("spo2", QCBAND_MEASURE_SPO2_TYPES, 15_000), 2_000);
-        window.setTimeout(() => runMeasureCycle("temp", QCBAND_MEASURE_TEMP_TYPES, 15_000), 4_500);
-        window.setTimeout(() => runMeasureCycle("hrv", QCBAND_MEASURE_HRV_TYPES, 20_000), 7_000);
-        window.setTimeout(() => runMeasureCycle("stress", QCBAND_MEASURE_STRESS_TYPES, 20_000), 9_500);
-        window.setTimeout(() => runMeasureCycle("blood-pressure", QCBAND_MEASURE_BP_TYPES, 45_000), 12_000);
-        window.setTimeout(() => runMeasureCycle("one-key", QCBAND_MEASURE_ONE_KEY_TYPES, 30_000), 14_500);
-      };
-      window.setTimeout(runAllMeasures, 2_000);
-      oneKeyTimer = window.setInterval(runAllMeasures, 3 * 60_000);
-
-      // Silence watchdog: if 25s after connect a metric has produced zero
-      // decoded values, re-arm it once with the SAME sub-types. This catches
-      // the case where the first arming write raced the notify subscription
-      // or the firmware dropped it. Every re-arm attempt is logged into the
-      // write log so the Debug tab shows the retry.
-      const watchdog = window.setTimeout(() => {
-        if (cancelled) return;
-        try {
-          const snap = getDecodedSnapshot();
-          const need: Array<[string, readonly number[]]> = [];
-          if (!snap.hr || snap.hr.count === 0) need.push(["hr", QCBAND_MEASURE_HR_TYPES]);
-          if (!snap.spo2 || snap.spo2.count === 0) need.push(["spo2", QCBAND_MEASURE_SPO2_TYPES]);
-          if (!snap.skinTemp || snap.skinTemp.count === 0) need.push(["temp", QCBAND_MEASURE_TEMP_TYPES]);
-          if (!snap.hrv || snap.hrv.count === 0) need.push(["hrv", QCBAND_MEASURE_HRV_TYPES]);
-          if (!snap.stress || snap.stress.count === 0) need.push(["stress", QCBAND_MEASURE_STRESS_TYPES]);
-          if (!snap.bp || snap.bp.count === 0) need.push(["blood-pressure", QCBAND_MEASURE_BP_TYPES]);
-          need.forEach(([label, subs], i) => {
-            window.setTimeout(() => {
-              console.log(`[qcband] watchdog re-arm ${label}`);
-              runMeasureCycle(`${label}-retry`, subs, 20_000);
-            }, i * 2_000);
-          });
-        } catch (err) {
-          console.warn("[qcband] watchdog failed", err);
+      const runAllMeasures = async () => {
+        if (cancelled || activeMeasureRef.current) return;
+        // Realtime HR and manual optical modes compete for the same PPG. Stop
+        // the HR stream for the cycle and restart it when all metrics finish.
+        await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
+        await measureMetric("spo2", QCBAND_MEASURE_SPO2_TYPES, 10_000);
+        await measureMetric("skinTemp", QCBAND_MEASURE_TEMP_TYPES, 8_000);
+        await measureMetric("hrv", QCBAND_MEASURE_HRV_TYPES, 12_000);
+        await measureMetric("stress", QCBAND_MEASURE_STRESS_TYPES, 10_000);
+        await measureMetric("bloodPressure", QCBAND_MEASURE_BP_TYPES, 20_000);
+        if (!cancelled) {
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
+          measurementLoopTimer = window.setTimeout(() => void runAllMeasures(), 5 * 60_000);
         }
-      }, 25_000);
-
-      // Stash extra timers so cleanup can clear them.
-      const stop = () => {
-        window.clearTimeout(watchdog);
       };
-      cleanupExtras = stop;
+      measurementLoopTimer = window.setTimeout(() => void runAllMeasures(), 3_000);
     }
 
     let cleanupExtras: (() => void) | null = null;
@@ -987,8 +952,8 @@ export function useVyroBand() {
       if (batteryTimer != null) window.clearInterval(batteryTimer);
       if (stepsTimer != null) window.clearInterval(stepsTimer);
       if (historyTimer != null) window.clearInterval(historyTimer);
-      if (oneKeyTimer != null) window.clearInterval(oneKeyTimer);
-      if (tempTimer != null) window.clearInterval(tempTimer);
+      if (measurementLoopTimer != null) window.clearTimeout(measurementLoopTimer);
+      activeMeasureRef.current = null;
       cleanupExtras?.();
       if (qcBandService) {
         void bluetooth
