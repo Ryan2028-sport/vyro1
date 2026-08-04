@@ -200,6 +200,26 @@ export type VyroBandSignalTimestamps = {
   bloodPressureAt: number | null;
 };
 
+export type MetricPipelineStatus = "idle" | "measuring" | "received" | "no_response" | "unsupported";
+
+export type MetricPipelineEntry = {
+  status: MetricPipelineStatus;
+  subType: number | null;
+  requestedAt: number | null;
+  respondedAt: number | null;
+  detail: string;
+};
+
+export type MetricPipeline = Record<"spo2" | "skinTemp" | "hrv" | "stress" | "bloodPressure", MetricPipelineEntry>;
+
+const emptyMetricPipeline = (): MetricPipeline => ({
+  spo2: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
+  skinTemp: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
+  hrv: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
+  stress: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
+  bloodPressure: { status: "idle", subType: null, requestedAt: null, respondedAt: null, detail: "Not requested" },
+});
+
 const emptySignalTimestamps = (): VyroBandSignalTimestamps => ({
   batteryAt: null,
   spo2At: null,
@@ -393,13 +413,13 @@ export function useVyroBand() {
   const [hardwareRevision, setHardwareRevision] = useState<string | null>(null);
   const [serialNumber, setSerialNumber] = useState<string | null>(null);
   const [signalAt, setSignalAt] = useState<VyroBandSignalTimestamps>(() => emptySignalTimestamps());
+  const [metricPipeline, setMetricPipeline] = useState<MetricPipeline>(() => emptyMetricPipeline());
   const hrSamplesRef = useRef<{ t: number; bpm: number }[]>([]);
   const activeConnectionRef = useRef<string | null>(null);
   const activityBucketsRef = useRef<Map<string, { steps: number; distanceM: number; calories: number }>>(new Map());
   const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(null);
   const bigDataV2Ref = useRef<{ expected: number; chunks: number[] } | null>(null);
-  const rawMotionByOpRef = useRef<Map<number, Uint8Array>>(new Map());
-  const rawMotionLastEventAtRef = useRef(0);
+  const activeMeasureRef = useRef<{ metric: keyof MetricPipeline; subType: number; startedAt: number } | null>(null);
   const sleepSamplesRef = useRef<SleepDerivedSample[]>(loadSleepSamples());
   const lastSleepSampleAtRef = useRef(0);
 
@@ -457,86 +477,6 @@ export function useVyroBand() {
     tapDecoded("calories", merged.calories);
   };
 
-  const ingestRawMotionSignal = (bytes: Uint8Array) => {
-    const op = bytes[0] & 0xff;
-    // Some firmware builds do not expose the VYRO IMU characteristic. The
-    // calibration tool already uses raw QCBand 0x69/0x73/0x87/0x89 packet
-    // movement as the fallback motion source; mirror that here so sport/load
-    // tiles are driven by real watch traffic instead of staying grey forever.
-    if (op !== 0x69 && op !== 0x73 && op !== 0x87 && op !== 0x89) return;
-    if (bytes.length < 6) return;
-    const body = bytes.slice(1, Math.max(1, bytes.length - 1));
-    const prev = rawMotionByOpRef.current.get(op);
-    rawMotionByOpRef.current.set(op, body);
-    if (!prev) return;
-    const len = Math.max(prev.length, body.length);
-    let delta = Math.abs(prev.length - body.length) * 8;
-    for (let i = 0; i < len; i++) delta += Math.abs((body[i] ?? 0) - (prev[i] ?? 0));
-    if (delta < 18) return;
-    const now = Date.now();
-    const since = now - rawMotionLastEventAtRef.current;
-    if (since < 650) return;
-
-    const intensity = Math.max(1, Math.min(100, Math.round(delta / 3)));
-    const accelPeakG = { value: Math.max(0.1, Math.min(16, delta / 45)), saturated: false };
-    const gyroPeakDps = { value: Math.round(Math.min(2200, delta * 9)), saturated: false };
-    const jerkPeakGps = { value: Math.round(Math.min(600, delta * 2.5)), saturated: false };
-    const durationMs = Math.max(80, Math.min(1200, since || 250));
-    let event: VyroMotionEvent;
-    if (delta > 130) {
-      event = {
-        type: "swing",
-        code: 0x10,
-        intensity,
-        accelPeakG,
-        gyroPeakDps,
-        durationMs,
-        refFwdG: { value: 0, saturated: false },
-        refLrG: { value: 0, saturated: false },
-        refUdG: { value: 0, saturated: false },
-      };
-    } else if (since > 0 && since < 2400) {
-      event = {
-        type: "direction_change",
-        code: 0x13,
-        accelPeakG,
-        gyroPeakDps,
-        gapMs: durationMs,
-        prevFwdG: { value: 0, saturated: false },
-        prevLrG: { value: 0, saturated: false },
-        currFwdG: { value: 0, saturated: false },
-        currLrG: { value: 0, saturated: false },
-      };
-    } else {
-      event = delta > 60
-        ? {
-            type: "burst",
-            code: 0x12,
-            accelPeakG,
-            jerkPeakGps,
-            gyroPeakDps,
-            durationMs,
-            refFwdG: { value: 0, saturated: false },
-            refLrG: { value: 0, saturated: false },
-          }
-        : {
-            type: "rapid_start",
-            code: 0x11,
-            accelPeakG,
-            jerkPeakGps,
-            gyroPeakDps,
-            durationMs,
-            refFwdG: { value: 0, saturated: false },
-            refLrG: { value: 0, saturated: false },
-          };
-    }
-    rawMotionLastEventAtRef.current = now;
-    setEvents((prevEvents) => {
-      const next = [...prevEvents, { ts: now, event }];
-      return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
-    });
-  };
-
   // When connected, always subscribe to the VYRO motion event characteristic
   // (cheap if the remote watch doesn't expose it — the platform just errors
   // out and we move on).
@@ -569,8 +509,7 @@ export function useVyroBand() {
     hrSamplesRef.current = [];
     activityBucketsRef.current.clear();
     activityTotalRef.current = null;
-      rawMotionByOpRef.current.clear();
-      rawMotionLastEventAtRef.current = 0;
+    activeMeasureRef.current = null;
     setEvents([]);
     setHeartRateBpm(null);
     setHeartRateAt(null);
@@ -590,6 +529,7 @@ export function useVyroBand() {
     setHardwareRevision(null);
     setSerialNumber(null);
     setSignalAt(emptySignalTimestamps());
+    setMetricPipeline(emptyMetricPipeline());
   }, [connectedId]);
 
   useEffect(() => {
