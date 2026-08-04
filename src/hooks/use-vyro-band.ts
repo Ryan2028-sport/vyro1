@@ -427,12 +427,23 @@ export function useVyroBand() {
   const activityTotalRef = useRef<{ day: string; steps: number; distanceM: number; calories: number; priority: number } | null>(null);
   const bigDataV2Ref = useRef<{ expected: number; chunks: number[] } | null>(null);
   const activeMeasureRef = useRef<{ metric: keyof MetricPipeline; subType: number; startedAt: number } | null>(null);
+  // Sensor arbitration bookkeeping. `sensorHold` is true while a manual optical
+  // measurement owns the PPG, so the UI can keep showing the last HR-derived
+  // values instead of blanking them.
+  const [sensorHold, setSensorHold] = useState(false);
+  const measureFailStreakRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 });
+  const metricBackoffUntilRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 });
+  const unsupportedHitRef = useRef<Record<keyof MetricPipeline, number>>({ spo2: 0, skinTemp: 0, hrv: 0, stress: 0, bloodPressure: 0 });
+  const measureCursorRef = useRef(0);
+  const signalAtRef = useRef<VyroBandSignalTimestamps>(emptySignalTimestamps());
   const sleepSamplesRef = useRef<SleepDerivedSample[]>(loadSleepSamples());
   const lastSleepSampleAtRef = useRef(0);
 
   const markSignal = (key: keyof VyroBandSignalTimestamps, at = Date.now()) => {
+    signalAtRef.current = { ...signalAtRef.current, [key]: at };
     setSignalAt((prev) => ({ ...prev, [key]: at }));
   };
+
 
   const updateMetricPipeline = (
     metric: keyof MetricPipeline,
