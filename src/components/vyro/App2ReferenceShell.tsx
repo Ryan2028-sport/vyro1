@@ -1598,7 +1598,7 @@ export function App2ReferenceShell() {
     <div className="app2-ref">
       <div className="app2-phone">
         {/* Real iOS status bar shows through via safe-area inset; no fake status bar */}
-        <header>
+        <header className="app2-shell-header">
           <div className="app2-topbar">
             <div>
               <Logo />
