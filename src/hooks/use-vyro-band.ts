@@ -40,6 +40,9 @@ import {
   decodeQcBandStressHistory,
   decodeQcBandRealtimeHeartRate,
   decodeQcBandTempPayload,
+  isPlausibleSkinTempC,
+  encodeQcBandBpCalibrations,
+
   decodeQcBandTemperatureHistory,
   decodeQcBandTemperatureNotification,
   decodeQcBandTodaySports,
@@ -461,6 +464,29 @@ export function useVyroBand() {
     signalAtRef.current = { ...signalAtRef.current, [key]: at };
     setSignalAt((prev) => ({ ...prev, [key]: at }));
   };
+
+  // Skin temperature is published through one guarded path so no decoder
+  // variant can leak an implausible value (e.g. a 20.0°C header byte). A value
+  // must also be confirmed twice within 1.5°C before it reaches the UI.
+  const skinTempCandidateRef = useRef<{ value: number; hits: number } | null>(null);
+  const applySkinTemp = (temp: number | null, detail: string, at = Date.now()) => {
+    if (!isPlausibleSkinTempC(temp)) return false;
+    const prev = skinTempCandidateRef.current;
+    const consistent = prev != null && Math.abs(prev.value - temp) <= 1.5;
+    skinTempCandidateRef.current = { value: temp, hits: consistent ? prev!.hits + 1 : 1 };
+    const confirmed = skinTempCandidateRef.current.hits >= 2 || signalAtRef.current.skinTempAt != null;
+    if (!confirmed) {
+      updateMetricPipeline("skinTemp", { status: "measuring", detail: `${detail} · confirming ${temp.toFixed(1)}°C` });
+      return false;
+    }
+    setSkinTempC(temp);
+    markSignal("skinTempAt", at);
+    tapDecoded("skinTemp", temp);
+    metricBackoffUntilRef.current.skinTemp = 0;
+    updateMetricPipeline("skinTemp", { status: "received", respondedAt: at, detail });
+    return true;
+  };
+
 
 
   const updateMetricPipeline = (
