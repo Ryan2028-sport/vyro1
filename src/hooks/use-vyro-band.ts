@@ -731,12 +731,14 @@ export function useVyroBand() {
       }, 1500);
       // Keep-alive: every 8s send a "hold" so the optical sensor doesn't shut off.
       holdTimer = window.setInterval(() => {
+        if (activeMeasureRef.current) return;
         void writeQcBand(service, write, encodeQcBandRealtimeHeartRate("hold")).catch(
           () => undefined,
         );
       }, 8_000);
       // Re-issue "start" every minute as a safety net (some firmwares time out).
       restartTimer = window.setInterval(() => {
+        if (activeMeasureRef.current) return;
         void writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(
           () => undefined,
         );
