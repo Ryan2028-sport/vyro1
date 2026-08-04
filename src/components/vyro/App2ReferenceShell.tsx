@@ -1410,16 +1410,27 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 label="Agility"
                 accent="teal"
                 value={agility}
-                emptyHint={agilityReason ?? undefined}
-                status={agility != null ? (agility >= 75 ? "Peaking" : agility >= 50 ? "Steady" : "Low") : undefined}
+                emptyHint={agility == null ? (agilityReason ?? undefined) : undefined}
+                status={
+                  agility == null
+                    ? undefined
+                    : agilityReason
+                      ? "Est."
+                      : agility >= 75
+                        ? "Peaking"
+                        : agility >= 50
+                          ? "Steady"
+                          : "Low"
+                }
               />
               <MetricRow
                 label="Sleep"
                 accent="indigo"
                 value={sleep}
-                emptyHint="wear the band overnight"
+                emptyHint="Unlocks after a night wearing the band"
                 status={sleep != null ? (sleep >= 80 ? "Rested" : "Short") : undefined}
               />
+
 
             </div>
           </InfoCard>
