@@ -1518,19 +1518,14 @@ export function useVyroBand() {
       } else if (op === QCBAND_CMD_SYNC_HRV) {
         const hrv = decodeQcBandHrvHistory(bytes);
         if (hrv != null) {
-          setHrvMs(hrv);
-          markSignal("hrvAt");
-          tapDecoded("hrv", hrv, bytes);
-          updateMetricPipeline("hrv", { status: "received", respondedAt: Date.now(), detail: "History response 0x39" });
+          applyHistoryMetric("hrv", hrv, setHrvMs, "hrvAt", "History response 0x39", bytes);
         }
       } else if (op === QCBAND_CMD_SYNC_STRESS) {
         const stress = decodeQcBandStressHistory(bytes);
         if (stress != null) {
-          setStressScore(stress);
-          markSignal("stressAt");
-          tapDecoded("stress", stress, bytes);
-          updateMetricPipeline("stress", { status: "received", respondedAt: Date.now(), detail: "History response 0x37" });
+          applyHistoryMetric("stress", stress, setStressScore, "stressAt", "History response 0x37", bytes);
         }
+
       } else if (op === QCBAND_CMD_START_MEASURE || op === QCBAND_CMD_STOP_MEASURE) {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame) return;
