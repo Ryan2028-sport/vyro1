@@ -992,9 +992,11 @@ function CognitiveFatigueCard({
       <div className="mt-2.5 flex items-start gap-2.5 rounded-[16px] border border-vyro-indigo/18 bg-vyro-indigo/[0.07] p-3">
         <Activity size={15} className="mt-[1px] shrink-0 text-vyro-indigo" />
         <span className="text-[11.5px] leading-relaxed text-vyro-mute">
-          {m.connected && baselineMs != null
-            ? "Past 200ms of divergence, decision speed drops before your body feels tired — ease off late-game intensity."
-            : "Wear the band through a few rallies to seed the cognitive baseline."}
+          {meterPct != null
+            ? caption.startsWith("hrv")
+              ? "HRV suppressed more than ~17% below your baseline means decision speed drops before your body feels tired — ease off late-game intensity."
+              : "Past 200ms of divergence, decision speed drops before your body feels tired — ease off late-game intensity."
+            : "Keep wearing the band — a few days of HRV (or a logged session) seeds the cognitive baseline."}
         </span>
       </div>
     </GlassCard>
