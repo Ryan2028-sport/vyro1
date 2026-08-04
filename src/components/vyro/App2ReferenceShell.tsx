@@ -1120,30 +1120,30 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         trend: trend(m.restingHrBpm, baselines.restingHr, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs 7d`),
         live: m.connected && m.restingHrBpm != null },
       { label: "HRV (RMSSD)", value: liveCell(m.hrvMs), unit: "ms", accent: "green" as Accent,
-        trend: trend(m.hrvMs, baselines.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`),
+        trend: trend(m.hrvMs, baselines.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`) ?? m.metricPipeline.hrv.detail,
         live: m.connected && m.hrvMs != null },
       { label: "Steps", value: liveCell(m.stepsToday), unit: "", accent: "teal" as Accent,
         trend: m.connected && m.distanceM != null ? `${(m.distanceM / 1000).toFixed(2)} km` : undefined,
         live: m.connected && m.stepsToday != null },
-      { label: "Skin Temp", value: m.connected && m.skinTempC != null ? m.skinTempC.toFixed(1) : "—", unit: "°C", accent: "orange" as Accent,
+      { label: "Skin Temp", value: m.connected && m.skinTempC != null ? m.skinTempC.toFixed(1) : "—", unit: "°C", accent: "orange" as Accent, trend: m.skinTempC == null ? m.metricPipeline.skinTemp.detail : undefined,
         live: m.connected && m.skinTempC != null },
-      { label: "Blood Pressure", value: m.connected && m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—", unit: "mmHg", accent: "purple" as Accent,
+      { label: "Blood Pressure", value: m.connected && m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—", unit: "mmHg", accent: "purple" as Accent, trend: m.bloodPressure == null ? m.metricPipeline.bloodPressure.detail : undefined,
         live: m.connected && m.bloodPressure != null },
       { label: "Strain", value: fmtCell(strain), unit: "/100", accent: "yellow" as Accent,
         trend: strain != null ? (strain > 70 ? "overload" : strain > 40 ? "tempo" : "easy") : undefined,
         live: m.connected && strain != null },
       { label: "SpO₂", value: liveCell(m.spo2Pct), unit: "%", accent: "blue" as Accent,
-        trend: m.connected && m.spo2Pct != null ? (m.spo2Pct >= 95 ? "stable" : "low") : undefined,
+        trend: m.connected && m.spo2Pct != null ? (m.spo2Pct >= 95 ? "stable" : "low") : m.metricPipeline.spo2.detail,
         live: m.connected && m.spo2Pct != null },
-      { label: "Resp Rate", value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm", accent: "indigo" as Accent,
+      { label: "Resp Rate", value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm", accent: "indigo" as Accent, trend: m.respRateBrpm == null ? "Unsupported by connected firmware" : undefined,
         live: m.connected && m.respRateBrpm != null },
       { label: "Stress", value: liveCell(m.stressScore), unit: "/100", accent: "orange" as Accent,
-        trend: m.connected && m.stressScore != null ? (m.stressScore < 40 ? "calm" : m.stressScore < 70 ? "alert" : "high") : undefined,
+        trend: m.connected && m.stressScore != null ? (m.stressScore < 40 ? "calm" : m.stressScore < 70 ? "alert" : "high") : m.metricPipeline.stress.detail,
         live: m.connected && m.stressScore != null },
     ],
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [m.connected, m.heartRateBpm, m.restingHrBpm, m.hrvMs, m.stepsToday, m.distanceM, m.skinTempC, m.bloodPressure, m.spo2Pct, m.respRateBrpm, m.stressScore, strain, baselines.hrv, baselines.restingHr],
+    [m.connected, m.heartRateBpm, m.restingHrBpm, m.hrvMs, m.stepsToday, m.distanceM, m.skinTempC, m.bloodPressure, m.spo2Pct, m.respRateBrpm, m.stressScore, m.metricPipeline, strain, baselines.hrv, baselines.restingHr],
   );
 
   // Auto-injected live training block (from the active session)
@@ -1313,7 +1313,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           <OpportunityCard agility={agility} recovery={recovery} />
 
 
-          <InfoCard eyebrow="Base readiness" title="Core metrics" icon={Gauge} accent="green">
+          <InfoCard eyebrow="Watch-derived readiness" title="Core metrics" icon={Gauge} accent="green">
             <div className="divide-y divide-white/[0.06]">
               <MetricRow
                 label="Fatigue"
