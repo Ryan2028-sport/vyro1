@@ -233,25 +233,32 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
         connected: m.connected,
         hrvMs: m.hrvMs,
         restingHrBpm: m.restingHrBpm,
+        heartRateBpm: m.heartRateBpm,
         stress: m.stressScore,
         peakJerk: m.peakJerk ?? null,
         peakG: m.peakG ?? null,
         eventsLastMin: m.eventsLastMin,
         reactMin: m.reactMin,
         sleepScore: lastNight?.score ?? null,
+        hrvBaselineMs: baselines.hrv,
+        restingHrBaseline: baselines.restingHr,
       }),
     [
       m.connected,
       m.hrvMs,
       m.restingHrBpm,
+      m.heartRateBpm,
       m.stressScore,
       m.peakJerk,
       m.peakG,
       m.eventsLastMin,
       m.reactMin,
       lastNight?.score,
+      baselines.hrv,
+      baselines.restingHr,
     ],
   );
+
 
   // ---- Strain (EMA-smoothed so the tile can't whip 75 → 11) ---------------
   const strainEmaRef = useRef<number | null>(null);
