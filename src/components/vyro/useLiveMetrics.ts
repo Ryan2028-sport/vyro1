@@ -482,15 +482,39 @@ export function computeSubScores(i: SubScoreInputs): SubScores {
     ? Math.round((recParts.reduce((a, b) => a + b.v * b.w, 0) / recW) * 100)
     : null;
 
-  // Agility — IMU explosiveness (peak g) + reaction speed. No physiological
-  // substitute exists, so it stays null with an explicit reason.
+  // Agility — best evidence first: IMU explosiveness (peak g) and measured
+  // reaction time. When the band streams no motion frames (this firmware only
+  // reports step/activity counters at rest) fall back to an autonomic
+  // neuromuscular-readiness estimate so the tile is informative instead of
+  // blank, and label it as an estimate.
   const agParts: number[] = [];
   if (i.peakG != null && i.peakG > 0) agParts.push(clamp01(i.peakG / 6));
   if (i.reactMin != null) agParts.push(clamp01(1 - Math.min(i.reactMin, 400) / 400));
-  const agility = agParts.length
+  let agility = agParts.length
     ? Math.round((agParts.reduce((a, b) => a + b, 0) / agParts.length) * 100)
     : null;
-  const agilityReason = agility == null ? "Needs motion data — start a session" : null;
+  let agilityReason: string | null = null;
+  if (agility == null) {
+    const est: { v: number; w: number }[] = [];
+    if (i.hrvMs != null) {
+      const hb = i.hrvBaselineMs != null && i.hrvBaselineMs > 0 ? i.hrvBaselineMs : 55;
+      est.push({ v: clamp01(0.5 + (i.hrvMs - hb) / (hb * 0.6)), w: 0.45 });
+    }
+    if (i.restingHrBpm != null && i.heartRateBpm != null) {
+      // Headroom between current HR and resting HR: more headroom = more
+      // capacity for explosive work.
+      est.push({ v: clamp01(1 - (i.heartRateBpm - i.restingHrBpm) / 45), w: 0.3 });
+    }
+    if (i.stress != null) est.push({ v: clamp01(1 - i.stress / 100), w: 0.25 });
+    if (est.length >= 2) {
+      const w = est.reduce((a, b) => a + b.w, 0);
+      agility = Math.round((est.reduce((a, b) => a + b.v * b.w, 0) / w) * 100);
+      agilityReason = "Estimated from autonomic readiness — run a reaction test for a measured score";
+    } else {
+      agilityReason = "Needs motion or a reaction test";
+    }
+  }
+
 
   // Sleep — passed through from the sleep engine when present.
   const sleep = i.sleepScore != null ? Math.round(clamp01(i.sleepScore / 100) * 100) : null;
