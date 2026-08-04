@@ -160,6 +160,47 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
     };
   }, [pairedId, ble.connectedId]);
 
+  // Lightweight remote diagnostics: while a band is live, push a compact
+  // metric snapshot to the account every 2 minutes so the pipeline can be
+  // inspected even when the Debug tab is not open.
+  const pushSnapshot = useServerFn(saveDebugSnapshot);
+  const liveRef = useRef(vyro);
+  liveRef.current = vyro;
+  useEffect(() => {
+    if (!ble.connectedId) return;
+    const send = async () => {
+      const v = liveRef.current;
+      try {
+        await pushSnapshot({
+          data: {
+            kind: "live",
+            payload: {
+              capturedAt: new Date().toISOString(),
+              connectedId: v.ble.connectedId,
+              powerState: v.ble.powerState,
+              lastError: v.ble.error ?? null,
+              heartRateBpm: v.heartRateBpm ?? null,
+              spo2Pct: v.spo2Pct ?? null,
+              skinTempC: v.skinTempC ?? null,
+              hrvMs: v.hrvMs ?? null,
+              stressScore: v.stressScore ?? null,
+              bloodPressure: v.bloodPressure ?? null,
+              stepsToday: v.stepsToday ?? null,
+              caloriesKcal: v.caloriesKcal ?? null,
+              distanceM: v.distanceM ?? null,
+              batteryPct: v.batteryPct ?? null,
+            },
+          },
+        });
+      } catch {
+        /* ignore, retry next tick */
+      }
+    };
+    void send();
+    const id = window.setInterval(send, 120_000);
+    return () => window.clearInterval(id);
+  }, [ble.connectedId, pushSnapshot]);
+
   return (
     <Ctx.Provider value={{ ...vyro, pairedId, pairedName }}>
       <MetricsPersistence />
