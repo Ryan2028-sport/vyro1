@@ -14,6 +14,7 @@ import { createContext, useContext, useEffect, useRef, type ReactNode } from "re
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyProfile } from "@/lib/profile.functions";
+import { saveDebugSnapshot } from "@/lib/debug-snapshot.functions";
 import { useVyroBand } from "@/hooks/use-vyro-band";
 import { useMetricsPersistence } from "./useMetricsPersistence";
 import { isNative, location as despiaLocation, run as despiaRun } from "@/lib/despia";
