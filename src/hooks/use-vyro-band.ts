@@ -757,6 +757,7 @@ export function useVyroBand() {
     let measurementLoopTimer: number | null = null;
     let historyTimer: number | null = null;
     let probeTimer: number | null = null;
+    let hrWatchdogTimer: number | null = null;
 
     let writeChain = Promise.resolve();
 
