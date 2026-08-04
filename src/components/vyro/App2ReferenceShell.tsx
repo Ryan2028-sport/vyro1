@@ -378,12 +378,14 @@ function MetricRow({
   accent = "mute",
   status,
   invert = false,
+  emptyHint,
 }: {
   label: string;
   value: number | null | undefined;
   accent?: Accent;
   status?: string;
   invert?: boolean;
+  emptyHint?: string;
 }) {
   const has = value != null && Number.isFinite(value);
   const pct = has ? Math.max(0, Math.min(100, value as number)) : 0;
