@@ -1487,8 +1487,43 @@ export function useVyroBand() {
         markSignal("skinTempAt");
         tapDecoded("skinTemp", temp, bytes);
         updateMetricPipeline("skinTemp", { status: "received", respondedAt: Date.now(), detail: "V2 history response" });
+      } else if (probeBigDataRef.current != null) {
+        // Protocol discovery on an undocumented big-data channel.
+        const probeType = probeBigDataRef.current;
+        const probeTemp = signalAtRef.current.skinTempAt == null ? scanBigDataTemperature(bytes) : null;
+        if (probeTemp != null) {
+          setSkinTempC(probeTemp);
+          markSignal("skinTempAt");
+          tapDecoded("skinTemp", probeTemp, bytes);
+          metricBackoffUntilRef.current.skinTemp = 0;
+          updateMetricPipeline("skinTemp", {
+            status: "received",
+            respondedAt: Date.now(),
+            detail: `Discovered on big-data channel 0x${probeType.toString(16)}`,
+          });
+        }
+        if (signalAtRef.current.bloodPressureAt == null && bytes.length >= 8) {
+          const probeBp = scanBloodPressurePair(bytes, 6);
+          if (probeBp) {
+            const prev = bpCandidateRef.current;
+            const hits = prev && prev.sbp === probeBp.sbp && prev.dbp === probeBp.dbp ? prev.hits + 1 : 1;
+            bpCandidateRef.current = { ...probeBp, hits };
+            if (hits >= 2) {
+              setBloodPressure(probeBp);
+              markSignal("bloodPressureAt");
+              tapDecoded("bp", `${probeBp.sbp}/${probeBp.dbp}`, bytes);
+              metricBackoffUntilRef.current.bloodPressure = 0;
+              updateMetricPipeline("bloodPressure", {
+                status: "received",
+                respondedAt: Date.now(),
+                detail: `Discovered on big-data channel 0x${probeType.toString(16)}`,
+              });
+            }
+          }
+        }
       }
       return;
+
     }
     if (uuidMatches(cuuid, BAT_LVL_CHAR)) {
       const bytes = payloadToBytes(data.value);
