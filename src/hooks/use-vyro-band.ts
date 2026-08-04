@@ -1374,9 +1374,59 @@ export function useVyroBand() {
         const frame = decodeQcBandMeasureFrame(bytes);
         if (!frame) return;
         const active = activeMeasureRef.current;
+        // Protocol discovery: while probing undocumented sub-types there is no
+        // "owning" metric, so accept temperature / blood pressure from any
+        // frame whose payload decodes to a physiologically plausible value.
+        if (frame.errorCode === 0 && (probeSubTypeRef.current != null || !active)) {
+          const now = Date.now();
+          if (signalAtRef.current.skinTempAt == null) {
+            const composite = decodeQcBandOneKeyPayload(frame.data);
+            const probeTemp = composite?.tempC ?? decodeQcBandTempPayload(frame.data);
+            if (probeTemp != null && probeTemp >= 28 && probeTemp <= 42) {
+              setSkinTempC(probeTemp);
+              markSignal("skinTempAt", now);
+              tapDecoded("skinTemp", probeTemp, bytes);
+              metricBackoffUntilRef.current.skinTemp = 0;
+              updateMetricPipeline("skinTemp", {
+                status: "received",
+                respondedAt: now,
+                detail: `Discovered on 0x69 subtype 0x${frame.subType.toString(16)}`,
+              });
+            }
+          }
+          if (signalAtRef.current.bloodPressureAt == null) {
+            const composite = decodeQcBandOneKeyPayload(frame.data);
+            const probeBp =
+              decodeQcBandBloodPressurePayload(frame.data) ??
+              (composite?.sbp != null && composite.dbp != null
+                ? { sbp: composite.sbp, dbp: composite.dbp }
+                : scanBloodPressurePair(frame.data));
+            if (probeBp) {
+              const prev = bpCandidateRef.current;
+              const hits = prev && prev.sbp === probeBp.sbp && prev.dbp === probeBp.dbp ? prev.hits + 1 : 1;
+              bpCandidateRef.current = { ...probeBp, hits };
+              if (hits >= 2) {
+                setBloodPressure(probeBp);
+                markSignal("bloodPressureAt", now);
+                tapDecoded("bp", `${probeBp.sbp}/${probeBp.dbp}`, bytes);
+                metricBackoffUntilRef.current.bloodPressure = 0;
+                updateMetricPipeline("bloodPressure", {
+                  status: "received",
+                  respondedAt: now,
+                  detail: `Discovered on 0x69 subtype 0x${frame.subType.toString(16)}`,
+                });
+              } else {
+                updateMetricPipeline("bloodPressure", {
+                  detail: `Candidate ${probeBp.sbp}/${probeBp.dbp} on subtype 0x${frame.subType.toString(16)} — confirming`,
+                });
+              }
+            }
+          }
+        }
         // Overlapping subtype enums make an uncorrelated frame ambiguous. Only
         // the metric that currently owns the optical sensor may decode it.
         if (!active || active.subType !== frame.subType || frame.errorCode !== 0) return;
+
         const receivedAt = Date.now();
         let accepted = false;
         if (active.metric === "spo2" && frame.value >= 70 && frame.value <= 100) {
