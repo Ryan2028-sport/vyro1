@@ -68,6 +68,12 @@ import {
   encodeQcBandTemperatureLegacyHistoryRequest,
   encodeQcBandTemperatureManualHistoryRequest,
   encodeQcBandTodaySportsRequest,
+  encodeQcBandBigDataProbe,
+  scanBigDataTemperature,
+  scanBloodPressurePair,
+  QCBAND_BIG_DATA_PROBE_TYPES,
+  QCBAND_MEASURE_PROBE_TYPES,
+
   QCBAND_CMD_BATTERY,
   QCBAND_CMD_BIG_DATA_V2,
   QCBAND_CMD_NOTIFICATION,
