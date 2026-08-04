@@ -491,6 +491,49 @@ export function useVyroBand() {
     return true;
   };
 
+  // HRV / stress / SpO2 arrive as *day history* replies, so every poll replays
+  // the same stored sample. Advancing the freshness clock on an unchanged value
+  // makes a hours-old reading look live. Only a changed sample refreshes the
+  // clock; an unchanged one is held for HISTORY_HOLD_MS and then allowed to go
+  // stale honestly so the UI/readiness gates stop trusting it.
+  const HISTORY_HOLD_MS = 20 * 60_000;
+  const historyValueRef = useRef<Record<"hrv" | "stress" | "spo2", { value: number; changedAt: number } | null>>({
+    hrv: null,
+    stress: null,
+    spo2: null,
+  });
+  const applyHistoryMetric = (
+    metric: "hrv" | "stress" | "spo2",
+    value: number,
+    setter: (value: number) => void,
+    signalKey: keyof VyroBandSignalTimestamps,
+    label: string,
+    bytes?: Uint8Array,
+  ) => {
+    const now = Date.now();
+    const prev = historyValueRef.current[metric];
+    const changed = prev == null || prev.value !== value;
+    const changedAt = changed ? now : prev!.changedAt;
+    historyValueRef.current[metric] = { value, changedAt };
+    setter(value);
+    tapDecoded(metric === "spo2" ? "spo2" : metric, value, bytes);
+    const heldMs = now - changedAt;
+    if (changed || heldMs < HISTORY_HOLD_MS) {
+      markSignal(signalKey, changed ? now : changedAt);
+      updateMetricPipeline(metric, {
+        status: "received",
+        respondedAt: now,
+        detail: changed ? `${label} · new sample` : `${label} · unchanged for ${Math.round(heldMs / 60_000)}m`,
+      });
+      return;
+    }
+    updateMetricPipeline(metric, {
+      status: "measuring",
+      respondedAt: now,
+      detail: `${label} · stored sample is ${Math.round(heldMs / 60_000)}m old — waiting for a new one`,
+    });
+  };
+
 
 
   const updateMetricPipeline = (
