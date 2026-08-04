@@ -804,16 +804,29 @@ export function useVyroBand() {
       historyTimer = window.setInterval(pollHistory, 60_000);
 
       // ---- DETERMINISTIC MEASUREMENT SCHEDULE --------------------------
-      // Only one optical measurement may own the sensor at a time. Previous
-      // code queued ~6.4 minutes of work every 3 minutes, so cycles overlapped
-      // and the watch mostly answered HR while dropping every other request.
+      // Rules learned from real device traces:
+      //  * Realtime HR and manual optical measurements compete for the same
+      //    PPG sensor. Suspending HR for a whole multi-metric cycle blanked
+      //    HR, Resting HR (derived from the HR buffer) and Strain for minutes.
+      //  * SpO₂ / HRV / Stress usually arrive on their own via the passive
+      //    history channels (0xbc / 0x39 / 0x37) — measuring them again is
+      //    pure sensor waste.
+      //  * Sub-types this firmware refuses answer 0x87/0x89 0xee. After two
+      //    such cycles we back off for 30 minutes.
+      // Therefore: ONE metric per cycle, hard time budget, HR restarted the
+      // moment the metric finishes.
+      const METRIC_BUDGET_MS = 25_000;
+      const PASSIVE_FRESH_MS = 10 * 60_000;
+
       const measureMetric = async (
         metric: keyof MetricPipeline,
         subTypes: readonly number[],
         durationMs: number,
       ) => {
+        const deadline = Date.now() + METRIC_BUDGET_MS;
+        let sawUnsupported = false;
         for (const subType of subTypes) {
-          if (cancelled) return;
+          if (cancelled || Date.now() > deadline) break;
           const startedAt = Date.now();
           activeMeasureRef.current = { metric, subType, startedAt };
           updateMetricPipeline(metric, {
@@ -823,38 +836,84 @@ export function useVyroBand() {
             detail: `Waiting for 0x69 subtype 0x${subType.toString(16)}`,
           });
           await writeQcBand(service, write, encodeQcBandMeasureStart(subType)).catch(() => undefined);
-          await wait(durationMs);
+          await wait(Math.min(durationMs, Math.max(1_500, deadline - Date.now())));
           await writeQcBand(service, write, encodeQcBandMeasureStop(subType)).catch(() => undefined);
-          await wait(900);
+          await wait(700);
+          if (unsupportedHitRef.current[metric] === startedAt) sawUnsupported = true;
           if ((metricReceivedAtRef.current[metric] ?? 0) >= startedAt) {
             activeMeasureRef.current = null;
+            measureFailStreakRef.current[metric] = 0;
             return;
           }
         }
         activeMeasureRef.current = null;
-        updateMetricPipeline(metric, {
-          status: "no_response",
-          detail: "All supported subtype requests completed without a valid value",
-        });
-      };
-
-      const runAllMeasures = async () => {
-        if (cancelled || activeMeasureRef.current) return;
-        // Realtime HR and manual optical modes compete for the same PPG. Stop
-        // the HR stream for the cycle and restart it when all metrics finish.
-        await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
-        await measureMetric("spo2", QCBAND_MEASURE_SPO2_TYPES, 10_000);
-        await measureMetric("skinTemp", QCBAND_MEASURE_TEMP_TYPES, 8_000);
-        await measureMetric("hrv", QCBAND_MEASURE_HRV_TYPES, 12_000);
-        await measureMetric("stress", QCBAND_MEASURE_STRESS_TYPES, 10_000);
-        await measureMetric("bloodPressure", QCBAND_MEASURE_BP_TYPES, 20_000);
-        if (!cancelled) {
-          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
-          measurementLoopTimer = window.setTimeout(() => void runAllMeasures(), 5 * 60_000);
+        const streak = (measureFailStreakRef.current[metric] ?? 0) + 1;
+        measureFailStreakRef.current[metric] = streak;
+        if (streak >= 2) {
+          // Firmware clearly isn't answering. Stop stealing the sensor.
+          metricBackoffUntilRef.current[metric] = Date.now() + 30 * 60_000;
+          updateMetricPipeline(metric, {
+            status: sawUnsupported ? "unsupported" : "no_response",
+            detail: sawUnsupported
+              ? "Not supported by this firmware — retrying in 30 min"
+              : "No response from watch — retrying in 30 min",
+          });
+        } else {
+          updateMetricPipeline(metric, {
+            status: sawUnsupported ? "unsupported" : "no_response",
+            detail: sawUnsupported
+              ? "Firmware replied 'unsupported' to every subtype"
+              : "All subtype requests completed without a valid value",
+          });
         }
       };
-      measurementLoopTimer = window.setTimeout(() => void runAllMeasures(), 3_000);
+
+      const measureOrder: {
+        metric: keyof MetricPipeline;
+        subTypes: readonly number[];
+        durationMs: number;
+        passiveKey: keyof VyroBandSignalTimestamps | null;
+      }[] = [
+        { metric: "skinTemp", subTypes: QCBAND_MEASURE_TEMP_TYPES, durationMs: 8_000, passiveKey: "skinTempAt" },
+        { metric: "bloodPressure", subTypes: QCBAND_MEASURE_BP_TYPES, durationMs: 12_000, passiveKey: "bloodPressureAt" },
+        { metric: "spo2", subTypes: QCBAND_MEASURE_SPO2_TYPES, durationMs: 10_000, passiveKey: "spo2At" },
+        { metric: "hrv", subTypes: QCBAND_MEASURE_HRV_TYPES, durationMs: 12_000, passiveKey: "hrvAt" },
+        { metric: "stress", subTypes: QCBAND_MEASURE_STRESS_TYPES, durationMs: 10_000, passiveKey: "stressAt" },
+      ];
+
+      const nextMetric = () => {
+        const now = Date.now();
+        for (let i = 0; i < measureOrder.length; i++) {
+          const entry = measureOrder[(measureCursorRef.current + i) % measureOrder.length];
+          if ((metricBackoffUntilRef.current[entry.metric] ?? 0) > now) continue;
+          // Already arriving passively and recent → don't touch the sensor.
+          const at = entry.passiveKey ? signalAtRef.current[entry.passiveKey] : null;
+          if (at != null && now - at < PASSIVE_FRESH_MS) continue;
+          measureCursorRef.current = (measureCursorRef.current + i + 1) % measureOrder.length;
+          return entry;
+        }
+        return null;
+      };
+
+      const runMeasureCycle = async () => {
+        if (cancelled || activeMeasureRef.current) return;
+        const entry = nextMetric();
+        if (entry) {
+          setSensorHold(true);
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("end")).catch(() => undefined);
+          await measureMetric(entry.metric, entry.subTypes, entry.durationMs);
+          // Give the PPG straight back to heart rate.
+          await writeQcBand(service, write, encodeQcBandRealtimeHeartRate("start")).catch(() => undefined);
+          setSensorHold(false);
+        }
+        if (!cancelled) {
+          measurementLoopTimer = window.setTimeout(() => void runMeasureCycle(), 3 * 60_000);
+        }
+      };
+      // Let HR / Resting HR / Strain establish before touching the sensor.
+      measurementLoopTimer = window.setTimeout(() => void runMeasureCycle(), 60_000);
     }
+
 
     const off = bluetooth.on("discovered", (tree: BleDiscovered) => {
       if (tree.id !== connectedId) return;
