@@ -690,6 +690,16 @@ export function useVyroBand() {
     const estimate = estimateRespirationFromHeartRate(hrSamplesRef.current);
     if (!estimate) {
       const count = hrSamplesRef.current.length;
+      // Never leave an old low-confidence estimate pinned on screen while the
+      // current PPG window no longer has a valid respiratory lock.
+      if (
+        signalAtRef.current.respirationAt != null &&
+        heartRateAt - signalAtRef.current.respirationAt > 90_000
+      ) {
+        setRespRateBrpm(null);
+        signalAtRef.current = { ...signalAtRef.current, respirationAt: null };
+        setSignalAt((prev) => ({ ...prev, respirationAt: null }));
+      }
       updateMetricPipeline("respiration", {
         status: "measuring",
         requestedAt: hrSamplesRef.current[0]?.t ?? heartRateAt,

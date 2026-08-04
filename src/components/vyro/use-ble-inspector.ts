@@ -148,7 +148,7 @@ function notify(s: ReturnType<typeof getStore>) {
   }
 }
 
-function ensureInitialized() {
+export function ensureBleInspectorInitialized(): void {
   const s = getStore();
   if (s.initialized) return;
   s.initialized = true;
@@ -260,7 +260,7 @@ function ensureInitialized() {
 }
 
 export function useBleInspector(): BleInspectorState {
-  ensureInitialized();
+  ensureBleInspectorInitialized();
   const s = getStore();
   const [state, setState] = useState<BleInspectorState>(s.state);
   useEffect(() => {
@@ -269,6 +269,17 @@ export function useBleInspector(): BleInspectorState {
     return () => { s.subs.delete(setState); };
   }, [s]);
   return state;
+}
+
+/**
+ * Read the bounded raw-protocol snapshot without mounting the Debug screen.
+ * The app-wide band provider uses this for remote diagnostics, so opcode,
+ * characteristic and command/response evidence is captured whenever a watch
+ * is connected—not only while the user is looking at the Debug tab.
+ */
+export function getBleInspectorSnapshot(): BleInspectorState {
+  ensureBleInspectorInitialized();
+  return getStore().state;
 }
 
 export function shortUuid(uuid: string): string {

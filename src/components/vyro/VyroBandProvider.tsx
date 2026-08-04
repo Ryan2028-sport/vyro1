@@ -18,6 +18,11 @@ import { saveDebugSnapshot } from "@/lib/debug-snapshot.functions";
 import { useVyroBand } from "@/hooks/use-vyro-band";
 import { useMetricsPersistence } from "./useMetricsPersistence";
 import { startKeepAlive, pokeKeepAlive } from "@/lib/keep-alive";
+import {
+  ensureBleInspectorInitialized,
+  getBleInspectorSnapshot,
+} from "./use-ble-inspector";
+import { getDecodedSnapshot } from "@/lib/vyro-ble/decoder-tap";
 
 type VyroBandCtx = ReturnType<typeof useVyroBand> & {
   pairedId: string | null;
@@ -40,6 +45,9 @@ export function useVyroBandCtx() {
 }
 
 export function VyroBandProvider({ children }: { children: ReactNode }) {
+  // Start the wire-level inspector globally. Previously it only subscribed
+  // when DebugView mounted, leaving automatic snapshots with no raw evidence.
+  ensureBleInspectorInitialized();
   const fetchProfile = useServerFn(getMyProfile);
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile() });
   const pairedId = profile?.paired_band_id ?? null;
@@ -140,6 +148,8 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
       const v = liveRef.current;
       const now = Date.now();
       const age = (t: number | null | undefined) => (t ? Math.round((now - t) / 1000) : null);
+      const inspector = getBleInspectorSnapshot();
+      const decoded = getDecodedSnapshot();
       try {
         await pushSnapshot({
           data: {
@@ -185,6 +195,40 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
               ),
               metricPipeline: v.metricPipeline ?? null,
               recentEvents: (v.events ?? []).slice(-40),
+              protocol: {
+                totalNotifications: inspector.totalNotifications,
+                decoderKnownCount: inspector.decoderKnownCount,
+                decoderUnknownCount: inspector.decoderUnknownCount,
+                unknownOpcodes: inspector.unknownOpcodes,
+                writes: inspector.writes,
+                perOpcode: Object.fromEntries(
+                  Object.entries(inspector.perOpcode).map(([key, stat]) => [key, {
+                    count: stat.count,
+                    lastAt: stat.lastAt,
+                    lastHex: stat.lastHex,
+                    service: stat.service,
+                    characteristic: stat.characteristic,
+                  }]),
+                ),
+                perCharacteristic: Object.fromEntries(
+                  Object.entries(inspector.perChar).map(([key, stat]) => [key, {
+                    count: stat.count,
+                    lastAt: stat.lastAt,
+                    lastOpcode: stat.lastOpcode,
+                    lastHex: stat.lastHex,
+                  }]),
+                ),
+                recentNotifications: inspector.recent.slice(0, 40),
+                recentWrites: inspector.writeLog.slice(0, 25),
+                decoded,
+                gatt: inspector.discovered?.services.map((service) => ({
+                  uuid: service.uuid,
+                  characteristics: service.characteristics.map((characteristic) => ({
+                    uuid: characteristic.uuid,
+                    properties: characteristic.properties,
+                  })),
+                })) ?? [],
+              },
             },
           },
         });
