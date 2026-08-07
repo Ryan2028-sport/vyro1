@@ -7,12 +7,14 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import BackendSyncOverlay from "@/components/BackendSyncOverlay";
+
 
 function NotFoundComponent() {
   const navigate = useNavigate();
