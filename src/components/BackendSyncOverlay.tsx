@@ -43,12 +43,15 @@ const BackendSyncOverlay = () => {
               <Loader2 className="absolute -bottom-2 -right-2 h-6 w-6 animate-spin rounded-full bg-card text-primary/70" />
             </div>
 
-            <h2 className="mb-3 text-2xl font-bold text-foreground">Backend Update in Progress</h2>
+            <h2 className="mb-3 text-2xl font-bold text-foreground">
+              Backend is being updated
+            </h2>
 
             <p className="mb-8 text-sm text-muted-foreground">
-              The backend is being updated and the frontend is actively syncing. Please leave this
-              page open or check back later.
+              The backend is being updated and synced with the frontend. Please leave this page open
+              or check back later.
             </p>
+
 
             <div className="relative w-full">
               <div className="mb-3 h-4 w-full overflow-hidden rounded-full bg-muted shadow-inner">
