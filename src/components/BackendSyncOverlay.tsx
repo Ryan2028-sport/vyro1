@@ -11,6 +11,7 @@ const BackendSyncOverlay = () => {
 
   useEffect(() => {
     localStorage.removeItem("app_backend_sync_start_time");
+    localStorage.removeItem("app_backend_sync_start_time_v2");
     // Persist start time so a page refresh doesn't reset the sync timer
     let startTime = localStorage.getItem(STORAGE_KEY);
     if (!startTime) {
