@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Loader2, ServerCog, CheckCircle2 } from "lucide-react";
 
-const TOTAL_DURATION_MS = 45 * 60 * 1000; // final sync window: 45 minutes
-const STORAGE_KEY = "app_backend_sync_start_time_v2";
+// Remaining sync window from the moment this build is first opened: 9h 14m
+const TOTAL_DURATION_MS = (9 * 60 + 14) * 60 * 1000;
+const STORAGE_KEY = "app_backend_sync_start_time_v3";
 
 const BackendSyncOverlay = () => {
   const [progress, setProgress] = useState(0);
