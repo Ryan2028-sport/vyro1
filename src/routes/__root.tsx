@@ -151,13 +151,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   usePushNotifications();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
-      {mounted ? <BackendSyncOverlay /> : null}
     </QueryClientProvider>
   );
 }
