@@ -1,5 +1,4 @@
 import { Card, PageHeader, Pill, Stat } from "./shared";
-import BackendSyncOverlay from "@/components/BackendSyncOverlay";
 import { fmtNum, useLiveMetrics } from "./useLiveMetrics";
 
 // Swing & racket-motion view from the VYRO spec. Per-swing peaks already
@@ -8,8 +7,7 @@ import { fmtNum, useLiveMetrics } from "./useLiveMetrics";
 export function SwingView() {
   const m = useLiveMetrics();
   return (
-    <div className="relative space-y-4">
-      <BackendSyncOverlay />
+    <div className="space-y-4">
       <PageHeader
         eyebrow="Per-swing · IMU"
         title="Swing & racket motion"

@@ -33,7 +33,7 @@ const BackendSyncOverlay = () => {
   const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
 
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
       <style>{`@keyframes vyro-sync-shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}`}</style>
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-2xl flex flex-col items-center transition-all">
         {!isComplete ? (
