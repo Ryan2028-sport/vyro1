@@ -74,9 +74,7 @@ const BackendSyncOverlay = () => {
 
               <div className="flex w-full justify-between text-sm font-semibold text-muted-foreground">
                 <span>{progress.toFixed(2)}%</span>
-                <span>
-                  ETA: {remainingHours}h {remainingMinutes}m
-                </span>
+                <span>ETA: {etaLabel}</span>
               </div>
             </div>
           </>
