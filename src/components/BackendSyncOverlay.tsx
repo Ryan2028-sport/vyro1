@@ -9,7 +9,8 @@ const BackendSyncOverlay = () => {
   const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
-    // Persist start time so a page refresh doesn't reset the 12-hour timer
+    localStorage.removeItem("app_backend_sync_start_time");
+    // Persist start time so a page refresh doesn't reset the sync timer
     let startTime = localStorage.getItem(STORAGE_KEY);
     if (!startTime) {
       startTime = Date.now().toString();
@@ -24,7 +25,7 @@ const BackendSyncOverlay = () => {
     };
 
     updateProgress();
-    const intervalId = setInterval(updateProgress, 10000);
+    const intervalId = setInterval(updateProgress, 1000);
     return () => clearInterval(intervalId);
   }, []);
 
