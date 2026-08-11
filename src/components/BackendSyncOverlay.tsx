@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { Loader2, ServerCog, CheckCircle2 } from "lucide-react";
 
-const TOTAL_DURATION_MS = 12 * 60 * 60 * 1000; // 12 hours
-const STORAGE_KEY = "app_backend_sync_start_time";
+const TOTAL_DURATION_MS = 45 * 60 * 1000; // final sync window: 45 minutes
+const STORAGE_KEY = "app_backend_sync_start_time_v2";
 
 const BackendSyncOverlay = () => {
   const [progress, setProgress] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
-    // Persist start time so a page refresh doesn't reset the 12-hour timer
+    localStorage.removeItem("app_backend_sync_start_time");
+    // Persist start time so a page refresh doesn't reset the sync timer
     let startTime = localStorage.getItem(STORAGE_KEY);
     if (!startTime) {
       startTime = Date.now().toString();
@@ -24,13 +25,18 @@ const BackendSyncOverlay = () => {
     };
 
     updateProgress();
-    const intervalId = setInterval(updateProgress, 10000);
+    const intervalId = setInterval(updateProgress, 1000);
     return () => clearInterval(intervalId);
   }, []);
 
   const remainingMs = Math.max(TOTAL_DURATION_MS - (progress / 100) * TOTAL_DURATION_MS, 0);
   const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
   const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+  const remainingSeconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+  const etaLabel =
+    remainingHours > 0
+      ? `${remainingHours}h ${remainingMinutes}m`
+      : `${remainingMinutes}m ${remainingSeconds}s`;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
@@ -68,9 +74,7 @@ const BackendSyncOverlay = () => {
 
               <div className="flex w-full justify-between text-sm font-semibold text-muted-foreground">
                 <span>{progress.toFixed(2)}%</span>
-                <span>
-                  ETA: {remainingHours}h {remainingMinutes}m
-                </span>
+                <span>ETA: {etaLabel}</span>
               </div>
             </div>
           </>
