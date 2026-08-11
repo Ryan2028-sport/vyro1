@@ -32,6 +32,11 @@ const BackendSyncOverlay = () => {
   const remainingMs = Math.max(TOTAL_DURATION_MS - (progress / 100) * TOTAL_DURATION_MS, 0);
   const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
   const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+  const remainingSeconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+  const etaLabel =
+    remainingHours > 0
+      ? `${remainingHours}h ${remainingMinutes}m`
+      : `${remainingMinutes}m ${remainingSeconds}s`;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
