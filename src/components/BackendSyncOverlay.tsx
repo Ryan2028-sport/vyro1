@@ -33,7 +33,7 @@ const BackendSyncOverlay = () => {
   const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
       <style>{`@keyframes vyro-sync-shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}`}</style>
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-2xl flex flex-col items-center transition-all">
         {!isComplete ? (
@@ -44,12 +44,12 @@ const BackendSyncOverlay = () => {
             </div>
 
             <h2 className="mb-3 text-2xl font-bold text-foreground">
-              Backend is being updated
+              AI video analysis is being updated
             </h2>
 
             <p className="mb-8 text-sm text-muted-foreground">
-              The backend is being updated and synced with the frontend. Please leave this page open
-              or check back later.
+              The AI video analysis engine is being updated and synced with the backend. Please leave
+              this page open or check back later.
             </p>
 
 
@@ -81,7 +81,7 @@ const BackendSyncOverlay = () => {
             <h2 className="mb-3 text-2xl font-bold text-foreground">100% Update Complete</h2>
 
             <p className="mb-8 text-sm text-muted-foreground">
-              Frontend has successfully synced with the new backend architecture.
+              AI video analysis has successfully synced with the new backend architecture.
             </p>
 
             <button
