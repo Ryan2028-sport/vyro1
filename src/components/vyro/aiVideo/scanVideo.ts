@@ -362,7 +362,11 @@ export async function scanSquashVideo(
         // The mover producing the most motion at the contact frame struck the ball.
         const playerStruck = (playerMass[i] ?? 0) >= (opponentMass[i] ?? 0);
         const striker = playerStruck ? me : them;
-        const actor: "player" | "opponent" = striker ? (playerStruck ? "player" : "opponent") : "unknown";
+        const actor: "player" | "opponent" | "unknown" = striker
+          ? playerStruck
+            ? "player"
+            : "opponent"
+          : "unknown";
         const zone = striker ? zoneFor(striker.x, striker.y) : "mid-centre";
         shotCandidates.push({ t: Number(f.t.toFixed(2)), motion: f.motion, zone, actor });
         if (inRally) currentShots += 1;
