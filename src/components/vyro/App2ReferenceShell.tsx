@@ -18,6 +18,7 @@ import {
   Settings2,
   Sparkles,
   Stethoscope,
+  Video,
   Trophy,
   UserRound,
 } from "lucide-react";
@@ -45,6 +46,7 @@ import {
 } from "@/lib/training-plan.functions";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SegmentedTabs } from "./shared";
+import { AiVideoView } from "./AiVideoView";
 import "./app2-reference.css";
 
 
@@ -60,6 +62,7 @@ type App2View =
   | "recovery"
   | "sleep"
   | "debug"
+  | "ai-video"
   | "session"
   | "coach"
   | "social"
@@ -1055,6 +1058,14 @@ function EmbeddedView({
       </div>
     );
   }
+  if (view === "ai-video") {
+    return (
+      <div className="app2-scroll-embed">
+        <AiVideoView />
+      </div>
+    );
+  }
+
   if (view === "coach") {
     return (
       <div className="app2-scroll-embed">
@@ -1697,7 +1708,14 @@ export function App2ReferenceShell() {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("") || "RC";
-  const title = view === "trends" ? "Player Dashboard" : view === "athlete" ? "Athlete" : view[0].toUpperCase() + view.slice(1);
+  const title =
+    view === "trends"
+      ? "Player Dashboard"
+      : view === "athlete"
+        ? "Athlete"
+        : view === "ai-video"
+          ? "AI Video"
+          : view[0].toUpperCase() + view.slice(1);
   const topButtons = [
     { id: "trends" as App2View, label: "Trends", icon: LineChart },
     { id: "session" as App2View, label: "Session", icon: Radio },
@@ -1710,7 +1728,9 @@ export function App2ReferenceShell() {
     { id: "recovery" as App2View, label: "Recovery", icon: Heart },
     { id: "sleep" as App2View, label: "Sleep", icon: Moon },
     { id: "debug" as App2View, label: "Debug", icon: Stethoscope },
+    { id: "ai-video" as App2View, label: "AI Video", icon: Video },
   ];
+
 
   return (
     <div className="app2-ref">

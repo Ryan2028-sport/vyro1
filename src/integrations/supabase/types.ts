@@ -281,6 +281,33 @@ export type Database = {
         }
         Relationships: []
       }
+      video_analyses: {
+        Row: {
+          created_at: string
+          duration_sec: number
+          id: string
+          insight: Json
+          user_id: string
+          video_name: string
+        }
+        Insert: {
+          created_at?: string
+          duration_sec?: number
+          id?: string
+          insight: Json
+          user_id: string
+          video_name: string
+        }
+        Update: {
+          created_at?: string
+          duration_sec?: number
+          id?: string
+          insight?: Json
+          user_id?: string
+          video_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
