@@ -438,7 +438,7 @@ export async function scanSquashVideo(
         // A huge foreground means the camera moved or the scene cut — skip it.
         const usable = fgCells < GRID * GRID * 0.5;
         const motion = Math.max(0, Math.min(100, Math.round((motionTotal / (GRID * GRID * 26)) * 100)));
-        frames.push({ t: times[i]!, motion, blobs: usable ? extractBlobs(mask, weight) : [] });
+        frames.push({ t: times[i]!, motion, blobs: usable ? extractBlobs(mask, weight, px) : [] });
       }
 
       // Slow background update: fast enough for lighting drift, slow enough
