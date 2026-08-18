@@ -28,7 +28,7 @@ function HeatmapGrid({ title, values, tone }: { title: string; values: number[];
   const max = Math.max(...values, 1);
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-vyro-mute">{title}</div>
       <div className="grid grid-cols-3 gap-1.5">
         {ZONE_KEYS.map((zone, i) => {
           const v = values[i] ?? 0;
@@ -37,16 +37,16 @@ function HeatmapGrid({ title, values, tone }: { title: string; values: number[];
           return (
             <div
               key={zone}
-              className="rounded-xl border border-border/40 px-2 py-3 text-center"
+              className="rounded-xl border border-vyro-line px-2 py-3 text-center"
               style={{ background: `rgba(${hue} / ${alpha})` }}
             >
-              <div className="text-[10px] uppercase tracking-wider text-foreground/70">{ZONE_LABELS[zone]}</div>
-              <div className="text-sm font-bold tabular-nums text-foreground">{v}</div>
+              <div className="text-[10px] uppercase tracking-wider text-vyro-mute">{ZONE_LABELS[zone]}</div>
+              <div className="text-sm font-bold tabular-nums text-vyro-text">{v}</div>
             </div>
           );
         })}
       </div>
-      <div className="text-[10px] text-muted-foreground">Front of court at the top · 100 = busiest zone</div>
+      <div className="text-[10px] text-vyro-mute">Front of court at the top · 100 = busiest zone</div>
     </div>
   );
 }
@@ -56,8 +56,8 @@ function Bullets({ items }: { items: string[] }) {
   return (
     <ul className="space-y-1.5">
       {items.map((line, i) => (
-        <li key={i} className="flex gap-2 text-[13px] leading-snug text-foreground/85">
-          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
+        <li key={i} className="flex gap-2 text-[13px] leading-snug text-vyro-text/85">
+          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-vyro-mint" />
           <span>{line}</span>
         </li>
       ))}
@@ -148,13 +148,13 @@ export function AiVideoView() {
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/60 bg-card/40 px-4 py-6 text-sm font-semibold text-foreground/90 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-vyro-line bg-vyro-text/[0.03] px-4 py-6 text-sm font-semibold text-vyro-text/90 disabled:opacity-50"
           >
             <Upload className="h-4 w-4" />
             {file ? "Choose a different video" : "Select match video"}
           </button>
           {file && (
-            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex min-w-0 items-center gap-2 text-xs text-vyro-mute">
               <Video className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{file.name}</span>
               <span className="shrink-0">· {(file.size / 1_048_576).toFixed(1)} MB</span>
@@ -164,20 +164,20 @@ export function AiVideoView() {
             type="button"
             disabled={!file || busy}
             onClick={() => file && run.mutate(file)}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-40"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-vyro-mint px-4 py-3 text-sm font-bold text-black disabled:opacity-40"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             {busy ? "Analysing…" : "Analyse match"}
           </button>
           {progress && (
             <div className="space-y-1.5">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-vyro-text/10">
                 <div
-                  className="h-full rounded-full bg-primary transition-all"
+                  className="h-full rounded-full bg-vyro-mint transition-all"
                   style={{ width: `${Math.round(progress.ratio * 100)}%` }}
                 />
               </div>
-              <div className="text-[11px] text-muted-foreground">{progress.label}</div>
+              <div className="text-[11px] text-vyro-mute">{progress.label}</div>
             </div>
           )}
         </div>
@@ -193,7 +193,7 @@ export function AiVideoView() {
       {insight && (
         <>
           <Card eyebrow={`Confidence · ${insight.confidence}`} title={insight.headline}>
-            <p className="text-[13px] leading-relaxed text-foreground/85">{insight.summary}</p>
+            <p className="text-[13px] leading-relaxed text-vyro-text/85">{insight.summary}</p>
           </Card>
 
           <Card eyebrow="T discipline" title="Recovery to the T">
@@ -203,7 +203,7 @@ export function AiVideoView() {
               <Stat label="Time on T" value={t.tTimePercent ?? "—"} unit="%" />
               <Stat label="Longest off T" value={t.longestOffTSeconds ?? "—"} unit="s" />
             </div>
-            {t.note && <p className="mt-3 text-[13px] leading-snug text-foreground/80">{t.note}</p>}
+            {t.note && <p className="mt-3 text-[13px] leading-snug text-vyro-text/80">{t.note}</p>}
           </Card>
 
           <Card eyebrow="Court coverage" title="Shot heat maps">
@@ -212,7 +212,7 @@ export function AiVideoView() {
               <HeatmapGrid title="Opponent shots" values={insight.opponentHeatmap} tone="opponent" />
             </div>
             {insight.heatmapNote && (
-              <p className="mt-3 text-[13px] leading-snug text-foreground/80">{insight.heatmapNote}</p>
+              <p className="mt-3 text-[13px] leading-snug text-vyro-text/80">{insight.heatmapNote}</p>
             )}
           </Card>
 
@@ -224,7 +224,7 @@ export function AiVideoView() {
               <Stat label="Work:rest" value={rally.workRestRatio ?? "—"} />
             </div>
             {rally.fatigueDrift && (
-              <p className="mt-3 text-[13px] leading-snug text-foreground/80">{rally.fatigueDrift}</p>
+              <p className="mt-3 text-[13px] leading-snug text-vyro-text/80">{rally.fatigueDrift}</p>
             )}
           </Card>
 
@@ -256,14 +256,14 @@ export function AiVideoView() {
             <Card eyebrow="Timeline" title="Key moments">
               <div className="space-y-3">
                 {insight.timeline.map((row, i) => (
-                  <div key={i} className="rounded-2xl border border-border/40 bg-card/40 p-3">
-                    <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <div key={i} className="rounded-2xl border border-vyro-line bg-vyro-text/[0.03] p-3">
+                    <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-wider text-vyro-mute">
                       <span className="tabular-nums">{row.time}</span>
                       <span className="truncate">{row.phase}</span>
                     </div>
-                    <div className="mt-1 text-[13px] font-semibold text-foreground">{row.keyShot}</div>
-                    <div className="text-[13px] leading-snug text-foreground/80">{row.observation}</div>
-                    <div className="mt-1.5 flex gap-2 text-[12px] text-primary">
+                    <div className="mt-1 text-[13px] font-semibold text-vyro-text">{row.keyShot}</div>
+                    <div className="text-[13px] leading-snug text-vyro-text/80">{row.observation}</div>
+                    <div className="mt-1.5 flex gap-2 text-[12px] text-vyro-mint">
                       <Target className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       <span>{row.coachingCue}</span>
                     </div>
@@ -323,12 +323,12 @@ export function AiVideoView() {
                 key={row.id}
                 type="button"
                 onClick={() => setInsight(row.insight as unknown as SquashInsight)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-border/40 bg-card/40 p-3 text-left"
+                className="flex w-full items-center gap-3 rounded-2xl border border-vyro-line bg-vyro-text/[0.03] p-3 text-left"
               >
-                <Flame className="h-4 w-4 shrink-0 text-primary" />
+                <Flame className="h-4 w-4 shrink-0 text-vyro-mint" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-semibold text-foreground">{row.video_name}</div>
-                  <div className="text-[11px] text-muted-foreground">
+                  <div className="truncate text-[13px] font-semibold text-vyro-text">{row.video_name}</div>
+                  <div className="text-[11px] text-vyro-mute">
                     {new Date(row.created_at).toLocaleString()} · {Math.round(row.duration_sec)}s
                   </div>
                 </div>
