@@ -1707,7 +1707,14 @@ export function App2ReferenceShell() {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("") || "RC";
-  const title = view === "trends" ? "Player Dashboard" : view === "athlete" ? "Athlete" : view[0].toUpperCase() + view.slice(1);
+  const title =
+    view === "trends"
+      ? "Player Dashboard"
+      : view === "athlete"
+        ? "Athlete"
+        : view === "ai-video"
+          ? "AI Video"
+          : view[0].toUpperCase() + view.slice(1);
   const topButtons = [
     { id: "trends" as App2View, label: "Trends", icon: LineChart },
     { id: "session" as App2View, label: "Session", icon: Radio },
@@ -1720,7 +1727,9 @@ export function App2ReferenceShell() {
     { id: "recovery" as App2View, label: "Recovery", icon: Heart },
     { id: "sleep" as App2View, label: "Sleep", icon: Moon },
     { id: "debug" as App2View, label: "Debug", icon: Stethoscope },
+    { id: "ai-video" as App2View, label: "AI Video", icon: Video },
   ];
+
 
   return (
     <div className="app2-ref">
