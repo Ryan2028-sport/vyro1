@@ -1,215 +1,47 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { ClipInputSchema, type SquashInsight } from "./video-analysis-core";
+import { runClipAnalysis } from "./video-analysis.server";
 
-const InputSchema = z.object({
-  videoName: z.string().min(1).max(255),
-  durationSec: z.number().min(0).max(60 * 60 * 3),
-  frames: z.array(z.string().min(10).max(900_000)).min(1).max(24),
-  frameTimes: z.array(z.number().min(0).max(60 * 60 * 3)).max(24).optional(),
-  sampleEverySec: z.number().min(0.25).max(10).optional(),
-  motionTimeline: z.array(z.object({
-    t: z.number().min(0).max(60 * 60 * 3),
-    motion: z.number().min(0).max(100),
-    x: z.number().min(0).max(1),
-    y: z.number().min(0).max(1),
-    zone: z.string().min(3).max(32),
-    brightness: z.number().min(0).max(255),
-  })).max(900).optional(),
-  shotCandidates: z.array(z.object({
-    t: z.number().min(0).max(60 * 60 * 3),
-    motion: z.number().min(0).max(100),
-    zone: z.string().min(3).max(32),
-  })).max(240).optional(),
-  derivedStats: z.object({
-    scannedFrames: z.number().min(1).max(1000),
-    activeSeconds: z.number().min(0).max(60 * 60 * 3),
-    rallyCountEstimate: z.number().min(0).max(1000),
-    totalShotsEstimate: z.number().min(0).max(5000),
-    averageMotion: z.number().min(0).max(100),
-    peakMotion: z.number().min(0).max(100),
-    highIntensityWindows: z.number().min(0).max(1000),
-  }).optional(),
-});
-
-export type SquashInsight = {
-  headline: string;
-  summary: string;
-  confidence: "low" | "medium" | "high";
-  metrics: {
-    rallyCountEstimate: number;
-    totalShotsEstimate: number;
-    forehandEstimate: number;
-    backhandEstimate: number;
-    volleyEstimate: number;
-    driveEstimate: number;
-    boastEstimate: number;
-    dropEstimate: number;
-    lobEstimate: number;
-    winnersEstimate: number;
-    forcedErrorsEstimate: number;
-    unforcedErrorsEstimate: number;
-    avgReturnToTSeconds: number;
-    tControlPercent: number;
-    swingPathScore: number;
-    footworkScore: number;
-    shotQualityScore: number;
-  };
-  timeline: Array<{
-    time: string;
-    phase: string;
-    observation: string;
-    keyShot: string;
-    coachingCue: string;
-  }>;
-  shotBreakdown: string[];
-  swingPath: string[];
-  explosiveSteps: string[];
-  tCourt: string[];
-  shotSelection: string[];
-  loadRecovery: string[];
-  coachNotes: string[];
-  developmentPlan?: string[];
-  videoEvidence?: string[];
-  limitations?: string[];
-};
-
-const TOOL = {
-  name: "report_squash_analysis",
-  description: "Return a detailed squash performance report from sampled video frames across the full clip.",
-  input_schema: {
-    type: "object",
-    properties: {
-      headline: { type: "string" },
-      summary: { type: "string" },
-      confidence: { type: "string", enum: ["low", "medium", "high"] },
-      metrics: {
-        type: "object",
-        properties: {
-          rallyCountEstimate: { type: "number" },
-          totalShotsEstimate: { type: "number" },
-          forehandEstimate: { type: "number" },
-          backhandEstimate: { type: "number" },
-          volleyEstimate: { type: "number" },
-          driveEstimate: { type: "number" },
-          boastEstimate: { type: "number" },
-          dropEstimate: { type: "number" },
-          lobEstimate: { type: "number" },
-          winnersEstimate: { type: "number" },
-          forcedErrorsEstimate: { type: "number" },
-          unforcedErrorsEstimate: { type: "number" },
-          avgReturnToTSeconds: { type: "number" },
-          tControlPercent: { type: "number" },
-          swingPathScore: { type: "number" },
-          footworkScore: { type: "number" },
-          shotQualityScore: { type: "number" },
-        },
-        required: ["rallyCountEstimate", "totalShotsEstimate", "forehandEstimate", "backhandEstimate", "volleyEstimate", "driveEstimate", "boastEstimate", "dropEstimate", "lobEstimate", "winnersEstimate", "forcedErrorsEstimate", "unforcedErrorsEstimate", "avgReturnToTSeconds", "tControlPercent", "swingPathScore", "footworkScore", "shotQualityScore"],
-      },
-      timeline: {
-        type: "array",
-        minItems: 4,
-        maxItems: 8,
-        items: {
-          type: "object",
-          properties: {
-            time: { type: "string" },
-            phase: { type: "string" },
-            observation: { type: "string" },
-            keyShot: { type: "string" },
-            coachingCue: { type: "string" },
-          },
-          required: ["time", "phase", "observation", "keyShot", "coachingCue"],
-        },
-      },
-      shotBreakdown: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
-      swingPath: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
-      explosiveSteps: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
-      tCourt: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
-      shotSelection: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
-      loadRecovery: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
-      coachNotes: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 6 },
-      developmentPlan: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 6 },
-      videoEvidence: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 8 },
-      limitations: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
-    },
-    required: ["headline", "summary", "confidence", "metrics", "timeline", "shotBreakdown", "swingPath", "explosiveSteps", "tCourt", "shotSelection", "loadRecovery", "coachNotes", "developmentPlan", "videoEvidence", "limitations"],
-  },
-};
-
-function summarizeMotion(data: z.infer<typeof InputSchema>) {
-  const timeline = data.motionTimeline ?? [];
-  const zoneCounts = timeline.reduce<Record<string, number>>((acc, s) => {
-    if (s.motion >= Math.max(8, (data.derivedStats?.averageMotion ?? 0) + 4)) acc[s.zone] = (acc[s.zone] ?? 0) + 1;
-    return acc;
-  }, {});
-  const zones = Object.entries(zoneCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([zone, count]) => `${zone}:${count}`).join(", ");
-  const shots = (data.shotCandidates ?? []).slice(0, 120).map((s) => `${s.t.toFixed(1)}s/${s.zone}/${s.motion}`).join(" | ");
-  const compressedTimeline = timeline
-    .filter((_, i) => i % Math.max(1, Math.ceil(timeline.length / 180)) === 0)
-    .map((s) => `${s.t.toFixed(1)}:${s.motion}:${s.zone}`)
-    .join(" | ");
-  return { zones, shots, compressedTimeline };
-}
+export type { SquashInsight } from "./video-analysis-core";
 
 export const analyzeSquashClip = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => InputSchema.parse(d))
-  .handler(async ({ data }): Promise<{ insight: SquashInsight | null; error: string | null }> => {
-    const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env.apivyro;
-    if (!apiKey) return { insight: null, error: "Claude API key not configured." };
+  .inputValidator((d: unknown) => ClipInputSchema.parse(d))
+  .handler(async ({ data }): Promise<{ insight: SquashInsight | null; error: string | null }> =>
+    runClipAnalysis(data),
+  );
 
-    const content: Array<Record<string, unknown>> = [];
-    data.frames.forEach((b64, i) => {
-      const match = b64.match(/^data:(image\/[a-zA-Z+]+);base64,(.*)$/);
-      const mediaType = match?.[1] ?? "image/jpeg";
-      const raw = match?.[2] ?? b64;
-      const stamp = data.frameTimes?.[i];
-      content.push({ type: "text", text: `Sample ${i + 1}/${data.frames.length}${typeof stamp === "number" ? ` at ${stamp.toFixed(1)}s` : ""}` });
-      content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: raw } });
-    });
-    content.push({
-      type: "text",
-      text:
-        (() => {
-          const motion = summarizeMotion(data);
-          return `Analyze this entire squash video, not just still images: ${data.videoName}, duration ${data.durationSec.toFixed(1)} seconds.\n` +
-            `The browser scanned ${data.derivedStats?.scannedFrames ?? data.motionTimeline?.length ?? data.frames.length} checkpoints across the whole clip every ${data.sampleEverySec ?? "unknown"} seconds and then selected ${data.frames.length} evidence frames near key moments.\n\n` +
-            `Motion-derived whole-video stats: ${JSON.stringify(data.derivedStats ?? {})}. Active court zones: ${motion.zones || "not enough signal"}.\n` +
-            `Shot/contact candidates as time/zone/motion: ${motion.shots || "none detected"}.\n` +
-            `Compressed full-video motion timeline as time:motion:zone: ${motion.compressedTimeline}.\n\n` +
-            `You are an elite squash coach. Use the motion timeline as the primary source for counts and rhythm; use the images to verify posture, racket preparation, court position, and swing path. ` +
-            `Return a report that makes the player better: concrete shot count, rally estimate, winners/errors, shot mix, forehand/backhand split, swing path diagnosis, T-control, recovery speed, fatigue pattern, and exactly what to train next. ` +
-            `If camera angle prevents a precise winner/error count, still give a best estimate grounded in motion/contact patterns and list limitations. Call report_squash_analysis.`;
-        })(),
-    });
+export const saveVideoAnalysis = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        video_name: z.string().min(1).max(255),
+        duration_sec: z.number().min(0).max(60 * 60 * 3),
+        insight: z.record(z.string(), z.any()),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("video_analyses")
+      .insert({ ...data, user_id: context.userId })
+      .select("id, video_name, duration_sec, insight, created_at")
+      .single();
+    if (error) throw error;
+    return row;
+  });
 
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-5-20250929",
-          max_tokens: 3000,
-          tools: [TOOL],
-          tool_choice: { type: "tool", name: TOOL.name },
-          messages: [{ role: "user", content }],
-        }),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text();
-        console.error("Claude error", res.status, txt);
-        return { insight: null, error: `Claude API ${res.status}` };
-      }
-      const json = await res.json() as { content?: Array<{ type: string; name?: string; input?: SquashInsight }> };
-      const toolUse = json.content?.find((c) => c.type === "tool_use" && c.name === TOOL.name);
-      if (!toolUse?.input) return { insight: null, error: "No analysis returned." };
-      return { insight: toolUse.input, error: null };
-    } catch (e) {
-      console.error("analyzeSquashClip failed", e);
-      return { insight: null, error: e instanceof Error ? e.message : "Unknown error" };
-    }
+export const listVideoAnalyses = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("video_analyses")
+      .select("id, video_name, duration_sec, insight, created_at")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(25);
+    if (error) throw error;
+    return data ?? [];
   });
