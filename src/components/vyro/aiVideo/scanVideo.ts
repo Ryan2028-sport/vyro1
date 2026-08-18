@@ -305,7 +305,29 @@ export async function scanSquashVideo(
       opponentMass.push(assignB?.mass ?? 0);
     }
 
-    // ---- derived stats ----------------------------------------------------
+    // ---- anchor the court grid on the real T ------------------------------
+    // Both players hover around the T, so the centre of the occupancy
+    // distribution IS the T for this camera angle. Zones are then court
+    // relative (mid-centre == the T) instead of arbitrary frame thirds.
+    const occX: number[] = [];
+    const occY: number[] = [];
+    for (const p of [...playerPos, ...opponentPos]) {
+      if (!p) continue;
+      occX.push(p.x);
+      occY.push(p.y);
+    }
+    occX.sort((a, b) => a - b);
+    occY.sort((a, b) => a - b);
+    const tcx = occX.length > 20 ? percentile(occX, 0.5) : 0.5;
+    const tcy = occY.length > 20 ? percentile(occY, 0.5) : 0.5;
+    const LANE = 0.15; // half-width of the centre lane, court units
+    const DEPTH = 0.17; // half-depth of the mid band, court units
+    const zoneOf = (p: { x: number; y: number }) => {
+      const depth = p.y < tcy - DEPTH ? "front" : p.y <= tcy + DEPTH ? "mid" : "back";
+      const lane = p.x < tcx - LANE ? "forehand" : p.x <= tcx + LANE ? "centre" : "backhand";
+      return `${depth}-${lane}`;
+    };
+
     const motions = frames.map((f) => f.motion);
     const averageMotion = motions.length ? motions.reduce((a, b) => a + b, 0) / motions.length : 0;
     const peakMotion = motions.length ? Math.max(...motions) : 0;
