@@ -467,7 +467,7 @@ export async function scanSquashVideo(
           motion: f.motion,
           x: Number(x.toFixed(3)),
           y: Number(y.toFixed(3)),
-          zone: zoneFor(x, y),
+          zone: zoneOf({ x, y }),
           brightness: f.brightness,
         };
       });
