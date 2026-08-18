@@ -7,13 +7,12 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
-import BackendSyncOverlay from "@/components/BackendSyncOverlay";
 
 
 function NotFoundComponent() {
@@ -151,13 +150,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   usePushNotifications();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+
 
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
-      {mounted ? <BackendSyncOverlay /> : null}
     </QueryClientProvider>
   );
 }
