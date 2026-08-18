@@ -6,11 +6,15 @@ import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
 import {
   scanSquashVideo,
   probeForIdentity,
+  sampleSigAt,
+  sigToCss,
   ScanAborted,
   type ScanProgress,
   type IdentityCandidate,
   type IdentityPick,
+  type ColourSig,
 } from "./aiVideo/scanVideo";
+
 import {
   ZONE_KEYS,
   type MatchReport,
