@@ -534,8 +534,10 @@ export async function scanSquashVideo(
       if (!me) continue;
       playerSeen += 1;
       if (inT(me)) {
+        tSamples += 1;
         longestOffT = Math.max(longestOffT, offTRun);
         offTRun = 0;
+
       } else if (active[i]) {
         offTRun += step;
       }
