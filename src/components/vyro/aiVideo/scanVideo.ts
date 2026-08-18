@@ -347,7 +347,7 @@ export async function scanSquashVideo(
     const opponentHist = new Array(9).fill(0);
     const tReturnEvents: NonNullable<ClipInput["tReturnEvents"]> = [];
 
-    const inT = (p: Pos) => !!p && p.x >= T_X[0] && p.x <= T_X[1] && p.y >= T_Y[0] && p.y <= T_Y[1];
+    const inT = (p: Pos) => !!p && zoneOf(p) === "mid-centre";
     let tSamples = 0;
     let playerSeen = 0;
     let offTRun = 0;
