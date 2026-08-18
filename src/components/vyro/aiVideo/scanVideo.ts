@@ -20,6 +20,7 @@ const MAX_CHECKPOINTS = 2400;
 const MAX_EVIDENCE = 30;
 const DIFF_THRESHOLD = 13;
 const MIN_BLOB_CELLS = 5;
+const COLOUR_WEIGHT = 0.9; // how much kit colour counts against position when matching
 const MAX_BLOB_FRACTION = 0.22; // a blob bigger than this is a light change, not a body
 
 export type ScanStage = "load" | "scan" | "track" | "frames" | "done";
@@ -361,8 +362,6 @@ export async function probeForIdentity(
 export type ScanResult = {
   payload: ClipInput;
   measured: MeasuredStats;
-  /** The same match measured with the two players' labels swapped. */
-  swapped: { payload: ClipInput; measured: MeasuredStats };
 };
 
 export async function scanSquashVideo(
