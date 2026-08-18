@@ -238,16 +238,140 @@ function mean(list: number[]): number {
   return list.length ? list.reduce((a, b) => a + b, 0) / list.length : 0;
 }
 
+/**
+ * Fast pre-pass (a few seconds) whose only job is to find a frame where both
+ * players are clearly visible and well apart, so the user can tap themselves.
+ * No metrics come out of this — it never guesses who is who.
+ */
+export async function probeForIdentity(
+  file: File,
+  onProgress?: (p: ScanProgress) => void,
+  signal?: AbortSignal,
+): Promise<IdentityCandidate[]> {
+  const started = Date.now();
+  const elapsed = () => Number(((Date.now() - started) / 1000).toFixed(1));
+  const url = URL.createObjectURL(file);
+
+  try {
+    onProgress?.({ ratio: 0.05, label: "Looking for a frame with both players…", stage: "load", elapsedSec: elapsed() });
+    const video = await loadVideo(url);
+    const duration = video.duration;
+
+    const SAMPLES = 22;
+    const times: number[] = [];
+    for (let k = 0; k < SAMPLES; k++) {
+      const t = 0.08 + (duration - 0.3) * ((k + 0.5) / SAMPLES);
+      if (t > 0 && t < duration) times.push(t);
+    }
+
+    const small = document.createElement("canvas");
+    small.width = GRID;
+    small.height = GRID;
+    const sctx = small.getContext("2d", { willReadFrequently: true });
+    const big = document.createElement("canvas");
+    const bctx = big.getContext("2d");
+    if (!sctx || !bctx) throw new Error("Canvas is unavailable in this browser.");
+
+    const targetW = 760;
+    const scale = video.videoWidth ? Math.min(1, targetW / video.videoWidth) : 1;
+    big.width = Math.max(240, Math.round((video.videoWidth || targetW) * scale));
+    big.height = Math.max(135, Math.round((video.videoHeight || 428) * scale));
+
+    // First pass: learn a background from the samples themselves so a player
+    // standing still is still foreground.
+    const grays: Uint8ClampedArray[] = [];
+    const colours: Uint8ClampedArray[] = [];
+    for (const t of times) {
+      if (signal?.aborted) throw new ScanAborted();
+      await seek(video, t);
+      sctx.drawImage(video, 0, 0, GRID, GRID);
+      const px = sctx.getImageData(0, 0, GRID, GRID).data;
+      const gray = new Uint8ClampedArray(GRID * GRID);
+      for (let p = 0; p < GRID * GRID; p++) {
+        gray[p] = (px[p * 4]! * 0.299 + px[p * 4 + 1]! * 0.587 + px[p * 4 + 2]! * 0.114) | 0;
+      }
+      grays.push(gray);
+      colours.push(new Uint8ClampedArray(px));
+    }
+    if (!grays.length) throw new Error("Could not read any frame from this video.");
+
+    // Per-pixel median across samples = empty court.
+    const bg = new Uint8ClampedArray(GRID * GRID);
+    const column: number[] = [];
+    for (let p = 0; p < GRID * GRID; p++) {
+      column.length = 0;
+      for (const g of grays) column.push(g[p]!);
+      column.sort((a, b) => a - b);
+      bg[p] = column[Math.floor(column.length / 2)]!;
+    }
+
+    const mask = new Uint8Array(GRID * GRID);
+    const weight = new Uint8ClampedArray(GRID * GRID);
+    type Scored = { t: number; index: number; blobs: Blob[]; score: number };
+    const scored: Scored[] = [];
+
+    for (let i = 0; i < grays.length; i++) {
+      const gray = grays[i]!;
+      let fg = 0;
+      for (let p = 0; p < GRID * GRID; p++) {
+        const d = Math.abs(gray[p]! - bg[p]!);
+        const on = d > DIFF_THRESHOLD + 2;
+        mask[p] = on ? 1 : 0;
+        weight[p] = on ? Math.min(255, d) : 0;
+        if (on) fg += 1;
+      }
+      if (fg > GRID * GRID * 0.5) continue;
+      const blobs = extractBlobs(mask, weight, colours[i]!);
+      if (blobs.length < 2) continue;
+      const [a, b] = [blobs[0]!, blobs[1]!];
+      const apart = Math.hypot(a.x - b.x, a.y - b.y);
+      const colourGap = sigDist(a.sig, b.sig);
+      if (apart < 0.18) continue;
+      scored.push({ t: times[i]!, index: i, blobs, score: apart * 2 + colourGap + Math.min(1, (a.mass + b.mass) / 8000) });
+    }
+
+    scored.sort((x, y) => y.score - x.score);
+    const chosen = scored.slice(0, 3);
+    const candidates: IdentityCandidate[] = [];
+    for (const s of chosen) {
+      if (signal?.aborted) throw new ScanAborted();
+      await seek(video, s.t);
+      bctx.drawImage(video, 0, 0, big.width, big.height);
+      candidates.push({
+        t: Number(s.t.toFixed(2)),
+        image: big.toDataURL("image/jpeg", 0.72),
+        players: s.blobs.slice(0, 2).map((b) => ({
+          x: Number(b.x.toFixed(4)),
+          y: Number(b.y.toFixed(4)),
+          w: Number(Math.max(0.06, b.w).toFixed(4)),
+          h: Number(Math.max(0.1, b.h).toFixed(4)),
+          sig: b.sig,
+          swatch: sigToCss(b.sig),
+        })),
+      });
+    }
+
+    onProgress?.({ ratio: 1, label: "Ready to identify players", stage: "done", elapsedSec: elapsed() });
+    return candidates;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export type ScanResult = {
   payload: ClipInput;
   measured: MeasuredStats;
+  /** The same match measured with the two players' labels swapped. */
+  swapped: { payload: ClipInput; measured: MeasuredStats };
 };
 
 export async function scanSquashVideo(
   file: File,
   onProgress: (p: ScanProgress) => void,
   signal?: AbortSignal,
+  identity?: IdentityPick,
 ): Promise<ScanResult> {
+
   const started = Date.now();
   const elapsed = () => Number(((Date.now() - started) / 1000).toFixed(1));
   const abortIfNeeded = () => {
