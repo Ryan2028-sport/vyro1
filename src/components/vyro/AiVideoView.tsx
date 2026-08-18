@@ -484,7 +484,7 @@ export function AiVideoView() {
         <Card
           eyebrow="Step 2"
           title="Which player is you?"
-          right={
+          action={
             identity ? (
               <Pill tone="live">YOU SELECTED</Pill>
             ) : (
