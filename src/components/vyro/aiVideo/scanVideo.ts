@@ -477,8 +477,16 @@ export async function scanSquashVideo(
     const courtX = (x: number) => Math.max(0, Math.min(1, (x - x0) / spanX));
     const courtY = (y: number) => Math.max(0, Math.min(1, (y - y0) / spanY));
 
-    // ---- track two movers with position prediction ------------------------
-    type Track = { pos: { x: number; y: number }; vel: { x: number; y: number }; miss: number };
+    // ---- track two movers: position prediction + kit colour ---------------
+    // Track A is YOU when an identity was tapped (its colour signature is
+    // seeded from your kit), otherwise A/B are anonymous and labelled by depth
+    // at the end, as before.
+    type Track = {
+      pos: { x: number; y: number };
+      vel: { x: number; y: number };
+      miss: number;
+      sig: ColourSig;
+    };
     let A: Track | null = null;
     let B: Track | null = null;
     const rawA: Pos[] = [];
@@ -487,18 +495,30 @@ export async function scanSquashVideo(
     const massB: number[] = [];
     let twoBlobFrames = 0;
     let activeFrames = 0;
+    let identityFrames = 0;
+    let identityConfidentFrames = 0;
+
+    // Seeds from the tap. `sigA` is you.
+    let sigA: ColourSig | null = identity?.sig ?? null;
+    let sigB: ColourSig | null = identity?.otherSig ?? null;
 
     const predict = (tr: Track | null): Pos =>
       tr ? { x: tr.pos.x + tr.vel.x, y: tr.pos.y + tr.vel.y } : null;
     const gap = (p: Pos, b: Blob) => (p ? Math.hypot(p.x - b.x, p.y - b.y) : 1.5);
     const update = (tr: Track | null, b: Blob): Track => {
-      if (!tr) return { pos: { x: b.x, y: b.y }, vel: { x: 0, y: 0 }, miss: 0 };
+      if (!tr) return { pos: { x: b.x, y: b.y }, vel: { x: 0, y: 0 }, miss: 0, sig: b.sig };
       return {
         pos: { x: b.x, y: b.y },
         vel: { x: (b.x - tr.pos.x) * 0.6 + tr.vel.x * 0.4, y: (b.y - tr.pos.y) * 0.6 + tr.vel.y * 0.4 },
         miss: 0,
+        // Slow colour memory: survives a shadowed corner, still adapts to light.
+        sig: blendSig(tr.sig, b.sig, 0.12),
       };
     };
+    // Colour reference for a track: the tapped kit first, then what it has seen.
+    const refSig = (tr: Track | null, seed: ColourSig | null): ColourSig | null =>
+      seed ? (tr ? blendSig(seed, tr.sig, 0.35) : seed) : tr ? tr.sig : null;
+    const colourCost = (ref: ColourSig | null, b: Blob) => (ref ? sigDist(ref, b.sig) : 0);
 
     for (const f of frames) {
       const blobs = f.blobs;
@@ -506,25 +526,40 @@ export async function scanSquashVideo(
       let pickB: Blob | null = null;
       const pa = predict(A);
       const pb = predict(B);
+      const ra = refSig(A, sigA);
+      const rb = refSig(B, sigB);
 
       if (blobs.length >= 2) {
         twoBlobFrames += 1;
         const [b1, b2] = [blobs[0]!, blobs[1]!];
-        if (!A || !B) {
-          // Seed: camera sits behind the court, so the lower blob is nearer.
+        if (identity && (!A || !B)) {
+          // Seed by kit colour: whichever blob looks most like the tapped
+          // player becomes track A. No camera-angle assumption at all.
+          const d1 = sigDist(identity.sig, b1.sig);
+          const d2 = sigDist(identity.sig, b2.sig);
+          if (d1 <= d2) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+          if (!sigB) sigB = pickB.sig;
+        } else if (!A || !B) {
+          // No identity: camera usually sits behind the court, lower = nearer.
           if (b1.y >= b2.y) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
         } else {
-          const straight = gap(pa, b1) + gap(pb, b2);
-          const swapped = gap(pa, b2) + gap(pb, b1);
+          // Position continuity plus colour. Colour is what carries identity
+          // through a crossing, where position alone flips the two players.
+          const straight = gap(pa, b1) + gap(pb, b2) + (colourCost(ra, b1) + colourCost(rb, b2)) * COLOUR_WEIGHT;
+          const swapped = gap(pa, b2) + gap(pb, b1) + (colourCost(ra, b2) + colourCost(rb, b1)) * COLOUR_WEIGHT;
           if (straight <= swapped) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+          if (identity) {
+            identityFrames += 1;
+            if (Math.abs(straight - swapped) > 0.06) identityConfidentFrames += 1;
+          }
         }
       } else if (blobs.length === 1) {
         const b = blobs[0]!;
-        const da = gap(pa, b);
-        const db = gap(pb, b);
+        const da = gap(pa, b) + colourCost(ra, b) * COLOUR_WEIGHT;
+        const db = gap(pb, b) + colourCost(rb, b) * COLOUR_WEIGHT;
         // A single blob only claims a track when it is plausibly that track.
-        if (da <= db && da < 0.3) pickA = b;
-        else if (db < da && db < 0.3) pickB = b;
+        if (da <= db && da < 0.35) pickA = b;
+        else if (db < da && db < 0.35) pickB = b;
         else if (!A) pickA = b;
         else if (!B) pickB = b;
         else if (da <= db) pickA = b;
@@ -546,18 +581,29 @@ export async function scanSquashVideo(
       if (f.motion > 0) activeFrames += 1;
     }
 
-    // "You" is the mover living closer to the camera across the WHOLE clip,
-    // not whichever blob happened to seed the tracker first.
-    const depthA = mean(rawA.filter(Boolean).map((p) => p!.y));
-    const depthB = mean(rawB.filter(Boolean).map((p) => p!.y));
-    const flip = depthB > depthA + 0.02;
+    // With a tapped identity, track A IS you — no depth guess. Without one,
+    // fall back to "the mover living closer to the camera across the clip".
+    let flip = false;
+    if (!identity) {
+      const depthA = mean(rawA.filter(Boolean).map((p) => p!.y));
+      const depthB = mean(rawB.filter(Boolean).map((p) => p!.y));
+      flip = depthB > depthA + 0.02;
+    }
     const rawPlayer = flip ? rawB : rawA;
     const rawOpp = flip ? rawA : rawB;
     const playerMass = flip ? massB : massA;
     const opponentMass = flip ? massA : massB;
 
+    const identitySource: MeasuredStats["identitySource"] = identity ? "tapped" : "auto";
+    const identityConfidencePercent = identity
+      ? identityFrames
+        ? Number(((identityConfidentFrames / identityFrames) * 100).toFixed(1))
+        : 0
+      : 0;
+
     const playerPos: Pos[] = rawPlayer.map((p) => (p ? { x: courtX(p.x), y: courtY(p.y) } : null));
     const opponentPos: Pos[] = rawOpp.map((p) => (p ? { x: courtX(p.x), y: courtY(p.y) } : null));
+
 
     // ---- anchor the court grid on the real T ------------------------------
     const occX: number[] = [];
