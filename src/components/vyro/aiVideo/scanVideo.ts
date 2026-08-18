@@ -409,6 +409,18 @@ export async function probeForIdentity(
       });
     }
 
+    // Even with no confident detection the user can still tap themselves, so
+    // always hand back some frames to tap on.
+    if (!candidates.length) {
+      const fallbackTimes = times.filter((_, i) => i % Math.max(1, Math.floor(times.length / 3)) === 0).slice(0, 3);
+      for (const t of fallbackTimes) {
+        if (signal?.aborted) throw new ScanAborted();
+        await seek(video, t);
+        bctx.drawImage(video, 0, 0, big.width, big.height);
+        candidates.push({ t: Number(t.toFixed(2)), image: big.toDataURL("image/jpeg", 0.72), players: [] });
+      }
+    }
+
 
     onProgress?.({ ratio: 1, label: "Ready to identify players", stage: "done", elapsedSec: elapsed() });
     return candidates;
