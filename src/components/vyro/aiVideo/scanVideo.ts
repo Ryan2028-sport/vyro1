@@ -13,10 +13,6 @@ import { ZONE_KEYS, type ClipInput } from "@/lib/video-analysis-core";
 
 const GRID = 24; // diff grid resolution (GRID x GRID cells)
 const MAX_CHECKPOINTS = 420;
-// T box in normalised COURT coordinates (not raw frame coordinates).
-const T_X = [0.33, 0.67] as const;
-const T_Y = [0.3, 0.72] as const;
-
 export type ScanProgress = { ratio: number; label: string };
 
 type Det = { x: number; y: number; mass: number };
@@ -29,12 +25,6 @@ type Frame = {
 };
 
 type Pos = { x: number; y: number } | null;
-
-function zoneFor(x: number, y: number): string {
-  const depth = y < 1 / 3 ? "front" : y < 2 / 3 ? "mid" : "back";
-  const lane = x < 1 / 3 ? "forehand" : x < 2 / 3 ? "centre" : "backhand";
-  return `${depth}-${lane}`;
-}
 
 function seek(video: HTMLVideoElement, time: number): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -355,7 +345,7 @@ export async function scanSquashVideo(
 
     const bump = (hist: number[], p: Pos) => {
       if (!p) return;
-      const idx = ZONE_KEYS.indexOf(zoneFor(p.x, p.y) as (typeof ZONE_KEYS)[number]);
+      const idx = ZONE_KEYS.indexOf(zoneOf(p) as (typeof ZONE_KEYS)[number]);
       if (idx >= 0) hist[idx] += 1;
     };
 
@@ -390,7 +380,7 @@ export async function scanSquashVideo(
             ? "player"
             : "opponent"
           : "unknown";
-        const zone = striker ? zoneFor(striker.x, striker.y) : "mid-centre";
+        const zone = striker ? zoneOf(striker) : "mid-centre";
         shotCandidates.push({ t: Number(f.t.toFixed(2)), motion: f.motion, zone, actor });
         if (inRally) currentShots += 1;
 
