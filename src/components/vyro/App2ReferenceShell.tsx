@@ -45,6 +45,7 @@ import {
 } from "@/lib/training-plan.functions";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SegmentedTabs } from "./shared";
+import { AiVideoView } from "./AiVideoView";
 import "./app2-reference.css";
 
 
