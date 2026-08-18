@@ -327,9 +327,10 @@ export async function scanSquashVideo(
       }
 
       if (pickA) A = update(A, pickA);
-      else if (A) A = { ...A, miss: A.miss + 1, pos: A.pos };
+      else if (A !== null) A.miss += 1;
       if (pickB) B = update(B, pickB);
-      else if (B) B = { ...B, miss: B.miss + 1, pos: B.pos };
+      else if (B !== null) B.miss += 1;
+
       if (A && A.miss > 12) A = null;
       if (B && B.miss > 12) B = null;
 
