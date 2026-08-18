@@ -25,7 +25,40 @@ const MAX_BLOB_FRACTION = 0.22; // a blob bigger than this is a light change, no
 export type ScanStage = "load" | "scan" | "track" | "frames" | "done";
 export type ScanProgress = { ratio: number; label: string; stage: ScanStage; elapsedSec: number };
 
-type Blob = { x: number; y: number; mass: number; cells: number; w: number; h: number };
+/** Lighting-tolerant colour signature: chroma ratios + relative luminance. */
+export type ColourSig = { r: number; g: number; b: number; l: number };
+
+/** One player the probe found in a candidate frame, for the tap UI. */
+export type IdentityChoice = {
+  /** normalised centre + box in the displayed frame */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  sig: ColourSig;
+  /** css colour of that player's kit, for the swatch */
+  swatch: string;
+};
+
+export type IdentityCandidate = {
+  t: number;
+  /** jpeg data URL of the full frame */
+  image: string;
+  players: IdentityChoice[];
+};
+
+/** What the user picked on the identify screen. */
+export type IdentityPick = { sig: ColourSig; otherSig?: ColourSig; atSec: number };
+
+type Blob = {
+  x: number;
+  y: number;
+  mass: number;
+  cells: number;
+  w: number;
+  h: number;
+  sig: ColourSig;
+};
 type Frame = { t: number; motion: number; blobs: Blob[] };
 type Pos = { x: number; y: number } | null;
 
@@ -35,6 +68,34 @@ export class ScanAborted extends Error {
     this.name = "ScanAborted";
   }
 }
+
+function sigOf(r: number, g: number, b: number): ColourSig {
+  const sum = Math.max(1, r + g + b);
+  return { r: r / sum, g: g / sum, b: b / sum, l: Math.min(1, sum / 765) };
+}
+
+/** 0 = same kit colour, ~1 = completely different. */
+function sigDist(a: ColourSig, b: ColourSig): number {
+  const chroma = Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b) * 2.4;
+  const lum = Math.abs(a.l - b.l) * 0.55;
+  return chroma + lum;
+}
+
+function blendSig(a: ColourSig, b: ColourSig, k: number): ColourSig {
+  return {
+    r: a.r * (1 - k) + b.r * k,
+    g: a.g * (1 - k) + b.g * k,
+    b: a.b * (1 - k) + b.b * k,
+    l: a.l * (1 - k) + b.l * k,
+  };
+}
+
+function sigToCss(s: ColourSig): string {
+  const scale = 255 * Math.max(0.35, Math.min(1, s.l * 2.4));
+  const peak = Math.max(s.r, s.g, s.b) || 1;
+  return `rgb(${Math.round((s.r / peak) * scale)}, ${Math.round((s.g / peak) * scale)}, ${Math.round((s.b / peak) * scale)})`;
+}
+
 
 function seek(video: HTMLVideoElement, time: number): Promise<void> {
   return new Promise((resolve, reject) => {
