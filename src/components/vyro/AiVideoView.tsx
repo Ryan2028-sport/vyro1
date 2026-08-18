@@ -480,6 +480,115 @@ export function AiVideoView() {
         </div>
       </Card>
 
+      {(probing || activeCandidate) && !busy && (
+        <Card
+          eyebrow="Step 2"
+          title="Which player is you?"
+          right={
+            identity ? (
+              <Pill tone="live">YOU SELECTED</Pill>
+            ) : (
+              <Pill tone="off">{probing ? "FINDING FRAME" : "TAP YOURSELF"}</Pill>
+            )
+          }
+        >
+          {probing && (
+            <div className="flex items-center gap-2 text-xs text-vyro-mute">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Finding a frame where both players are clearly apart…
+            </div>
+          )}
+
+          {!probing && activeCandidate && (
+            <div className="space-y-3">
+              <p className="text-[11px] leading-snug text-vyro-mute">
+                Tap yourself in the frame. Your kit colour is then used to follow you through every
+                crossing, so your heat map and T stats are yours — not your opponent's.
+              </p>
+
+              <div className="relative overflow-hidden rounded-2xl border border-vyro-line">
+                <img
+                  src={activeCandidate.image}
+                  alt={`Match frame at ${activeCandidate.t.toFixed(1)} seconds with both players visible`}
+                  className="block w-full"
+                />
+                {activeCandidate.players.map((p, i) => {
+                  const chosen =
+                    identity !== null &&
+                    identity.atSec === activeCandidate.t &&
+                    identity.sig === p.sig;
+                  return (
+                    <button
+                      key={`${p.x}-${p.y}-${i}`}
+                      type="button"
+                      onClick={() =>
+                        setIdentity({
+                          sig: p.sig,
+                          otherSig: activeCandidate.players.find((o) => o !== p)?.sig,
+                          atSec: activeCandidate.t,
+                        })
+                      }
+                      aria-label={`That is me — player ${i + 1}`}
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 transition ${
+                        chosen
+                          ? "border-vyro-mint bg-vyro-mint/25"
+                          : "border-white/70 bg-black/20 hover:bg-black/10"
+                      }`}
+                      style={{
+                        left: `${p.x * 100}%`,
+                        top: `${p.y * 100}%`,
+                        width: `${Math.max(9, p.w * 100 * 1.5)}%`,
+                        height: `${Math.max(14, p.h * 100 * 1.3)}%`,
+                      }}
+                    >
+                      <span
+                        className={`absolute -top-2 left-1/2 -translate-x-1/2 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          chosen ? "bg-vyro-mint text-black" : "bg-black/80 text-white"
+                        }`}
+                      >
+                        {chosen ? "ME" : i + 1}
+                      </span>
+                      <span
+                        className="absolute bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-white/60"
+                        style={{ background: p.swatch }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {candidates.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setCandIdx((i) => (i + 1) % candidates.length)}
+                    className="rounded-xl border border-vyro-line px-3 py-1.5 text-[11px] font-semibold text-vyro-text/80"
+                  >
+                    Show another frame
+                  </button>
+                )}
+                {identity && (
+                  <button
+                    type="button"
+                    onClick={() => setIdentity(null)}
+                    className="rounded-xl border border-vyro-line px-3 py-1.5 text-[11px] font-semibold text-vyro-text/80"
+                  >
+                    Clear selection
+                  </button>
+                )}
+                <span className="text-[11px] text-vyro-mute">
+                  {identity
+                    ? `Locked at ${activeCandidate.t.toFixed(1)}s — run the scan above.`
+                    : "Without a tap the scan falls back to guessing by camera depth."}
+                </span>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+
+
       {!report && !busy && (
         <EmptyState
           title="No analysis yet"
