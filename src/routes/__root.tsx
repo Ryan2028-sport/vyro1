@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { Toaster } from "@/components/ui/sonner";
 
 
 function NotFoundComponent() {
