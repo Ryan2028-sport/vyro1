@@ -584,20 +584,18 @@ export function AiVideoView() {
                 ))}
 
                 {/* The tap itself */}
-                {(pending || (identity && identity.atSec === activeCandidate.t)) && (
+                {pending && (
                   <span
-                    className={`pointer-events-none absolute h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 ${
-                      pending ? "border-white" : "border-vyro-mint"
-                    }`}
+                    className="pointer-events-none absolute h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90"
                     style={{
-                      left: `${(pending?.x ?? 0.5) * 100}%`,
-                      top: `${(pending?.y ?? 0.5) * 100}%`,
-                      background: `${(pending ?? { sig: identity!.sig }) ? sigToCss((pending?.sig ?? identity!.sig)) : "transparent"}`,
+                      left: `${pending.x * 100}%`,
+                      top: `${pending.y * 100}%`,
+                      background: sigToCss(pending.sig),
                       opacity: 0.85,
-                      display: pending ? undefined : "none",
                     }}
                   />
                 )}
+
               </div>
 
               {pending ? (
