@@ -280,6 +280,10 @@ export function AiVideoView() {
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [aiStage, setAiStage] = useState<string | null>(null);
   const [report, setReport] = useState<MatchReport | null>(null);
+  const [probing, setProbing] = useState(false);
+  const [candidates, setCandidates] = useState<IdentityCandidate[]>([]);
+  const [candIdx, setCandIdx] = useState(0);
+  const [identity, setIdentity] = useState<IdentityPick | null>(null);
   const analyze = useServerFn(analyzeSquashClip);
   const save = useServerFn(saveVideoAnalysis);
   const listFn = useServerFn(listVideoAnalyses);
@@ -291,14 +295,43 @@ export function AiVideoView() {
     retry: false,
   });
 
+  /** Pick a video, then immediately hunt for a frame where you can tap yourself. */
+  const onPickFile = async (f: File | null) => {
+    setFile(f);
+    setReport(null);
+    setIdentity(null);
+    setCandidates([]);
+    setCandIdx(0);
+    if (!f) return;
+    setProbing(true);
+    try {
+      const found = await probeForIdentity(f, setProgress);
+      setCandidates(found);
+      if (!found.length) {
+        toast.info("Could not isolate two players automatically — the scan will label players by camera depth.");
+      }
+    } catch {
+      toast.error("Could not read frames from that video.");
+    } finally {
+      setProbing(false);
+      setProgress(null);
+    }
+  };
+
   const run = useMutation({
-    mutationFn: async (f: File): Promise<MatchReport> => {
+    mutationFn: async (input: { f: File; identity: IdentityPick | null }): Promise<MatchReport> => {
+      const { f } = input;
       const controller = new AbortController();
       abortRef.current = controller;
       setReport(null);
       setAiStage(null);
 
-      const { payload, measured } = await scanSquashVideo(f, setProgress, controller.signal);
+      const { payload, measured } = await scanSquashVideo(
+        f,
+        setProgress,
+        controller.signal,
+        input.identity ?? undefined,
+      );
       // Measured numbers land on screen before the AI leg runs.
       const base: MatchReport = {
         measured,
@@ -344,11 +377,25 @@ export function AiVideoView() {
 
   const busy = run.isPending;
   const insight: SquashInsight | null = report?.insight ?? null;
+  const activeCandidate = candidates[candIdx] ?? null;
+
+  /** Re-measure the match with the other player treated as you. */
+  const swapPlayers = () => {
+    if (!file || !identity?.otherSig) return;
+    const next: IdentityPick = {
+      sig: identity.otherSig,
+      otherSig: identity.sig,
+      atSec: identity.atSec,
+    };
+    setIdentity(next);
+    run.mutate({ f: file, identity: next });
+  };
 
   const pastItems = useMemo(
     () => (Array.isArray(history.data) ? history.data : []),
     [history.data],
   );
+
 
   return (
     <div className="space-y-4">
