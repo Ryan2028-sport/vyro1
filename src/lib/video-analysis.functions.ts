@@ -1,16 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { ClipInputSchema, type SquashInsight } from "./video-analysis-core";
+import { ClipInputSchema, type SquashInsight, type VerifiedCounts } from "./video-analysis-core";
 import { runClipAnalysis } from "./video-analysis.server";
 
 export type { SquashInsight } from "./video-analysis-core";
 
 export const analyzeSquashClip = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => ClipInputSchema.parse(d))
-  .handler(async ({ data }): Promise<{ insight: SquashInsight | null; error: string | null }> =>
-    runClipAnalysis(data),
+  .handler(
+    async ({
+      data,
+    }): Promise<{ insight: SquashInsight | null; verified: VerifiedCounts | null; error: string | null }> =>
+      runClipAnalysis(data),
   );
+
 
 export const saveVideoAnalysis = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
