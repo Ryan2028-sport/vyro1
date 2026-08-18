@@ -1,10 +1,16 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Upload, Play, Loader2, Video, Target, Flame } from "lucide-react";
+import { Upload, Play, Loader2, Video, Target, Flame, X, ShieldCheck, Ruler } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
-import { scanSquashVideo, type ScanProgress } from "./aiVideo/scanVideo";
-import { ZONE_KEYS, type SquashInsight } from "@/lib/video-analysis-core";
+import { scanSquashVideo, ScanAborted, type ScanProgress } from "./aiVideo/scanVideo";
+import {
+  ZONE_KEYS,
+  type MatchReport,
+  type MeasuredStats,
+  type SquashInsight,
+  type VerifiedCounts,
+} from "@/lib/video-analysis-core";
 import {
   analyzeSquashClip,
   listVideoAnalyses,
@@ -24,34 +30,78 @@ const ZONE_LABELS: Record<string, string> = {
   "back-backhand": "Back BH",
 };
 
-function HeatmapGrid({ title, values, tone }: { title: string; values: number[]; tone: "player" | "opponent" }) {
+/** Provenance badge — every number on this screen says where it came from. */
+function Source({ kind, n }: { kind: "measured" | "verified" | "none"; n?: number }) {
+  if (kind === "none") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-vyro-line px-2 py-0.5 text-[10px] uppercase tracking-wider text-vyro-mute">
+        Not established
+      </span>
+    );
+  }
+  const measured = kind === "measured";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+        measured
+          ? "border-vyro-mint/40 bg-vyro-mint/10 text-vyro-mint"
+          : "border-vyro-line bg-vyro-text/[0.05] text-vyro-text/70"
+      }`}
+    >
+      {measured ? <Ruler className="h-2.5 w-2.5" /> : <ShieldCheck className="h-2.5 w-2.5" />}
+      {measured ? "Measured from video" : `AI-verified on ${n ?? 0} frames`}
+    </span>
+  );
+}
+
+/** Heat map drawn on a squash court (front wall at the top, T in the middle). */
+function CourtHeatmap({
+  title,
+  values,
+  counts,
+  tone,
+}: {
+  title: string;
+  values: number[];
+  counts: number[];
+  tone: "player" | "opponent";
+}) {
   const max = Math.max(...values, 1);
+  const total = counts.reduce((a, b) => a + b, 0);
+  const hue = tone === "player" ? "16 185 129" : "244 114 182";
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-vyro-mute">{title}</div>
-      <div className="grid grid-cols-3 gap-1.5">
-        {ZONE_KEYS.map((zone, i) => {
-          const v = values[i] ?? 0;
-          const alpha = Math.max(0.06, (v / max) * 0.85);
-          const hue = tone === "player" ? "16 185 129" : "244 114 182";
-          return (
-            <div
-              key={zone}
-              className="rounded-xl border border-vyro-line px-2 py-3 text-center"
-              style={{ background: `rgba(${hue} / ${alpha})` }}
-            >
-              <div className="text-[10px] uppercase tracking-wider text-vyro-mute">{ZONE_LABELS[zone]}</div>
-              <div className="text-sm font-bold tabular-nums text-vyro-text">{v}</div>
-            </div>
-          );
-        })}
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-vyro-mute">{title}</div>
+        <div className="text-[10px] text-vyro-mute">{total} contacts</div>
       </div>
-      <div className="text-[10px] text-vyro-mute">Front of court at the top · 100 = busiest zone</div>
+      <div className="relative overflow-hidden rounded-2xl border border-vyro-line bg-vyro-text/[0.02] p-1.5">
+        <div className="grid grid-cols-3 gap-1">
+          {ZONE_KEYS.map((zone, i) => {
+            const v = values[i] ?? 0;
+            const alpha = Math.max(0.04, (v / max) * 0.8);
+            return (
+              <div
+                key={zone}
+                className="relative rounded-lg border border-vyro-line/70 px-1 py-3.5 text-center"
+                style={{ background: `rgba(${hue} / ${alpha})` }}
+              >
+                <div className="text-[9px] uppercase tracking-wider text-vyro-mute">{ZONE_LABELS[zone]}</div>
+                <div className="text-[13px] font-bold tabular-nums text-vyro-text">{counts[i] ?? 0}</div>
+              </div>
+            );
+          })}
+        </div>
+        {/* short line + T marker, drawn over the grid */}
+        <div className="pointer-events-none absolute inset-x-1.5 top-[36%] h-px bg-vyro-text/25" />
+        <div className="pointer-events-none absolute left-1/2 top-[36%] h-[28%] w-px -translate-x-1/2 bg-vyro-text/25" />
+      </div>
+      <div className="text-[10px] text-vyro-mute">Front wall at the top · numbers are counted contacts</div>
     </div>
   );
 }
 
-function Bullets({ items }: { items: string[] }) {
+function Bullets({ items }: { items?: string[] }) {
   if (!items?.length) return null;
   return (
     <ul className="space-y-1.5">
@@ -65,11 +115,171 @@ function Bullets({ items }: { items: string[] }) {
   );
 }
 
+function MeasuredPanels({ measured: s }: { measured: MeasuredStats }) {
+  return (
+    <>
+      <Card
+        eyebrow="Scan quality"
+        title="What the scan could see"
+        action={<Source kind="measured" />}
+      >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="Checkpoints" value={s.scannedFrames} />
+          <Stat label="Sample rate" value={(1 / s.sampleEverySec).toFixed(1)} unit="/s" />
+          <Stat label="Both players tracked" value={s.twoPlayerTrackPercent} unit="%" />
+          <Stat label="Scan time" value={Math.round(s.scanSeconds)} unit="s" />
+        </div>
+        {s.twoPlayerTrackPercent < 45 && (
+          <p className="mt-3 text-[12px] leading-snug text-vyro-text/70">
+            Both players were only separated in {s.twoPlayerTrackPercent}% of active frames, so the
+            opponent heat map and the who-struck split are less reliable for this clip. Filming from
+            behind the court, higher up, fixes this.
+          </p>
+        )}
+      </Card>
+
+      <Card eyebrow="T discipline" title="Recovery to the T" action={<Source kind="measured" />}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="Returns to T" value={s.tReturnCount} />
+          <Stat label="Median to T" value={s.medianSecondsToT} unit="s" />
+          <Stat label="Avg to T" value={s.avgSecondsToT} unit="s" />
+          <Stat label="Time on T" value={s.tTimePercent} unit="%" />
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="Longest off T" value={s.longestOffTSeconds} unit="s" />
+          <Stat label="Your contacts" value={s.playerContacts} />
+          <Stat label="Opponent contacts" value={s.opponentContacts} />
+          <Stat label="Total contacts" value={s.contactCount} />
+        </div>
+      </Card>
+
+      <Card eyebrow="Court coverage" title="Where the shots were struck" action={<Source kind="measured" />}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <CourtHeatmap title="Your shots" values={s.playerHeatmap} counts={s.playerHeatCounts} tone="player" />
+          <CourtHeatmap
+            title="Opponent shots"
+            values={s.opponentHeatmap}
+            counts={s.opponentHeatCounts}
+            tone="opponent"
+          />
+        </div>
+      </Card>
+
+      <Card eyebrow="Rally profile" title="Match structure" action={<Source kind="measured" />}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="Rallies" value={s.rallyCount} />
+          <Stat label="Shots / rally" value={s.avgShotsPerRally} />
+          <Stat label="Longest rally" value={s.longestRallyShots} unit="shots" />
+          <Stat label="Work:rest" value={s.workRestRatio} />
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="Short (≤4)" value={s.rallyBuckets.short} />
+          <Stat label="Medium (5-9)" value={s.rallyBuckets.medium} />
+          <Stat label="Long (10+)" value={s.rallyBuckets.long} />
+          <Stat label="Intensity drift" value={s.fatigueDriftPercent} unit="%" />
+        </div>
+      </Card>
+    </>
+  );
+}
+
+function VerifiedPanel({ verified: v, measured }: { verified: VerifiedCounts; measured: MeasuredStats }) {
+  const mix = v.scaledShotMix;
+  const sideTotal = v.side.forehand + v.side.backhand;
+  return (
+    <>
+      <Card
+        eyebrow="Shot mix"
+        title="What the AI could actually see"
+        action={<Source kind="verified" n={v.framesLabelled} />}
+      >
+        {v.framesLabelled === 0 ? (
+          <p className="text-[13px] leading-snug text-vyro-text/75">
+            The vision pass could not confidently read a single contact frame, so no shot mix is shown
+            rather than a guessed one.
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Stat label="Frames read" value={`${v.framesLabelled}/${v.framesSent}`} />
+              <Stat
+                label="Forehand"
+                value={sideTotal ? Math.round((v.side.forehand / sideTotal) * 100) : "—"}
+                unit="%"
+              />
+              <Stat
+                label="Backhand"
+                value={sideTotal ? Math.round((v.side.backhand / sideTotal) * 100) : "—"}
+                unit="%"
+              />
+              <Stat label="Unclear side" value={v.side.unclear} />
+            </div>
+            {mix ? (
+              <>
+                <div className="mt-3 text-[11px] uppercase tracking-wider text-vyro-mute">
+                  Shot families, scaled from the verified sample to {measured.contactCount} measured contacts
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <Stat label="Drives" value={mix.drive} />
+                  <Stat label="Cross-court" value={mix["cross-court"]} />
+                  <Stat label="Boasts" value={mix.boast} />
+                  <Stat label="Drops" value={mix.drop} />
+                  <Stat label="Lobs" value={mix.lob} />
+                  <Stat label="Volleys" value={mix.volley} />
+                  <Stat label="Serves" value={mix.serve} />
+                  <Stat label="Sample" value={v.framesLabelled} unit="frames" />
+                </div>
+              </>
+            ) : (
+              <p className="mt-3 text-[12px] leading-snug text-vyro-text/70">
+                Too few frames were readable to scale a shot-family breakdown — raw verified counts only:
+                {" "}
+                {Object.entries(v.family)
+                  .filter(([, n]) => n > 0)
+                  .map(([k, n]) => `${k} ${n}`)
+                  .join(", ") || "none"}
+                .
+              </p>
+            )}
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Stat label="Prep high" value={v.racketPrep.high} />
+              <Stat label="Prep low" value={v.racketPrep.low} />
+              <Stat label="Prep late" value={v.racketPrep.late} />
+              <Stat label="Segments ok" value={`${v.segmentsOk}/${v.segmentsOk + v.segmentsFailed}`} />
+            </div>
+          </>
+        )}
+      </Card>
+
+      <Card eyebrow="Outcomes" title="Winners & errors">
+        {v.rallyEndFrames > 0 ? (
+          <p className="text-[13px] leading-snug text-vyro-text/85">
+            {v.rallyEndFrames} of the {v.framesSent} sampled contact frames looked like a rally ending.
+            That is a sample, not a full count — a complete winner / forced / unforced breakdown needs
+            ball tracking this camera angle can't give.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <Source kind="none" />
+            <p className="text-[13px] leading-snug text-vyro-text/75">
+              No winner or error count is shown. Deciding a winner from a forced or unforced error needs
+              the ball's bounce and the wall it hit, which isn't recoverable from this footage — so the
+              app reports nothing instead of inventing numbers.
+            </p>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
 export function AiVideoView() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
-  const [insight, setInsight] = useState<SquashInsight | null>(null);
+  const [aiStage, setAiStage] = useState<string | null>(null);
+  const [report, setReport] = useState<MatchReport | null>(null);
   const analyze = useServerFn(analyzeSquashClip);
   const save = useServerFn(saveVideoAnalysis);
   const listFn = useServerFn(listVideoAnalyses);
@@ -82,40 +292,58 @@ export function AiVideoView() {
   });
 
   const run = useMutation({
-    mutationFn: async (f: File) => {
-      const payload = await scanSquashVideo(f, setProgress);
-      if (!payload.frames.length) throw new Error("No readable frames in this video.");
+    mutationFn: async (f: File): Promise<MatchReport> => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setReport(null);
+      setAiStage(null);
+
+      const { payload, measured } = await scanSquashVideo(f, setProgress, controller.signal);
+      // Measured numbers land on screen before the AI leg runs.
+      const base: MatchReport = {
+        measured,
+        verified: null,
+        insight: null,
+        videoName: payload.videoName,
+        durationSec: payload.durationSec,
+      };
+      setReport(base);
+      setAiStage("Verifying contact frames with the AI, then writing your report…");
+
       const res = await analyze({ data: payload });
-      if (res.error || !res.insight) throw new Error(res.error ?? "Analysis failed.");
+      const full: MatchReport = { ...base, verified: res.verified ?? null, insight: res.insight ?? null };
+      setReport(full);
+      if (res.error) toast.error(res.error);
+
       try {
         await save({
           data: {
             video_name: payload.videoName,
             duration_sec: payload.durationSec,
-            insight: res.insight as unknown as Record<string, unknown>,
+            insight: full as unknown as Record<string, unknown>,
           },
         });
         void qc.invalidateQueries({ queryKey: ["video-analyses"] });
       } catch {
         // Saving is best-effort (e.g. signed out) — the report still shows.
       }
-      return res.insight;
+      return full;
     },
     onSuccess: (data) => {
-      setInsight(data);
       setProgress(null);
-      toast.success("Match analysed");
+      setAiStage(null);
+      if (data.insight) toast.success("Match analysed");
     },
     onError: (e: Error) => {
       setProgress(null);
-      toast.error(e.message);
+      setAiStage(null);
+      if (e instanceof ScanAborted || e.name === "ScanAborted") toast.info("Scan cancelled");
+      else toast.error(e.message);
     },
   });
 
-  const m = insight?.metrics ?? {};
-  const t = insight?.tDiscipline ?? {};
-  const rally = insight?.rallyProfile ?? {};
   const busy = run.isPending;
+  const insight: SquashInsight | null = report?.insight ?? null;
 
   const pastItems = useMemo(
     () => (Array.isArray(history.data) ? history.data : []),
@@ -127,8 +355,8 @@ export function AiVideoView() {
       <PageHeader
         eyebrow="AI video · squash"
         title="AI match analysis"
-        subtitle="Upload a match clip. The whole video is scanned on-device, then the AI returns T discipline, shot heat maps and a coaching plan."
-        action={<Pill tone={insight ? "live" : "off"}>{insight ? "REPORT READY" : "NO CLIP"}</Pill>}
+        subtitle="Your match is scanned frame by frame on this device, then the AI verifies the real contact frames. Every number is labelled measured or AI-verified — nothing is estimated."
+        action={<Pill tone={report ? "live" : "off"}>{report ? "REPORT READY" : "NO CLIP"}</Pill>}
       />
 
       <Card eyebrow="Step 1" title="Add your match video">
@@ -140,7 +368,7 @@ export function AiVideoView() {
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
             setFile(f);
-            setInsight(null);
+            setReport(null);
           }}
         />
         <div className="space-y-3">
@@ -169,90 +397,67 @@ export function AiVideoView() {
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             {busy ? "Analysing…" : "Analyse match"}
           </button>
-          {progress && (
+          {!busy && !report && (
+            <p className="text-[11px] leading-snug text-vyro-mute">
+              A full match takes roughly 2–5 minutes: the whole clip is sampled about four times a
+              second, both players are tracked, then the AI reads every detected contact frame.
+            </p>
+          )}
+          {(progress || aiStage) && (
             <div className="space-y-1.5">
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-vyro-text/10">
                 <div
                   className="h-full rounded-full bg-vyro-mint transition-all"
-                  style={{ width: `${Math.round(progress.ratio * 100)}%` }}
+                  style={{ width: `${Math.round((aiStage ? 0.97 : (progress?.ratio ?? 0)) * 100)}%` }}
                 />
               </div>
-              <div className="text-[11px] text-vyro-mute">{progress.label}</div>
+              <div className="flex items-center justify-between gap-2 text-[11px] text-vyro-mute">
+                <span className="truncate">{aiStage ?? progress?.label}</span>
+                {progress && <span className="shrink-0 tabular-nums">{Math.round(progress.elapsedSec)}s</span>}
+              </div>
+              <button
+                type="button"
+                onClick={() => abortRef.current?.abort()}
+                className="flex items-center gap-1 text-[11px] font-semibold text-vyro-text/70"
+              >
+                <X className="h-3 w-3" /> Cancel scan
+              </button>
             </div>
           )}
         </div>
       </Card>
 
-      {!insight && !busy && (
+      {!report && !busy && (
         <EmptyState
           title="No analysis yet"
-          hint="Film from behind the court for the best results — the scanner tracks both players' movement, contact points and how fast you recover to the T."
+          hint="Film from behind the court, as high as you can, with both players in frame — that is what lets the scanner separate you from your opponent and measure real contacts."
         />
       )}
 
-      {insight && (
+      {report && (
         <>
-          <Card eyebrow={`Confidence · ${insight.confidence}`} title={insight.headline}>
-            <p className="text-[13px] leading-relaxed text-vyro-text/85">{insight.summary}</p>
-          </Card>
+          {insight && (
+            <Card eyebrow={`Confidence · ${insight.confidence}`} title={insight.headline}>
+              <p className="text-[13px] leading-relaxed text-vyro-text/85">{insight.summary}</p>
+            </Card>
+          )}
 
-          <Card eyebrow="T discipline" title="Recovery to the T">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="Returns to T" value={t.returnsToT ?? "—"} />
-              <Stat label="Avg to T" value={t.avgSecondsToT ?? "—"} unit="s" />
-              <Stat label="Time on T" value={t.tTimePercent ?? "—"} unit="%" />
-              <Stat label="Longest off T" value={t.longestOffTSeconds ?? "—"} unit="s" />
-            </div>
-            {t.note && <p className="mt-3 text-[13px] leading-snug text-vyro-text/80">{t.note}</p>}
-          </Card>
+          <MeasuredPanels measured={report.measured} />
+          {insight?.tNote && (
+            <Card eyebrow="Coach read" title="On your T discipline">
+              <p className="text-[13px] leading-snug text-vyro-text/85">{insight.tNote}</p>
+              {insight.heatmapNote && (
+                <p className="mt-2 text-[13px] leading-snug text-vyro-text/85">{insight.heatmapNote}</p>
+              )}
+              {insight.rallyNote && (
+                <p className="mt-2 text-[13px] leading-snug text-vyro-text/85">{insight.rallyNote}</p>
+              )}
+            </Card>
+          )}
 
-          <Card eyebrow="Court coverage" title="Shot heat maps">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <HeatmapGrid title="Your shots" values={insight.playerHeatmap} tone="player" />
-              <HeatmapGrid title="Opponent shots" values={insight.opponentHeatmap} tone="opponent" />
-            </div>
-            {insight.heatmapNote && (
-              <p className="mt-3 text-[13px] leading-snug text-vyro-text/80">{insight.heatmapNote}</p>
-            )}
-          </Card>
+          {report.verified && <VerifiedPanel verified={report.verified} measured={report.measured} />}
 
-          <Card eyebrow="Rally profile" title="Match structure">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="Rallies" value={rally.rallyCount ?? m.rallyCountEstimate ?? "—"} />
-              <Stat label="Shots / rally" value={rally.avgShotsPerRally ?? "—"} />
-              <Stat label="Longest rally" value={rally.longestRallyShots ?? "—"} unit="shots" />
-              <Stat label="Work:rest" value={rally.workRestRatio ?? "—"} />
-            </div>
-            {rally.fatigueDrift && (
-              <p className="mt-3 text-[13px] leading-snug text-vyro-text/80">{rally.fatigueDrift}</p>
-            )}
-          </Card>
-
-          <Card eyebrow="Shot mix" title="What you hit">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="Total shots" value={m.totalShotsEstimate ?? "—"} />
-              <Stat label="Forehand" value={m.forehandEstimate ?? "—"} />
-              <Stat label="Backhand" value={m.backhandEstimate ?? "—"} />
-              <Stat label="Volleys" value={m.volleyEstimate ?? "—"} />
-              <Stat label="Drives" value={m.driveEstimate ?? "—"} />
-              <Stat label="Boasts" value={m.boastEstimate ?? "—"} />
-              <Stat label="Drops" value={m.dropEstimate ?? "—"} />
-              <Stat label="Lobs" value={m.lobEstimate ?? "—"} />
-            </div>
-          </Card>
-
-          <Card eyebrow="Outcomes" title="Winners & errors">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <Stat label="Winners" value={m.winnersEstimate ?? "—"} />
-              <Stat label="Forced errors" value={m.forcedErrorsEstimate ?? "—"} />
-              <Stat label="Unforced errors" value={m.unforcedErrorsEstimate ?? "—"} />
-              <Stat label="Swing path" value={m.swingPathScore ?? "—"} unit="/100" />
-              <Stat label="Footwork" value={m.footworkScore ?? "—"} unit="/100" />
-              <Stat label="Shot quality" value={m.shotQualityScore ?? "—"} unit="/100" />
-            </div>
-          </Card>
-
-          {insight.timeline.length > 0 && (
+          {insight && insight.timeline.length > 0 && (
             <Card eyebrow="Timeline" title="Key moments">
               <div className="space-y-3">
                 {insight.timeline.map((row, i) => (
@@ -273,44 +478,48 @@ export function AiVideoView() {
             </Card>
           )}
 
-          <Card eyebrow="Diagnosis" title="Shots & swing path">
-            <div className="space-y-3">
-              <Bullets items={insight.shotBreakdown} />
-              <Bullets items={insight.swingPath} />
-            </div>
-          </Card>
+          {insight && (
+            <>
+              <Card eyebrow="Diagnosis" title="Shots & swing path">
+                <div className="space-y-3">
+                  <Bullets items={insight.shotBreakdown} />
+                  <Bullets items={insight.swingPath} />
+                </div>
+              </Card>
 
-          <Card eyebrow="Movement" title="Footwork & T control">
-            <div className="space-y-3">
-              <Bullets items={insight.explosiveSteps} />
-              <Bullets items={insight.tCourt} />
-            </div>
-          </Card>
+              <Card eyebrow="Movement" title="Footwork & T control">
+                <div className="space-y-3">
+                  <Bullets items={insight.explosiveSteps} />
+                  <Bullets items={insight.tCourt} />
+                </div>
+              </Card>
 
-          <Card eyebrow="Tactics" title="Shot selection & load">
-            <div className="space-y-3">
-              <Bullets items={insight.shotSelection} />
-              <Bullets items={insight.loadRecovery} />
-            </div>
-          </Card>
+              <Card eyebrow="Tactics" title="Shot selection & load">
+                <div className="space-y-3">
+                  <Bullets items={insight.shotSelection} />
+                  <Bullets items={insight.loadRecovery} />
+                </div>
+              </Card>
 
-          <Card eyebrow="Coach" title="What to train next">
-            <div className="space-y-3">
-              <Bullets items={insight.coachNotes} />
-              <Bullets items={insight.developmentPlan} />
-            </div>
-          </Card>
+              <Card eyebrow="Coach" title="What to train next">
+                <div className="space-y-3">
+                  <Bullets items={insight.coachNotes} />
+                  <Bullets items={insight.developmentPlan} />
+                </div>
+              </Card>
 
-          {insight.videoEvidence.length > 0 && (
-            <Card eyebrow="Evidence" title="Seen in the video">
-              <Bullets items={insight.videoEvidence} />
-            </Card>
-          )}
+              {insight.videoEvidence.length > 0 && (
+                <Card eyebrow="Evidence" title="Seen in the video">
+                  <Bullets items={insight.videoEvidence} />
+                </Card>
+              )}
 
-          {insight.limitations.length > 0 && (
-            <Card eyebrow="Honest limits" title="What the camera couldn't confirm">
-              <Bullets items={insight.limitations} />
-            </Card>
+              {insight.limitations.length > 0 && (
+                <Card eyebrow="Honest limits" title="What the camera couldn't confirm">
+                  <Bullets items={insight.limitations} />
+                </Card>
+              )}
+            </>
           )}
         </>
       )}
@@ -322,7 +531,11 @@ export function AiVideoView() {
               <button
                 key={row.id}
                 type="button"
-                onClick={() => setInsight(row.insight as unknown as SquashInsight)}
+                onClick={() => {
+                  const saved = row.insight as unknown as MatchReport | null;
+                  if (saved?.measured) setReport(saved);
+                  else toast.info("That report was saved by an older version and can't be reopened.");
+                }}
                 className="flex w-full items-center gap-3 rounded-2xl border border-vyro-line bg-vyro-text/[0.03] p-3 text-left"
               >
                 <Flame className="h-4 w-4 shrink-0 text-vyro-mint" />
