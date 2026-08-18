@@ -313,6 +313,7 @@ export function AiVideoView() {
     setFile(f);
     setReport(null);
     setIdentity(null);
+    setPending(null);
     setCandidates([]);
     setCandIdx(0);
     if (!f) return;
@@ -321,7 +322,7 @@ export function AiVideoView() {
       const found = await probeForIdentity(f, setProgress);
       setCandidates(found);
       if (!found.length) {
-        toast.info("Could not isolate two players automatically — the scan will label players by camera depth.");
+        toast.info("Could not read frames to identify players — the scan will label players by camera depth.");
       }
     } catch {
       toast.error("Could not read frames from that video.");
@@ -330,6 +331,45 @@ export function AiVideoView() {
       setProgress(null);
     }
   };
+
+  /** A tap anywhere on the frame reads the kit colour from the real pixels. */
+  const onTapFrame = async (
+    e: React.MouseEvent<HTMLDivElement>,
+    candidate: IdentityCandidate,
+  ) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    try {
+      const sig = await sampleSigAt(candidate.image, x, y);
+      setPending({ x, y, sig });
+    } catch {
+      toast.error("Could not read the colour at that point — try again.");
+    }
+  };
+
+  /** Lock the tapped player in as "you", with the opponent as second reference. */
+  const confirmPending = async (candidate: IdentityCandidate) => {
+    if (!pending) return;
+    let otherSig: ColourSig | undefined = candidate.players
+      .map((p) => ({ p, d: Math.hypot(p.x - pending.x, p.y - pending.y) }))
+      .filter((c) => c.d > 0.12)
+      .sort((a, b) => b.d - a.d)[0]?.p.sig;
+    if (!otherSig) {
+      // No trustworthy second detection — sample the point furthest from the tap.
+      const fx = pending.x < 0.5 ? 0.78 : 0.22;
+      const fy = pending.y < 0.5 ? 0.72 : 0.35;
+      try {
+        otherSig = await sampleSigAt(candidate.image, fx, fy);
+      } catch {
+        otherSig = undefined;
+      }
+    }
+    setIdentity({ sig: pending.sig, otherSig, atSec: candidate.t });
+    setPending(null);
+  };
+
 
   const run = useMutation({
     mutationFn: async (input: { f: File; identity: IdentityPick | null }): Promise<MatchReport> => {
