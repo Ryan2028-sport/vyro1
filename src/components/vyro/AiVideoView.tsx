@@ -3,7 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Upload, Play, Loader2, Video, Target, Flame, X, ShieldCheck, Ruler } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
-import { scanSquashVideo, ScanAborted, type ScanProgress } from "./aiVideo/scanVideo";
+import {
+  scanSquashVideo,
+  probeForIdentity,
+  ScanAborted,
+  type ScanProgress,
+  type IdentityCandidate,
+  type IdentityPick,
+} from "./aiVideo/scanVideo";
 import {
   ZONE_KEYS,
   type MatchReport,
@@ -280,6 +287,10 @@ export function AiVideoView() {
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [aiStage, setAiStage] = useState<string | null>(null);
   const [report, setReport] = useState<MatchReport | null>(null);
+  const [probing, setProbing] = useState(false);
+  const [candidates, setCandidates] = useState<IdentityCandidate[]>([]);
+  const [candIdx, setCandIdx] = useState(0);
+  const [identity, setIdentity] = useState<IdentityPick | null>(null);
   const analyze = useServerFn(analyzeSquashClip);
   const save = useServerFn(saveVideoAnalysis);
   const listFn = useServerFn(listVideoAnalyses);
@@ -291,14 +302,43 @@ export function AiVideoView() {
     retry: false,
   });
 
+  /** Pick a video, then immediately hunt for a frame where you can tap yourself. */
+  const onPickFile = async (f: File | null) => {
+    setFile(f);
+    setReport(null);
+    setIdentity(null);
+    setCandidates([]);
+    setCandIdx(0);
+    if (!f) return;
+    setProbing(true);
+    try {
+      const found = await probeForIdentity(f, setProgress);
+      setCandidates(found);
+      if (!found.length) {
+        toast.info("Could not isolate two players automatically — the scan will label players by camera depth.");
+      }
+    } catch {
+      toast.error("Could not read frames from that video.");
+    } finally {
+      setProbing(false);
+      setProgress(null);
+    }
+  };
+
   const run = useMutation({
-    mutationFn: async (f: File): Promise<MatchReport> => {
+    mutationFn: async (input: { f: File; identity: IdentityPick | null }): Promise<MatchReport> => {
+      const { f } = input;
       const controller = new AbortController();
       abortRef.current = controller;
       setReport(null);
       setAiStage(null);
 
-      const { payload, measured } = await scanSquashVideo(f, setProgress, controller.signal);
+      const { payload, measured } = await scanSquashVideo(
+        f,
+        setProgress,
+        controller.signal,
+        input.identity ?? undefined,
+      );
       // Measured numbers land on screen before the AI leg runs.
       const base: MatchReport = {
         measured,
@@ -344,11 +384,25 @@ export function AiVideoView() {
 
   const busy = run.isPending;
   const insight: SquashInsight | null = report?.insight ?? null;
+  const activeCandidate = candidates[candIdx] ?? null;
+
+  /** Re-measure the match with the other player treated as you. */
+  const swapPlayers = () => {
+    if (!file || !identity?.otherSig) return;
+    const next: IdentityPick = {
+      sig: identity.otherSig,
+      otherSig: identity.sig,
+      atSec: identity.atSec,
+    };
+    setIdentity(next);
+    run.mutate({ f: file, identity: next });
+  };
 
   const pastItems = useMemo(
     () => (Array.isArray(history.data) ? history.data : []),
     [history.data],
   );
+
 
   return (
     <div className="space-y-4">
@@ -366,16 +420,14 @@ export function AiVideoView() {
           accept="video/*"
           className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            setFile(f);
-            setReport(null);
+            void onPickFile(e.target.files?.[0] ?? null);
           }}
         />
         <div className="space-y-3">
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            disabled={busy}
+            disabled={busy || probing}
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-vyro-line bg-vyro-text/[0.03] px-4 py-6 text-sm font-semibold text-vyro-text/90 disabled:opacity-50"
           >
             <Upload className="h-4 w-4" />
@@ -390,12 +442,12 @@ export function AiVideoView() {
           )}
           <button
             type="button"
-            disabled={!file || busy}
-            onClick={() => file && run.mutate(file)}
+            disabled={!file || busy || probing}
+            onClick={() => file && run.mutate({ f: file, identity })}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-vyro-mint px-4 py-3 text-sm font-bold text-black disabled:opacity-40"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            {busy ? "Analysing…" : "Analyse match"}
+            {busy ? "Analysing…" : identity ? "Analyse match" : "Analyse match (auto-detect players)"}
           </button>
           {!busy && !report && (
             <p className="text-[11px] leading-snug text-vyro-mute">
@@ -403,6 +455,7 @@ export function AiVideoView() {
               second, both players are tracked, then the AI reads every detected contact frame.
             </p>
           )}
+
           {(progress || aiStage) && (
             <div className="space-y-1.5">
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-vyro-text/10">
@@ -427,6 +480,115 @@ export function AiVideoView() {
         </div>
       </Card>
 
+      {(probing || activeCandidate) && !busy && (
+        <Card
+          eyebrow="Step 2"
+          title="Which player is you?"
+          action={
+            identity ? (
+              <Pill tone="live">YOU SELECTED</Pill>
+            ) : (
+              <Pill tone="off">{probing ? "FINDING FRAME" : "TAP YOURSELF"}</Pill>
+            )
+          }
+        >
+          {probing && (
+            <div className="flex items-center gap-2 text-xs text-vyro-mute">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Finding a frame where both players are clearly apart…
+            </div>
+          )}
+
+          {!probing && activeCandidate && (
+            <div className="space-y-3">
+              <p className="text-[11px] leading-snug text-vyro-mute">
+                Tap yourself in the frame. Your kit colour is then used to follow you through every
+                crossing, so your heat map and T stats are yours — not your opponent's.
+              </p>
+
+              <div className="relative overflow-hidden rounded-2xl border border-vyro-line">
+                <img
+                  src={activeCandidate.image}
+                  alt={`Match frame at ${activeCandidate.t.toFixed(1)} seconds with both players visible`}
+                  className="block w-full"
+                />
+                {activeCandidate.players.map((p, i) => {
+                  const chosen =
+                    identity !== null &&
+                    identity.atSec === activeCandidate.t &&
+                    identity.sig === p.sig;
+                  return (
+                    <button
+                      key={`${p.x}-${p.y}-${i}`}
+                      type="button"
+                      onClick={() =>
+                        setIdentity({
+                          sig: p.sig,
+                          otherSig: activeCandidate.players.find((o) => o !== p)?.sig,
+                          atSec: activeCandidate.t,
+                        })
+                      }
+                      aria-label={`That is me — player ${i + 1}`}
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 transition ${
+                        chosen
+                          ? "border-vyro-mint bg-vyro-mint/25"
+                          : "border-white/70 bg-black/20 hover:bg-black/10"
+                      }`}
+                      style={{
+                        left: `${Math.min(92, Math.max(8, p.x * 100))}%`,
+                        top: `${Math.min(88, Math.max(12, p.y * 100))}%`,
+                        width: `${Math.min(20, Math.max(10, p.w * 100 * 1.4))}%`,
+                        height: `${Math.min(34, Math.max(16, p.h * 100 * 1.2))}%`,
+                      }}
+                    >
+                      <span
+                        className={`absolute -top-2 left-1/2 -translate-x-1/2 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          chosen ? "bg-vyro-mint text-black" : "bg-black/80 text-white"
+                        }`}
+                      >
+                        {chosen ? "ME" : i + 1}
+                      </span>
+                      <span
+                        className="absolute bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-white/60"
+                        style={{ background: p.swatch }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {candidates.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setCandIdx((i) => (i + 1) % candidates.length)}
+                    className="rounded-xl border border-vyro-line px-3 py-1.5 text-[11px] font-semibold text-vyro-text/80"
+                  >
+                    Show another frame
+                  </button>
+                )}
+                {identity && (
+                  <button
+                    type="button"
+                    onClick={() => setIdentity(null)}
+                    className="rounded-xl border border-vyro-line px-3 py-1.5 text-[11px] font-semibold text-vyro-text/80"
+                  >
+                    Clear selection
+                  </button>
+                )}
+                <span className="text-[11px] text-vyro-mute">
+                  {identity
+                    ? `Locked at ${activeCandidate.t.toFixed(1)}s — run the scan above.`
+                    : "Without a tap the scan falls back to guessing by camera depth."}
+                </span>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+
+
       {!report && !busy && (
         <EmptyState
           title="No analysis yet"
@@ -436,6 +598,26 @@ export function AiVideoView() {
 
       {report && (
         <>
+          <Card
+            eyebrow="Player identity"
+            title={report.measured.identitySource === "tapped" ? "You picked yourself" : "Players detected automatically"}
+          >
+            <p className="text-[13px] leading-snug text-vyro-text/85">
+              {report.measured.identitySource === "tapped"
+                ? `Followed by kit colour and movement — the two players stayed clearly separable in ${report.measured.identityConfidencePercent}% of tracked frames.`
+                : "No tap was given, so the player nearer the camera across the clip was treated as you. If the stats below look like your opponent's, re-select the video and tap yourself."}
+            </p>
+            {identity?.otherSig && !busy && (
+              <button
+                type="button"
+                onClick={swapPlayers}
+                className="mt-3 rounded-xl border border-vyro-line px-3 py-1.5 text-[11px] font-semibold text-vyro-text/80"
+              >
+                That's not me — swap players and re-measure
+              </button>
+            )}
+          </Card>
+
           {insight && (
             <Card eyebrow={`Confidence · ${insight.confidence}`} title={insight.headline}>
               <p className="text-[13px] leading-relaxed text-vyro-text/85">{insight.summary}</p>
@@ -443,6 +625,7 @@ export function AiVideoView() {
           )}
 
           <MeasuredPanels measured={report.measured} />
+
           {insight?.tNote && (
             <Card eyebrow="Coach read" title="On your T discipline">
               <p className="text-[13px] leading-snug text-vyro-text/85">{insight.tNote}</p>

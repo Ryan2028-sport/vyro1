@@ -20,12 +20,46 @@ const MAX_CHECKPOINTS = 2400;
 const MAX_EVIDENCE = 30;
 const DIFF_THRESHOLD = 13;
 const MIN_BLOB_CELLS = 5;
+const COLOUR_WEIGHT = 0.9; // how much kit colour counts against position when matching
 const MAX_BLOB_FRACTION = 0.22; // a blob bigger than this is a light change, not a body
 
 export type ScanStage = "load" | "scan" | "track" | "frames" | "done";
 export type ScanProgress = { ratio: number; label: string; stage: ScanStage; elapsedSec: number };
 
-type Blob = { x: number; y: number; mass: number; cells: number; w: number; h: number };
+/** Lighting-tolerant colour signature: chroma ratios + relative luminance. */
+export type ColourSig = { r: number; g: number; b: number; l: number };
+
+/** One player the probe found in a candidate frame, for the tap UI. */
+export type IdentityChoice = {
+  /** normalised centre + box in the displayed frame */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  sig: ColourSig;
+  /** css colour of that player's kit, for the swatch */
+  swatch: string;
+};
+
+export type IdentityCandidate = {
+  t: number;
+  /** jpeg data URL of the full frame */
+  image: string;
+  players: IdentityChoice[];
+};
+
+/** What the user picked on the identify screen. */
+export type IdentityPick = { sig: ColourSig; otherSig?: ColourSig; atSec: number };
+
+type Blob = {
+  x: number;
+  y: number;
+  mass: number;
+  cells: number;
+  w: number;
+  h: number;
+  sig: ColourSig;
+};
 type Frame = { t: number; motion: number; blobs: Blob[] };
 type Pos = { x: number; y: number } | null;
 
@@ -35,6 +69,34 @@ export class ScanAborted extends Error {
     this.name = "ScanAborted";
   }
 }
+
+function sigOf(r: number, g: number, b: number): ColourSig {
+  const sum = Math.max(1, r + g + b);
+  return { r: r / sum, g: g / sum, b: b / sum, l: Math.min(1, sum / 765) };
+}
+
+/** 0 = same kit colour, ~1 = completely different. */
+function sigDist(a: ColourSig, b: ColourSig): number {
+  const chroma = Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b) * 2.4;
+  const lum = Math.abs(a.l - b.l) * 0.55;
+  return chroma + lum;
+}
+
+function blendSig(a: ColourSig, b: ColourSig, k: number): ColourSig {
+  return {
+    r: a.r * (1 - k) + b.r * k,
+    g: a.g * (1 - k) + b.g * k,
+    b: a.b * (1 - k) + b.b * k,
+    l: a.l * (1 - k) + b.l * k,
+  };
+}
+
+function sigToCss(s: ColourSig): string {
+  const scale = 255 * Math.max(0.35, Math.min(1, s.l * 2.4));
+  const peak = Math.max(s.r, s.g, s.b) || 1;
+  return `rgb(${Math.round((s.r / peak) * scale)}, ${Math.round((s.g / peak) * scale)}, ${Math.round((s.b / peak) * scale)})`;
+}
+
 
 function seek(video: HTMLVideoElement, time: number): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -83,8 +145,13 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
   });
 }
 
-/** 4-neighbour connected components over the foreground mask. */
-function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray): Blob[] {
+/**
+ * 4-neighbour connected components over the foreground mask. `px` is the RGBA
+ * data of the same downscaled frame, so every blob also carries the kit-colour
+ * signature of the pixels that make it up — that is what keeps "you" as you
+ * when the two players cross.
+ */
+function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray, px: Uint8ClampedArray): Blob[] {
   const seen = new Uint8Array(GRID * GRID);
   const stack: number[] = [];
   const blobs: Blob[] = [];
@@ -99,6 +166,9 @@ function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray): Blob[] {
     let mass = 0;
     let sx = 0;
     let sy = 0;
+    let sr = 0;
+    let sg = 0;
+    let sb = 0;
     let minX = GRID, maxX = 0, minY = GRID, maxY = 0;
 
     while (stack.length) {
@@ -110,6 +180,9 @@ function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray): Blob[] {
       mass += w;
       sx += gx * w;
       sy += gy * w;
+      sr += px[idx * 4]! * w;
+      sg += px[idx * 4 + 1]! * w;
+      sb += px[idx * 4 + 2]! * w;
       if (gx < minX) minX = gx;
       if (gx > maxX) maxX = gx;
       if (gy < minY) minY = gy;
@@ -124,8 +197,17 @@ function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray): Blob[] {
     if (cells < MIN_BLOB_CELLS || cells > limit || mass <= 0) continue;
     const w = (maxX - minX + 1) / GRID;
     const h = (maxY - minY + 1) / GRID;
-    blobs.push({ x: (sx / mass + 0.5) / GRID, y: (sy / mass + 0.5) / GRID, mass, cells, w, h });
+    blobs.push({
+      x: (sx / mass + 0.5) / GRID,
+      y: (sy / mass + 0.5) / GRID,
+      mass,
+      cells,
+      w,
+      h,
+      sig: sigOf(sr / mass, sg / mass, sb / mass),
+    });
   }
+
 
   // Body-like: reasonably tall and compact. Score by mass with a shape bonus.
   const score = (b: Blob) => {
@@ -157,6 +239,126 @@ function mean(list: number[]): number {
   return list.length ? list.reduce((a, b) => a + b, 0) / list.length : 0;
 }
 
+/**
+ * Fast pre-pass (a few seconds) whose only job is to find a frame where both
+ * players are clearly visible and well apart, so the user can tap themselves.
+ * No metrics come out of this — it never guesses who is who.
+ */
+export async function probeForIdentity(
+  file: File,
+  onProgress?: (p: ScanProgress) => void,
+  signal?: AbortSignal,
+): Promise<IdentityCandidate[]> {
+  const started = Date.now();
+  const elapsed = () => Number(((Date.now() - started) / 1000).toFixed(1));
+  const url = URL.createObjectURL(file);
+
+  try {
+    onProgress?.({ ratio: 0.05, label: "Looking for a frame with both players…", stage: "load", elapsedSec: elapsed() });
+    const video = await loadVideo(url);
+    const duration = video.duration;
+
+    const SAMPLES = 22;
+    const times: number[] = [];
+    for (let k = 0; k < SAMPLES; k++) {
+      const t = 0.08 + (duration - 0.3) * ((k + 0.5) / SAMPLES);
+      if (t > 0 && t < duration) times.push(t);
+    }
+
+    const small = document.createElement("canvas");
+    small.width = GRID;
+    small.height = GRID;
+    const sctx = small.getContext("2d", { willReadFrequently: true });
+    const big = document.createElement("canvas");
+    const bctx = big.getContext("2d");
+    if (!sctx || !bctx) throw new Error("Canvas is unavailable in this browser.");
+
+    const targetW = 760;
+    const scale = video.videoWidth ? Math.min(1, targetW / video.videoWidth) : 1;
+    big.width = Math.max(240, Math.round((video.videoWidth || targetW) * scale));
+    big.height = Math.max(135, Math.round((video.videoHeight || 428) * scale));
+
+    // First pass: learn a background from the samples themselves so a player
+    // standing still is still foreground.
+    const grays: Uint8ClampedArray[] = [];
+    const colours: Uint8ClampedArray[] = [];
+    for (const t of times) {
+      if (signal?.aborted) throw new ScanAborted();
+      await seek(video, t);
+      sctx.drawImage(video, 0, 0, GRID, GRID);
+      const px = sctx.getImageData(0, 0, GRID, GRID).data;
+      const gray = new Uint8ClampedArray(GRID * GRID);
+      for (let p = 0; p < GRID * GRID; p++) {
+        gray[p] = (px[p * 4]! * 0.299 + px[p * 4 + 1]! * 0.587 + px[p * 4 + 2]! * 0.114) | 0;
+      }
+      grays.push(gray);
+      colours.push(new Uint8ClampedArray(px));
+    }
+    if (!grays.length) throw new Error("Could not read any frame from this video.");
+
+    // Per-pixel median across samples = empty court.
+    const bg = new Uint8ClampedArray(GRID * GRID);
+    const column: number[] = [];
+    for (let p = 0; p < GRID * GRID; p++) {
+      column.length = 0;
+      for (const g of grays) column.push(g[p]!);
+      column.sort((a, b) => a - b);
+      bg[p] = column[Math.floor(column.length / 2)]!;
+    }
+
+    const mask = new Uint8Array(GRID * GRID);
+    const weight = new Uint8ClampedArray(GRID * GRID);
+    type Scored = { t: number; index: number; blobs: Blob[]; score: number };
+    const scored: Scored[] = [];
+
+    for (let i = 0; i < grays.length; i++) {
+      const gray = grays[i]!;
+      let fg = 0;
+      for (let p = 0; p < GRID * GRID; p++) {
+        const d = Math.abs(gray[p]! - bg[p]!);
+        const on = d > DIFF_THRESHOLD + 2;
+        mask[p] = on ? 1 : 0;
+        weight[p] = on ? Math.min(255, d) : 0;
+        if (on) fg += 1;
+      }
+      if (fg > GRID * GRID * 0.5) continue;
+      const blobs = extractBlobs(mask, weight, colours[i]!);
+      if (blobs.length < 2) continue;
+      const [a, b] = [blobs[0]!, blobs[1]!];
+      const apart = Math.hypot(a.x - b.x, a.y - b.y);
+      const colourGap = sigDist(a.sig, b.sig);
+      if (apart < 0.18) continue;
+      scored.push({ t: times[i]!, index: i, blobs, score: apart * 2 + colourGap + Math.min(1, (a.mass + b.mass) / 8000) });
+    }
+
+    scored.sort((x, y) => y.score - x.score);
+    const chosen = scored.slice(0, 3);
+    const candidates: IdentityCandidate[] = [];
+    for (const s of chosen) {
+      if (signal?.aborted) throw new ScanAborted();
+      await seek(video, s.t);
+      bctx.drawImage(video, 0, 0, big.width, big.height);
+      candidates.push({
+        t: Number(s.t.toFixed(2)),
+        image: big.toDataURL("image/jpeg", 0.72),
+        players: s.blobs.slice(0, 2).map((b) => ({
+          x: Number(b.x.toFixed(4)),
+          y: Number(b.y.toFixed(4)),
+          w: Number(Math.max(0.06, b.w).toFixed(4)),
+          h: Number(Math.max(0.1, b.h).toFixed(4)),
+          sig: b.sig,
+          swatch: sigToCss(b.sig),
+        })),
+      });
+    }
+
+    onProgress?.({ ratio: 1, label: "Ready to identify players", stage: "done", elapsedSec: elapsed() });
+    return candidates;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export type ScanResult = {
   payload: ClipInput;
   measured: MeasuredStats;
@@ -166,7 +368,9 @@ export async function scanSquashVideo(
   file: File,
   onProgress: (p: ScanProgress) => void,
   signal?: AbortSignal,
+  identity?: IdentityPick,
 ): Promise<ScanResult> {
+
   const started = Date.now();
   const elapsed = () => Number(((Date.now() - started) / 1000).toFixed(1));
   const abortIfNeeded = () => {
@@ -233,7 +437,7 @@ export async function scanSquashVideo(
         // A huge foreground means the camera moved or the scene cut — skip it.
         const usable = fgCells < GRID * GRID * 0.5;
         const motion = Math.max(0, Math.min(100, Math.round((motionTotal / (GRID * GRID * 26)) * 100)));
-        frames.push({ t: times[i]!, motion, blobs: usable ? extractBlobs(mask, weight) : [] });
+        frames.push({ t: times[i]!, motion, blobs: usable ? extractBlobs(mask, weight, px) : [] });
       }
 
       // Slow background update: fast enough for lighting drift, slow enough
@@ -272,8 +476,16 @@ export async function scanSquashVideo(
     const courtX = (x: number) => Math.max(0, Math.min(1, (x - x0) / spanX));
     const courtY = (y: number) => Math.max(0, Math.min(1, (y - y0) / spanY));
 
-    // ---- track two movers with position prediction ------------------------
-    type Track = { pos: { x: number; y: number }; vel: { x: number; y: number }; miss: number };
+    // ---- track two movers: position prediction + kit colour ---------------
+    // Track A is YOU when an identity was tapped (its colour signature is
+    // seeded from your kit), otherwise A/B are anonymous and labelled by depth
+    // at the end, as before.
+    type Track = {
+      pos: { x: number; y: number };
+      vel: { x: number; y: number };
+      miss: number;
+      sig: ColourSig;
+    };
     let A: Track | null = null;
     let B: Track | null = null;
     const rawA: Pos[] = [];
@@ -282,18 +494,30 @@ export async function scanSquashVideo(
     const massB: number[] = [];
     let twoBlobFrames = 0;
     let activeFrames = 0;
+    let identityFrames = 0;
+    let identityConfidentFrames = 0;
+
+    // Seeds from the tap. `sigA` is you.
+    let sigA: ColourSig | null = identity?.sig ?? null;
+    let sigB: ColourSig | null = identity?.otherSig ?? null;
 
     const predict = (tr: Track | null): Pos =>
       tr ? { x: tr.pos.x + tr.vel.x, y: tr.pos.y + tr.vel.y } : null;
     const gap = (p: Pos, b: Blob) => (p ? Math.hypot(p.x - b.x, p.y - b.y) : 1.5);
     const update = (tr: Track | null, b: Blob): Track => {
-      if (!tr) return { pos: { x: b.x, y: b.y }, vel: { x: 0, y: 0 }, miss: 0 };
+      if (!tr) return { pos: { x: b.x, y: b.y }, vel: { x: 0, y: 0 }, miss: 0, sig: b.sig };
       return {
         pos: { x: b.x, y: b.y },
         vel: { x: (b.x - tr.pos.x) * 0.6 + tr.vel.x * 0.4, y: (b.y - tr.pos.y) * 0.6 + tr.vel.y * 0.4 },
         miss: 0,
+        // Slow colour memory: survives a shadowed corner, still adapts to light.
+        sig: blendSig(tr.sig, b.sig, 0.12),
       };
     };
+    // Colour reference for a track: the tapped kit first, then what it has seen.
+    const refSig = (tr: Track | null, seed: ColourSig | null): ColourSig | null =>
+      seed ? (tr ? blendSig(seed, tr.sig, 0.35) : seed) : tr ? tr.sig : null;
+    const colourCost = (ref: ColourSig | null, b: Blob) => (ref ? sigDist(ref, b.sig) : 0);
 
     for (const f of frames) {
       const blobs = f.blobs;
@@ -301,25 +525,40 @@ export async function scanSquashVideo(
       let pickB: Blob | null = null;
       const pa = predict(A);
       const pb = predict(B);
+      const ra = refSig(A, sigA);
+      const rb = refSig(B, sigB);
 
       if (blobs.length >= 2) {
         twoBlobFrames += 1;
         const [b1, b2] = [blobs[0]!, blobs[1]!];
-        if (!A || !B) {
-          // Seed: camera sits behind the court, so the lower blob is nearer.
+        if (identity && (!A || !B)) {
+          // Seed by kit colour: whichever blob looks most like the tapped
+          // player becomes track A. No camera-angle assumption at all.
+          const d1 = sigDist(identity.sig, b1.sig);
+          const d2 = sigDist(identity.sig, b2.sig);
+          if (d1 <= d2) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+          if (!sigB) sigB = pickB.sig;
+        } else if (!A || !B) {
+          // No identity: camera usually sits behind the court, lower = nearer.
           if (b1.y >= b2.y) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
         } else {
-          const straight = gap(pa, b1) + gap(pb, b2);
-          const swapped = gap(pa, b2) + gap(pb, b1);
+          // Position continuity plus colour. Colour is what carries identity
+          // through a crossing, where position alone flips the two players.
+          const straight = gap(pa, b1) + gap(pb, b2) + (colourCost(ra, b1) + colourCost(rb, b2)) * COLOUR_WEIGHT;
+          const swapped = gap(pa, b2) + gap(pb, b1) + (colourCost(ra, b2) + colourCost(rb, b1)) * COLOUR_WEIGHT;
           if (straight <= swapped) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+          if (identity) {
+            identityFrames += 1;
+            if (Math.abs(straight - swapped) > 0.06) identityConfidentFrames += 1;
+          }
         }
       } else if (blobs.length === 1) {
         const b = blobs[0]!;
-        const da = gap(pa, b);
-        const db = gap(pb, b);
+        const da = gap(pa, b) + colourCost(ra, b) * COLOUR_WEIGHT;
+        const db = gap(pb, b) + colourCost(rb, b) * COLOUR_WEIGHT;
         // A single blob only claims a track when it is plausibly that track.
-        if (da <= db && da < 0.3) pickA = b;
-        else if (db < da && db < 0.3) pickB = b;
+        if (da <= db && da < 0.35) pickA = b;
+        else if (db < da && db < 0.35) pickB = b;
         else if (!A) pickA = b;
         else if (!B) pickB = b;
         else if (da <= db) pickA = b;
@@ -341,18 +580,29 @@ export async function scanSquashVideo(
       if (f.motion > 0) activeFrames += 1;
     }
 
-    // "You" is the mover living closer to the camera across the WHOLE clip,
-    // not whichever blob happened to seed the tracker first.
-    const depthA = mean(rawA.filter(Boolean).map((p) => p!.y));
-    const depthB = mean(rawB.filter(Boolean).map((p) => p!.y));
-    const flip = depthB > depthA + 0.02;
+    // With a tapped identity, track A IS you — no depth guess. Without one,
+    // fall back to "the mover living closer to the camera across the clip".
+    let flip = false;
+    if (!identity) {
+      const depthA = mean(rawA.filter(Boolean).map((p) => p!.y));
+      const depthB = mean(rawB.filter(Boolean).map((p) => p!.y));
+      flip = depthB > depthA + 0.02;
+    }
     const rawPlayer = flip ? rawB : rawA;
     const rawOpp = flip ? rawA : rawB;
     const playerMass = flip ? massB : massA;
     const opponentMass = flip ? massA : massB;
 
+    const identitySource: MeasuredStats["identitySource"] = identity ? "tapped" : "auto";
+    const identityConfidencePercent = identity
+      ? identityFrames
+        ? Number(((identityConfidentFrames / identityFrames) * 100).toFixed(1))
+        : 0
+      : 0;
+
     const playerPos: Pos[] = rawPlayer.map((p) => (p ? { x: courtX(p.x), y: courtY(p.y) } : null));
     const opponentPos: Pos[] = rawOpp.map((p) => (p ? { x: courtX(p.x), y: courtY(p.y) } : null));
+
 
     // ---- anchor the court grid on the real T ------------------------------
     const occX: number[] = [];
@@ -652,7 +902,10 @@ export async function scanSquashVideo(
       averageMotion: Number(averageMotion.toFixed(1)),
       peakMotion,
       fatigueDriftPercent: Number(Math.max(-100, Math.min(100, fatigueDrift)).toFixed(1)),
+      identitySource,
+      identityConfidencePercent,
     };
+
 
     onProgress({ ratio: 0.93, label: "Verifying frames with the AI…", stage: "done", elapsedSec: elapsed() });
 

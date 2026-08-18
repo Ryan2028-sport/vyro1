@@ -47,7 +47,12 @@ export const MeasuredSchema = z.object({
   averageMotion: z.number().min(0).max(100),
   peakMotion: z.number().min(0).max(100),
   fatigueDriftPercent: z.number().min(-100).max(100),
+  /** "tapped" = the user pointed at themselves; "auto" = camera-depth guess. */
+  identitySource: z.enum(["tapped", "auto"]).default("auto"),
+  /** How often the two players stayed clearly separable, 0-100. */
+  identityConfidencePercent: z.number().min(0).max(100).default(0),
 });
+
 
 export type MeasuredStats = z.infer<typeof MeasuredSchema>;
 
@@ -234,6 +239,10 @@ export function buildSynthesisPrompt(data: ClipInput, verified: VerifiedCounts |
     `Squash match "${data.videoName}", ${data.durationSec.toFixed(1)}s long.\n\n` +
     `MEASURED BY THE SCAN (trust these, they come from the pixels):\n` +
     `  checkpoints ${m.scannedFrames} every ${m.sampleEverySec}s; both players tracked cleanly in ${m.twoPlayerTrackPercent}% of active frames\n` +
+    (m.identitySource === "tapped"
+      ? `  which player is "you": chosen by the user on a frame and followed by kit colour (clear separation in ${m.identityConfidencePercent}% of tracked frames)\n`
+      : `  which player is "you": inferred from camera depth, not confirmed by the user — do not make claims that depend on the two players not being mixed up\n`) +
+
     `  contacts detected ${m.contactCount} (you ${m.playerContacts}, opponent ${m.opponentContacts})\n` +
     `  rallies ${m.rallyCount}, avg ${m.avgShotsPerRally} shots/rally, longest ${m.longestRallyShots} shots, buckets ${JSON.stringify(m.rallyBuckets)}\n` +
     `  work ${m.activeSeconds}s vs rest ${m.restSeconds}s (ratio ${m.workRestRatio})\n` +
