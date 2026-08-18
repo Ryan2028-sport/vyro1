@@ -535,10 +535,10 @@ export function AiVideoView() {
                           : "border-white/70 bg-black/20 hover:bg-black/10"
                       }`}
                       style={{
-                        left: `${p.x * 100}%`,
-                        top: `${p.y * 100}%`,
-                        width: `${Math.max(9, p.w * 100 * 1.5)}%`,
-                        height: `${Math.max(14, p.h * 100 * 1.3)}%`,
+                        left: `${Math.min(92, Math.max(8, p.x * 100))}%`,
+                        top: `${Math.min(88, Math.max(12, p.y * 100))}%`,
+                        width: `${Math.min(20, Math.max(10, p.w * 100 * 1.4))}%`,
+                        height: `${Math.min(34, Math.max(16, p.h * 100 * 1.2))}%`,
                       }}
                     >
                       <span
