@@ -3,7 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Upload, Play, Loader2, Video, Target, Flame, X, ShieldCheck, Ruler } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill, Stat } from "./shared";
-import { scanSquashVideo, ScanAborted, type ScanProgress } from "./aiVideo/scanVideo";
+import {
+  scanSquashVideo,
+  probeForIdentity,
+  ScanAborted,
+  type ScanProgress,
+  type IdentityCandidate,
+  type IdentityPick,
+} from "./aiVideo/scanVideo";
 import {
   ZONE_KEYS,
   type MatchReport,
