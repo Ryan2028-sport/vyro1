@@ -375,7 +375,11 @@ export async function probeForIdentity(
         if (on) fg += 1;
       }
       if (fg > GRID * GRID * 0.5) continue;
-      const blobs = extractBlobs(mask, weight, colours[i]!);
+      // Body-shaped only: drop wide banners / score bars and anything sitting in
+      // the crowd band above the court or the graphics strip at the very bottom.
+      const blobs = extractBlobs(mask, weight, colours[i]!).filter(
+        (b) => b.h / Math.max(0.02, b.w) >= 0.5 && b.y > 0.12 && b.y < 0.95,
+      );
       if (blobs.length < 2) continue;
       const [a, b] = [blobs[0]!, blobs[1]!];
       const apart = Math.hypot(a.x - b.x, a.y - b.y);
@@ -397,13 +401,14 @@ export async function probeForIdentity(
         players: s.blobs.slice(0, 2).map((b) => ({
           x: Number(b.x.toFixed(4)),
           y: Number(b.y.toFixed(4)),
-          w: Number(Math.max(0.06, b.w).toFixed(4)),
-          h: Number(Math.max(0.1, b.h).toFixed(4)),
+          w: Number(b.w.toFixed(4)),
+          h: Number(b.h.toFixed(4)),
           sig: b.sig,
           swatch: sigToCss(b.sig),
         })),
       });
     }
+
 
     onProgress?.({ ratio: 1, label: "Ready to identify players", stage: "done", elapsedSec: elapsed() });
     return candidates;
