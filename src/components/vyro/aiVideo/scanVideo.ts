@@ -903,7 +903,10 @@ export async function scanSquashVideo(
       averageMotion: Number(averageMotion.toFixed(1)),
       peakMotion,
       fatigueDriftPercent: Number(Math.max(-100, Math.min(100, fatigueDrift)).toFixed(1)),
+      identitySource,
+      identityConfidencePercent,
     };
+
 
     onProgress({ ratio: 0.93, label: "Verifying frames with the AI…", stage: "done", elapsedSec: elapsed() });
 
