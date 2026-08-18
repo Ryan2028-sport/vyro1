@@ -295,6 +295,8 @@ export function AiVideoView() {
   const [candidates, setCandidates] = useState<IdentityCandidate[]>([]);
   const [candIdx, setCandIdx] = useState(0);
   const [identity, setIdentity] = useState<IdentityPick | null>(null);
+  const [pending, setPending] = useState<{ x: number; y: number; sig: ColourSig } | null>(null);
+
   const analyze = useServerFn(analyzeSquashClip);
   const save = useServerFn(saveVideoAnalysis);
   const listFn = useServerFn(listVideoAnalyses);
