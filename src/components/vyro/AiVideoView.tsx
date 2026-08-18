@@ -420,16 +420,14 @@ export function AiVideoView() {
           accept="video/*"
           className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            setFile(f);
-            setReport(null);
+            void onPickFile(e.target.files?.[0] ?? null);
           }}
         />
         <div className="space-y-3">
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            disabled={busy}
+            disabled={busy || probing}
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-vyro-line bg-vyro-text/[0.03] px-4 py-6 text-sm font-semibold text-vyro-text/90 disabled:opacity-50"
           >
             <Upload className="h-4 w-4" />
@@ -444,12 +442,12 @@ export function AiVideoView() {
           )}
           <button
             type="button"
-            disabled={!file || busy}
-            onClick={() => file && run.mutate(file)}
+            disabled={!file || busy || probing}
+            onClick={() => file && run.mutate({ f: file, identity })}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-vyro-mint px-4 py-3 text-sm font-bold text-black disabled:opacity-40"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            {busy ? "Analysing…" : "Analyse match"}
+            {busy ? "Analysing…" : identity ? "Analyse match" : "Analyse match (auto-detect players)"}
           </button>
           {!busy && !report && (
             <p className="text-[11px] leading-snug text-vyro-mute">
@@ -457,6 +455,7 @@ export function AiVideoView() {
               second, both players are tracked, then the AI reads every detected contact frame.
             </p>
           )}
+
           {(progress || aiStage) && (
             <div className="space-y-1.5">
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-vyro-text/10">
