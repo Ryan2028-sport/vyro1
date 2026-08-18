@@ -77,7 +77,7 @@ export function AiVideoView() {
 
   const history = useQuery({
     queryKey: ["video-analyses"],
-    queryFn: () => listFn({}),
+    queryFn: () => listFn(),
     retry: false,
   });
 
