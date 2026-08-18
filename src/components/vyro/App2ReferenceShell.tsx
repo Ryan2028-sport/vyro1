@@ -18,6 +18,7 @@ import {
   Settings2,
   Sparkles,
   Stethoscope,
+  Video,
   Trophy,
   UserRound,
 } from "lucide-react";
