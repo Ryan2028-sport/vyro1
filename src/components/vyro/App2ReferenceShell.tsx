@@ -60,6 +60,7 @@ type App2View =
   | "recovery"
   | "sleep"
   | "debug"
+  | "ai-video"
   | "session"
   | "coach"
   | "social"
