@@ -91,11 +91,64 @@ function blendSig(a: ColourSig, b: ColourSig, k: number): ColourSig {
   };
 }
 
-function sigToCss(s: ColourSig): string {
+export function sigToCss(s: ColourSig): string {
   const scale = 255 * Math.max(0.35, Math.min(1, s.l * 2.4));
   const peak = Math.max(s.r, s.g, s.b) || 1;
   return `rgb(${Math.round((s.r / peak) * scale)}, ${Math.round((s.g / peak) * scale)}, ${Math.round((s.b / peak) * scale)})`;
 }
+
+/**
+ * Read the kit colour straight from a candidate frame at a tapped point.
+ * Nothing about this depends on the motion detector, so a tap is always right.
+ * A median over the patch keeps a stray highlight from skewing the signature.
+ */
+const patchCache = new Map<string, { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D }>();
+
+async function frameCanvas(image: string) {
+  const hit = patchCache.get(image);
+  if (hit) return hit;
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("Could not read the frame."));
+    el.src = image;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas is unavailable in this browser.");
+  ctx.drawImage(img, 0, 0);
+  const entry = { canvas, ctx };
+  if (patchCache.size > 6) patchCache.clear();
+  patchCache.set(image, entry);
+  return entry;
+}
+
+/** x/y are normalised (0-1) coordinates inside the displayed frame. */
+export async function sampleSigAt(image: string, x: number, y: number): Promise<ColourSig> {
+  const { canvas, ctx } = await frameCanvas(image);
+  const size = Math.max(6, Math.round(canvas.width * 0.04));
+  const px = Math.round(Math.min(canvas.width - 1, Math.max(0, x * canvas.width)));
+  const py = Math.round(Math.min(canvas.height - 1, Math.max(0, y * canvas.height)));
+  const sx = Math.max(0, Math.min(canvas.width - size, px - Math.round(size / 2)));
+  const sy = Math.max(0, Math.min(canvas.height - size, py - Math.round(size / 2)));
+  const data = ctx.getImageData(sx, sy, Math.min(size, canvas.width), Math.min(size, canvas.height)).data;
+  const rs: number[] = [];
+  const gs: number[] = [];
+  const bs: number[] = [];
+  for (let i = 0; i < data.length; i += 4) {
+    rs.push(data[i]!);
+    gs.push(data[i + 1]!);
+    bs.push(data[i + 2]!);
+  }
+  const med = (list: number[]) => {
+    list.sort((a, b) => a - b);
+    return list[Math.floor(list.length / 2)] ?? 0;
+  };
+  return sigOf(med(rs), med(gs), med(bs));
+}
+
 
 
 function seek(video: HTMLVideoElement, time: number): Promise<void> {
@@ -322,7 +375,11 @@ export async function probeForIdentity(
         if (on) fg += 1;
       }
       if (fg > GRID * GRID * 0.5) continue;
-      const blobs = extractBlobs(mask, weight, colours[i]!);
+      // Body-shaped only: drop wide banners / score bars and anything sitting in
+      // the crowd band above the court or the graphics strip at the very bottom.
+      const blobs = extractBlobs(mask, weight, colours[i]!).filter(
+        (b) => b.h / Math.max(0.02, b.w) >= 0.5 && b.y > 0.12 && b.y < 0.95,
+      );
       if (blobs.length < 2) continue;
       const [a, b] = [blobs[0]!, blobs[1]!];
       const apart = Math.hypot(a.x - b.x, a.y - b.y);
@@ -344,13 +401,26 @@ export async function probeForIdentity(
         players: s.blobs.slice(0, 2).map((b) => ({
           x: Number(b.x.toFixed(4)),
           y: Number(b.y.toFixed(4)),
-          w: Number(Math.max(0.06, b.w).toFixed(4)),
-          h: Number(Math.max(0.1, b.h).toFixed(4)),
+          w: Number(b.w.toFixed(4)),
+          h: Number(b.h.toFixed(4)),
           sig: b.sig,
           swatch: sigToCss(b.sig),
         })),
       });
     }
+
+    // Even with no confident detection the user can still tap themselves, so
+    // always hand back some frames to tap on.
+    if (!candidates.length) {
+      const fallbackTimes = times.filter((_, i) => i % Math.max(1, Math.floor(times.length / 3)) === 0).slice(0, 3);
+      for (const t of fallbackTimes) {
+        if (signal?.aborted) throw new ScanAborted();
+        await seek(video, t);
+        bctx.drawImage(video, 0, 0, big.width, big.height);
+        candidates.push({ t: Number(t.toFixed(2)), image: big.toDataURL("image/jpeg", 0.72), players: [] });
+      }
+    }
+
 
     onProgress?.({ ratio: 1, label: "Ready to identify players", stage: "done", elapsedSec: elapsed() });
     return candidates;
