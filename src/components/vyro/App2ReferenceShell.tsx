@@ -1056,6 +1056,14 @@ function EmbeddedView({
       </div>
     );
   }
+  if (view === "ai-video") {
+    return (
+      <div className="app2-scroll-embed">
+        <AiVideoView />
+      </div>
+    );
+  }
+
   if (view === "coach") {
     return (
       <div className="app2-scroll-embed">
