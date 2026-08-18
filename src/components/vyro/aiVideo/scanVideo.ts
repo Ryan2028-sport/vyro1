@@ -328,6 +328,7 @@ export async function scanSquashVideo(
       return `${depth}-${lane}`;
     };
 
+    // ---- derived stats ----------------------------------------------------
     const motions = frames.map((f) => f.motion);
     const averageMotion = motions.length ? motions.reduce((a, b) => a + b, 0) / motions.length : 0;
     const peakMotion = motions.length ? Math.max(...motions) : 0;
