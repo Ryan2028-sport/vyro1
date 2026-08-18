@@ -47,7 +47,12 @@ export const MeasuredSchema = z.object({
   averageMotion: z.number().min(0).max(100),
   peakMotion: z.number().min(0).max(100),
   fatigueDriftPercent: z.number().min(-100).max(100),
+  /** "tapped" = the user pointed at themselves; "auto" = camera-depth guess. */
+  identitySource: z.enum(["tapped", "auto"]).default("auto"),
+  /** How often the two players stayed clearly separable, 0-100. */
+  identityConfidencePercent: z.number().min(0).max(100).default(0),
 });
+
 
 export type MeasuredStats = z.infer<typeof MeasuredSchema>;
 
