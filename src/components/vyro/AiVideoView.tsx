@@ -598,6 +598,26 @@ export function AiVideoView() {
 
       {report && (
         <>
+          <Card
+            eyebrow="Player identity"
+            title={report.measured.identitySource === "tapped" ? "You picked yourself" : "Players detected automatically"}
+          >
+            <p className="text-[13px] leading-snug text-vyro-text/85">
+              {report.measured.identitySource === "tapped"
+                ? `Followed by kit colour and movement — the two players stayed clearly separable in ${report.measured.identityConfidencePercent}% of tracked frames.`
+                : "No tap was given, so the player nearer the camera across the clip was treated as you. If the stats below look like your opponent's, re-select the video and tap yourself."}
+            </p>
+            {identity?.otherSig && !busy && (
+              <button
+                type="button"
+                onClick={swapPlayers}
+                className="mt-3 rounded-xl border border-vyro-line px-3 py-1.5 text-[11px] font-semibold text-vyro-text/80"
+              >
+                That's not me — swap players and re-measure
+              </button>
+            )}
+          </Card>
+
           {insight && (
             <Card eyebrow={`Confidence · ${insight.confidence}`} title={insight.headline}>
               <p className="text-[13px] leading-relaxed text-vyro-text/85">{insight.summary}</p>
@@ -605,6 +625,7 @@ export function AiVideoView() {
           )}
 
           <MeasuredPanels measured={report.measured} />
+
           {insight?.tNote && (
             <Card eyebrow="Coach read" title="On your T discipline">
               <p className="text-[13px] leading-snug text-vyro-text/85">{insight.tNote}</p>
