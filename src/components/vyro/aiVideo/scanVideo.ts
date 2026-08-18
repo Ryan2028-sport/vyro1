@@ -1,30 +1,40 @@
 // Browser-only whole-clip scanner for the AI squash video analyser.
 // Never call at module scope — only from an event handler.
 //
-// Pipeline:
-//   1. sample the clip on a fixed cadence and build a coarse frame-difference grid
-//   2. cluster the moving pixels into up to TWO movers per frame (k-means, k=2)
-//      so the two players are separated instead of averaged into one centroid
-//   3. fit the court box from where motion actually happens in THIS clip, then
-//      map every position into normalised court coordinates
-//   4. track the two movers across frames so "you" and "your opponent" keep
-//      their identity, and derive shots, zones and recovery-to-T per player
-import { ZONE_KEYS, type ClipInput } from "@/lib/video-analysis-core";
+// Everything this file returns is MEASURED from the pixels:
+//   1. sample the clip ~4x/second and build a 64x64 luminance grid
+//   2. keep a rolling background model so a standing player is still detected
+//      and slow camera drift / crowd movement is rejected
+//   3. connected-component blobs on the foreground mask → keep the two most
+//      body-like blobs per checkpoint (the two players)
+//   4. track both blobs with position prediction so identities survive
+//      crossings; "you" = the mover that lives closer to the camera
+//   5. contacts come from a strike signal (own-motion spike + direction
+//      reversal / deceleration), not a bare global motion peak
+//   6. court box + T are fitted to where play actually happens in THIS clip
+import { ZONE_KEYS, type ClipInput, type MeasuredStats } from "@/lib/video-analysis-core";
 
-const GRID = 24; // diff grid resolution (GRID x GRID cells)
-const MAX_CHECKPOINTS = 420;
-export type ScanProgress = { ratio: number; label: string };
+const GRID = 64;
+const TARGET_FPS = 4;
+const MAX_CHECKPOINTS = 2400;
+const MAX_EVIDENCE = 30;
+const DIFF_THRESHOLD = 13;
+const MIN_BLOB_CELLS = 5;
+const MAX_BLOB_FRACTION = 0.22; // a blob bigger than this is a light change, not a body
 
-type Det = { x: number; y: number; mass: number };
+export type ScanStage = "load" | "scan" | "track" | "frames" | "done";
+export type ScanProgress = { ratio: number; label: string; stage: ScanStage; elapsedSec: number };
 
-type Frame = {
-  t: number;
-  motion: number;
-  brightness: number;
-  dets: Det[]; // 0, 1 or 2 movers, strongest first (raw frame coords)
-};
-
+type Blob = { x: number; y: number; mass: number; cells: number; w: number; h: number };
+type Frame = { t: number; motion: number; blobs: Blob[] };
 type Pos = { x: number; y: number } | null;
+
+export class ScanAborted extends Error {
+  constructor() {
+    super("Scan cancelled.");
+    this.name = "ScanAborted";
+  }
+}
 
 function seek(video: HTMLVideoElement, time: number): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -73,71 +83,68 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
   });
 }
 
-/** Split moving cells into up to two movers with a tiny weighted k-means. */
-function clusterMovers(cells: Array<{ x: number; y: number; v: number }>, total: number): Det[] {
-  if (!cells.length || total <= 0) return [];
-  // Single centroid fallback.
-  const cx = cells.reduce((a, c) => a + c.x * c.v, 0) / total;
-  const cy = cells.reduce((a, c) => a + c.y * c.v, 0) / total;
-  if (cells.length < 4) return [{ x: cx, y: cy, mass: total }];
+/** 4-neighbour connected components over the foreground mask. */
+function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray): Blob[] {
+  const seen = new Uint8Array(GRID * GRID);
+  const stack: number[] = [];
+  const blobs: Blob[] = [];
+  const limit = GRID * GRID * MAX_BLOB_FRACTION;
 
-  // Seed the two centres at the two most distant heavy cells.
-  let seedA = cells[0]!;
-  for (const c of cells) if (c.v > seedA.v) seedA = c;
-  let seedB = cells[0]!;
-  let bestScore = -1;
-  for (const c of cells) {
-    const score = Math.hypot(c.x - seedA.x, c.y - seedA.y) * c.v;
-    if (score > bestScore) {
-      bestScore = score;
-      seedB = c;
-    }
-  }
-  let ax = seedA.x;
-  let ay = seedA.y;
-  let bx = seedB.x;
-  let by = seedB.y;
+  for (let start = 0; start < GRID * GRID; start++) {
+    if (!mask[start] || seen[start]) continue;
+    stack.length = 0;
+    stack.push(start);
+    seen[start] = 1;
+    let cells = 0;
+    let mass = 0;
+    let sx = 0;
+    let sy = 0;
+    let minX = GRID, maxX = 0, minY = GRID, maxY = 0;
 
-  let massA = 0;
-  let massB = 0;
-  for (let iter = 0; iter < 5; iter++) {
-    let sax = 0, say = 0, sbx = 0, sby = 0;
-    massA = 0;
-    massB = 0;
-    for (const c of cells) {
-      const da = Math.hypot(c.x - ax, c.y - ay);
-      const db = Math.hypot(c.x - bx, c.y - by);
-      if (da <= db) {
-        massA += c.v;
-        sax += c.x * c.v;
-        say += c.y * c.v;
-      } else {
-        massB += c.v;
-        sbx += c.x * c.v;
-        sby += c.y * c.v;
-      }
+    while (stack.length) {
+      const idx = stack.pop()!;
+      const gx = idx % GRID;
+      const gy = (idx - gx) / GRID;
+      const w = weight[idx]! || 1;
+      cells += 1;
+      mass += w;
+      sx += gx * w;
+      sy += gy * w;
+      if (gx < minX) minX = gx;
+      if (gx > maxX) maxX = gx;
+      if (gy < minY) minY = gy;
+      if (gy > maxY) maxY = gy;
+
+      if (gx > 0 && mask[idx - 1] && !seen[idx - 1]) { seen[idx - 1] = 1; stack.push(idx - 1); }
+      if (gx < GRID - 1 && mask[idx + 1] && !seen[idx + 1]) { seen[idx + 1] = 1; stack.push(idx + 1); }
+      if (gy > 0 && mask[idx - GRID] && !seen[idx - GRID]) { seen[idx - GRID] = 1; stack.push(idx - GRID); }
+      if (gy < GRID - 1 && mask[idx + GRID] && !seen[idx + GRID]) { seen[idx + GRID] = 1; stack.push(idx + GRID); }
     }
-    if (massA > 0) {
-      ax = sax / massA;
-      ay = say / massA;
-    }
-    if (massB > 0) {
-      bx = sbx / massB;
-      by = sby / massB;
-    }
+
+    if (cells < MIN_BLOB_CELLS || cells > limit || mass <= 0) continue;
+    const w = (maxX - minX + 1) / GRID;
+    const h = (maxY - minY + 1) / GRID;
+    blobs.push({ x: (sx / mass + 0.5) / GRID, y: (sy / mass + 0.5) / GRID, mass, cells, w, h });
   }
 
-  const separation = Math.hypot(ax - bx, ay - by);
-  const weaker = Math.min(massA, massB);
-  // One blob (or two overlapping bodies) → report a single mover.
-  if (separation < 0.14 || weaker < total * 0.14) return [{ x: cx, y: cy, mass: total }];
+  // Body-like: reasonably tall and compact. Score by mass with a shape bonus.
+  const score = (b: Blob) => {
+    const aspect = b.h / Math.max(0.02, b.w);
+    const shape = aspect >= 0.8 && aspect <= 4 ? 1.35 : aspect >= 0.5 ? 1 : 0.7;
+    const fill = b.cells / Math.max(1, (b.w * GRID) * (b.h * GRID));
+    const solid = fill > 0.25 ? 1.15 : 1;
+    return b.mass * shape * solid;
+  };
+  blobs.sort((a, b) => score(b) - score(a));
 
-  const out: Det[] = [
-    { x: ax, y: ay, mass: massA },
-    { x: bx, y: by, mass: massB },
-  ];
-  out.sort((p, q) => q.mass - p.mass);
-  return out;
+  // Keep the two strongest blobs that are actually apart from each other.
+  const kept: Blob[] = [];
+  for (const b of blobs) {
+    if (kept.length >= 2) break;
+    if (kept.some((k) => Math.hypot(k.x - b.x, k.y - b.y) < 0.12)) continue;
+    kept.push(b);
+  }
+  return kept;
 }
 
 function percentile(sorted: number[], p: number): number {
@@ -146,21 +153,36 @@ function percentile(sorted: number[], p: number): number {
   return sorted[i]!;
 }
 
+function mean(list: number[]): number {
+  return list.length ? list.reduce((a, b) => a + b, 0) / list.length : 0;
+}
+
+export type ScanResult = {
+  payload: ClipInput;
+  measured: MeasuredStats;
+};
+
 export async function scanSquashVideo(
   file: File,
   onProgress: (p: ScanProgress) => void,
-): Promise<ClipInput> {
+  signal?: AbortSignal,
+): Promise<ScanResult> {
+  const started = Date.now();
+  const elapsed = () => Number(((Date.now() - started) / 1000).toFixed(1));
+  const abortIfNeeded = () => {
+    if (signal?.aborted) throw new ScanAborted();
+  };
   const url = URL.createObjectURL(file);
+
   try {
-    onProgress({ ratio: 0.02, label: "Loading video…" });
+    onProgress({ ratio: 0.01, label: "Loading video…", stage: "load", elapsedSec: elapsed() });
     const video = await loadVideo(url);
     const duration = video.duration;
 
-    // Fixed budget of checkpoints so a 3s clip and a 60min match both stay responsive.
-    const step = Math.max(0.35, duration / MAX_CHECKPOINTS);
+    const step = Math.max(1 / TARGET_FPS, duration / MAX_CHECKPOINTS);
     const times: number[] = [];
-    for (let t = 0.05; t < duration - 0.05 && times.length < MAX_CHECKPOINTS; t += step) times.push(t);
-    if (times.length === 0) times.push(0);
+    for (let t = 0.05; t < duration - 0.03 && times.length < MAX_CHECKPOINTS; t += step) times.push(t);
+    if (!times.length) times.push(0);
 
     const small = document.createElement("canvas");
     small.width = GRID;
@@ -170,135 +192,169 @@ export async function scanSquashVideo(
     const bctx = big.getContext("2d");
     if (!sctx || !bctx) throw new Error("Canvas is unavailable in this browser.");
 
-    // ---- pass 1: motion + movers ------------------------------------------
+    // ---- pass 1: background model + blobs ---------------------------------
     const frames: Frame[] = [];
+    const bg = new Float32Array(GRID * GRID);
     let prev: Uint8ClampedArray | null = null;
+    let bgReady = false;
+    const mask = new Uint8Array(GRID * GRID);
+    const weight = new Uint8ClampedArray(GRID * GRID);
 
     for (let i = 0; i < times.length; i++) {
+      abortIfNeeded();
       await seek(video, times[i]!);
       sctx.drawImage(video, 0, 0, GRID, GRID);
       const px = sctx.getImageData(0, 0, GRID, GRID).data;
       const gray = new Uint8ClampedArray(GRID * GRID);
-      let bright = 0;
       for (let p = 0; p < GRID * GRID; p++) {
-        const g = (px[p * 4]! * 0.299 + px[p * 4 + 1]! * 0.587 + px[p * 4 + 2]! * 0.114) | 0;
-        gray[p] = g;
-        bright += g;
+        gray[p] = (px[p * 4]! * 0.299 + px[p * 4 + 1]! * 0.587 + px[p * 4 + 2]! * 0.114) | 0;
       }
-      const brightness = bright / (GRID * GRID);
+
+      if (!bgReady) {
+        for (let p = 0; p < GRID * GRID; p++) bg[p] = gray[p]!;
+        bgReady = true;
+      }
 
       if (prev) {
-        let total = 0;
-        const cells: Array<{ x: number; y: number; v: number }> = [];
-        for (let gy = 0; gy < GRID; gy++) {
-          for (let gx = 0; gx < GRID; gx++) {
-            const idx = gy * GRID + gx;
-            const d = Math.abs(gray[idx]! - prev[idx]!);
-            if (d > 14) {
-              total += d;
-              cells.push({ x: (gx + 0.5) / GRID, y: (gy + 0.5) / GRID, v: d });
-            }
-          }
+        let motionTotal = 0;
+        let fgCells = 0;
+        for (let p = 0; p < GRID * GRID; p++) {
+          const g = gray[p]!;
+          const dFrame = Math.abs(g - prev[p]!);
+          const dBg = Math.abs(g - bg[p]!);
+          // Foreground = differs from the learned background AND is not a
+          // whole-scene brightness shift (frame diff corroborates movement).
+          const fg = dBg > DIFF_THRESHOLD + 4 && (dFrame > 6 || dBg > DIFF_THRESHOLD + 14);
+          mask[p] = fg ? 1 : 0;
+          weight[p] = fg ? Math.min(255, dBg) : 0;
+          if (fg) fgCells += 1;
+          if (dFrame > DIFF_THRESHOLD) motionTotal += dFrame;
         }
-        const motion = Math.max(0, Math.min(100, Math.round((total / (GRID * GRID * 40)) * 100)));
-        frames.push({
-          t: times[i]!,
-          motion,
-          brightness: Math.round(brightness),
-          dets: clusterMovers(cells, total),
-        });
+        // A huge foreground means the camera moved or the scene cut — skip it.
+        const usable = fgCells < GRID * GRID * 0.5;
+        const motion = Math.max(0, Math.min(100, Math.round((motionTotal / (GRID * GRID * 26)) * 100)));
+        frames.push({ t: times[i]!, motion, blobs: usable ? extractBlobs(mask, weight) : [] });
       }
+
+      // Slow background update: fast enough for lighting drift, slow enough
+      // that a player standing still stays foreground for a few seconds.
+      for (let p = 0; p < GRID * GRID; p++) bg[p] = bg[p]! * 0.965 + gray[p]! * 0.035;
       prev = gray;
 
-      if (i % 4 === 0) {
+      if (i % 8 === 0) {
         onProgress({
-          ratio: 0.05 + 0.7 * (i / times.length),
+          ratio: 0.02 + 0.66 * (i / times.length),
           label: `Scanning court motion ${Math.round((i / times.length) * 100)}% · ${Math.round(times[i]!)}s of ${Math.round(duration)}s`,
+          stage: "scan",
+          elapsedSec: elapsed(),
         });
+        // Let the UI paint between chunks.
+        await new Promise((r) => setTimeout(r, 0));
       }
     }
 
-    onProgress({ ratio: 0.76, label: "Fitting the court and tracking both players…" });
+    abortIfNeeded();
+    onProgress({ ratio: 0.7, label: "Fitting the court and tracking both players…", stage: "track", elapsedSec: elapsed() });
 
-    // ---- fit the court box from observed motion ---------------------------
+    // ---- fit the court box from observed play -----------------------------
     const xs: number[] = [];
     const ys: number[] = [];
-    for (const f of frames) {
-      if (f.motion < 4) continue;
-      for (const d of f.dets) {
-        xs.push(d.x);
-        ys.push(d.y);
-      }
-    }
+    for (const f of frames) for (const b of f.blobs) { xs.push(b.x); ys.push(b.y); }
     xs.sort((a, b) => a - b);
     ys.sort((a, b) => a - b);
-    const x0 = xs.length > 20 ? percentile(xs, 0.03) : 0;
-    const x1 = xs.length > 20 ? percentile(xs, 0.97) : 1;
-    const y0 = ys.length > 20 ? percentile(ys, 0.03) : 0;
-    const y1 = ys.length > 20 ? percentile(ys, 0.97) : 1;
+    const enough = xs.length > 40;
+    const x0 = enough ? percentile(xs, 0.03) : 0;
+    const x1 = enough ? percentile(xs, 0.97) : 1;
+    const y0 = enough ? percentile(ys, 0.03) : 0;
+    const y1 = enough ? percentile(ys, 0.97) : 1;
     const spanX = Math.max(0.15, x1 - x0);
     const spanY = Math.max(0.15, y1 - y0);
     const courtX = (x: number) => Math.max(0, Math.min(1, (x - x0) / spanX));
     const courtY = (y: number) => Math.max(0, Math.min(1, (y - y0) / spanY));
 
-    // ---- track the two movers so identities persist -----------------------
-    let trackA: Pos = null; // "you"
-    let trackB: Pos = null; // opponent
-    const playerPos: Pos[] = [];
-    const opponentPos: Pos[] = [];
-    const playerMass: number[] = [];
-    const opponentMass: number[] = [];
+    // ---- track two movers with position prediction ------------------------
+    type Track = { pos: { x: number; y: number }; vel: { x: number; y: number }; miss: number };
+    let A: Track | null = null;
+    let B: Track | null = null;
+    const rawA: Pos[] = [];
+    const rawB: Pos[] = [];
+    const massA: number[] = [];
+    const massB: number[] = [];
+    let twoBlobFrames = 0;
+    let activeFrames = 0;
 
-    const dist = (p: Pos, d: Det) => (p ? Math.hypot(p.x - d.x, p.y - d.y) : Number.POSITIVE_INFINITY);
+    const predict = (tr: Track | null): Pos =>
+      tr ? { x: tr.pos.x + tr.vel.x, y: tr.pos.y + tr.vel.y } : null;
+    const gap = (p: Pos, b: Blob) => (p ? Math.hypot(p.x - b.x, p.y - b.y) : 1.5);
+    const update = (tr: Track | null, b: Blob): Track => {
+      if (!tr) return { pos: { x: b.x, y: b.y }, vel: { x: 0, y: 0 }, miss: 0 };
+      return {
+        pos: { x: b.x, y: b.y },
+        vel: { x: (b.x - tr.pos.x) * 0.6 + tr.vel.x * 0.4, y: (b.y - tr.pos.y) * 0.6 + tr.vel.y * 0.4 },
+        miss: 0,
+      };
+    };
 
     for (const f of frames) {
-      const dets = f.dets;
-      let assignA: Det | null = null;
-      let assignB: Det | null = null;
+      const blobs = f.blobs;
+      let pickA: Blob | null = null;
+      let pickB: Blob | null = null;
+      const pa = predict(A);
+      const pb = predict(B);
 
-      if (dets.length >= 2) {
-        const [d1, d2] = [dets[0]!, dets[1]!];
-        if (!trackA && !trackB) {
-          // Seed: the mover nearer the bottom of the frame is closest to the
-          // camera, which is filmed from behind the player.
-          if (d1.y >= d2.y) {
-            assignA = d1;
-            assignB = d2;
-          } else {
-            assignA = d2;
-            assignB = d1;
-          }
+      if (blobs.length >= 2) {
+        twoBlobFrames += 1;
+        const [b1, b2] = [blobs[0]!, blobs[1]!];
+        if (!A || !B) {
+          // Seed: camera sits behind the court, so the lower blob is nearer.
+          if (b1.y >= b2.y) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
         } else {
-          const straight = dist(trackA, d1) + dist(trackB, d2);
-          const swapped = dist(trackA, d2) + dist(trackB, d1);
-          if (straight <= swapped) {
-            assignA = d1;
-            assignB = d2;
-          } else {
-            assignA = d2;
-            assignB = d1;
-          }
+          const straight = gap(pa, b1) + gap(pb, b2);
+          const swapped = gap(pa, b2) + gap(pb, b1);
+          if (straight <= swapped) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
         }
-      } else if (dets.length === 1) {
-        const d = dets[0]!;
-        // Give the single blob to whichever track it is closer to.
-        assignA = dist(trackA, d) <= dist(trackB, d) ? d : null;
-        assignB = assignA ? null : d;
+      } else if (blobs.length === 1) {
+        const b = blobs[0]!;
+        const da = gap(pa, b);
+        const db = gap(pb, b);
+        // A single blob only claims a track when it is plausibly that track.
+        if (da <= db && da < 0.3) pickA = b;
+        else if (db < da && db < 0.3) pickB = b;
+        else if (!A) pickA = b;
+        else if (!B) pickB = b;
+        else if (da <= db) pickA = b;
+        else pickB = b;
       }
 
-      if (assignA) trackA = { x: assignA.x, y: assignA.y };
-      if (assignB) trackB = { x: assignB.x, y: assignB.y };
+      if (pickA) A = update(A, pickA);
+      else if (A !== null) A.miss += 1;
+      if (pickB) B = update(B, pickB);
+      else if (B !== null) B.miss += 1;
 
-      playerPos.push(assignA ? { x: courtX(assignA.x), y: courtY(assignA.y) } : null);
-      opponentPos.push(assignB ? { x: courtX(assignB.x), y: courtY(assignB.y) } : null);
-      playerMass.push(assignA?.mass ?? 0);
-      opponentMass.push(assignB?.mass ?? 0);
+      if (A && A.miss > 12) A = null;
+      if (B && B.miss > 12) B = null;
+
+      rawA.push(pickA ? { x: pickA.x, y: pickA.y } : null);
+      rawB.push(pickB ? { x: pickB.x, y: pickB.y } : null);
+      massA.push(pickA?.mass ?? 0);
+      massB.push(pickB?.mass ?? 0);
+      if (f.motion > 0) activeFrames += 1;
     }
 
+    // "You" is the mover living closer to the camera across the WHOLE clip,
+    // not whichever blob happened to seed the tracker first.
+    const depthA = mean(rawA.filter(Boolean).map((p) => p!.y));
+    const depthB = mean(rawB.filter(Boolean).map((p) => p!.y));
+    const flip = depthB > depthA + 0.02;
+    const rawPlayer = flip ? rawB : rawA;
+    const rawOpp = flip ? rawA : rawB;
+    const playerMass = flip ? massB : massA;
+    const opponentMass = flip ? massA : massB;
+
+    const playerPos: Pos[] = rawPlayer.map((p) => (p ? { x: courtX(p.x), y: courtY(p.y) } : null));
+    const opponentPos: Pos[] = rawOpp.map((p) => (p ? { x: courtX(p.x), y: courtY(p.y) } : null));
+
     // ---- anchor the court grid on the real T ------------------------------
-    // Both players hover around the T, so the centre of the occupancy
-    // distribution IS the T for this camera angle. Zones are then court
-    // relative (mid-centre == the T) instead of arbitrary frame thirds.
     const occX: number[] = [];
     const occY: number[] = [];
     for (const p of [...playerPos, ...opponentPos]) {
@@ -308,40 +364,103 @@ export async function scanSquashVideo(
     }
     occX.sort((a, b) => a - b);
     occY.sort((a, b) => a - b);
-    const tcx = occX.length > 20 ? percentile(occX, 0.5) : 0.5;
-    const tcy = occY.length > 20 ? percentile(occY, 0.5) : 0.5;
-    const LANE = 0.15; // half-width of the centre lane, court units
-    const DEPTH = 0.17; // half-depth of the mid band, court units
+    const tcx = occX.length > 40 ? percentile(occX, 0.5) : 0.5;
+    const tcy = occY.length > 40 ? percentile(occY, 0.5) : 0.5;
+    const LANE = 0.15;
+    const BAND = 0.17;
     const zoneOf = (p: { x: number; y: number }) => {
-      const depth = p.y < tcy - DEPTH ? "front" : p.y <= tcy + DEPTH ? "mid" : "back";
+      const depth = p.y < tcy - BAND ? "front" : p.y <= tcy + BAND ? "mid" : "back";
       const lane = p.x < tcx - LANE ? "forehand" : p.x <= tcx + LANE ? "centre" : "backhand";
       return `${depth}-${lane}`;
     };
+    const inT = (p: Pos) => !!p && zoneOf(p) === "mid-centre";
 
-    // ---- derived stats ----------------------------------------------------
+    // ---- rallies -----------------------------------------------------------
     const motions = frames.map((f) => f.motion);
-    const averageMotion = motions.length ? motions.reduce((a, b) => a + b, 0) / motions.length : 0;
+    const sortedMotion = [...motions].sort((a, b) => a - b);
+    const averageMotion = mean(motions);
     const peakMotion = motions.length ? Math.max(...motions) : 0;
-    const activeFloor = Math.max(6, averageMotion * 0.85);
-    const shotFloor = Math.max(12, averageMotion + (peakMotion - averageMotion) * 0.35);
+    const quietLevel = percentile(sortedMotion, 0.3);
+    const activeFloor = Math.max(4, quietLevel + Math.max(3, (peakMotion - quietLevel) * 0.16));
 
-    const activeSeconds = frames.filter((f) => f.motion >= activeFloor).length * step;
+    const active = motions.map((m) => m >= activeFloor);
+    const activeSeconds = active.filter(Boolean).length * step;
+    const restSeconds = Math.max(0.1, duration - activeSeconds);
 
-    let rallyCount = 0;
-    let inRally = false;
-    let quiet = 0;
-    const rallyShotCounts: number[] = [];
-    let currentShots = 0;
-    const shotCandidates: NonNullable<ClipInput["shotCandidates"]> = [];
+    // ---- contacts: per-player strike signal -------------------------------
+    const speed = (list: Pos[], i: number) => {
+      const a = list[i - 1];
+      const b = list[i];
+      return a && b ? Math.hypot(b.x - a.x, b.y - a.y) / step : 0;
+    };
+    const reversal = (list: Pos[], i: number) => {
+      const p0 = list[i - 2];
+      const p1 = list[i - 1];
+      const p2 = list[i];
+      const p3 = list[i + 1];
+      if (!p0 || !p1 || !p2 || !p3) return 0;
+      const v1 = { x: p1.x - p0.x, y: p1.y - p0.y };
+      const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
+      const n1 = Math.hypot(v1.x, v1.y);
+      const n2 = Math.hypot(v2.x, v2.y);
+      if (n1 < 1e-4 || n2 < 1e-4) return 0;
+      const cos = (v1.x * v2.x + v1.y * v2.y) / (n1 * n2);
+      return Math.max(0, -cos); // 1 = full direction reversal
+    };
+
+    const massFloor = (list: number[]) => {
+      const nz = list.filter((v) => v > 0).sort((a, b) => a - b);
+      return nz.length ? percentile(nz, 0.62) : Number.POSITIVE_INFINITY;
+    };
+    const playerFloor = massFloor(playerMass);
+    const opponentFloor = massFloor(opponentMass);
+
+    type RawContact = { i: number; t: number; actor: "player" | "opponent"; score: number; motion: number };
+    const raw: RawContact[] = [];
+    const strikeSignal = (
+      m: number[],
+      pos: Pos[],
+      floor: number,
+      i: number,
+    ): number => {
+      const v = m[i] ?? 0;
+      if (!Number.isFinite(floor) || v < floor) return 0;
+      const prevV = m[i - 1] ?? 0;
+      const nextV = m[i + 1] ?? 0;
+      if (v < prevV || v < nextV) return 0; // must be a local peak of own motion
+      const rev = reversal(pos, i);
+      const decel = Math.max(0, speed(pos, i - 1) - speed(pos, i + 1));
+      return v / floor + rev * 1.4 + Math.min(1.2, decel * 2.2);
+    };
+
+    for (let i = 2; i < frames.length - 2; i++) {
+      if (!active[i]) continue;
+      const ps = strikeSignal(playerMass, playerPos, playerFloor, i);
+      const os = strikeSignal(opponentMass, opponentPos, opponentFloor, i);
+      if (ps >= 1.35 && ps >= os) raw.push({ i, t: frames[i]!.t, actor: "player", score: ps, motion: frames[i]!.motion });
+      else if (os >= 1.35) raw.push({ i, t: frames[i]!.t, actor: "opponent", score: os, motion: frames[i]!.motion });
+    }
+
+    // Suppress duplicates: a real squash contact rate is < ~2/s per player,
+    // and consecutive contacts should alternate players.
+    const MIN_GAP = 0.55;
+    const contactsRaw: RawContact[] = [];
+    for (const c of raw.sort((a, b) => a.t - b.t)) {
+      const last = contactsRaw[contactsRaw.length - 1];
+      if (!last) { contactsRaw.push(c); continue; }
+      const dt = c.t - last.t;
+      if (dt < MIN_GAP) {
+        if (c.score > last.score) contactsRaw[contactsRaw.length - 1] = c;
+        continue;
+      }
+      if (c.actor === last.actor && dt < 1.1 && c.score < last.score) continue;
+      contactsRaw.push(c);
+    }
+
+    const contacts: NonNullable<ClipInput["contacts"]> = [];
     const playerHist = new Array(9).fill(0);
     const opponentHist = new Array(9).fill(0);
     const tReturnEvents: NonNullable<ClipInput["tReturnEvents"]> = [];
-
-    const inT = (p: Pos) => !!p && zoneOf(p) === "mid-centre";
-    let tSamples = 0;
-    let playerSeen = 0;
-    let offTRun = 0;
-    let longestOffTSeconds = 0;
 
     const bump = (hist: number[], p: Pos) => {
       if (!p) return;
@@ -349,158 +468,216 @@ export async function scanSquashVideo(
       if (idx >= 0) hist[idx] += 1;
     };
 
-    for (let i = 0; i < frames.length; i++) {
-      const f = frames[i]!;
-      const isActive = f.motion >= activeFloor;
-      if (isActive) {
-        if (!inRally) {
-          inRally = true;
-          rallyCount += 1;
-          currentShots = 0;
-        }
-        quiet = 0;
-      } else {
-        quiet += step;
-        if (inRally && quiet >= 3) {
-          inRally = false;
-          rallyShotCounts.push(currentShots);
-        }
-      }
+    for (const c of contactsRaw) {
+      const me = playerPos[c.i] ?? null;
+      const them = opponentPos[c.i] ?? null;
+      const striker = c.actor === "player" ? me : them;
+      contacts.push({
+        t: Number(c.t.toFixed(2)),
+        actor: striker ? c.actor : "unknown",
+        zone: striker ? zoneOf(striker) : "mid-centre",
+        opponentZone: c.actor === "player" ? (them ? zoneOf(them) : undefined) : me ? zoneOf(me) : undefined,
+        motion: c.motion,
+      });
+      // Heat maps count where each player STRUCK, not where they stood.
+      if (c.actor === "player") bump(playerHist, me);
+      else bump(opponentHist, them);
 
-      const prevM = frames[i - 1]?.motion ?? 0;
-      const nextM = frames[i + 1]?.motion ?? 0;
-      if (f.motion >= shotFloor && f.motion >= prevM && f.motion >= nextM) {
-        const me = playerPos[i]!;
-        const them = opponentPos[i]!;
-        // The mover producing the most motion at the contact frame struck the ball.
-        const playerStruck = (playerMass[i] ?? 0) >= (opponentMass[i] ?? 0);
-        const striker = playerStruck ? me : them;
-        const actor: "player" | "opponent" | "unknown" = striker
-          ? playerStruck
-            ? "player"
-            : "opponent"
-          : "unknown";
-        const zone = striker ? zoneOf(striker) : "mid-centre";
-        shotCandidates.push({ t: Number(f.t.toFixed(2)), motion: f.motion, zone, actor });
-        if (inRally) currentShots += 1;
-
-        // Each contact records BOTH players' court positions so the two heat
-        // maps describe different areas of the court.
-        bump(playerHist, me);
-        bump(opponentHist, them);
-
-        // Time from this contact until you are back inside the T box.
-        for (let j = i + 1; j < Math.min(frames.length, i + Math.ceil(8 / step)); j++) {
-          if (inT(playerPos[j]!)) {
-            tReturnEvents.push({
-              t: Number(f.t.toFixed(2)),
-              secondsToT: Number(((j - i) * step).toFixed(2)),
-            });
+      // Recovery to the T after your own strike only.
+      if (c.actor === "player") {
+        const horizon = Math.min(frames.length, c.i + Math.ceil(8 / step));
+        for (let j = c.i + 1; j < horizon; j++) {
+          if (inT(playerPos[j] ?? null)) {
+            tReturnEvents.push({ t: Number(c.t.toFixed(2)), secondsToT: Number(((j - c.i) * step).toFixed(2)) });
             break;
           }
         }
       }
+    }
 
-      const me = playerPos[i]!;
-      if (me) {
-        playerSeen += 1;
-        if (inT(me)) {
-          tSamples += 1;
-          longestOffTSeconds = Math.max(longestOffTSeconds, offTRun);
-          offTRun = 0;
-        } else if (isActive) {
-          offTRun += step;
+    // ---- rally segmentation with shot counts ------------------------------
+    let rallyCount = 0;
+    let inRally = false;
+    let quiet = 0;
+    let rallyStart = 0;
+    const rallyShots: number[] = [];
+    for (let i = 0; i < frames.length; i++) {
+      if (active[i]) {
+        if (!inRally) {
+          inRally = true;
+          rallyCount += 1;
+          rallyStart = frames[i]!.t;
+        }
+        quiet = 0;
+      } else {
+        quiet += step;
+        if (inRally && quiet >= 2) {
+          inRally = false;
+          const end = frames[i]!.t;
+          rallyShots.push(contacts.filter((c) => c.t >= rallyStart && c.t <= end).length);
         }
       }
     }
-    if (inRally) rallyShotCounts.push(currentShots);
-    longestOffTSeconds = Math.max(longestOffTSeconds, offTRun);
+    if (inRally) {
+      const end = frames[frames.length - 1]?.t ?? duration;
+      rallyShots.push(contacts.filter((c) => c.t >= rallyStart && c.t <= end).length);
+    }
+    const scoredRallies = rallyShots.filter((n) => n > 0);
 
+    // ---- T occupancy -------------------------------------------------------
+    let tSamples = 0;
+    let playerSeen = 0;
+    let offTRun = 0;
+    let longestOffT = 0;
+    for (let i = 0; i < frames.length; i++) {
+      const me = playerPos[i] ?? null;
+      if (!me) continue;
+      playerSeen += 1;
+      if (inT(me)) {
+        tSamples += 1;
+        longestOffT = Math.max(longestOffT, offTRun);
+        offTRun = 0;
+
+      } else if (active[i]) {
+        offTRun += step;
+      }
+    }
+    longestOffT = Math.max(longestOffT, offTRun);
+
+    const toSeconds = tReturnEvents.map((e) => e.secondsToT).sort((a, b) => a - b);
     const normalise = (h: number[]) => {
       const max = Math.max(...h, 0);
       return max > 0 ? h.map((v) => Math.round((v / max) * 100)) : h.map(() => 0);
     };
 
-    const avgSecondsToT = tReturnEvents.length
-      ? tReturnEvents.reduce((a, e) => a + e.secondsToT, 0) / tReturnEvents.length
-      : 0;
-    const restSeconds = Math.max(0.1, duration - activeSeconds);
+    const third = Math.max(1, Math.floor(frames.length / 3));
+    const firstThird = mean(motions.slice(0, third));
+    const lastThird = mean(motions.slice(-third));
+    const fatigueDrift = firstThird > 0 ? ((lastThird - firstThird) / firstThird) * 100 : 0;
 
-    onProgress({ ratio: 0.82, label: "Choosing evidence frames…" });
+    // ---- evidence frames at real detected contacts ------------------------
+    onProgress({ ratio: 0.76, label: "Capturing evidence frames at detected contacts…", stage: "frames", elapsedSec: elapsed() });
 
-    // ---- evidence frames --------------------------------------------------
-    const bucketCount = 8;
-    const picks: number[] = [];
-    for (let b = 0; b < bucketCount; b++) {
-      const lo = (duration * b) / bucketCount;
-      const hi = (duration * (b + 1)) / bucketCount;
-      const inBucket = frames.filter((f) => f.t >= lo && f.t < hi);
-      if (!inBucket.length) continue;
-      const best = inBucket.reduce((a, f) => (f.motion > a.motion ? f : a), inBucket[0]!);
-      picks.push(best.t);
-    }
-    const targetW = 560;
+    const pickContacts = (() => {
+      if (contacts.length <= MAX_EVIDENCE) return contacts.slice();
+      const out: typeof contacts = [];
+      const stride = contacts.length / MAX_EVIDENCE;
+      for (let k = 0; k < MAX_EVIDENCE; k++) out.push(contacts[Math.floor(k * stride)]!);
+      return out;
+    })();
+
+    const targetW = 640;
     const scale = video.videoWidth ? Math.min(1, targetW / video.videoWidth) : 1;
     big.width = Math.max(160, Math.round((video.videoWidth || targetW) * scale));
     big.height = Math.max(90, Math.round((video.videoHeight || 360) * scale));
 
     const evidence: string[] = [];
     const frameTimes: number[] = [];
-    for (let i = 0; i < picks.length; i++) {
-      await seek(video, picks[i]!);
+    const frameMeta: NonNullable<ClipInput["frameMeta"]> = [];
+    for (let i = 0; i < pickContacts.length; i++) {
+      abortIfNeeded();
+      const c = pickContacts[i]!;
+      await seek(video, c.t);
       bctx.drawImage(video, 0, 0, big.width, big.height);
-      evidence.push(big.toDataURL("image/jpeg", 0.55));
-      frameTimes.push(Number(picks[i]!.toFixed(2)));
-      onProgress({ ratio: 0.85 + 0.1 * ((i + 1) / picks.length), label: "Capturing evidence frames…" });
+      evidence.push(big.toDataURL("image/jpeg", 0.6));
+      frameTimes.push(c.t);
+      frameMeta.push({ t: c.t, actor: c.actor, zone: c.zone, opponentZone: c.opponentZone });
+      onProgress({
+        ratio: 0.76 + 0.16 * ((i + 1) / pickContacts.length),
+        label: `Capturing evidence frames ${i + 1}/${pickContacts.length}…`,
+        stage: "frames",
+        elapsedSec: elapsed(),
+      });
     }
 
-    const stride = Math.max(1, Math.ceil(frames.length / 600));
+    // Fallback for a clip where no contact was detected at all: still send a
+    // few high-motion frames so the AI leg has something real to look at.
+    if (!evidence.length) {
+      const busiest = [...frames].sort((a, b) => b.motion - a.motion).slice(0, 6).sort((a, b) => a.t - b.t);
+      for (const f of busiest) {
+        abortIfNeeded();
+        await seek(video, f.t);
+        bctx.drawImage(video, 0, 0, big.width, big.height);
+        evidence.push(big.toDataURL("image/jpeg", 0.6));
+        frameTimes.push(Number(f.t.toFixed(2)));
+        frameMeta.push({ t: Number(f.t.toFixed(2)), actor: "unknown", zone: "mid-centre" });
+      }
+    }
+
+    const stride = Math.max(1, Math.ceil(frames.length / 500));
     const motionTimeline = frames
       .filter((_, i) => i % stride === 0)
       .map((f, k) => {
         const i = k * stride;
         const me = playerPos[i] ?? null;
-        const x = me ? me.x : f.dets[0] ? courtX(f.dets[0]!.x) : 0.5;
-        const y = me ? me.y : f.dets[0] ? courtY(f.dets[0]!.y) : 0.5;
+        const x = me ? me.x : 0.5;
+        const y = me ? me.y : 0.5;
         return {
           t: Number(f.t.toFixed(2)),
           motion: f.motion,
           x: Number(x.toFixed(3)),
           y: Number(y.toFixed(3)),
           zone: zoneOf({ x, y }),
-          brightness: f.brightness,
         };
       });
 
-    onProgress({ ratio: 0.97, label: "Sending to the analyser…" });
+    const measured: MeasuredStats = {
+      scannedFrames: Math.max(1, frames.length),
+      sampleEverySec: Number(step.toFixed(3)),
+      scanSeconds: elapsed(),
+      activeSeconds: Number(activeSeconds.toFixed(1)),
+      restSeconds: Number(restSeconds.toFixed(1)),
+      workRestRatio: Number(Math.min(50, activeSeconds / restSeconds).toFixed(2)),
+      rallyCount,
+      avgShotsPerRally: scoredRallies.length ? Number(mean(scoredRallies).toFixed(1)) : 0,
+      longestRallyShots: scoredRallies.length ? Math.max(...scoredRallies) : 0,
+      rallyBuckets: {
+        short: scoredRallies.filter((n) => n <= 4).length,
+        medium: scoredRallies.filter((n) => n > 4 && n <= 9).length,
+        long: scoredRallies.filter((n) => n > 9).length,
+      },
+      contactCount: contacts.length,
+      playerContacts: contacts.filter((c) => c.actor === "player").length,
+      opponentContacts: contacts.filter((c) => c.actor === "opponent").length,
+      tReturnCount: tReturnEvents.length,
+      avgSecondsToT: toSeconds.length ? Number(mean(toSeconds).toFixed(2)) : 0,
+      medianSecondsToT: toSeconds.length ? Number(percentile(toSeconds, 0.5).toFixed(2)) : 0,
+      tTimePercent: playerSeen ? Number(((tSamples || countT(playerPos, inT)) / playerSeen * 100).toFixed(1)) : 0,
+      longestOffTSeconds: Number(Math.min(600, longestOffT).toFixed(1)),
+      playerHeatmap: normalise(playerHist),
+      opponentHeatmap: normalise(opponentHist),
+      playerHeatCounts: playerHist,
+      opponentHeatCounts: opponentHist,
+      twoPlayerTrackPercent: activeFrames ? Number(((twoBlobFrames / activeFrames) * 100).toFixed(1)) : 0,
+      averageMotion: Number(averageMotion.toFixed(1)),
+      peakMotion,
+      fatigueDriftPercent: Number(Math.max(-100, Math.min(100, fatigueDrift)).toFixed(1)),
+    };
+
+    onProgress({ ratio: 0.93, label: "Verifying frames with the AI…", stage: "done", elapsedSec: elapsed() });
 
     return {
-      videoName: file.name.slice(0, 200) || "match.mp4",
-      durationSec: Number(duration.toFixed(2)),
-      frames: evidence.slice(0, 12),
-      frameTimes: frameTimes.slice(0, 12),
-      sampleEverySec: Number(step.toFixed(2)),
-      motionTimeline,
-      shotCandidates: shotCandidates.slice(0, 400),
-      tReturnEvents: tReturnEvents.slice(0, 400),
-      playerZoneHistogram: normalise(playerHist),
-      opponentZoneHistogram: normalise(opponentHist),
-      derivedStats: {
-        scannedFrames: Math.max(1, frames.length),
-        activeSeconds: Number(activeSeconds.toFixed(1)),
-        rallyCountEstimate: rallyCount,
-        totalShotsEstimate: shotCandidates.length,
-        averageMotion: Number(averageMotion.toFixed(1)),
-        peakMotion,
-        highIntensityWindows: frames.filter((f) => f.motion >= shotFloor).length,
-        tReturnCount: tReturnEvents.length,
-        avgSecondsToT: Number(avgSecondsToT.toFixed(2)),
-        tTimePercent: playerSeen ? Number(((tSamples / playerSeen) * 100).toFixed(1)) : 0,
-        longestOffTSeconds: Number(Math.min(600, longestOffTSeconds).toFixed(1)),
-        workRestRatio: Number(Math.min(50, activeSeconds / restSeconds).toFixed(2)),
+      measured,
+      payload: {
+        videoName: file.name.slice(0, 200) || "match.mp4",
+        durationSec: Number(duration.toFixed(2)),
+        sampleEverySec: Number(step.toFixed(3)),
+        frames: evidence.slice(0, MAX_EVIDENCE),
+        frameTimes: frameTimes.slice(0, MAX_EVIDENCE),
+        frameMeta: frameMeta.slice(0, MAX_EVIDENCE),
+        motionTimeline,
+        contacts: contacts.slice(0, 600),
+        tReturnEvents: tReturnEvents.slice(0, 600),
+        measured,
       },
     };
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+function countT(list: Pos[], inT: (p: Pos) => boolean): number {
+  let n = 0;
+  for (const p of list) if (inT(p)) n += 1;
+  return n;
 }
