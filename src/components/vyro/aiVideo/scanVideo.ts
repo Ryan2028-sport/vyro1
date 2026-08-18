@@ -91,11 +91,64 @@ function blendSig(a: ColourSig, b: ColourSig, k: number): ColourSig {
   };
 }
 
-function sigToCss(s: ColourSig): string {
+export function sigToCss(s: ColourSig): string {
   const scale = 255 * Math.max(0.35, Math.min(1, s.l * 2.4));
   const peak = Math.max(s.r, s.g, s.b) || 1;
   return `rgb(${Math.round((s.r / peak) * scale)}, ${Math.round((s.g / peak) * scale)}, ${Math.round((s.b / peak) * scale)})`;
 }
+
+/**
+ * Read the kit colour straight from a candidate frame at a tapped point.
+ * Nothing about this depends on the motion detector, so a tap is always right.
+ * A median over the patch keeps a stray highlight from skewing the signature.
+ */
+const patchCache = new Map<string, { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D }>();
+
+async function frameCanvas(image: string) {
+  const hit = patchCache.get(image);
+  if (hit) return hit;
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("Could not read the frame."));
+    el.src = image;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas is unavailable in this browser.");
+  ctx.drawImage(img, 0, 0);
+  const entry = { canvas, ctx };
+  if (patchCache.size > 6) patchCache.clear();
+  patchCache.set(image, entry);
+  return entry;
+}
+
+/** x/y are normalised (0-1) coordinates inside the displayed frame. */
+export async function sampleSigAt(image: string, x: number, y: number): Promise<ColourSig> {
+  const { canvas, ctx } = await frameCanvas(image);
+  const size = Math.max(6, Math.round(canvas.width * 0.04));
+  const px = Math.round(Math.min(canvas.width - 1, Math.max(0, x * canvas.width)));
+  const py = Math.round(Math.min(canvas.height - 1, Math.max(0, y * canvas.height)));
+  const sx = Math.max(0, Math.min(canvas.width - size, px - Math.round(size / 2)));
+  const sy = Math.max(0, Math.min(canvas.height - size, py - Math.round(size / 2)));
+  const data = ctx.getImageData(sx, sy, Math.min(size, canvas.width), Math.min(size, canvas.height)).data;
+  const rs: number[] = [];
+  const gs: number[] = [];
+  const bs: number[] = [];
+  for (let i = 0; i < data.length; i += 4) {
+    rs.push(data[i]!);
+    gs.push(data[i + 1]!);
+    bs.push(data[i + 2]!);
+  }
+  const med = (list: number[]) => {
+    list.sort((a, b) => a - b);
+    return list[Math.floor(list.length / 2)] ?? 0;
+  };
+  return sigOf(med(rs), med(gs), med(bs));
+}
+
 
 
 function seek(video: HTMLVideoElement, time: number): Promise<void> {
