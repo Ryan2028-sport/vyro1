@@ -144,8 +144,13 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
   });
 }
 
-/** 4-neighbour connected components over the foreground mask. */
-function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray): Blob[] {
+/**
+ * 4-neighbour connected components over the foreground mask. `px` is the RGBA
+ * data of the same downscaled frame, so every blob also carries the kit-colour
+ * signature of the pixels that make it up — that is what keeps "you" as you
+ * when the two players cross.
+ */
+function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray, px: Uint8ClampedArray): Blob[] {
   const seen = new Uint8Array(GRID * GRID);
   const stack: number[] = [];
   const blobs: Blob[] = [];
@@ -160,6 +165,9 @@ function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray): Blob[] {
     let mass = 0;
     let sx = 0;
     let sy = 0;
+    let sr = 0;
+    let sg = 0;
+    let sb = 0;
     let minX = GRID, maxX = 0, minY = GRID, maxY = 0;
 
     while (stack.length) {
@@ -171,6 +179,9 @@ function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray): Blob[] {
       mass += w;
       sx += gx * w;
       sy += gy * w;
+      sr += px[idx * 4]! * w;
+      sg += px[idx * 4 + 1]! * w;
+      sb += px[idx * 4 + 2]! * w;
       if (gx < minX) minX = gx;
       if (gx > maxX) maxX = gx;
       if (gy < minY) minY = gy;
@@ -185,8 +196,17 @@ function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray): Blob[] {
     if (cells < MIN_BLOB_CELLS || cells > limit || mass <= 0) continue;
     const w = (maxX - minX + 1) / GRID;
     const h = (maxY - minY + 1) / GRID;
-    blobs.push({ x: (sx / mass + 0.5) / GRID, y: (sy / mass + 0.5) / GRID, mass, cells, w, h });
+    blobs.push({
+      x: (sx / mass + 0.5) / GRID,
+      y: (sy / mass + 0.5) / GRID,
+      mass,
+      cells,
+      w,
+      h,
+      sig: sigOf(sr / mass, sg / mass, sb / mass),
+    });
   }
+
 
   // Body-like: reasonably tall and compact. Score by mass with a shape bonus.
   const score = (b: Blob) => {
