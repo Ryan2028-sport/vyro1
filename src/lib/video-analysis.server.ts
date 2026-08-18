@@ -90,43 +90,56 @@ async function verifyFrames(
     });
   }
 
-  for (let b = 0; b < batches.length; b++) {
-    const batch = batches[b]!;
-    onNote?.(`segment ${b + 1}/${batches.length}`);
-    const content: ChatContent = [];
-    batch.frames.forEach((b64, i) => {
-      content.push({ type: "text", text: `frame ${i + 1} · ${(batch.times[i] ?? 0).toFixed(1)}s` });
-      content.push({ type: "image_url", image_url: { url: b64 } });
-    });
-    content.push({ type: "text", text: buildVerifyPrompt(batch.times, batch.hints) });
+  // Segments run a few at a time so a long match doesn't take forever.
+  const CONCURRENCY = 4;
+  for (let start = 0; start < batches.length; start += CONCURRENCY) {
+    const slice = batches.slice(start, start + CONCURRENCY);
+    onNote?.(`segments ${start + 1}-${start + slice.length}/${batches.length}`);
+    const replies = await Promise.all(
+      slice.map(async (batch) => {
+        const content: ChatContent = [];
+        batch.frames.forEach((b64, i) => {
+          content.push({ type: "text", text: `frame ${i + 1} · ${(batch.times[i] ?? 0).toFixed(1)}s` });
+          content.push({ type: "image_url", image_url: { url: b64 } });
+        });
+        content.push({ type: "text", text: buildVerifyPrompt(batch.times, batch.hints) });
+        try {
+          return await callGateway(key, VERIFY_SYSTEM, content);
+        } catch {
+          return { text: null, error: "segment failed" };
+        }
+      }),
+    );
 
-    const { text, error } = await callGateway(key, VERIFY_SYSTEM, content);
-    if (error || !text) {
-      counts.segmentsFailed += 1;
-      continue;
-    }
-    const obj = parseJsonObject(text);
-    const parsed = obj ? SegmentReplySchema.safeParse(obj) : null;
-    if (!parsed?.success) {
-      counts.segmentsFailed += 1;
-      continue;
-    }
-    counts.segmentsOk += 1;
+    for (const { text, error } of replies) {
+      if (error || !text) {
+        counts.segmentsFailed += 1;
+        continue;
+      }
+      const obj = parseJsonObject(text);
+      const parsed = obj ? SegmentReplySchema.safeParse(obj) : null;
+      if (!parsed?.success) {
+        counts.segmentsFailed += 1;
+        continue;
+      }
+      counts.segmentsOk += 1;
 
-    for (const label of parsed.data.labels as FrameLabel[]) {
-      if (label.striking === "none") continue;
-      if (label.striking === "near") counts.playerStrikes += 1;
-      else if (label.striking === "far") counts.opponentStrikes += 1;
-      if (label.striking === "unclear" && label.side === "unclear" && label.family === "unclear") continue;
-      counts.framesLabelled += 1;
-      counts.side[label.side] += 1;
-      counts.depth[label.depth] += 1;
-      counts.family[label.family] += 1;
-      counts.racketPrep[label.racketPrep] += 1;
-      if (label.rallyEnd) counts.rallyEndFrames += 1;
-      if (label.note) counts.notes.push(`${label.frame}: ${label.note}`);
+      for (const label of parsed.data.labels as FrameLabel[]) {
+        if (label.striking === "none") continue;
+        if (label.striking === "near") counts.playerStrikes += 1;
+        else if (label.striking === "far") counts.opponentStrikes += 1;
+        if (label.striking === "unclear" && label.side === "unclear" && label.family === "unclear") continue;
+        counts.framesLabelled += 1;
+        counts.side[label.side] += 1;
+        counts.depth[label.depth] += 1;
+        counts.family[label.family] += 1;
+        counts.racketPrep[label.racketPrep] += 1;
+        if (label.rallyEnd) counts.rallyEndFrames += 1;
+        if (label.note) counts.notes.push(`${label.frame}: ${label.note}`);
+      }
     }
   }
+
 
   // Scale the verified shot mix up to the measured contact total, but only
   // when the sample is big enough to mean anything.
