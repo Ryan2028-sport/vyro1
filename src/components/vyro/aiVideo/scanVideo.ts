@@ -1229,6 +1229,8 @@ export async function scanSquashVideo(
 
     return {
       measured,
+      segments,
+
       payload: {
         videoName: file.name.slice(0, 200) || "match.mp4",
         durationSec: Number(duration.toFixed(2)),
