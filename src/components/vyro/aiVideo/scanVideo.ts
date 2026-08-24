@@ -1137,9 +1137,14 @@ export async function scanSquashVideo(
     }
 
     // Fallback for a clip where no contact was detected at all: still send a
-    // few high-motion frames so the AI leg has something real to look at.
+    // few high-motion frames from readable shots so the AI leg has something
+    // real to look at.
     if (!evidence.length) {
-      const busiest = [...frames].sort((a, b) => b.motion - a.motion).slice(0, 6).sort((a, b) => a.t - b.t);
+      const busiest = frames
+        .filter((_, i) => usable[i])
+        .sort((a, b) => b.motion - a.motion)
+        .slice(0, 6)
+        .sort((a, b) => a.t - b.t);
       for (const f of busiest) {
         abortIfNeeded();
         await seek(video, f.t);
@@ -1150,11 +1155,12 @@ export async function scanSquashVideo(
       }
     }
 
-    const stride = Math.max(1, Math.ceil(frames.length / 500));
-    const motionTimeline = frames
-      .filter((_, i) => i % stride === 0)
-      .map((f, k) => {
-        const i = k * stride;
+    const usableIdx = frames.map((_, i) => i).filter((i) => usable[i]);
+    const stride = Math.max(1, Math.ceil(usableIdx.length / 500));
+    const motionTimeline = usableIdx
+      .filter((_, k) => k % stride === 0)
+      .map((i) => {
+        const f = frames[i]!;
         const me = playerPos[i] ?? null;
         const x = me ? me.x : 0.5;
         const y = me ? me.y : 0.5;
@@ -1200,7 +1206,20 @@ export async function scanSquashVideo(
       fatigueDriftPercent: Number(Math.max(-100, Math.min(100, fatigueDrift)).toFixed(1)),
       identitySource,
       identityConfidencePercent,
+      cameraCuts: cutCount,
+      segmentCount: segments.length,
+      playableSegments: playable.length,
+      usableSeconds: Number(usableSeconds.toFixed(1)),
+      measurableSeconds: Number(measurableSeconds.toFixed(1)),
+      coveragePercent: Number(Math.min(100, (usableSeconds / Math.max(0.1, duration)) * 100).toFixed(1)),
+      rejectedSeconds: {
+        closeUp: Number(secondsWhere("close-up").toFixed(1)),
+        unstable: Number(secondsWhere("unstable").toFixed(1)),
+        noPlay: Number(secondsWhere("no-play").toFixed(1)),
+        tooShort: Number(secondsWhere("too-short").toFixed(1)),
+      },
     };
+
 
 
     onProgress({ ratio: 0.93, label: "Verifying frames with the AI…", stage: "done", elapsedSec: elapsed() });
