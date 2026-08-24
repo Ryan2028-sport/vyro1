@@ -78,8 +78,37 @@ type Blob = {
   h: number;
   sig: ColourSig;
 };
-type Frame = { t: number; motion: number; blobs: Blob[] };
+type Frame = {
+  t: number;
+  motion: number;
+  blobs: Blob[];
+  /** which camera segment this checkpoint belongs to */
+  seg: number;
+  /** mean per-cell luminance change against the previous checkpoint */
+  gdiff: number;
+  /** area of the biggest blob, as a fraction of the picture */
+  maxCellFrac: number;
+  /** false for cut frames and the warm-up right after a cut */
+  settled: boolean;
+};
 type Pos = { x: number; y: number } | null;
+
+export type SegmentLabel = "playable" | "close-up" | "unstable" | "no-play" | "too-short";
+
+export type SegmentInfo = {
+  index: number;
+  startT: number;
+  endT: number;
+  seconds: number;
+  from: number;
+  to: number;
+  label: SegmentLabel;
+  /** court box fitted from this segment's own play */
+  courtOk: boolean;
+  /** "you" resolved against the tapped kit colour inside this segment */
+  identityResolved: boolean;
+};
+
 
 export class ScanAborted extends Error {
   constructor() {
