@@ -15,13 +15,31 @@
 import { ZONE_KEYS, type ClipInput, type MeasuredStats } from "@/lib/video-analysis-core";
 
 const GRID = 64;
-const TARGET_FPS = 4;
-const MAX_CHECKPOINTS = 2400;
+const TARGET_FPS = 8;
+const MAX_CHECKPOINTS = 4000;
 const MAX_EVIDENCE = 30;
 const DIFF_THRESHOLD = 13;
 const MIN_BLOB_CELLS = 5;
 const COLOUR_WEIGHT = 0.9; // how much kit colour counts against position when matching
 const MAX_BLOB_FRACTION = 0.22; // a blob bigger than this is a light change, not a body
+
+// --- camera-segment detection (broadcast edits) -----------------------------
+/** Mean per-cell luminance change that can only be a cut, never a rally. */
+const CUT_MEAN_DIFF = 26;
+/** A softer cut: most of the picture changed a lot at once. */
+const CUT_FRACTION = 0.55;
+const CUT_FRACTION_DIFF = 16;
+/** Frames right after a cut, while the new background is still being learnt. */
+const SEGMENT_WARMUP = 4;
+/** A segment shorter than this can't carry a rally measurement. */
+const MIN_SEGMENT_SECONDS = 1.2;
+/** Median largest-blob area above this = close-up / replay, not a court view. */
+const CLOSEUP_CELL_FRACTION = 0.13;
+/** Median frame-to-frame change above this = pan, wipe or shaky replay. */
+const UNSTABLE_MEAN_DIFF = 17;
+/** Blob samples a segment needs before its court fit is trusted. */
+const MIN_COURT_SAMPLES = 25;
+
 
 export type ScanStage = "load" | "scan" | "track" | "frames" | "done";
 export type ScanProgress = { ratio: number; label: string; stage: ScanStage; elapsedSec: number };
