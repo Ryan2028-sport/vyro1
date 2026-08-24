@@ -925,16 +925,19 @@ export async function scanSquashVideo(
 
     // ---- contacts: per-player strike signal -------------------------------
     const speed = (list: Pos[], i: number) => {
+      if (!linked(i - 1, i)) return 0;
       const a = list[i - 1];
       const b = list[i];
       return a && b ? Math.hypot(b.x - a.x, b.y - a.y) / step : 0;
     };
     const reversal = (list: Pos[], i: number) => {
+      if (!linked(i - 2, i) || !linked(i, i + 1)) return 0;
       const p0 = list[i - 2];
       const p1 = list[i - 1];
       const p2 = list[i];
       const p3 = list[i + 1];
       if (!p0 || !p1 || !p2 || !p3) return 0;
+
       const v1 = { x: p1.x - p0.x, y: p1.y - p0.y };
       const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
       const n1 = Math.hypot(v1.x, v1.y);
