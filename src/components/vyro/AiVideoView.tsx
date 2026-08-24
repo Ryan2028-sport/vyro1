@@ -194,6 +194,48 @@ function MeasuredPanels({ measured: s }: { measured: MeasuredStats }) {
   );
 }
 
+/** What the scanner could and could not read — broadcast edits get cut up. */
+function CoveragePanel({ measured: s }: { measured: MeasuredStats }) {
+  const mins = (sec: number) => (sec >= 60 ? `${(sec / 60).toFixed(1)} min` : `${sec.toFixed(0)}s`);
+  const rejected = s.rejectedSeconds ?? { closeUp: 0, unstable: 0, noPlay: 0, tooShort: 0 };
+  const dropped = rejected.closeUp + rejected.unstable + rejected.noPlay + rejected.tooShort;
+  const thin = s.measurableSeconds > 0 && s.measurableSeconds < 20;
+  return (
+    <Card
+      eyebrow="Footage coverage"
+      title={s.cameraCuts > 0 ? `${s.cameraCuts} camera cuts detected` : "One continuous camera"}
+      action={<Source kind="measured" />}
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stat label="Usable play" value={mins(s.usableSeconds)} />
+        <Stat label="Measured on court" value={mins(s.measurableSeconds)} />
+        <Stat label="Coverage" value={s.coveragePercent} unit="%" />
+        <Stat label="Shots used" value={`${s.playableSegments}/${s.segmentCount}`} />
+      </div>
+      {dropped > 0 && (
+        <p className="mt-3 text-[12px] leading-snug text-vyro-text/70">
+          Skipped {mins(dropped)}: {mins(rejected.closeUp)} close-ups and replays, {mins(rejected.unstable)} pans
+          and wipes, {mins(rejected.noPlay)} with no live play, {mins(rejected.tooShort)} too short to measure.
+          Every remaining shot got its own court fit, so nothing from a different framing is mixed in.
+        </p>
+      )}
+      {s.measurableSeconds === 0 && (
+        <p className="mt-3 text-[12px] leading-snug text-vyro-amber">
+          No shot in this clip gave a readable court view with you identified, so T discipline and the heat maps
+          below are empty. A single continuous camera behind the court fixes this.
+        </p>
+      )}
+      {thin && (
+        <p className="mt-3 text-[12px] leading-snug text-vyro-text/70">
+          Only {mins(s.measurableSeconds)} of court-fitted play — treat the court numbers as indicative, not exact.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+
+
 function VerifiedPanel({ verified: v, measured }: { verified: VerifiedCounts; measured: MeasuredStats }) {
   const mix = v.scaledShotMix;
   const sideTotal = v.side.forehand + v.side.backhand;
@@ -694,6 +736,10 @@ export function AiVideoView() {
               </button>
             )}
           </Card>
+
+          <CoveragePanel measured={report.measured} />
+
+
 
           {insight && (
             <Card eyebrow={`Confidence · ${insight.confidence}`} title={insight.headline}>

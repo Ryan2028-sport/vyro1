@@ -51,7 +51,30 @@ export const MeasuredSchema = z.object({
   identitySource: z.enum(["tapped", "auto"]).default("auto"),
   /** How often the two players stayed clearly separable, 0-100. */
   identityConfidencePercent: z.number().min(0).max(100).default(0),
+
+  // --- broadcast coverage (older saved reports have none of these) ---------
+  /** Camera cuts detected in the clip. 0 = one continuous camera. */
+  cameraCuts: z.number().min(0).max(5000).default(0),
+  /** Camera shots the clip was split into. */
+  segmentCount: z.number().min(0).max(5000).default(1),
+  /** Shots that showed live court play from a readable angle. */
+  playableSegments: z.number().min(0).max(5000).default(1),
+  /** Seconds of footage that produced motion measurements. */
+  usableSeconds: z.number().min(0).max(60 * 60 * 3).default(0),
+  /** Seconds where the court was fitted AND "you" was identified. */
+  measurableSeconds: z.number().min(0).max(60 * 60 * 3).default(0),
+  /** usableSeconds as a share of the clip. */
+  coveragePercent: z.number().min(0).max(100).default(0),
+  rejectedSeconds: z
+    .object({
+      closeUp: z.number().min(0).max(60 * 60 * 3).default(0),
+      unstable: z.number().min(0).max(60 * 60 * 3).default(0),
+      noPlay: z.number().min(0).max(60 * 60 * 3).default(0),
+      tooShort: z.number().min(0).max(60 * 60 * 3).default(0),
+    })
+    .default({ closeUp: 0, unstable: 0, noPlay: 0, tooShort: 0 }),
 });
+
 
 
 export type MeasuredStats = z.infer<typeof MeasuredSchema>;
@@ -185,10 +208,12 @@ export type MatchReport = {
 
 export const VERIFY_SYSTEM =
   "You are a squash video annotator. You look at still frames captured at detected ball-contact moments " +
-  "of a squash match and report ONLY what is literally visible in each frame. The camera is behind the " +
-  "court, so 'near' means the player closer to the camera (lower in the frame) and 'far' means the player " +
-  "further up the court. If you cannot see a strike, or cannot tell a detail, answer 'none' or 'unclear' — " +
-  "never guess. Reply with STRICT JSON only, no markdown, no commentary.";
+  "of a squash match and report ONLY what is literally visible in each frame. Frames may come from " +
+  "different camera shots of a broadcast: the main camera sits behind the court, so 'near' means the " +
+  "player closer to the camera (lower in the frame) and 'far' means the player further up the court. If a " +
+  "frame is not a normal court view, or you cannot see a strike, or cannot tell a detail, answer 'none' or " +
+  "'unclear' — never guess. Reply with STRICT JSON only, no markdown, no commentary.";
+
 
 export function buildVerifyPrompt(times: number[], hints: string[]): string {
   const rows = times
@@ -235,10 +260,18 @@ export function buildSynthesisPrompt(data: ClipInput, verified: VerifiedCounts |
       `  annotator notes: ${verified.notes.slice(0, 24).join(" · ")}\n`
     : "VERIFIED BY VISION: none — the frame verification pass did not return usable labels.\n";
 
+  const rej = m.rejectedSeconds ?? { closeUp: 0, unstable: 0, noPlay: 0, tooShort: 0 };
+
   return (
     `Squash match "${data.videoName}", ${data.durationSec.toFixed(1)}s long.\n\n` +
+    `FOOTAGE COVERAGE (this is a ${m.cameraCuts > 0 ? "broadcast-style edit" : "single continuous camera"}):\n` +
+    `  ${m.cameraCuts} camera cuts, split into ${m.segmentCount} shots, ${m.playableSegments} of them showing live court play\n` +
+    `  ${m.usableSeconds}s of readable play (${m.coveragePercent}% of the clip); ${m.measurableSeconds}s had a fitted court AND a confirmed identity\n` +
+    `  skipped: ${rej.closeUp}s close-ups/replays, ${rej.unstable}s pans and wipes, ${rej.noPlay}s no live play, ${rej.tooShort}s too short\n` +
+    `  Everything below was measured only inside the readable shots. Do not describe the whole clip as if it were all court play.\n\n` +
     `MEASURED BY THE SCAN (trust these, they come from the pixels):\n` +
     `  checkpoints ${m.scannedFrames} every ${m.sampleEverySec}s; both players tracked cleanly in ${m.twoPlayerTrackPercent}% of active frames\n` +
+
     (m.identitySource === "tapped"
       ? `  which player is "you": chosen by the user on a frame and followed by kit colour (clear separation in ${m.identityConfidencePercent}% of tracked frames)\n`
       : `  which player is "you": inferred from camera depth, not confirmed by the user — do not make claims that depend on the two players not being mixed up\n`) +
