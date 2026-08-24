@@ -317,17 +317,32 @@ export function buildSynthesisPrompt(data: ClipInput, verified: VerifiedCounts |
   );
 }
 
-export function parseJsonObject(raw: string): unknown | null {
+/** Parse a model reply that may be an object OR an array, fenced or not. */
+export function parseJsonValue(raw: string): unknown | null {
   const cleaned = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start < 0 || end <= start) return null;
   try {
-    return JSON.parse(cleaned.slice(start, end + 1));
+    return JSON.parse(cleaned);
   } catch {
-    return null;
+    /* fall through to bracket slicing */
   }
+  const slice = (open: string, close: string) => {
+    const start = cleaned.indexOf(open);
+    const end = cleaned.lastIndexOf(close);
+    if (start < 0 || end <= start) return null;
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  };
+  return slice("{", "}") ?? slice("[", "]");
 }
+
+export function parseJsonObject(raw: string): unknown | null {
+  const value = parseJsonValue(raw);
+  return value && !Array.isArray(value) ? value : null;
+}
+
 
 export function parseInsight(raw: string): SquashInsight | null {
   const obj = parseJsonObject(raw);
