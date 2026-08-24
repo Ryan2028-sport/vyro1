@@ -1025,16 +1025,19 @@ export async function scanSquashVideo(
       if (c.actor === "player") bump(playerHist, me);
       else bump(opponentHist, them);
 
-      // Recovery to the T after your own strike only.
+      // Recovery to the T after your own strike only, and only while the same
+      // camera take is still running.
       if (c.actor === "player") {
         const horizon = Math.min(frames.length, c.i + Math.ceil(8 / step));
         for (let j = c.i + 1; j < horizon; j++) {
+          if (!linked(c.i, j)) break;
           if (inT(playerPos[j] ?? null)) {
             tReturnEvents.push({ t: Number(c.t.toFixed(2)), secondsToT: Number(((j - c.i) * step).toFixed(2)) });
             break;
           }
         }
       }
+
     }
 
     // ---- rally segmentation with shot counts ------------------------------
