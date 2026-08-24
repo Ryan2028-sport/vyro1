@@ -51,7 +51,30 @@ export const MeasuredSchema = z.object({
   identitySource: z.enum(["tapped", "auto"]).default("auto"),
   /** How often the two players stayed clearly separable, 0-100. */
   identityConfidencePercent: z.number().min(0).max(100).default(0),
+
+  // --- broadcast coverage (older saved reports have none of these) ---------
+  /** Camera cuts detected in the clip. 0 = one continuous camera. */
+  cameraCuts: z.number().min(0).max(5000).default(0),
+  /** Camera shots the clip was split into. */
+  segmentCount: z.number().min(0).max(5000).default(1),
+  /** Shots that showed live court play from a readable angle. */
+  playableSegments: z.number().min(0).max(5000).default(1),
+  /** Seconds of footage that produced motion measurements. */
+  usableSeconds: z.number().min(0).max(60 * 60 * 3).default(0),
+  /** Seconds where the court was fitted AND "you" was identified. */
+  measurableSeconds: z.number().min(0).max(60 * 60 * 3).default(0),
+  /** usableSeconds as a share of the clip. */
+  coveragePercent: z.number().min(0).max(100).default(0),
+  rejectedSeconds: z
+    .object({
+      closeUp: z.number().min(0).max(60 * 60 * 3).default(0),
+      unstable: z.number().min(0).max(60 * 60 * 3).default(0),
+      noPlay: z.number().min(0).max(60 * 60 * 3).default(0),
+      tooShort: z.number().min(0).max(60 * 60 * 3).default(0),
+    })
+    .default({ closeUp: 0, unstable: 0, noPlay: 0, tooShort: 0 }),
 });
+
 
 
 export type MeasuredStats = z.infer<typeof MeasuredSchema>;
