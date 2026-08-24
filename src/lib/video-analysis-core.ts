@@ -141,6 +141,27 @@ export const SegmentReplySchema = z.object({
   labels: z.array(FrameLabelSchema).max(40),
 });
 
+/**
+ * Vision models answer this prompt either as {"labels":[...]} or as a bare
+ * array of label objects. Accept both, plus a couple of common key aliases.
+ */
+export function parseSegmentLabels(raw: string): FrameLabel[] | null {
+  const value = parseJsonValue(raw);
+  if (!value) return null;
+  const candidate = Array.isArray(value)
+    ? { labels: value }
+    : (() => {
+        const obj = value as Record<string, unknown>;
+        for (const key of ["labels", "frames", "results", "data"]) {
+          if (Array.isArray(obj[key])) return { labels: obj[key] };
+        }
+        return obj;
+      })();
+  const parsed = SegmentReplySchema.safeParse(candidate);
+  return parsed.success ? parsed.data.labels : null;
+}
+
+
 /** Counts fused from the AI-verified frames — always carries its sample size. */
 export type VerifiedCounts = {
   framesSent: number;
@@ -156,6 +177,8 @@ export type VerifiedCounts = {
   notes: string[];
   segmentsOk: number;
   segmentsFailed: number;
+  /** Why segments failed, when they did — surfaced so failures are debuggable. */
+  failureReasons: string[];
 };
 
 // ---------------------------------------------------------------------------
@@ -296,17 +319,32 @@ export function buildSynthesisPrompt(data: ClipInput, verified: VerifiedCounts |
   );
 }
 
-export function parseJsonObject(raw: string): unknown | null {
+/** Parse a model reply that may be an object OR an array, fenced or not. */
+export function parseJsonValue(raw: string): unknown | null {
   const cleaned = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start < 0 || end <= start) return null;
   try {
-    return JSON.parse(cleaned.slice(start, end + 1));
+    return JSON.parse(cleaned);
   } catch {
-    return null;
+    /* fall through to bracket slicing */
   }
+  const slice = (open: string, close: string) => {
+    const start = cleaned.indexOf(open);
+    const end = cleaned.lastIndexOf(close);
+    if (start < 0 || end <= start) return null;
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  };
+  return slice("{", "}") ?? slice("[", "]");
 }
+
+export function parseJsonObject(raw: string): unknown | null {
+  const value = parseJsonValue(raw);
+  return value && !Array.isArray(value) ? value : null;
+}
+
 
 export function parseInsight(raw: string): SquashInsight | null {
   const obj = parseJsonObject(raw);
