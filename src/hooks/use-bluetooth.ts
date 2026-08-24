@@ -164,7 +164,7 @@ export function useBluetooth() {
         setPowerState("unsupported");
         setError(
           isIOS
-            ? "BLE bridge not detected. Reopen the app from the TestFlight build (Despia/Capacitor) — Safari/WKWebView have no Web Bluetooth on iOS."
+            ? "iOS can't reach Bluetooth from a web page or a Home Screen shortcut — Apple gives Safari/WKWebView no Bluetooth API. Open VYRO from the installed app build (TestFlight/App Store) to pair the watch."
             : isAndroid
               ? "BLE bridge not detected. Open this page from the Android app build (Capacitor) — the Android WebView does not expose Web Bluetooth. Chrome on Android works if you open the site directly."
               : "Web Bluetooth is not available in this browser. Open this page inside the native app build, or use Chrome/Edge on desktop.",
