@@ -260,10 +260,18 @@ export function buildSynthesisPrompt(data: ClipInput, verified: VerifiedCounts |
       `  annotator notes: ${verified.notes.slice(0, 24).join(" · ")}\n`
     : "VERIFIED BY VISION: none — the frame verification pass did not return usable labels.\n";
 
+  const rej = m.rejectedSeconds ?? { closeUp: 0, unstable: 0, noPlay: 0, tooShort: 0 };
+
   return (
     `Squash match "${data.videoName}", ${data.durationSec.toFixed(1)}s long.\n\n` +
+    `FOOTAGE COVERAGE (this is a ${m.cameraCuts > 0 ? "broadcast-style edit" : "single continuous camera"}):\n` +
+    `  ${m.cameraCuts} camera cuts, split into ${m.segmentCount} shots, ${m.playableSegments} of them showing live court play\n` +
+    `  ${m.usableSeconds}s of readable play (${m.coveragePercent}% of the clip); ${m.measurableSeconds}s had a fitted court AND a confirmed identity\n` +
+    `  skipped: ${rej.closeUp}s close-ups/replays, ${rej.unstable}s pans and wipes, ${rej.noPlay}s no live play, ${rej.tooShort}s too short\n` +
+    `  Everything below was measured only inside the readable shots. Do not describe the whole clip as if it were all court play.\n\n` +
     `MEASURED BY THE SCAN (trust these, they come from the pixels):\n` +
     `  checkpoints ${m.scannedFrames} every ${m.sampleEverySec}s; both players tracked cleanly in ${m.twoPlayerTrackPercent}% of active frames\n` +
+
     (m.identitySource === "tapped"
       ? `  which player is "you": chosen by the user on a frame and followed by kit colour (clear separation in ${m.identityConfidencePercent}% of tracked frames)\n`
       : `  which player is "you": inferred from camera depth, not confirmed by the user — do not make claims that depend on the two players not being mixed up\n`) +
