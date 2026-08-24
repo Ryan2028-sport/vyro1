@@ -695,6 +695,10 @@ export function AiVideoView() {
             )}
           </Card>
 
+          <CoveragePanel measured={report.measured} />
+
+
+
           {insight && (
             <Card eyebrow={`Confidence · ${insight.confidence}`} title={insight.headline}>
               <p className="text-[13px] leading-relaxed text-vyro-text/85">{insight.summary}</p>
