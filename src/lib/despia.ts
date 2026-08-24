@@ -11,45 +11,74 @@ import {
   type ScanResult,
 } from "@capacitor-community/bluetooth-le";
 
-// Detect the native iOS wrapper. Despia injects "despia" into the UA, but
-// the Capacitor TestFlight build does NOT — it sets window.Capacitor and the
-// UA reports plain Mobile Safari. Without this, the BLE layer falls back to
-// Web Bluetooth (which iOS WKWebView does not implement) and throws
-// "Web Bluetooth is not available". We treat ANY iOS app-context webview as
-// native: Despia UA, Capacitor bridge, or the standalone PWA install.
+// Detect a REAL native bridge. This must not be optimistic: an iOS
+// home-screen PWA ("Add to Home Screen") reports a UA with no `Safari/` token
+// and `navigator.standalone === true`, but it has NO despia bridge and NO Web
+// Bluetooth. Previously that case was treated as native, so every BLE command
+// was posted to `bluetooth://…` and silently swallowed — the scan spinner ran
+// forever and no device ever appeared. We now require actual evidence of a
+// bridge (despia UA/global, a despia message handler, or a native Capacitor
+// runtime) before claiming native.
+export function hasDespiaMessageHandler(): boolean {
+  if (typeof window === "undefined") return false;
+  const handlers = (
+    window as unknown as { webkit?: { messageHandlers?: Record<string, unknown> } }
+  ).webkit?.messageHandlers;
+  if (!handlers) return false;
+  try {
+    return Object.keys(handlers).length > 0;
+  } catch {
+    return true;
+  }
+}
+
+/** True when the page runs as an installed home-screen PWA (no native bridge). */
+export function isStandalonePwa(): boolean {
+  if (typeof window === "undefined") return false;
+  const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const displayMode =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(display-mode: standalone)").matches;
+  return iosStandalone || displayMode;
+}
+
 function detectNative(): boolean {
   if (typeof navigator === "undefined") return false;
   const w =
     typeof window !== "undefined"
       ? (window as unknown as {
-          Capacitor?: unknown;
-          webkit?: { messageHandlers?: unknown };
+          Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
           despia?: unknown;
         })
       : undefined;
   const ua = navigator.userAgent || "";
   if (/despia/i.test(ua)) return true;
-  if (w?.Capacitor) return true;
   if (w?.despia) return true;
-  // WKWebView on iOS (TestFlight wrappers) exposes webkit.messageHandlers
-  // and reports as iPhone/iPad with no Safari token in the UA.
+  const capPlatform = w?.Capacitor?.getPlatform?.()?.toLowerCase();
+  if (w?.Capacitor?.isNativePlatform?.() === true) return true;
+  if (capPlatform === "ios" || capPlatform === "android") return true;
+  // iOS wrapper webviews expose webkit.messageHandlers. A home-screen PWA does
+  // NOT, so requiring the handler keeps installed-PWA users on the honest
+  // "no BLE bridge" path instead of a dead native path.
   const isIOS =
     /iPad|iPhone|iPod/.test(ua) ||
     (ua.includes("Mac") &&
       ((navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints ?? 0) > 1);
-  const inAppWebView = !!w?.webkit?.messageHandlers || (isIOS && !/Safari\//.test(ua));
-  if (isIOS && inAppWebView) return true;
+  if (isIOS && hasDespiaMessageHandler() && !isStandalonePwa()) return true;
   // Android inside a Capacitor / Despia wrapper: the Android WebView does not
-  // expose Web Bluetooth, so we must route to the native @capacitor-community
-  // /bluetooth-le plugin. Detect Android WebView (no Chrome token, or the
-  // "; wv" marker) or an explicit Capacitor / Despia bridge on Android.
+  // expose Web Bluetooth, so we must route to the native plugin. A Chrome-based
+  // installed PWA on Android DOES have Web Bluetooth, so exclude it.
   const isAndroid = /Android/i.test(ua);
   if (isAndroid) {
+    const hasWebBluetooth =
+      typeof (navigator as Navigator & { bluetooth?: { requestDevice?: unknown } }).bluetooth
+        ?.requestDevice === "function";
     const isWebView = /; wv\)/.test(ua) || !/Chrome\/\d/.test(ua);
-    if (isWebView || w?.Capacitor || w?.despia) return true;
+    if (!hasWebBluetooth && isWebView) return true;
   }
   return false;
 }
+
 
 export const isNative = detectNative();
 
