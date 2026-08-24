@@ -513,13 +513,31 @@ export async function scanSquashVideo(
     const bctx = big.getContext("2d");
     if (!sctx || !bctx) throw new Error("Canvas is unavailable in this browser.");
 
-    // ---- pass 1: background model + blobs ---------------------------------
+    // ---- pass 1: camera cuts + per-segment background model ---------------
+    // A broadcast edit is not one camera. Every cut restarts the background
+    // model, so a shot change can never masquerade as court motion.
     const frames: Frame[] = [];
     const bg = new Float32Array(GRID * GRID);
     let prev: Uint8ClampedArray | null = null;
-    let bgReady = false;
     const mask = new Uint8Array(GRID * GRID);
     const weight = new Uint8ClampedArray(GRID * GRID);
+
+    // Score bar / broadcast graphics strip: never counted as movement.
+    const ignore = new Uint8Array(GRID * GRID);
+    let liveCells = 0;
+    for (let gy = 0; gy < GRID; gy++) {
+      for (let gx = 0; gx < GRID; gx++) {
+        const nx = (gx + 0.5) / GRID;
+        const ny = (gy + 0.5) / GRID;
+        const off = ny > 0.86 && nx > 0.18 && nx < 0.82;
+        ignore[gy * GRID + gx] = off ? 1 : 0;
+        if (!off) liveCells += 1;
+      }
+    }
+
+    let segIndex = 0;
+    let sinceCut = 0;
+    let cutCount = 0;
 
     for (let i = 0; i < times.length; i++) {
       abortIfNeeded();
@@ -531,41 +549,74 @@ export async function scanSquashVideo(
         gray[p] = (px[p * 4]! * 0.299 + px[p * 4 + 1]! * 0.587 + px[p * 4 + 2]! * 0.114) | 0;
       }
 
-      if (!bgReady) {
-        for (let p = 0; p < GRID * GRID; p++) bg[p] = gray[p]!;
-        bgReady = true;
+      // --- cut detection against the previous checkpoint -------------------
+      let gdiff = 0;
+      let changedCells = 0;
+      if (prev) {
+        for (let p = 0; p < GRID * GRID; p++) {
+          if (ignore[p]) continue;
+          const d = Math.abs(gray[p]! - prev[p]!);
+          gdiff += d;
+          if (d > 30) changedCells += 1;
+        }
+        gdiff /= Math.max(1, liveCells);
+      }
+      const changedFrac = prev ? changedCells / Math.max(1, liveCells) : 0;
+      const cut =
+        !!prev &&
+        (gdiff > CUT_MEAN_DIFF || (changedFrac > CUT_FRACTION && gdiff > CUT_FRACTION_DIFF));
+      if (cut) {
+        segIndex += 1;
+        sinceCut = 0;
+        cutCount += 1;
       }
 
-      if (prev) {
+      const warm = sinceCut < SEGMENT_WARMUP;
+      const settled = !!prev && !cut && !warm;
+
+      let motion = 0;
+      let blobs: Blob[] = [];
+      let maxCellFrac = 0;
+
+      if (settled && prev) {
         let motionTotal = 0;
         let fgCells = 0;
         for (let p = 0; p < GRID * GRID; p++) {
+          if (ignore[p]) { mask[p] = 0; weight[p] = 0; continue; }
           const g = gray[p]!;
           const dFrame = Math.abs(g - prev[p]!);
           const dBg = Math.abs(g - bg[p]!);
-          // Foreground = differs from the learned background AND is not a
-          // whole-scene brightness shift (frame diff corroborates movement).
           const fg = dBg > DIFF_THRESHOLD + 4 && (dFrame > 6 || dBg > DIFF_THRESHOLD + 14);
           mask[p] = fg ? 1 : 0;
           weight[p] = fg ? Math.min(255, dBg) : 0;
           if (fg) fgCells += 1;
           if (dFrame > DIFF_THRESHOLD) motionTotal += dFrame;
         }
-        // A huge foreground means the camera moved or the scene cut — skip it.
-        const usable = fgCells < GRID * GRID * 0.5;
-        const motion = Math.max(0, Math.min(100, Math.round((motionTotal / (GRID * GRID * 26)) * 100)));
-        frames.push({ t: times[i]!, motion, blobs: usable ? extractBlobs(mask, weight, px) : [] });
+        const readable = fgCells < liveCells * 0.5;
+        motion = Math.max(0, Math.min(100, Math.round((motionTotal / (liveCells * 26)) * 100)));
+        blobs = readable ? extractBlobs(mask, weight, px) : [];
+        maxCellFrac = blobs.length
+          ? Math.max(...blobs.map((b) => b.cells)) / Math.max(1, liveCells)
+          : fgCells / Math.max(1, liveCells);
       }
 
-      // Slow background update: fast enough for lighting drift, slow enough
-      // that a player standing still stays foreground for a few seconds.
-      for (let p = 0; p < GRID * GRID; p++) bg[p] = bg[p]! * 0.965 + gray[p]! * 0.035;
+      frames.push({ t: times[i]!, motion, blobs, seg: segIndex, gdiff, maxCellFrac, settled });
+
+      // Background: hard reset at a cut, learn fast through the warm-up, then
+      // slow enough that a player standing still stays foreground.
+      if (!prev || cut) {
+        for (let p = 0; p < GRID * GRID; p++) bg[p] = gray[p]!;
+      } else {
+        const k = warm ? 0.45 : 0.035;
+        for (let p = 0; p < GRID * GRID; p++) bg[p] = bg[p]! * (1 - k) + gray[p]! * k;
+      }
       prev = gray;
+      sinceCut += 1;
 
       if (i % 8 === 0) {
         onProgress({
-          ratio: 0.02 + 0.66 * (i / times.length),
-          label: `Scanning court motion ${Math.round((i / times.length) * 100)}% · ${Math.round(times[i]!)}s of ${Math.round(duration)}s`,
+          ratio: 0.02 + 0.6 * (i / times.length),
+          label: `Scanning court motion ${Math.round((i / times.length) * 100)}% · ${Math.round(times[i]!)}s of ${Math.round(duration)}s · ${cutCount} camera cut${cutCount === 1 ? "" : "s"}`,
           stage: "scan",
           elapsedSec: elapsed(),
         });
@@ -575,51 +626,101 @@ export async function scanSquashVideo(
     }
 
     abortIfNeeded();
-    onProgress({ ratio: 0.7, label: "Fitting the court and tracking both players…", stage: "track", elapsedSec: elapsed() });
+    onProgress({ ratio: 0.62, label: "Splitting the clip into camera shots…", stage: "track", elapsedSec: elapsed() });
 
-    // ---- fit the court box from observed play -----------------------------
-    const xs: number[] = [];
-    const ys: number[] = [];
-    for (const f of frames) for (const b of f.blobs) { xs.push(b.x); ys.push(b.y); }
-    xs.sort((a, b) => a - b);
-    ys.sort((a, b) => a - b);
-    const enough = xs.length > 40;
-    const x0 = enough ? percentile(xs, 0.03) : 0;
-    const x1 = enough ? percentile(xs, 0.97) : 1;
-    const y0 = enough ? percentile(ys, 0.03) : 0;
-    const y1 = enough ? percentile(ys, 0.97) : 1;
-    const spanX = Math.max(0.15, x1 - x0);
-    const spanY = Math.max(0.15, y1 - y0);
-    const courtX = (x: number) => Math.max(0, Math.min(1, (x - x0) / spanX));
-    const courtY = (y: number) => Math.max(0, Math.min(1, (y - y0) / spanY));
+    // ---- segment triage ----------------------------------------------------
+    const segments: SegmentInfo[] = [];
+    const segCount = frames.length ? frames[frames.length - 1]!.seg + 1 : 0;
+    for (let s = 0; s < segCount; s++) {
+      let from = -1;
+      let to = -1;
+      for (let i = 0; i < frames.length; i++) {
+        if (frames[i]!.seg !== s) continue;
+        if (from < 0) from = i;
+        to = i;
+      }
+      if (from < 0) continue;
+      const own = frames.slice(from, to + 1);
+      const settledFrames = own.filter((f) => f.settled);
+      const seconds = own.length * step;
+      const fracs = settledFrames.map((f) => f.maxCellFrac).sort((a, b) => a - b);
+      const diffs = settledFrames.map((f) => f.gdiff).sort((a, b) => a - b);
+      const withOne = settledFrames.filter((f) => f.blobs.length >= 1).length;
+      const withTwo = settledFrames.filter((f) => f.blobs.length >= 2).length;
 
-    // ---- track two movers: position prediction + kit colour ---------------
-    // Track A is YOU when an identity was tapped (its colour signature is
-    // seeded from your kit), otherwise A/B are anonymous and labelled by depth
-    // at the end, as before.
+      let label: SegmentLabel = "playable";
+      if (seconds < MIN_SEGMENT_SECONDS || settledFrames.length < 3) label = "too-short";
+      else if (percentile(fracs, 0.5) > CLOSEUP_CELL_FRACTION) label = "close-up";
+      else if (percentile(diffs, 0.5) > UNSTABLE_MEAN_DIFF) label = "unstable";
+      else if (withOne < settledFrames.length * 0.4 || withTwo < settledFrames.length * 0.15) label = "no-play";
+
+      segments.push({
+        index: s,
+        startT: Number(frames[from]!.t.toFixed(2)),
+        endT: Number(frames[to]!.t.toFixed(2)),
+        seconds: Number(seconds.toFixed(1)),
+        from,
+        to,
+        label,
+        courtOk: false,
+        identityResolved: false,
+      });
+    }
+
+    const playable = segments.filter((s) => s.label === "playable");
+
+    // Colour reference for the whole clip: lets a kit signature be corrected
+    // for the white balance of each camera before it is matched.
+    const meanSig = (list: ColourSig[]): ColourSig | null => {
+      if (!list.length) return null;
+      const n = list.length;
+      return {
+        r: list.reduce((a, s) => a + s.r, 0) / n,
+        g: list.reduce((a, s) => a + s.g, 0) / n,
+        b: list.reduce((a, s) => a + s.b, 0) / n,
+        l: list.reduce((a, s) => a + s.l, 0) / n,
+      };
+    };
+    const allSigs: ColourSig[] = [];
+    for (const s of playable) for (let i = s.from; i <= s.to; i++) for (const b of frames[i]!.blobs) allSigs.push(b.sig);
+    const refMean = meanSig(allSigs);
+
+    /** Re-balance a kit signature from one camera's colour cast to another's. */
+    const wbShift = (sig: ColourSig, from: ColourSig | null, to: ColourSig | null): ColourSig => {
+      if (!from || !to) return sig;
+      const r = Math.max(0, sig.r - from.r + to.r);
+      const g = Math.max(0, sig.g - from.g + to.g);
+      const b = Math.max(0, sig.b - from.b + to.b);
+      const sum = Math.max(1e-4, r + g + b);
+      return { r: r / sum, g: g / sum, b: b / sum, l: Math.max(0, Math.min(1, sig.l - from.l + to.l)) };
+    };
+
+    // ---- per-segment court fit + identity tracking ------------------------
+    onProgress({
+      ratio: 0.66,
+      label: `Fitting the court in ${playable.length} usable shot${playable.length === 1 ? "" : "s"}…`,
+      stage: "track",
+      elapsedSec: elapsed(),
+    });
+
     type Track = {
       pos: { x: number; y: number };
       vel: { x: number; y: number };
       miss: number;
       sig: ColourSig;
     };
-    let A: Track | null = null;
-    let B: Track | null = null;
-    const rawA: Pos[] = [];
-    const rawB: Pos[] = [];
-    const massA: number[] = [];
-    const massB: number[] = [];
+
+    const playerPos: Pos[] = new Array(frames.length).fill(null);
+    const opponentPos: Pos[] = new Array(frames.length).fill(null);
+    const playerMass: number[] = new Array(frames.length).fill(0);
+    const opponentMass: number[] = new Array(frames.length).fill(0);
+    const usable: boolean[] = new Array(frames.length).fill(false);
     let twoBlobFrames = 0;
     let activeFrames = 0;
     let identityFrames = 0;
     let identityConfidentFrames = 0;
 
-    // Seeds from the tap. `sigA` is you.
-    let sigA: ColourSig | null = identity?.sig ?? null;
-    let sigB: ColourSig | null = identity?.otherSig ?? null;
-
-    const predict = (tr: Track | null): Pos =>
-      tr ? { x: tr.pos.x + tr.vel.x, y: tr.pos.y + tr.vel.y } : null;
+    const predict = (tr: Track | null): Pos => (tr ? { x: tr.pos.x + tr.vel.x, y: tr.pos.y + tr.vel.y } : null);
     const gap = (p: Pos, b: Blob) => (p ? Math.hypot(p.x - b.x, p.y - b.y) : 1.5);
     const update = (tr: Track | null, b: Blob): Track => {
       if (!tr) return { pos: { x: b.x, y: b.y }, vel: { x: 0, y: 0 }, miss: 0, sig: b.sig };
@@ -627,88 +728,143 @@ export async function scanSquashVideo(
         pos: { x: b.x, y: b.y },
         vel: { x: (b.x - tr.pos.x) * 0.6 + tr.vel.x * 0.4, y: (b.y - tr.pos.y) * 0.6 + tr.vel.y * 0.4 },
         miss: 0,
-        // Slow colour memory: survives a shadowed corner, still adapts to light.
         sig: blendSig(tr.sig, b.sig, 0.12),
       };
     };
-    // Colour reference for a track: the tapped kit first, then what it has seen.
-    const refSig = (tr: Track | null, seed: ColourSig | null): ColourSig | null =>
-      seed ? (tr ? blendSig(seed, tr.sig, 0.35) : seed) : tr ? tr.sig : null;
     const colourCost = (ref: ColourSig | null, b: Blob) => (ref ? sigDist(ref, b.sig) : 0);
 
-    for (const f of frames) {
-      const blobs = f.blobs;
-      let pickA: Blob | null = null;
-      let pickB: Blob | null = null;
-      const pa = predict(A);
-      const pb = predict(B);
-      const ra = refSig(A, sigA);
-      const rb = refSig(B, sigB);
+    for (const s of playable) {
+      // Court box from this camera's own play, so every position is stored in
+      // one shared court space no matter how the shot was framed.
+      const xs: number[] = [];
+      const ys: number[] = [];
+      const segSigs: ColourSig[] = [];
+      for (let i = s.from; i <= s.to; i++) {
+        for (const b of frames[i]!.blobs) { xs.push(b.x); ys.push(b.y); segSigs.push(b.sig); }
+      }
+      xs.sort((a, b) => a - b);
+      ys.sort((a, b) => a - b);
+      s.courtOk = xs.length >= MIN_COURT_SAMPLES;
+      const x0 = s.courtOk ? percentile(xs, 0.04) : 0;
+      const x1 = s.courtOk ? percentile(xs, 0.96) : 1;
+      const y0 = s.courtOk ? percentile(ys, 0.04) : 0;
+      const y1 = s.courtOk ? percentile(ys, 0.96) : 1;
+      const spanX = Math.max(0.15, x1 - x0);
+      const spanY = Math.max(0.15, y1 - y0);
+      const courtX = (x: number) => Math.max(0, Math.min(1, (x - x0) / spanX));
+      const courtY = (y: number) => Math.max(0, Math.min(1, (y - y0) / spanY));
 
-      if (blobs.length >= 2) {
-        twoBlobFrames += 1;
-        const [b1, b2] = [blobs[0]!, blobs[1]!];
-        if (identity && (!A || !B)) {
-          // Seed by kit colour: whichever blob looks most like the tapped
-          // player becomes track A. No camera-angle assumption at all.
-          const d1 = sigDist(identity.sig, b1.sig);
-          const d2 = sigDist(identity.sig, b2.sig);
-          if (d1 <= d2) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
-          if (!sigB) sigB = pickB.sig;
-        } else if (!A || !B) {
-          // No identity: camera usually sits behind the court, lower = nearer.
-          if (b1.y >= b2.y) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
-        } else {
-          // Position continuity plus colour. Colour is what carries identity
-          // through a crossing, where position alone flips the two players.
-          const straight = gap(pa, b1) + gap(pb, b2) + (colourCost(ra, b1) + colourCost(rb, b2)) * COLOUR_WEIGHT;
-          const swapped = gap(pa, b2) + gap(pb, b1) + (colourCost(ra, b2) + colourCost(rb, b1)) * COLOUR_WEIGHT;
-          if (straight <= swapped) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
-          if (identity) {
-            identityFrames += 1;
-            if (Math.abs(straight - swapped) > 0.06) identityConfidentFrames += 1;
+      // Kit signatures corrected for this camera's colour cast.
+      const segMean = meanSig(segSigs);
+      const seedSelf = identity ? wbShift(identity.sig, refMean, segMean) : null;
+      let seedOther = identity?.otherSig ? wbShift(identity.otherSig, refMean, segMean) : null;
+
+      let A: Track | null = null;
+      let B: Track | null = null;
+      const localA: Pos[] = [];
+      const localB: Pos[] = [];
+      const localMassA: number[] = [];
+      const localMassB: number[] = [];
+      const localIndex: number[] = [];
+      let acquired = false;
+
+      const refSig = (tr: Track | null, seed: ColourSig | null): ColourSig | null =>
+        seed ? (tr ? blendSig(seed, tr.sig, 0.35) : seed) : tr ? tr.sig : null;
+
+      for (let i = s.from; i <= s.to; i++) {
+        const f = frames[i]!;
+        if (!f.settled) continue;
+        usable[i] = true;
+        if (f.motion > 0) activeFrames += 1;
+        localIndex.push(i);
+
+        const blobs = f.blobs;
+        let pickA: Blob | null = null;
+        let pickB: Blob | null = null;
+        const pa = predict(A);
+        const pb = predict(B);
+        const ra = refSig(A, seedSelf);
+        const rb = refSig(B, seedOther);
+
+        if (blobs.length >= 2) {
+          twoBlobFrames += 1;
+          const [b1, b2] = [blobs[0]!, blobs[1]!];
+          if (!A || !B) {
+            if (seedSelf) {
+              // Re-acquire "you" inside every shot: the tracker never has to
+              // survive a cut, it just picks you up again on the far side.
+              const d1 = sigDist(seedSelf, b1.sig);
+              const d2 = sigDist(seedSelf, b2.sig);
+              if (d1 <= d2) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+              if (Math.abs(d1 - d2) > 0.045) acquired = true;
+              if (!seedOther) seedOther = pickB.sig;
+            } else {
+              // No tap: the camera sits behind the court, so lower = nearer.
+              if (b1.y >= b2.y) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+            }
+          } else {
+            const straight = gap(pa, b1) + gap(pb, b2) + (colourCost(ra, b1) + colourCost(rb, b2)) * COLOUR_WEIGHT;
+            const swapped = gap(pa, b2) + gap(pb, b1) + (colourCost(ra, b2) + colourCost(rb, b1)) * COLOUR_WEIGHT;
+            if (straight <= swapped) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+            if (identity) {
+              identityFrames += 1;
+              if (Math.abs(straight - swapped) > 0.06) identityConfidentFrames += 1;
+            }
           }
+        } else if (blobs.length === 1) {
+          const b = blobs[0]!;
+          const da = gap(pa, b) + colourCost(ra, b) * COLOUR_WEIGHT;
+          const db = gap(pb, b) + colourCost(rb, b) * COLOUR_WEIGHT;
+          if (da <= db && da < 0.35) pickA = b;
+          else if (db < da && db < 0.35) pickB = b;
+          else if (!A) pickA = b;
+          else if (!B) pickB = b;
+          else if (da <= db) pickA = b;
+          else pickB = b;
         }
-      } else if (blobs.length === 1) {
-        const b = blobs[0]!;
-        const da = gap(pa, b) + colourCost(ra, b) * COLOUR_WEIGHT;
-        const db = gap(pb, b) + colourCost(rb, b) * COLOUR_WEIGHT;
-        // A single blob only claims a track when it is plausibly that track.
-        if (da <= db && da < 0.35) pickA = b;
-        else if (db < da && db < 0.35) pickB = b;
-        else if (!A) pickA = b;
-        else if (!B) pickB = b;
-        else if (da <= db) pickA = b;
-        else pickB = b;
+
+        if (pickA) A = update(A, pickA);
+        else if (A !== null) A.miss += 1;
+        if (pickB) B = update(B, pickB);
+        else if (B !== null) B.miss += 1;
+        if (A && A.miss > 12) A = null;
+        if (B && B.miss > 12) B = null;
+
+        localA.push(pickA ? { x: pickA.x, y: pickA.y } : null);
+        localB.push(pickB ? { x: pickB.x, y: pickB.y } : null);
+        localMassA.push(pickA?.mass ?? 0);
+        localMassB.push(pickB?.mass ?? 0);
       }
 
-      if (pickA) A = update(A, pickA);
-      else if (A !== null) A.miss += 1;
-      if (pickB) B = update(B, pickB);
-      else if (B !== null) B.miss += 1;
+      // Which local track is "you" in this shot.
+      let flip = false;
+      if (!identity) {
+        const depthA = mean(localA.filter(Boolean).map((p) => p!.y));
+        const depthB = mean(localB.filter(Boolean).map((p) => p!.y));
+        flip = depthB > depthA + 0.02;
+      }
+      s.identityResolved = identity ? acquired : true;
 
-      if (A && A.miss > 12) A = null;
-      if (B && B.miss > 12) B = null;
+      const mePos = flip ? localB : localA;
+      const themPos = flip ? localA : localB;
+      const meMass = flip ? localMassB : localMassA;
+      const themMass = flip ? localMassA : localMassB;
 
-      rawA.push(pickA ? { x: pickA.x, y: pickA.y } : null);
-      rawB.push(pickB ? { x: pickB.x, y: pickB.y } : null);
-      massA.push(pickA?.mass ?? 0);
-      massB.push(pickB?.mass ?? 0);
-      if (f.motion > 0) activeFrames += 1;
+      // A shot whose court could not be fitted, or where "you" was never
+      // recognised, still counts for work/rest — but it contributes no
+      // positions, so it can never corrupt heat maps or T discipline.
+      if (!s.courtOk || !s.identityResolved) continue;
+
+      for (let k = 0; k < localIndex.length; k++) {
+        const i = localIndex[k]!;
+        const me = mePos[k] ?? null;
+        const them = themPos[k] ?? null;
+        playerPos[i] = me ? { x: courtX(me.x), y: courtY(me.y) } : null;
+        opponentPos[i] = them ? { x: courtX(them.x), y: courtY(them.y) } : null;
+        playerMass[i] = meMass[k] ?? 0;
+        opponentMass[i] = themMass[k] ?? 0;
+      }
     }
-
-    // With a tapped identity, track A IS you — no depth guess. Without one,
-    // fall back to "the mover living closer to the camera across the clip".
-    let flip = false;
-    if (!identity) {
-      const depthA = mean(rawA.filter(Boolean).map((p) => p!.y));
-      const depthB = mean(rawB.filter(Boolean).map((p) => p!.y));
-      flip = depthB > depthA + 0.02;
-    }
-    const rawPlayer = flip ? rawB : rawA;
-    const rawOpp = flip ? rawA : rawB;
-    const playerMass = flip ? massB : massA;
-    const opponentMass = flip ? massA : massB;
 
     const identitySource: MeasuredStats["identitySource"] = identity ? "tapped" : "auto";
     const identityConfidencePercent = identity
@@ -717,9 +873,14 @@ export async function scanSquashVideo(
         : 0
       : 0;
 
-    const playerPos: Pos[] = rawPlayer.map((p) => (p ? { x: courtX(p.x), y: courtY(p.y) } : null));
-    const opponentPos: Pos[] = rawOpp.map((p) => (p ? { x: courtX(p.x), y: courtY(p.y) } : null));
-
+    // ---- coverage ----------------------------------------------------------
+    const secondsWhere = (label: SegmentLabel) =>
+      segments.filter((s) => s.label === label).reduce((a, s) => a + s.seconds, 0);
+    const usableFrameCount = usable.filter(Boolean).length;
+    const usableSeconds = usableFrameCount * step;
+    const measurableSeconds = playable
+      .filter((s) => s.courtOk && s.identityResolved)
+      .reduce((a, s) => a + s.seconds, 0);
 
     // ---- anchor the court grid on the real T ------------------------------
     const occX: number[] = [];
@@ -742,17 +903,25 @@ export async function scanSquashVideo(
     };
     const inT = (p: Pos) => !!p && zoneOf(p) === "mid-centre";
 
+    /** Two checkpoints only relate to each other inside the same camera shot. */
+    const linked = (i: number, j: number) =>
+      !!frames[i] && !!frames[j] && frames[i]!.seg === frames[j]!.seg && !!usable[i] && !!usable[j];
+
     // ---- rallies -----------------------------------------------------------
-    const motions = frames.map((f) => f.motion);
-    const sortedMotion = [...motions].sort((a, b) => a - b);
-    const averageMotion = mean(motions);
-    const peakMotion = motions.length ? Math.max(...motions) : 0;
+    const motions = frames.map((f, i) => (usable[i] ? f.motion : 0));
+    const usableMotions = frames.filter((_, i) => usable[i]).map((f) => f.motion);
+    const sortedMotion = [...usableMotions].sort((a, b) => a - b);
+    const averageMotion = mean(usableMotions);
+    const peakMotion = usableMotions.length ? Math.max(...usableMotions) : 0;
     const quietLevel = percentile(sortedMotion, 0.3);
     const activeFloor = Math.max(4, quietLevel + Math.max(3, (peakMotion - quietLevel) * 0.16));
 
-    const active = motions.map((m) => m >= activeFloor);
+    const active = frames.map((f, i) => !!usable[i] && f.motion >= activeFloor);
     const activeSeconds = active.filter(Boolean).length * step;
-    const restSeconds = Math.max(0.1, duration - activeSeconds);
+    // Rest is measured inside the footage we could actually read — not against
+    // the whole broadcast, which includes replays and crowd shots.
+    const restSeconds = Math.max(0.1, usableSeconds - activeSeconds);
+
 
     // ---- contacts: per-player strike signal -------------------------------
     const speed = (list: Pos[], i: number) => {
