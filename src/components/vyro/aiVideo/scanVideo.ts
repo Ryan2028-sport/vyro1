@@ -973,7 +973,10 @@ export async function scanSquashVideo(
     };
 
     for (let i = 2; i < frames.length - 2; i++) {
-      if (!active[i]) continue;
+      // A contact is only claimed where the shot is readable and its
+      // neighbours belong to the same camera take.
+      if (!active[i] || !linked(i - 1, i) || !linked(i, i + 1)) continue;
+
       const ps = strikeSignal(playerMass, playerPos, playerFloor, i);
       const os = strikeSignal(opponentMass, opponentPos, opponentFloor, i);
       if (ps >= 1.35 && ps >= os) raw.push({ i, t: frames[i]!.t, actor: "player", score: ps, motion: frames[i]!.motion });
