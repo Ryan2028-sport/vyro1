@@ -1095,10 +1095,11 @@ export async function scanSquashVideo(
       return max > 0 ? h.map((v) => Math.round((v / max) * 100)) : h.map(() => 0);
     };
 
-    const third = Math.max(1, Math.floor(frames.length / 3));
-    const firstThird = mean(motions.slice(0, third));
-    const lastThird = mean(motions.slice(-third));
+    const third = Math.max(1, Math.floor(usableMotions.length / 3));
+    const firstThird = mean(usableMotions.slice(0, third));
+    const lastThird = mean(usableMotions.slice(-third));
     const fatigueDrift = firstThird > 0 ? ((lastThird - firstThird) / firstThird) * 100 : 0;
+
 
     // ---- evidence frames at real detected contacts ------------------------
     onProgress({ ratio: 0.76, label: "Capturing evidence frames at detected contacts…", stage: "frames", elapsedSec: elapsed() });
