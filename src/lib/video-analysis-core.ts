@@ -141,6 +141,27 @@ export const SegmentReplySchema = z.object({
   labels: z.array(FrameLabelSchema).max(40),
 });
 
+/**
+ * Vision models answer this prompt either as {"labels":[...]} or as a bare
+ * array of label objects. Accept both, plus a couple of common key aliases.
+ */
+export function parseSegmentLabels(raw: string): FrameLabel[] | null {
+  const value = parseJsonValue(raw);
+  if (!value) return null;
+  const candidate = Array.isArray(value)
+    ? { labels: value }
+    : (() => {
+        const obj = value as Record<string, unknown>;
+        for (const key of ["labels", "frames", "results", "data"]) {
+          if (Array.isArray(obj[key])) return { labels: obj[key] };
+        }
+        return obj;
+      })();
+  const parsed = SegmentReplySchema.safeParse(candidate);
+  return parsed.success ? parsed.data.labels : null;
+}
+
+
 /** Counts fused from the AI-verified frames — always carries its sample size. */
 export type VerifiedCounts = {
   framesSent: number;
