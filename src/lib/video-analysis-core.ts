@@ -208,10 +208,12 @@ export type MatchReport = {
 
 export const VERIFY_SYSTEM =
   "You are a squash video annotator. You look at still frames captured at detected ball-contact moments " +
-  "of a squash match and report ONLY what is literally visible in each frame. The camera is behind the " +
-  "court, so 'near' means the player closer to the camera (lower in the frame) and 'far' means the player " +
-  "further up the court. If you cannot see a strike, or cannot tell a detail, answer 'none' or 'unclear' — " +
-  "never guess. Reply with STRICT JSON only, no markdown, no commentary.";
+  "of a squash match and report ONLY what is literally visible in each frame. Frames may come from " +
+  "different camera shots of a broadcast: the main camera sits behind the court, so 'near' means the " +
+  "player closer to the camera (lower in the frame) and 'far' means the player further up the court. If a " +
+  "frame is not a normal court view, or you cannot see a strike, or cannot tell a detail, answer 'none' or " +
+  "'unclear' — never guess. Reply with STRICT JSON only, no markdown, no commentary.";
+
 
 export function buildVerifyPrompt(times: number[], hints: string[]): string {
   const rows = times
