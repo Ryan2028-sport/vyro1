@@ -1,12 +1,11 @@
 import {
   FAMILY,
-  SegmentReplySchema,
   SYNTHESIS_SYSTEM,
   VERIFY_SYSTEM,
   buildSynthesisPrompt,
   buildVerifyPrompt,
   parseInsight,
-  parseJsonObject,
+  parseSegmentLabels,
   type ClipInput,
   type FrameLabel,
   type SquashInsight,
@@ -116,15 +115,15 @@ async function verifyFrames(
         counts.segmentsFailed += 1;
         continue;
       }
-      const obj = parseJsonObject(text);
-      const parsed = obj ? SegmentReplySchema.safeParse(obj) : null;
-      if (!parsed?.success) {
+      const labels = parseSegmentLabels(text);
+      if (!labels || labels.length === 0) {
         counts.segmentsFailed += 1;
+        console.error("segment reply unparsable", text.slice(0, 300));
         continue;
       }
       counts.segmentsOk += 1;
 
-      for (const label of parsed.data.labels as FrameLabel[]) {
+      for (const label of labels as FrameLabel[]) {
         if (label.striking === "none") continue;
         if (label.striking === "near") counts.playerStrikes += 1;
         else if (label.striking === "far") counts.opponentStrikes += 1;
