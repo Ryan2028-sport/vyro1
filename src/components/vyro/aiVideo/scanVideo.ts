@@ -479,7 +479,10 @@ export async function probeForIdentity(
 export type ScanResult = {
   payload: ClipInput;
   measured: MeasuredStats;
+  /** Every camera shot the clip was split into, and why each was used or not. */
+  segments: SegmentInfo[];
 };
+
 
 export async function scanSquashVideo(
   file: File,
