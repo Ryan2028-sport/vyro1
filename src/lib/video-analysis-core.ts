@@ -177,6 +177,8 @@ export type VerifiedCounts = {
   notes: string[];
   segmentsOk: number;
   segmentsFailed: number;
+  /** Why segments failed, when they did — surfaced so failures are debuggable. */
+  failureReasons: string[];
 };
 
 // ---------------------------------------------------------------------------

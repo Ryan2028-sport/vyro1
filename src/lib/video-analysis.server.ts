@@ -68,6 +68,7 @@ function emptyCounts(framesSent: number): VerifiedCounts {
     notes: [],
     segmentsOk: 0,
     segmentsFailed: 0,
+    failureReasons: [],
   };
 }
 
@@ -104,8 +105,8 @@ async function verifyFrames(
         content.push({ type: "text", text: buildVerifyPrompt(batch.times, batch.hints) });
         try {
           return await callGateway(key, VERIFY_SYSTEM, content);
-        } catch {
-          return { text: null, error: "segment failed" };
+        } catch (e) {
+          return { text: null, error: e instanceof Error ? `segment failed: ${e.message}` : "segment failed" };
         }
       }),
     );
@@ -113,12 +114,13 @@ async function verifyFrames(
     for (const { text, error } of replies) {
       if (error || !text) {
         counts.segmentsFailed += 1;
+        if (counts.failureReasons.length < 4) counts.failureReasons.push(error ?? "empty reply");
         continue;
       }
       const labels = parseSegmentLabels(text);
       if (!labels || labels.length === 0) {
         counts.segmentsFailed += 1;
-        console.error("segment reply unparsable", text.slice(0, 300));
+        if (counts.failureReasons.length < 4) counts.failureReasons.push(`unreadable reply: ${text.slice(0, 120)}`);
         continue;
       }
       counts.segmentsOk += 1;
