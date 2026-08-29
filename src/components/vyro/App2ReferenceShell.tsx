@@ -998,9 +998,11 @@ function CognitiveFatigueCard({
 function EmbeddedView({
   view,
   profileSport,
+  canDebug = false,
 }: {
   view: App2View;
   profileSport: "squash" | "tennis";
+  canDebug?: boolean;
 }) {
   if (view === "trends") {
     return (
@@ -1038,6 +1040,7 @@ function EmbeddedView({
     );
   }
   if (view === "debug") {
+    if (!canDebug) return null;
     return (
       <div className="app2-scroll-embed">
         <DebugView />
@@ -1744,7 +1747,7 @@ export function App2ReferenceShell() {
           <AthleteHome setView={setView} />
         ) : (
           <main className="app2-main">
-            <EmbeddedView view={view} profileSport={sport} />
+            <EmbeddedView view={view} profileSport={sport} canDebug={isAdmin} />
           </main>
         )}
 
