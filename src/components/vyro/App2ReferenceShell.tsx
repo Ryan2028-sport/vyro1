@@ -8,8 +8,6 @@ import {
   CalendarDays,
   ChevronDown,
 
-  Brain,
-  CalendarDays,
   Gauge,
   Heart,
   LineChart,
