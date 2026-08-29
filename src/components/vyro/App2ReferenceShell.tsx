@@ -1232,15 +1232,18 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
     <main className="app2-main">
       <div className="space-y-4 pb-2">
         {/* ---- Greeting header -------------------------------------------- */}
-        <header className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <div className="flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.18em] text-vyro-mute">
-            <CalendarDays size={11} className="shrink-0" />
+        <header className="app2-greet animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <span className="app2-datechip">
+            <CalendarDays size={12} className="shrink-0" />
             {dateLabel}
-          </div>
-          <h1 className="mt-2 text-[30px] font-black leading-[1.05] tracking-[-0.045em] text-vyro-text">
-            Good morning, {firstName}.
+          </span>
+          <h1 className="app2-greet-title">
+            Good morning,{" "}
+            <span className="app2-greet-name">{firstName}</span>
           </h1>
+          <div className="app2-greet-rule" aria-hidden="true" />
         </header>
+
 
         {/* ---- Readiness hero -------------------------------------------- */}
         <GlassCard
