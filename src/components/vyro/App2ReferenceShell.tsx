@@ -36,7 +36,6 @@ import { CourtDbView } from "./CourtDbView";
 import { SwingView } from "./SwingView";
 import { TendencyView } from "./TendencyView";
 import { TrendsView } from "./TrendsView";
-import { getKeepAliveStatus, subscribeKeepAlive, pokeKeepAlive } from "@/lib/keep-alive";
 import { useLiveMetrics, type LiveMetrics } from "./useLiveMetrics";
 import { useVyroScores } from "./VyroScoresProvider";
 import {
@@ -1667,30 +1666,6 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   );
 }
 
-// Shows whether the band keeps streaming while the app is off-screen.
-function AlwaysOnPill({ connected }: { connected: boolean }) {
-  const [ka, setKa] = useState(() => getKeepAliveStatus());
-  useEffect(() => subscribeKeepAlive(setKa), []);
-  const on = connected && ka.active && (ka.audio || ka.native);
-  const label = !connected ? "Always-on off" : on ? "Always on" : "Tap to arm";
-  return (
-    <button
-      type="button"
-      className="app2-live-pill"
-      title={
-        on
-          ? "Background session active — the band keeps streaming when the app is minimized."
-          : "Tap anywhere once to arm the background session so the band keeps streaming off-screen."
-      }
-      onClick={() => pokeKeepAlive()}
-      aria-live="polite"
-    >
-      <span className={on ? "app2-dot app2-pulse" : "app2-dot"} />
-      {label}
-    </button>
-  );
-}
-
 export function App2ReferenceShell() {
 
   const [view, setView] = useState<App2View>("athlete");
@@ -1740,17 +1715,11 @@ export function App2ReferenceShell() {
           <div className="app2-topbar">
             <div>
               <Logo />
-              <div className="app2-kicker">VYRO IOS</div>
+              <div className="app2-kicker">VYRO</div>
               <div className="app2-title">{title}</div>
             </div>
             <div>
               <div className="app2-actions">
-                <AlwaysOnPill connected={m.connected} />
-                <button className="app2-sync" onClick={() => setView("band")}>
-                  <span className={m.connected ? "app2-dot app2-pulse" : "app2-dot"} />
-                  Sync now
-                </button>
-
                 <button
                   className="app2-icon-btn"
                   aria-label="Device settings"
