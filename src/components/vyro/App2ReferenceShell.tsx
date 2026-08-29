@@ -80,20 +80,6 @@ const dateLabel = new Date().toLocaleDateString([], {
   day: "numeric",
 });
 
-function Logo() {
-  return (
-    <div className="app2-logo">
-      <img
-        src="/vyro-logo.png"
-        alt="VYRO"
-        className="app2-logo-img"
-        width={96}
-        height={28}
-        loading="eager"
-      />
-    </div>
-  );
-}
 
 function toneVar(value: number | null | undefined) {
   if (value == null) return "hsl(0 0% 100% / 0.28)";
