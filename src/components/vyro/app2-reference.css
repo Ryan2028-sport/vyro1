@@ -762,7 +762,6 @@
 @media (max-width: 480px) {
   .app2-topbar { padding: 8px 14px 10px; gap: 10px; }
   .app2-actions { gap: 6px; }
-  .app2-module-nav { margin: 2px 12px 14px; }
   .app2-main { padding: 4px 12px calc(env(safe-area-inset-bottom, 0px) + 108px); }
   .app2-heading { font-size: 26px; }
   .app2-title { font-size: 19px; }
