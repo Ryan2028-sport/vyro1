@@ -1714,7 +1714,6 @@ export function App2ReferenceShell() {
         <header className="app2-shell-header">
           <div className="app2-topbar">
             <div>
-              <Logo />
               <div className="app2-kicker">VYRO</div>
               <div className="app2-title">{title}</div>
             </div>
