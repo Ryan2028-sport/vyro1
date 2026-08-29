@@ -1240,9 +1240,6 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           <h1 className="mt-2 text-[30px] font-black leading-[1.05] tracking-[-0.045em] text-vyro-text">
             Good morning, {firstName}.
           </h1>
-          <p className="mt-2 max-w-[34ch] text-[13px] leading-relaxed text-vyro-mute">
-            Your daily readiness command center — synced from your VYRO Band.
-          </p>
         </header>
 
         {/* ---- Readiness hero -------------------------------------------- */}
@@ -1596,12 +1593,6 @@ export function App2ReferenceShell() {
         : view === "ai-video"
           ? "AI Video"
           : view[0].toUpperCase() + view.slice(1);
-  const topButtons = [
-    { id: "trends" as App2View, label: "Trends", icon: LineChart },
-    { id: "session" as App2View, label: "Session", icon: Radio },
-    { id: "coach" as App2View, label: "Coach", icon: UserRound },
-    { id: "social" as App2View, label: "Social", icon: MessageCircle },
-  ];
   const tabs = [
     { id: "athlete" as App2View, label: "Athlete", icon: Activity },
     { id: "sport" as App2View, label: "Sport", icon: Trophy },
@@ -1609,6 +1600,10 @@ export function App2ReferenceShell() {
     { id: "sleep" as App2View, label: "Sleep", icon: Moon },
     ...(isAdmin ? [{ id: "debug" as App2View, label: "Debug", icon: Stethoscope }] : []),
     { id: "ai-video" as App2View, label: "AI Video", icon: Video },
+    { id: "trends" as App2View, label: "Trends", icon: LineChart },
+    { id: "session" as App2View, label: "Session", icon: Radio },
+    { id: "coach" as App2View, label: "Coach", icon: UserRound },
+    { id: "social" as App2View, label: "Social", icon: MessageCircle },
   ];
 
 
@@ -1644,14 +1639,6 @@ export function App2ReferenceShell() {
               </button>
             </div>
           </div>
-          <nav className="app2-module-nav" aria-label="VYRO modules">
-            {topButtons.map(({ id, label, icon: Icon }) => (
-              <button key={label} className={`app2-chip ${view === id ? "active" : ""}`} onClick={() => setView(id)}>
-                <Icon size={14} />
-                {label}
-              </button>
-            ))}
-          </nav>
         </header>
 
         {view === "athlete" ? (
