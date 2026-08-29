@@ -183,21 +183,6 @@ function SectionHeader({
   );
 }
 
-function Eyebrow({ children, tone = "mint" }: { children: ReactNode; tone?: "mint" | "amber" | "rose" | "mute" }) {
-  const color =
-    tone === "amber"
-      ? "text-vyro-amber"
-      : tone === "rose"
-        ? "text-vyro-rose"
-        : tone === "mute"
-          ? "text-vyro-mute"
-          : "text-vyro-mint";
-  return (
-    <div className={`font-[family-name:var(--font-display)] text-[9px] font-bold uppercase tracking-[0.2em] ${color}`}>
-      {children}
-    </div>
-  );
-}
 
 /** Apple Activity-style concentric rings: readiness (outer), recovery, sleep. */
 function Ring({
