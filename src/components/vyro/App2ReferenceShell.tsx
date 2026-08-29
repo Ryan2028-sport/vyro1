@@ -1247,7 +1247,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
   return (
     <main className="app2-main">
-      <div className="space-y-5 pb-2">
+      <div className="space-y-4 pb-2">
         {/* ---- Greeting header -------------------------------------------- */}
         <header className="animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.18em] text-vyro-mute">
