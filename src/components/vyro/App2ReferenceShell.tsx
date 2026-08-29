@@ -1642,14 +1642,6 @@ export function App2ReferenceShell() {
               </button>
             </div>
           </div>
-          <nav className="app2-module-nav" aria-label="VYRO modules">
-            {topButtons.map(({ id, label, icon: Icon }) => (
-              <button key={label} className={`app2-chip ${view === id ? "active" : ""}`} onClick={() => setView(id)}>
-                <Icon size={14} />
-                {label}
-              </button>
-            ))}
-          </nav>
         </header>
 
         {view === "athlete" ? (
