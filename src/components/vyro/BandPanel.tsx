@@ -328,8 +328,10 @@ export function BandPanel({
           )}
         </div>
       </Card>
+      )}
 
-      {/* OTA */}
+      {/* OTA — admin (debug) accounts only */}
+      {isAdmin && (
       <Card eyebrow="Update" title="Watch software update">
         {/* Current firmware / hardware — read from BLE Device Information Service (0x180a). */}
         <div className="mb-3 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-vyro-text/55">
