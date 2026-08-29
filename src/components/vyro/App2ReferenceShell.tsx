@@ -1331,49 +1331,18 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
               <div className="mt-5 h-px bg-linear-to-r from-transparent via-white/12 to-transparent" />
 
-              <div className="mt-4">
-                <Eyebrow tone="mute">What changed</Eyebrow>
-                <div className="mt-2.5 flex flex-wrap gap-2">
-                  {baselines.readiness != null && readiness != null ? (
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10.5px] font-semibold ${
-                        readiness < baselines.readiness
-                          ? "border-vyro-amber/20 bg-vyro-amber/10 text-vyro-amber"
-                          : "border-vyro-mint/20 bg-vyro-mint/10 text-vyro-mint"
-                      }`}
-                    >
-                      {readiness >= baselines.readiness ? "↗" : "↘"} Readiness{" "}
-                      {Math.round(readiness - baselines.readiness) > 0 ? "+" : ""}
-                      {Math.round(readiness - baselines.readiness)} vs {baselines.days}d baseline
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.05] px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-mute">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-                      Calibrating baseline…
-                    </span>
-                  )}
-                  {m.connected && m.hrvMs != null && baselines.hrv != null && (
-                    <span className="rounded-full border border-vyro-mint/20 bg-vyro-mint/10 px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-mint">
-                      ↗ HRV {m.hrvMs - baselines.hrv > 0 ? "+" : ""}
-                      {Math.round(m.hrvMs - baselines.hrv)} ms
-                    </span>
-                  )}
-                  {strain != null && strain > 70 && (
-                    <span className="rounded-full border border-vyro-rose/20 bg-vyro-rose/10 px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-rose">
-                      ⚠ Strain {strain}/100
-                    </span>
-                  )}
-                </div>
+              <div className="w-full min-w-0">
+                <h2 className="text-balance text-center font-[family-name:var(--font-display)] text-[21px] font-extrabold leading-[1.18] tracking-[-0.04em] text-vyro-text">
+                  {s.coachRead}
+                </h2>
+                <p className="mx-auto mt-2 max-w-[36ch] text-center text-[12.5px] leading-relaxed text-vyro-mute">
+                  {m.connected && readiness != null
+                    ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
+                    : m.connected
+                      ? "Connected. Waiting for enough independent body signals to calculate a trusted score."
+                      : "Open Settings to pair your VYRO Band and populate live signals."}
+                </p>
               </div>
-
-              {!m.connected && (
-                <button
-                  onClick={() => setView("band")}
-                  className="mt-4 w-full rounded-2xl bg-white px-4 py-3 font-[family-name:var(--font-display)] text-[12px] font-bold uppercase tracking-[0.14em] text-black transition-transform duration-200 ease-out active:scale-[0.98]"
-                >
-                  Pair your band
-                </button>
-              )}
             </div>
           </div>
         </GlassCard>
