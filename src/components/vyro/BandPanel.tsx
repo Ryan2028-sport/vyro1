@@ -66,6 +66,7 @@ export function BandPanel({
   defaultSport?: "squash" | "tennis";
 }) {
   const vyro = useVyroBandCtx();
+  const { isAdmin } = useRoles();
   const inspector = useBleInspector();
   const { ble, connected, events, sessionState: _s, sport: _sp, setSport, firmwareRevision, hardwareRevision } = vyro;
   const updateProfile = useServerFn(updateMyProfile);
