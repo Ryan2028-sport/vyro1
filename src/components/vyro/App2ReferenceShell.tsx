@@ -1148,8 +1148,6 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
   // Every score below is the GLOBAL value — identical on every other tab.
   const { readiness, recovery, sleep, fatigue, fatigueSource, agility, agilityReason, strain, statusLabel, baselines, rtp } = s;
-  const battery = m.batteryPct;
-  const status = m.connected ? "BAND CONNECTED" : m.connecting ? "BAND CONNECTING" : "PAIR BAND";
 
   const trend = (
     cur: number | null | undefined,
