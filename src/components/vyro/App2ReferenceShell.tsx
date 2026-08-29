@@ -1402,18 +1402,38 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             }
           >
             <div className="divide-y divide-white/[0.055]">
-              {vitals.map((vital) => (
+              {(showAllVitals ? vitals : vitals.slice(0, 4)).map((vital) => (
                 <VitalRow key={vital.label} {...vital} />
               ))}
             </div>
 
+            {vitals.length > 4 && (
+              <button
+                type="button"
+                onClick={() => setShowAllVitals((v) => !v)}
+                className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[14px] border border-white/[0.08] bg-white/[0.035] text-[12px] font-bold text-vyro-text"
+              >
+                {showAllVitals ? "Show less" : `Show all ${vitals.length} signals`}
+                <ChevronDown
+                  size={15}
+                  strokeWidth={2.6}
+                  className={`text-vyro-mute transition-transform duration-300 ${showAllVitals ? "rotate-180" : ""}`}
+                />
+              </button>
+            )}
           </InfoCard>
 
-          <CognitiveFatigueCard
-            m={m}
-            baselineMs={baselines.reactMs ?? undefined}
-            hrvBaselineMs={baselines.hrv ?? undefined}
-          />
+          <Disclosure title="Cognitive load" hint="Reaction time and autonomic strain">
+            <CognitiveFatigueCard
+              m={m}
+              baselineMs={baselines.reactMs ?? undefined}
+              hrvBaselineMs={baselines.hrv ?? undefined}
+            />
+          </Disclosure>
+
+          <Disclosure title="Return-to-play & training plan" hint="RTP validator and today's blocks">
+            <div className="space-y-4">
+
 
           <InfoCard
             eyebrow="Return-to-play"
