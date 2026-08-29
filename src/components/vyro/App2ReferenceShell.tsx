@@ -1326,23 +1326,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                   ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
                   : m.connected
                     ? "Connected. Waiting for enough independent body signals to calculate a trusted score."
-                  : "Pair your VYRO Band to populate live signals."}
+                    : "Open Settings to pair your VYRO Band and populate live signals."}
               </p>
-
-              <div className="mt-5 h-px bg-linear-to-r from-transparent via-white/12 to-transparent" />
-
-              <div className="w-full min-w-0">
-                <h2 className="text-balance text-center font-[family-name:var(--font-display)] text-[21px] font-extrabold leading-[1.18] tracking-[-0.04em] text-vyro-text">
-                  {s.coachRead}
-                </h2>
-                <p className="mx-auto mt-2 max-w-[36ch] text-center text-[12.5px] leading-relaxed text-vyro-mute">
-                  {m.connected && readiness != null
-                    ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
-                    : m.connected
-                      ? "Connected. Waiting for enough independent body signals to calculate a trusted score."
-                      : "Open Settings to pair your VYRO Band and populate live signals."}
-                </p>
-              </div>
             </div>
           </div>
         </GlassCard>
