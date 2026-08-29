@@ -44,6 +44,9 @@ function AuthPage() {
       }
       const email = usernameToEmail(username);
       if (mode === "signup") {
+        if (password.length < 8) {
+          throw new Error("Password must be at least 8 characters.");
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -89,7 +92,7 @@ function AuthPage() {
             required
             type="password"
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            minLength={6}
+            minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
