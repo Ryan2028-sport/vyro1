@@ -1596,12 +1596,6 @@ export function App2ReferenceShell() {
         : view === "ai-video"
           ? "AI Video"
           : view[0].toUpperCase() + view.slice(1);
-  const topButtons = [
-    { id: "trends" as App2View, label: "Trends", icon: LineChart },
-    { id: "session" as App2View, label: "Session", icon: Radio },
-    { id: "coach" as App2View, label: "Coach", icon: UserRound },
-    { id: "social" as App2View, label: "Social", icon: MessageCircle },
-  ];
   const tabs = [
     { id: "athlete" as App2View, label: "Athlete", icon: Activity },
     { id: "sport" as App2View, label: "Sport", icon: Trophy },
@@ -1609,6 +1603,10 @@ export function App2ReferenceShell() {
     { id: "sleep" as App2View, label: "Sleep", icon: Moon },
     ...(isAdmin ? [{ id: "debug" as App2View, label: "Debug", icon: Stethoscope }] : []),
     { id: "ai-video" as App2View, label: "AI Video", icon: Video },
+    { id: "trends" as App2View, label: "Trends", icon: LineChart },
+    { id: "session" as App2View, label: "Session", icon: Radio },
+    { id: "coach" as App2View, label: "Coach", icon: UserRound },
+    { id: "social" as App2View, label: "Social", icon: MessageCircle },
   ];
 
 
