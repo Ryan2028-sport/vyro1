@@ -1187,6 +1187,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   const deleteMutation = useMutation({ mutationFn: removeItem, onSuccess: invalidatePlan });
   const items = planItems ?? [];
   const [draft, setDraft] = useState({ time: "", title: "", load: "", tone: "green" as PlanItem["color"] });
+  const [showAllVitals, setShowAllVitals] = useState(false);
+
 
   // Every score below is the GLOBAL value — identical on every other tab.
   const { readiness, recovery, sleep, fatigue, fatigueSource, agility, agilityReason, strain, statusLabel, baselines, rtp } = s;
