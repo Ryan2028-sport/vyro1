@@ -448,6 +448,7 @@ export function BandPanel({
           </div>
         )}
       </Card>
+      )}
     </div>
   );
 }
