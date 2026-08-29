@@ -16,6 +16,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
 import { Card, Pill } from "./shared";
 import { QCBAND_SERVICE_UUID } from "@/lib/vyro-ble/qcband";
+import { useRoles } from "@/hooks/use-roles";
 
 
 function fmtSat(v: { value: number; saturated: boolean }, unit: string, dp = 2) {
