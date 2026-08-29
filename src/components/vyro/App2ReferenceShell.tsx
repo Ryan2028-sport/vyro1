@@ -1240,9 +1240,6 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           <h1 className="mt-2 text-[30px] font-black leading-[1.05] tracking-[-0.045em] text-vyro-text">
             Good morning, {firstName}.
           </h1>
-          <p className="mt-2 max-w-[34ch] text-[13px] leading-relaxed text-vyro-mute">
-            Your daily readiness command center — synced from your VYRO Band.
-          </p>
         </header>
 
         {/* ---- Readiness hero -------------------------------------------- */}
