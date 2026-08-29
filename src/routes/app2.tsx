@@ -1,26 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { VyroBandProvider } from "@/components/vyro/VyroBandProvider";
-import { VyroScoresProvider } from "@/components/vyro/VyroScoresProvider";
-import { App2ReferenceShell } from "@/components/vyro/App2ReferenceShell";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-// /app2 = public mirror of /app. Uses the SAME VyroBandProvider so BLE
-// pairing, firmware (OTA) updates, live metrics, and the always-on
-// background session run identically here.
+// Legacy path: everything now lives at /app.
 export const Route = createFileRoute("/app2")({
-  ssr: false,
-  head: () => ({
-    links: [
-      {
-        rel: "stylesheet",
-        href: "https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&f[]=jetbrains-mono@500,700&display=swap",
-      },
-    ],
-  }),
-  component: () => (
-    <VyroBandProvider>
-      <VyroScoresProvider>
-        <App2ReferenceShell />
-      </VyroScoresProvider>
-    </VyroBandProvider>
-  ),
+  beforeLoad: () => {
+    throw redirect({ to: "/app", replace: true });
+  },
 });
