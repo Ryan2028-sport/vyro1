@@ -1247,7 +1247,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
   return (
     <main className="app2-main">
-      <div className="space-y-5 pb-2">
+      <div className="space-y-4 pb-2">
         {/* ---- Greeting header -------------------------------------------- */}
         <header className="animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.18em] text-vyro-mute">
@@ -1279,7 +1279,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         {/* ---- Readiness hero -------------------------------------------- */}
         <GlassCard
           glow={toneVar(readiness)}
-          className="animate-in fade-in slide-in-from-bottom-3 p-5 duration-500 sm:p-6"
+          className="animate-in fade-in slide-in-from-bottom-3 p-4 duration-500 sm:p-5"
         >
           {/* status strip */}
           <div className="flex items-center justify-between gap-3">
@@ -1306,7 +1306,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             </span>
           </div>
 
-          <div className="mt-4 flex flex-col items-center gap-5">
+          <div className="mt-3 flex flex-col items-center gap-4">
             <Ring value={readiness} recovery={recovery} sleep={sleep} />
 
             <RingLegend
@@ -1326,54 +1326,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                   ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
                   : m.connected
                     ? "Connected. Waiting for enough independent body signals to calculate a trusted score."
-                  : "Pair your VYRO Band to populate live signals."}
+                    : "Open Settings to pair your VYRO Band and populate live signals."}
               </p>
-
-              <div className="mt-5 h-px bg-linear-to-r from-transparent via-white/12 to-transparent" />
-
-              <div className="mt-4">
-                <Eyebrow tone="mute">What changed</Eyebrow>
-                <div className="mt-2.5 flex flex-wrap gap-2">
-                  {baselines.readiness != null && readiness != null ? (
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10.5px] font-semibold ${
-                        readiness < baselines.readiness
-                          ? "border-vyro-amber/20 bg-vyro-amber/10 text-vyro-amber"
-                          : "border-vyro-mint/20 bg-vyro-mint/10 text-vyro-mint"
-                      }`}
-                    >
-                      {readiness >= baselines.readiness ? "↗" : "↘"} Readiness{" "}
-                      {Math.round(readiness - baselines.readiness) > 0 ? "+" : ""}
-                      {Math.round(readiness - baselines.readiness)} vs {baselines.days}d baseline
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.05] px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-mute">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-                      Calibrating baseline…
-                    </span>
-                  )}
-                  {m.connected && m.hrvMs != null && baselines.hrv != null && (
-                    <span className="rounded-full border border-vyro-mint/20 bg-vyro-mint/10 px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-mint">
-                      ↗ HRV {m.hrvMs - baselines.hrv > 0 ? "+" : ""}
-                      {Math.round(m.hrvMs - baselines.hrv)} ms
-                    </span>
-                  )}
-                  {strain != null && strain > 70 && (
-                    <span className="rounded-full border border-vyro-rose/20 bg-vyro-rose/10 px-2.5 py-1.5 text-[10.5px] font-semibold text-vyro-rose">
-                      ⚠ Strain {strain}/100
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {!m.connected && (
-                <button
-                  onClick={() => setView("band")}
-                  className="mt-4 w-full rounded-2xl bg-white px-4 py-3 font-[family-name:var(--font-display)] text-[12px] font-bold uppercase tracking-[0.14em] text-black transition-transform duration-200 ease-out active:scale-[0.98]"
-                >
-                  Pair your band
-                </button>
-              )}
             </div>
           </div>
         </GlassCard>
