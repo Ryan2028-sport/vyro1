@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { getMyProfile } from "@/lib/profile.functions";
+import { useRoles } from "@/hooks/use-roles";
 import { BandPanel } from "./BandPanel";
 import { CoachView } from "./CoachView";
 import { RecoveryView } from "./RecoveryView";
@@ -1688,7 +1689,7 @@ export function App2ReferenceShell() {
     { id: "sport" as App2View, label: "Sport", icon: Trophy },
     { id: "recovery" as App2View, label: "Recovery", icon: Heart },
     { id: "sleep" as App2View, label: "Sleep", icon: Moon },
-    { id: "debug" as App2View, label: "Debug", icon: Stethoscope },
+    ...(isAdmin ? [{ id: "debug" as App2View, label: "Debug", icon: Stethoscope }] : []),
     { id: "ai-video" as App2View, label: "AI Video", icon: Video },
   ];
 
