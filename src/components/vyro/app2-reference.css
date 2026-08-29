@@ -682,6 +682,8 @@
 .app2-add:disabled { opacity: 0.5; cursor: default; }
 
 /* ----------------------------------------------------------- bottom nav --- */
+/* Apple HIG tab bar: liquid-glass material, hairline separator, 44pt targets,
+   single-line labels, no horizontal scrolling, reduced-motion safe. */
 
 .app2-bottom-nav {
   position: fixed;
@@ -690,56 +692,87 @@
   transform: translateX(-50%);
   z-index: 50;
   width: min(430px, 100vw);
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 2px;
-  overflow-x: auto;
-  border-top: 1px solid hsl(0 0% 100% / 0.08);
-  background: hsl(0 0% 0% / 0.6);
-  padding: 7px 10px calc(env(safe-area-inset-bottom, 0px) + 9px);
-  backdrop-filter: blur(30px) saturate(180%);
-  scrollbar-width: none;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: stretch;
+  gap: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(to bottom, hsl(0 0% 4% / 0.72), hsl(0 0% 2% / 0.9));
+  padding: 6px 6px calc(env(safe-area-inset-bottom, 0px) + 6px);
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
 }
-.app2-bottom-nav::-webkit-scrollbar { display: none; }
+.app2-bottom-nav::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: hsl(0 0% 100% / 0.10);
+}
 
 .app2-tab {
   position: relative;
-  flex: 1 1 0;
-  min-width: 58px;
-  min-height: 46px;
-  display: grid;
-  place-items: center;
-  align-content: center;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 3px;
-  border-radius: 14px;
-  border: 1px solid transparent;
+  padding: 4px 2px;
+  border: 0;
   background: transparent;
   color: hsl(var(--app2-faint));
   font-size: 10px;
+  line-height: 1.1;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color 200ms var(--app2-ease),
+    transform 160ms var(--app2-ease);
 }
-.app2-tab svg { transition: transform 260ms var(--app2-ease); }
+.app2-tab > svg { flex: none; }
+.app2-tab span,
+.app2-tab {
+  white-space: nowrap;
+}
 .app2-tab:hover { color: hsl(var(--app2-muted)); }
+.app2-tab:active { transform: scale(0.94); }
+.app2-tab:focus-visible {
+  outline: 2px solid hsl(var(--app2-live));
+  outline-offset: -3px;
+  border-radius: 12px;
+}
+
 .app2-tab.active {
   color: hsl(0 0% 100%);
   font-weight: 700;
 }
-.app2-tab.active::before {
+.app2-tab.active > svg {
+  color: hsl(var(--app2-live));
+}
+/* Selection indicator: a small capsule above the icon, not a filled block. */
+.app2-tab.active::after {
   content: "";
   position: absolute;
-  inset: 2px 6px;
-  border-radius: 14px;
-  background: hsl(0 0% 100% / 0.09);
-  border: 1px solid hsl(0 0% 100% / 0.08);
+  top: 0;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: hsl(var(--app2-live));
+  box-shadow: 0 0 10px hsl(var(--app2-live) / 0.55);
 }
-.app2-tab.active svg {
-  position: relative;
-  color: hsl(var(--app2-live));
-  transform: translateY(-1px) scale(1.06);
-  filter: drop-shadow(0 0 10px hsl(var(--app2-live) / 0.55));
+
+@media (prefers-reduced-motion: reduce) {
+  .app2-tab,
+  .app2-tab:active { transition: none; transform: none; }
 }
-.app2-tab.active span, .app2-tab.active { z-index: 1; }
 
 /* ------------------------------------------------------- embedded views --- */
 
