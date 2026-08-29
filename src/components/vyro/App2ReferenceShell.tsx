@@ -141,6 +141,46 @@ function GlassCard({
   );
 }
 
+/** Progressive-disclosure section: collapsed by default, keeps the home page calm. */
+function Disclosure({
+  title,
+  hint,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="overflow-hidden rounded-[22px] border border-white/[0.08] bg-white/[0.035]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-[14px] font-bold tracking-[-0.02em] text-vyro-text">
+            {title}
+          </span>
+          {hint && (
+            <span className="mt-0.5 block truncate text-[11px] text-vyro-mute">{hint}</span>
+          )}
+        </span>
+        <ChevronDown
+          size={17}
+          strokeWidth={2.6}
+          className={`shrink-0 text-vyro-mute transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && <div className="px-3 pb-3">{children}</div>}
+    </section>
+  );
+}
+
 function SectionHeader({
   icon: Icon,
   eyebrow,
