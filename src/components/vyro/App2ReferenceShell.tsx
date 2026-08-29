@@ -1279,7 +1279,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
         {/* ---- Readiness hero -------------------------------------------- */}
         <GlassCard
           glow={toneVar(readiness)}
-          className="animate-in fade-in slide-in-from-bottom-3 p-5 duration-500 sm:p-6"
+          className="animate-in fade-in slide-in-from-bottom-3 p-4 duration-500 sm:p-5"
         >
           {/* status strip */}
           <div className="flex items-center justify-between gap-3">
@@ -1306,7 +1306,7 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             </span>
           </div>
 
-          <div className="mt-4 flex flex-col items-center gap-5">
+          <div className="mt-3 flex flex-col items-center gap-4">
             <Ring value={readiness} recovery={recovery} sleep={sleep} />
 
             <RingLegend
