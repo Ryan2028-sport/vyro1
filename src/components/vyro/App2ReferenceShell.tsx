@@ -1699,25 +1699,28 @@ export function App2ReferenceShell() {
         {/* Real iOS status bar shows through via safe-area inset; no fake status bar */}
         <header className="app2-shell-header">
           <div className="app2-topbar">
-            <div>
-              <div className="app2-kicker">VYRO</div>
-              <div className="app2-title">{title}</div>
-            </div>
-            <div>
-              <div className="app2-actions">
-                <button
-                  className="app2-icon-btn"
-                  aria-label="Device settings"
-                  onClick={() => setView("band")}
-                >
-                  <Settings2 size={17} />
-                </button>
-                <button className="app2-icon-btn" aria-label="Notifications">
-                  <Bell size={17} />
-                  <span className="app2-badge">2</span>
-                </button>
+            <div className="app2-brand">
+              <span className="app2-brand-tile" aria-hidden="true">
+                <Activity size={15} strokeWidth={2.75} />
+              </span>
+              <div className="app2-brand-text">
+                <div className="app2-kicker">VYRO</div>
+                <div className="app2-title">{title}</div>
               </div>
-              <button className="app2-avatar" onClick={() => setView("band")}>
+            </div>
+            <div className="app2-actions">
+              <button
+                className="app2-icon-btn"
+                aria-label="Device settings"
+                onClick={() => setView("band")}
+              >
+                <Settings2 size={16} />
+              </button>
+              <button className="app2-icon-btn" aria-label="Notifications">
+                <Bell size={16} />
+                <span className="app2-badge">2</span>
+              </button>
+              <button className="app2-avatar" onClick={() => setView("band")} aria-label="Profile">
                 {initials}
               </button>
             </div>
