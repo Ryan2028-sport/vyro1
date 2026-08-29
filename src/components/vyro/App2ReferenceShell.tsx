@@ -1622,8 +1622,11 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               </div>
             </div>
           </InfoCard>
+            </div>
+          </Disclosure>
 
         </div>
+
       </div>
     </main>
   );
