@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { getMyProfile } from "@/lib/profile.functions";
+import { useRoles } from "@/hooks/use-roles";
 import { BandPanel } from "./BandPanel";
 import { CoachView } from "./CoachView";
 import { RecoveryView } from "./RecoveryView";
@@ -997,9 +998,11 @@ function CognitiveFatigueCard({
 function EmbeddedView({
   view,
   profileSport,
+  canDebug = false,
 }: {
   view: App2View;
   profileSport: "squash" | "tennis";
+  canDebug?: boolean;
 }) {
   if (view === "trends") {
     return (
@@ -1037,6 +1040,7 @@ function EmbeddedView({
     );
   }
   if (view === "debug") {
+    if (!canDebug) return null;
     return (
       <div className="app2-scroll-embed">
         <DebugView />
@@ -1661,7 +1665,11 @@ export function App2ReferenceShell() {
     queryFn: () => fetchProfile(),
   });
   const m = useLiveMetrics();
+  const { isAdmin } = useRoles();
   const sport = (profile?.sport as "squash" | "tennis" | undefined) ?? "squash";
+  useEffect(() => {
+    if (!isAdmin && view === "debug") setView("athlete");
+  }, [isAdmin, view]);
   const initials =
     (profile?.display_name || "Ryan Carter")
       .split(/\s+/)
@@ -1688,7 +1696,7 @@ export function App2ReferenceShell() {
     { id: "sport" as App2View, label: "Sport", icon: Trophy },
     { id: "recovery" as App2View, label: "Recovery", icon: Heart },
     { id: "sleep" as App2View, label: "Sleep", icon: Moon },
-    { id: "debug" as App2View, label: "Debug", icon: Stethoscope },
+    ...(isAdmin ? [{ id: "debug" as App2View, label: "Debug", icon: Stethoscope }] : []),
     { id: "ai-video" as App2View, label: "AI Video", icon: Video },
   ];
 
@@ -1739,7 +1747,7 @@ export function App2ReferenceShell() {
           <AthleteHome setView={setView} />
         ) : (
           <main className="app2-main">
-            <EmbeddedView view={view} profileSport={sport} />
+            <EmbeddedView view={view} profileSport={sport} canDebug={isAdmin} />
           </main>
         )}
 
@@ -1750,8 +1758,8 @@ export function App2ReferenceShell() {
               className={`app2-tab ${view === id ? "active" : ""}`}
               onClick={() => setView(id)}
             >
-              <Icon size={17} />
-              {label}
+              <Icon size={19} strokeWidth={view === id ? 2.5 : 2} />
+              <span>{label}</span>
             </button>
           ))}
         </nav>
