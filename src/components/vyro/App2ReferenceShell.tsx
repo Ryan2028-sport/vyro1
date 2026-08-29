@@ -1758,8 +1758,8 @@ export function App2ReferenceShell() {
               className={`app2-tab ${view === id ? "active" : ""}`}
               onClick={() => setView(id)}
             >
-              <Icon size={17} />
-              {label}
+              <Icon size={19} strokeWidth={view === id ? 2.5 : 2} />
+              <span>{label}</span>
             </button>
           ))}
         </nav>
