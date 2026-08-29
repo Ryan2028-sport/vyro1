@@ -16,6 +16,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { updateMyProfile } from "@/lib/profile.functions";
 import { Card, Pill } from "./shared";
 import { QCBAND_SERVICE_UUID } from "@/lib/vyro-ble/qcband";
+import { useRoles } from "@/hooks/use-roles";
 
 
 function fmtSat(v: { value: number; saturated: boolean }, unit: string, dp = 2) {
@@ -65,6 +66,7 @@ export function BandPanel({
   defaultSport?: "squash" | "tennis";
 }) {
   const vyro = useVyroBandCtx();
+  const { isAdmin } = useRoles();
   const inspector = useBleInspector();
   const { ble, connected, events, sessionState: _s, sport: _sp, setSport, firmwareRevision, hardwareRevision } = vyro;
   const updateProfile = useServerFn(updateMyProfile);
@@ -294,7 +296,8 @@ export function BandPanel({
         </div>
       </Card>
 
-      {/* Live feed */}
+      {/* Live feed — admin (debug) accounts only */}
+      {isAdmin && (
       <Card
         eyebrow="Live motion"
         title="Recent events"
@@ -325,8 +328,10 @@ export function BandPanel({
           )}
         </div>
       </Card>
+      )}
 
-      {/* OTA */}
+      {/* OTA — admin (debug) accounts only */}
+      {isAdmin && (
       <Card eyebrow="Update" title="Watch software update">
         {/* Current firmware / hardware — read from BLE Device Information Service (0x180a). */}
         <div className="mb-3 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-vyro-text/55">
@@ -443,6 +448,7 @@ export function BandPanel({
           </div>
         )}
       </Card>
+      )}
     </div>
   );
 }
