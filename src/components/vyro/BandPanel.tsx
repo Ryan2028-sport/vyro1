@@ -296,7 +296,8 @@ export function BandPanel({
         </div>
       </Card>
 
-      {/* Live feed */}
+      {/* Live feed — admin (debug) accounts only */}
+      {isAdmin && (
       <Card
         eyebrow="Live motion"
         title="Recent events"
