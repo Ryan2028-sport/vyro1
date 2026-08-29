@@ -6,6 +6,8 @@ import {
   Bell,
   Brain,
   CalendarDays,
+  ChevronDown,
+
   Gauge,
   Heart,
   LineChart,
@@ -135,6 +137,46 @@ function GlassCard({
         className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/30 to-transparent"
       />
       <div className="relative">{children}</div>
+    </section>
+  );
+}
+
+/** Progressive-disclosure section: collapsed by default, keeps the home page calm. */
+function Disclosure({
+  title,
+  hint,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="overflow-hidden rounded-[22px] border border-white/[0.08] bg-white/[0.035]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-[14px] font-bold tracking-[-0.02em] text-vyro-text">
+            {title}
+          </span>
+          {hint && (
+            <span className="mt-0.5 block truncate text-[11px] text-vyro-mute">{hint}</span>
+          )}
+        </span>
+        <ChevronDown
+          size={17}
+          strokeWidth={2.6}
+          className={`shrink-0 text-vyro-mute transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && <div className="px-3 pb-3">{children}</div>}
     </section>
   );
 }
@@ -1145,6 +1187,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   const deleteMutation = useMutation({ mutationFn: removeItem, onSuccess: invalidatePlan });
   const items = planItems ?? [];
   const [draft, setDraft] = useState({ time: "", title: "", load: "", tone: "green" as PlanItem["color"] });
+  const [showAllVitals, setShowAllVitals] = useState(false);
+
 
   // Every score below is the GLOBAL value — identical on every other tab.
   const { readiness, recovery, sleep, fatigue, fatigueSource, agility, agilityReason, strain, statusLabel, baselines, rtp } = s;
@@ -1360,18 +1404,38 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             }
           >
             <div className="divide-y divide-white/[0.055]">
-              {vitals.map((vital) => (
+              {(showAllVitals ? vitals : vitals.slice(0, 4)).map((vital) => (
                 <VitalRow key={vital.label} {...vital} />
               ))}
             </div>
 
+            {vitals.length > 4 && (
+              <button
+                type="button"
+                onClick={() => setShowAllVitals((v) => !v)}
+                className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[14px] border border-white/[0.08] bg-white/[0.035] text-[12px] font-bold text-vyro-text"
+              >
+                {showAllVitals ? "Show less" : `Show all ${vitals.length} signals`}
+                <ChevronDown
+                  size={15}
+                  strokeWidth={2.6}
+                  className={`text-vyro-mute transition-transform duration-300 ${showAllVitals ? "rotate-180" : ""}`}
+                />
+              </button>
+            )}
           </InfoCard>
 
-          <CognitiveFatigueCard
-            m={m}
-            baselineMs={baselines.reactMs ?? undefined}
-            hrvBaselineMs={baselines.hrv ?? undefined}
-          />
+          <Disclosure title="Cognitive load" hint="Reaction time and autonomic strain">
+            <CognitiveFatigueCard
+              m={m}
+              baselineMs={baselines.reactMs ?? undefined}
+              hrvBaselineMs={baselines.hrv ?? undefined}
+            />
+          </Disclosure>
+
+          <Disclosure title="Return-to-play & training plan" hint="RTP validator and today's blocks">
+            <div className="space-y-4">
+
 
           <InfoCard
             eyebrow="Return-to-play"
@@ -1560,8 +1624,11 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               </div>
             </div>
           </InfoCard>
+            </div>
+          </Disclosure>
 
         </div>
+
       </div>
     </main>
   );
