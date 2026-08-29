@@ -1662,7 +1662,11 @@ export function App2ReferenceShell() {
     queryFn: () => fetchProfile(),
   });
   const m = useLiveMetrics();
+  const { isAdmin } = useRoles();
   const sport = (profile?.sport as "squash" | "tennis" | undefined) ?? "squash";
+  useEffect(() => {
+    if (!isAdmin && view === "debug") setView("athlete");
+  }, [isAdmin, view]);
   const initials =
     (profile?.display_name || "Ryan Carter")
       .split(/\s+/)
