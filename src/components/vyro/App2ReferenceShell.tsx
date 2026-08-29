@@ -183,21 +183,6 @@ function SectionHeader({
   );
 }
 
-function Eyebrow({ children, tone = "mint" }: { children: ReactNode; tone?: "mint" | "amber" | "rose" | "mute" }) {
-  const color =
-    tone === "amber"
-      ? "text-vyro-amber"
-      : tone === "rose"
-        ? "text-vyro-rose"
-        : tone === "mute"
-          ? "text-vyro-mute"
-          : "text-vyro-mint";
-  return (
-    <div className={`font-[family-name:var(--font-display)] text-[9px] font-bold uppercase tracking-[0.2em] ${color}`}>
-      {children}
-    </div>
-  );
-}
 
 /** Apple Activity-style concentric rings: readiness (outer), recovery, sleep. */
 function Ring({
@@ -1317,18 +1302,6 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               ]}
             />
 
-            <div className="w-full min-w-0">
-              <h2 className="text-balance text-center font-[family-name:var(--font-display)] text-[21px] font-extrabold leading-[1.18] tracking-[-0.04em] text-vyro-text">
-                {s.coachRead}
-              </h2>
-              <p className="mx-auto mt-2 max-w-[36ch] text-center text-[12.5px] leading-relaxed text-vyro-mute">
-                {m.connected && readiness != null
-                  ? "Live HRV, resting HR, SpO₂ and IMU load drive every score below."
-                  : m.connected
-                    ? "Connected. Waiting for enough independent body signals to calculate a trusted score."
-                    : "Open Settings to pair your VYRO Band and populate live signals."}
-              </p>
-            </div>
           </div>
         </GlassCard>
 
