@@ -1245,20 +1245,6 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
           <p className="mt-2 max-w-[34ch] text-[13px] leading-relaxed text-vyro-mute">
             Your daily readiness command center — synced from your VYRO Band.
           </p>
-          <button
-            className="mt-3.5 inline-flex items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.05] px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-vyro-text transition-all duration-200 hover:border-white/20 hover:bg-white/[0.09] active:scale-[0.97]"
-            onClick={() => setView("band")}
-          >
-            <span
-              className={`h-2 w-2 rounded-full ${
-                m.connected
-                  ? "animate-pulse bg-vyro-mint shadow-[0_0_8px_var(--vyro-mint)]"
-                  : "bg-vyro-mute/60"
-              }`}
-            />
-            {status}
-            {m.connected && battery != null ? ` · ${battery}%` : ""}
-          </button>
         </header>
 
         {/* ---- Readiness hero -------------------------------------------- */}
