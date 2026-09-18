@@ -16,11 +16,11 @@ CI enforces the same four gates. Do not tag a commit that is red.
 
 Semantic versioning, driven by what landed since the last tag:
 
-| Change | Bump |
-| --- | --- |
+| Change                                 | Bump  |
+| -------------------------------------- | ----- |
 | Breaking BLE protocol or schema change | major |
-| New user-visible capability | minor |
-| Fixes, performance, docs, internals | patch |
+| New user-visible capability            | minor |
+| Fixes, performance, docs, internals    | patch |
 
 A firmware-coupled change (new opcode, changed packet layout) is a **minor at minimum**, and
 the release notes must state the minimum firmware version required.

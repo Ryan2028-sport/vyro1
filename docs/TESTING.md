@@ -20,13 +20,13 @@ plugin chain, which is irrelevant to a Node-based unit run and slows it down.
 This codebase is mostly a live-hardware UI, so the tests target the parts that are pure,
 deterministic and expensive to get wrong:
 
-| Area | Why it is tested |
-| --- | --- |
-| `src/lib/vyro-ble/cbor.ts` | Encodes SMP/OTA payloads. A silent bug bricks firmware updates. |
-| `src/lib/vyro-ble/session-control.ts` | Byte-exact command envelopes the firmware parses. |
-| `src/lib/vyro-ble/packets.ts` | Hex/base64 ingestion from two different transport bridges. |
-| `src/lib/vyro-ble/respiration.ts` | Signal processing that must refuse to guess when data is thin. |
-| `src/lib/video-analysis-core.ts` | Parses untrusted model output in several shapes. |
+| Area                                  | Why it is tested                                                |
+| ------------------------------------- | --------------------------------------------------------------- |
+| `src/lib/vyro-ble/cbor.ts`            | Encodes SMP/OTA payloads. A silent bug bricks firmware updates. |
+| `src/lib/vyro-ble/session-control.ts` | Byte-exact command envelopes the firmware parses.               |
+| `src/lib/vyro-ble/packets.ts`         | Hex/base64 ingestion from two different transport bridges.      |
+| `src/lib/vyro-ble/respiration.ts`     | Signal processing that must refuse to guess when data is thin.  |
+| `src/lib/video-analysis-core.ts`      | Parses untrusted model output in several shapes.                |
 
 ## Rules
 

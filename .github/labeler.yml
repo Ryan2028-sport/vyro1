@@ -12,7 +12,12 @@ backend:
 
 ai-video:
   - changed-files:
-      - any-glob-to-any-file: ["src/lib/video-analysis*", "src/components/vyro/AiVideoView.tsx", "src/lib/vyro-video/**"]
+      - any-glob-to-any-file:
+          [
+            "src/lib/video-analysis*",
+            "src/components/vyro/AiVideoView.tsx",
+            "src/lib/vyro-video/**",
+          ]
 
 docs:
   - changed-files:

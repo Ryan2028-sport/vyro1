@@ -13,7 +13,12 @@ describe("cbor", () => {
   });
 
   it("round-trips nested containers", () => {
-    const value = { images: [{ slot: 0, version: "1.0.21" }, { slot: 1, version: "1.0.20" }] };
+    const value = {
+      images: [
+        { slot: 0, version: "1.0.21" },
+        { slot: 1, version: "1.0.20" },
+      ],
+    };
     expect(cborDecode(cborEncode(value))).toEqual(value);
   });
 

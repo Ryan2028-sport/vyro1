@@ -2,13 +2,13 @@
 
 ## Where to go
 
-| I want to… | Go here |
-| --- | --- |
-| Report a reproducible bug | [Open a bug report](../../issues/new?template=bug_report.yml) |
-| Request a feature | [Open a feature request](../../issues/new?template=feature_request.yml) |
-| Report a security issue | Follow [SECURITY.md](SECURITY.md) — never open a public issue |
-| Ask how something works | [Start a discussion](../../discussions) or read [docs/](docs/) |
-| Contribute code | Read [CONTRIBUTING.md](CONTRIBUTING.md) |
+| I want to…                | Go here                                                                 |
+| ------------------------- | ----------------------------------------------------------------------- |
+| Report a reproducible bug | [Open a bug report](../../issues/new?template=bug_report.yml)           |
+| Request a feature         | [Open a feature request](../../issues/new?template=feature_request.yml) |
+| Report a security issue   | Follow [SECURITY.md](SECURITY.md) — never open a public issue           |
+| Ask how something works   | [Start a discussion](../../discussions) or read [docs/](docs/)          |
+| Contribute code           | Read [CONTRIBUTING.md](CONTRIBUTING.md)                                 |
 
 ## Before opening an issue
 
