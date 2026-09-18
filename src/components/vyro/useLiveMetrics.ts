@@ -102,7 +102,7 @@ export function useLiveMetrics() {
     let eventsLastMin = 0;
     for (const e of events) {
       if (e.ts >= cutoff) eventsLastMin++;
-      const ev = e.event as any;
+      const ev = e.event as Record<string, any>;
       if (ev.accelPeakG?.value != null) peakG = Math.max(peakG, ev.accelPeakG.value);
       if (ev.gyroPeakDps?.value != null) peakDps = Math.max(peakDps, ev.gyroPeakDps.value);
       if (ev.jerkPeakGps?.value != null) peakJerk = Math.max(peakJerk, ev.jerkPeakGps.value);

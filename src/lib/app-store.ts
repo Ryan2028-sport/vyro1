@@ -18,7 +18,9 @@ function load(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return { pushStatus: "idle", pushError: null, ...JSON.parse(raw) };
-  } catch {}
+  } catch {
+    // Corrupt or unreadable storage — fall through to defaults.
+  }
   return { pushPlayerId: null, pushStatus: "idle", pushError: null };
 }
 
@@ -29,7 +31,9 @@ function persist() {
   if (typeof localStorage === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ pushPlayerId: state.pushPlayerId }));
-  } catch {}
+  } catch {
+    // Storage full or blocked (private mode) — persistence is best-effort.
+  }
 }
 
 export const appStore = {

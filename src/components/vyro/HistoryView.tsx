@@ -48,8 +48,8 @@ export function HistoryView() {
           />
         )}
         <div className="space-y-3">
-          {sessions?.map((s: any) => {
-            const summary = (s.summary || {}) as Record<string, any>;
+          {sessions?.map((s: SessionRow) => {
+            const summary = (s.summary || {}) as Record<string, unknown>;
             return (
               <div key={s.id} className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -100,7 +100,7 @@ export function HistoryView() {
   );
 }
 
-function Mini({ label, v }: { label: string; v: any }) {
+function Mini({ label, v }: { label: string; v: unknown }) {
   return (
     <div className="rounded-lg bg-vyro-text/[0.04] py-1.5">
       <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">{label}</div>

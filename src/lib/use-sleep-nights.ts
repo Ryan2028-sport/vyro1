@@ -98,7 +98,7 @@ export function useSleepNights() {
 
   useEffect(() => {
     if (!remote || !Array.isArray(remote)) return;
-    const merged: SleepNight[] = remote.map((r: any) => ({
+    const merged: SleepNight[] = remote.map((r: Record<string, any>) => ({
       endAt: r.end_at,
       score: r.score,
       asleepMin: r.asleep_min,
