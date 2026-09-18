@@ -8,7 +8,15 @@ import { useLiveMetrics } from "./useLiveMetrics";
 // the log starts empty until the user adds meals.
 // =============================================================================
 
-interface MealEntry { id: string; time: string; name: string; kcal: number; protein: number; carbs: number; fat: number; }
+interface MealEntry {
+  id: string;
+  time: string;
+  name: string;
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
 
 export function DietView() {
   const m = useLiveMetrics();
@@ -36,9 +44,9 @@ export function DietView() {
         time: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
         name: name.trim(),
         kcal: k,
-        protein: Math.round((k * 0.20) / 4),
-        carbs: Math.round((k * 0.50) / 4),
-        fat: Math.round((k * 0.30) / 9),
+        protein: Math.round((k * 0.2) / 4),
+        carbs: Math.round((k * 0.5) / 4),
+        fat: Math.round((k * 0.3) / 9),
       },
     ]);
     setName("");
@@ -51,7 +59,11 @@ export function DietView() {
         eyebrow="Fuel · Diet Coach"
         title="Diet coach"
         subtitle="Burn streams from the band's calorie characteristic. Intake comes from meals you log. Nothing is estimated."
-        action={<Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{m.connected ? "live" : "offline"}</Pill>}
+        action={
+          <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>
+            {m.connected ? "live" : "offline"}
+          </Pill>
+        }
       />
 
       <Card eyebrow="Calorie balance" title="Intake vs burn">
@@ -71,9 +83,17 @@ export function DietView() {
           {projectedBalance == null ? (
             "Pair the band so burn streams in, then your projected balance appears here."
           ) : (
-            <>Projected balance today:{" "}
-              <span className={projectedBalance < 0 ? "text-vyro-amber font-semibold" : "text-vyro-mint font-semibold"}>
-                {projectedBalance > 0 ? "+" : ""}{projectedBalance} kcal
+            <>
+              Projected balance today:{" "}
+              <span
+                className={
+                  projectedBalance < 0
+                    ? "text-vyro-amber font-semibold"
+                    : "text-vyro-mint font-semibold"
+                }
+              >
+                {projectedBalance > 0 ? "+" : ""}
+                {projectedBalance} kcal
               </span>
             </>
           )}
@@ -95,16 +115,22 @@ export function DietView() {
             <span className="text-4xl font-black tabular-nums text-vyro-text">{burn ?? "—"}</span>
             <span className="text-sm text-vyro-mute">kcal</span>
           </div>
-          <Pill tone={burn != null ? "live" : "off"}>{burn != null ? "from band" : "no signal"}</Pill>
+          <Pill tone={burn != null ? "live" : "off"}>
+            {burn != null ? "from band" : "no signal"}
+          </Pill>
         </div>
         <p className="mt-3 text-[11px] text-vyro-mute">
-          Resting / active / session split needs per-channel breakdowns the firmware doesn't currently emit.
+          Resting / active / session split needs per-channel breakdowns the firmware doesn't
+          currently emit.
         </p>
       </Card>
 
       <Card eyebrow="Macro tracker" title="Updates as meals are logged">
         {log.length === 0 ? (
-          <EmptyState title="No meals logged yet" hint="Log a meal below to see your macro totals fill in." />
+          <EmptyState
+            title="No meals logged yet"
+            hint="Log a meal below to see your macro totals fill in."
+          />
         ) : (
           <>
             <MacroBar label="Protein" cur={proteinG} target={null} color="bg-vyro-mint" />
@@ -149,7 +175,12 @@ export function DietView() {
             inputMode="numeric"
             className="w-20 rounded-xl border border-vyro-line bg-vyro-panel px-3 py-2 text-sm text-vyro-text outline-none focus:border-vyro-text/40"
           />
-          <button onClick={add} className="rounded-xl bg-vyro-mint px-3 py-2 text-sm font-bold text-vyro-ink">Log</button>
+          <button
+            onClick={add}
+            className="rounded-xl bg-vyro-mint px-3 py-2 text-sm font-bold text-vyro-ink"
+          >
+            Log
+          </button>
         </div>
       </Card>
 
@@ -174,7 +205,17 @@ function Tile({ k, v, u }: { k: string; v: number | null | undefined; u: string 
   );
 }
 
-function MacroBar({ label, cur, target, color }: { label: string; cur: number; target: number | null; color: string }) {
+function MacroBar({
+  label,
+  cur,
+  target,
+  color,
+}: {
+  label: string;
+  cur: number;
+  target: number | null;
+  color: string;
+}) {
   const pct = target ? Math.min(100, (cur / target) * 100) : 0;
   return (
     <div className="mb-2.5 last:mb-0">

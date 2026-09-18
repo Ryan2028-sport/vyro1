@@ -38,7 +38,11 @@ type BrowserBluetoothDevice = {
 
 const browserDevices = new Map<string, BrowserBluetoothDevice>();
 
-function getAndroidBluetoothMode(): { isAndroid: boolean; hasWebBluetooth: boolean; hasCapacitorBridge: boolean } {
+function getAndroidBluetoothMode(): {
+  isAndroid: boolean;
+  hasWebBluetooth: boolean;
+  hasCapacitorBridge: boolean;
+} {
   const isAndroid = /Android/i.test(navigator.userAgent || "");
   const nav = navigator as Navigator & {
     bluetooth?: { requestDevice?: (opts: unknown) => Promise<BrowserBluetoothDevice> };
@@ -47,7 +51,8 @@ function getAndroidBluetoothMode(): { isAndroid: boolean; hasWebBluetooth: boole
     Capacitor?: { getPlatform?: () => string; isNativePlatform?: () => boolean };
   };
   const platform = w.Capacitor?.getPlatform?.()?.toLowerCase();
-  const hasCapacitorBridge = !!w.Capacitor && (w.Capacitor.isNativePlatform?.() === true || platform === "android");
+  const hasCapacitorBridge =
+    !!w.Capacitor && (w.Capacitor.isNativePlatform?.() === true || platform === "android");
   return {
     isAndroid,
     hasWebBluetooth: typeof nav.bluetooth?.requestDevice === "function",
@@ -97,7 +102,11 @@ export function useBluetooth() {
             : "Bluetooth permission denied. Enable it in iOS Settings.",
         );
       } else if (s.state === "off") {
-        setError(isAndroid ? "Bluetooth is off. Turn it on, then tap Scan again." : "Bluetooth is off. Turn it on in Control Center.");
+        setError(
+          isAndroid
+            ? "Bluetooth is off. Turn it on, then tap Scan again."
+            : "Bluetooth is off. Turn it on in Control Center.",
+        );
       } else if (s.state === "unsupported") {
         setError("Bluetooth is not supported on this device.");
       } else {
@@ -108,10 +117,14 @@ export function useBluetooth() {
       const isAndroid = /Android/i.test(navigator.userAgent || "");
       if (!isAndroid) return;
       if (event.type === "android_location_services_off") {
-        setError("Android Location Services are off. Turn Location on, then tap Scan again so BLE advertisements from the watch are not hidden.");
+        setError(
+          "Android Location Services are off. Turn Location on, then tap Scan again so BLE advertisements from the watch are not hidden.",
+        );
       }
       if (event.type === "capacitor_scan_error" && typeof event.message === "string") {
-        const permissionLike = /permission|location|nearby|scan|denied|unauthori[sz]ed/i.test(event.message);
+        const permissionLike = /permission|location|nearby|scan|denied|unauthori[sz]ed/i.test(
+          event.message,
+        );
         setError(
           permissionLike
             ? "Android blocked BLE scanning. Enable Nearby devices/Bluetooth and Location for VYRO, then tap Scan again."
@@ -199,7 +212,9 @@ export function useBluetooth() {
         const msg = (err as Error)?.message || String(err);
         if (/permission|denied|SecurityError/i.test(msg)) {
           setPowerState("unauthorized");
-          setError("Android blocked Bluetooth access for this site/app. Allow Nearby devices/Bluetooth for VYRO, then tap Scan again.");
+          setError(
+            "Android blocked Bluetooth access for this site/app. Allow Nearby devices/Bluetooth for VYRO, then tap Scan again.",
+          );
         } else if (!/cancell?ed|NotFoundError/i.test(msg)) {
           setError(msg);
         }
@@ -225,80 +240,87 @@ export function useBluetooth() {
     setScanning(false);
   }, []);
 
-  const connect = useCallback(async (id: string) => {
-    setConnectionState("connecting");
-    setError(null);
-    if (isNative && scanning) {
-      await bluetooth.stopScan().catch(() => undefined);
-      setScanning(false);
-    }
-
-    const browserDevice = browserDevices.get(id);
-    if (browserDevice) {
-      try {
-        if (!browserDevice.gatt) {
-          throw new Error("This Bluetooth device has no GATT server.");
-        }
-        browserDevice.addEventListener?.("gattserverdisconnected", () => {
-          bluetooth.emitBrowserConnect({ id, state: "disconnected" });
-        });
-        const server = await browserDevice.gatt.connect();
-        bluetooth.emitBrowserConnect({ id, state: "connected" });
-        const services = await server.getPrimaryServices();
-        bluetooth.emitBrowserDiscovered({
-          id,
-          services: await Promise.all(
-            services.map(async (service) => ({
-              uuid: service.uuid,
-              characteristics: (await service.getCharacteristics()).map((c) => ({
-                uuid: c.uuid,
-                properties: Object.entries(c.properties)
-                  .filter(([, enabled]) => enabled)
-                  .map(([key]) => key),
-              })),
-            })),
-          ),
-        });
-      } catch (err) {
-        const msg = (err as Error)?.message || String(err);
-        setConnectionState("failed");
-        setError(msg);
-        bluetooth.emitBrowserConnect({ id, state: "failed", error: msg });
+  const connect = useCallback(
+    async (id: string) => {
+      setConnectionState("connecting");
+      setError(null);
+      if (isNative && scanning) {
+        await bluetooth.stopScan().catch(() => undefined);
+        setScanning(false);
       }
-      return;
-    }
 
-    if (isNative && !Object.values(devices).some((d) => sameDeviceId(d.id, id))) {
-      let resolvedId: string | null = null;
-      const waitForDevice = new Promise<string>((resolve, reject) => {
-        const timeout = window.setTimeout(() => {
-          off();
-          reject(new Error("Device not found nearby. Open the Band panel, tap Scan, then connect the watch that appears."));
-        }, 10_000);
-        const off = bluetooth.on("device", (d) => {
-          if (sameDeviceId(d.id, id)) {
-            window.clearTimeout(timeout);
-            off();
-            resolve(d.id);
+      const browserDevice = browserDevices.get(id);
+      if (browserDevice) {
+        try {
+          if (!browserDevice.gatt) {
+            throw new Error("This Bluetooth device has no GATT server.");
           }
-        });
-      });
-      try {
-        await bluetooth.scan([], 9000);
-        resolvedId = await waitForDevice;
-      } catch (err) {
-        const msg = (err as Error)?.message || String(err);
-        setConnectionState("failed");
-        setError(msg);
-        bluetooth.emitBrowserConnect({ id, state: "failed", error: msg });
+          browserDevice.addEventListener?.("gattserverdisconnected", () => {
+            bluetooth.emitBrowserConnect({ id, state: "disconnected" });
+          });
+          const server = await browserDevice.gatt.connect();
+          bluetooth.emitBrowserConnect({ id, state: "connected" });
+          const services = await server.getPrimaryServices();
+          bluetooth.emitBrowserDiscovered({
+            id,
+            services: await Promise.all(
+              services.map(async (service) => ({
+                uuid: service.uuid,
+                characteristics: (await service.getCharacteristics()).map((c) => ({
+                  uuid: c.uuid,
+                  properties: Object.entries(c.properties)
+                    .filter(([, enabled]) => enabled)
+                    .map(([key]) => key),
+                })),
+              })),
+            ),
+          });
+        } catch (err) {
+          const msg = (err as Error)?.message || String(err);
+          setConnectionState("failed");
+          setError(msg);
+          bluetooth.emitBrowserConnect({ id, state: "failed", error: msg });
+        }
         return;
       }
-      await bluetooth.connect(resolvedId, { autoConnect: true, timeout: 60000 });
-      return;
-    }
 
-    await bluetooth.connect(id, { autoConnect: true, timeout: 60000 });
-  }, [devices, scanning]);
+      if (isNative && !Object.values(devices).some((d) => sameDeviceId(d.id, id))) {
+        let resolvedId: string | null = null;
+        const waitForDevice = new Promise<string>((resolve, reject) => {
+          const timeout = window.setTimeout(() => {
+            off();
+            reject(
+              new Error(
+                "Device not found nearby. Open the Band panel, tap Scan, then connect the watch that appears.",
+              ),
+            );
+          }, 10_000);
+          const off = bluetooth.on("device", (d) => {
+            if (sameDeviceId(d.id, id)) {
+              window.clearTimeout(timeout);
+              off();
+              resolve(d.id);
+            }
+          });
+        });
+        try {
+          await bluetooth.scan([], 9000);
+          resolvedId = await waitForDevice;
+        } catch (err) {
+          const msg = (err as Error)?.message || String(err);
+          setConnectionState("failed");
+          setError(msg);
+          bluetooth.emitBrowserConnect({ id, state: "failed", error: msg });
+          return;
+        }
+        await bluetooth.connect(resolvedId, { autoConnect: true, timeout: 60000 });
+        return;
+      }
+
+      await bluetooth.connect(id, { autoConnect: true, timeout: 60000 });
+    },
+    [devices, scanning],
+  );
 
   const disconnect = useCallback(async (id: string) => {
     const browserDevice = browserDevices.get(id);

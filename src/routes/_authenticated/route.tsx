@@ -29,9 +29,7 @@ export const Route = createFileRoute("/_authenticated")({
   },
   component: () => <Outlet />,
   pendingComponent: () => (
-    <div className="flex min-h-screen items-center justify-center text-sm opacity-60">
-      Loading…
-    </div>
+    <div className="flex min-h-screen items-center justify-center text-sm opacity-60">Loading…</div>
   ),
   errorComponent: ({ error }: { error: Error }) => {
     console.error(error);

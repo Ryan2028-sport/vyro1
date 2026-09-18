@@ -28,10 +28,7 @@ const listeners = new Set<() => void>();
 function persist() {
   if (typeof localStorage === "undefined") return;
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ pushPlayerId: state.pushPlayerId }),
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ pushPlayerId: state.pushPlayerId }));
   } catch {}
 }
 

@@ -56,8 +56,12 @@ export function TrendsView() {
   return (
     <div className="mx-auto max-w-[430px] space-y-7 pb-8 text-vyro-text">
       <header className="space-y-3">
-        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">Player dashboard · Progress</p>
-        <h2 className="text-[26px] font-black leading-[1.1] tracking-[-0.035em] text-vyro-text">Trend intelligence</h2>
+        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">
+          Player dashboard · Progress
+        </p>
+        <h2 className="text-[26px] font-black leading-[1.1] tracking-[-0.035em] text-vyro-text">
+          Trend intelligence
+        </h2>
         <p className="text-[13px] leading-relaxed text-vyro-mute">
           {hasData
             ? `Computed from ${sessions.length} recorded session${sessions.length === 1 ? "" : "s"} and your live baselines.`
@@ -67,13 +71,20 @@ export function TrendsView() {
       </header>
 
       {isLoading ? (
-        <VCard><p className="py-12 text-center text-[14px] text-vyro-mute">Loading session history…</p></VCard>
+        <VCard>
+          <p className="py-12 text-center text-[14px] text-vyro-mute">Loading session history…</p>
+        </VCard>
       ) : !hasData ? (
         <VCard>
-          <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">No data yet</p>
-          <h3 className="mt-4 text-[19px] font-black leading-tight tracking-[-0.03em]">Run a tracked session.</h3>
+          <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">
+            No data yet
+          </p>
+          <h3 className="mt-4 text-[19px] font-black leading-tight tracking-[-0.03em]">
+            Run a tracked session.
+          </h3>
           <p className="mt-3 text-[13px] leading-relaxed text-vyro-mute">
-            Open the Session tab, pick a sport, hit Begin tracking, and end the session when you're done. Trends and AI readouts compute themselves from the saved summary.
+            Open the Session tab, pick a sport, hit Begin tracking, and end the session when you're
+            done. Trends and AI readouts compute themselves from the saved summary.
           </p>
         </VCard>
       ) : (
@@ -82,7 +93,11 @@ export function TrendsView() {
           <FeaturedGraph card={featured} />
           <AiReadout cards={cards} sessions={sessions} />
           <RecoveryTrend baselines={baselines} sessions={sessions} />
-          <CalendarView sessions={sessions} lastNight={lastNight?.score ?? null} loadToday={trainingLoad7d(sessions)} />
+          <CalendarView
+            sessions={sessions}
+            lastNight={lastNight?.score ?? null}
+            loadToday={trainingLoad7d(sessions)}
+          />
           <MetricTrendStack cards={cards} />
         </>
       )}
@@ -90,7 +105,8 @@ export function TrendsView() {
       {nights.length === 0 && hasData && (
         <VCard className="border-dashed">
           <p className="text-[13px] text-vyro-mute">
-            Sleep score is empty — no synced nights yet. As soon as the band syncs a sleep frame the Sleep card and the sleep trendline both populate.
+            Sleep score is empty — no synced nights yet. As soon as the band syncs a sleep frame the
+            Sleep card and the sleep trendline both populate.
           </p>
         </VCard>
       )}
@@ -99,12 +115,18 @@ export function TrendsView() {
 }
 
 function TrajectoryCard({ cards }: { cards: TrendCard[] }) {
-  const improving = cards.filter((c) => c.deltaPct != null && (c.higherIsBetter ? c.deltaPct > 0 : c.deltaPct < 0));
+  const improving = cards.filter(
+    (c) => c.deltaPct != null && (c.higherIsBetter ? c.deltaPct > 0 : c.deltaPct < 0),
+  );
   return (
     <VCard className="border-vyro-text/42">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">Performance trajectory</p>
-        <span className="rounded-xl border border-vyro-text/32 bg-vyro-text/8 px-4 py-2 font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-vyro-text">Last 14 days</span>
+        <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">
+          Performance trajectory
+        </p>
+        <span className="rounded-xl border border-vyro-text/32 bg-vyro-text/8 px-4 py-2 font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-vyro-text">
+          Last 14 days
+        </span>
       </div>
       <h3 className="mt-5 text-[22px] font-black leading-[1.18] tracking-[-0.03em] text-vyro-text">
         {improving.length > 0
@@ -130,15 +152,24 @@ function FeaturedGraph({ card }: { card: TrendCard }) {
     <VCard className="bg-vyro-elev/75">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <div>
-          <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">Featured graph</p>
-          <h3 className="mt-4 text-[20px] font-black leading-none tracking-[-0.03em] text-vyro-text">{card.label}</h3>
+          <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">
+            Featured graph
+          </p>
+          <h3 className="mt-4 text-[20px] font-black leading-none tracking-[-0.03em] text-vyro-text">
+            {card.label}
+          </h3>
         </div>
         <span className="rounded-lg border border-vyro-text/32 bg-vyro-text/8 px-3 py-2 font-mono text-[10px] text-vyro-text">
-          {card.current ?? "—"}{card.unit}
+          {card.current ?? "—"}
+          {card.unit}
         </span>
       </div>
       {card.spark.length >= 2 ? (
-        <GraphSvg data={card.spark} height={170} className="mt-7 rounded-[18px] border border-vyro-line bg-vyro-panel/70" />
+        <GraphSvg
+          data={card.spark}
+          height={170}
+          className="mt-7 rounded-[18px] border border-vyro-line bg-vyro-panel/70"
+        />
       ) : (
         <div className="mt-7 flex h-[170px] items-center justify-center rounded-[18px] border border-dashed border-vyro-line text-[13px] text-vyro-mute">
           Need a few more sessions to chart this.
@@ -158,28 +189,53 @@ function AiReadout({ cards, sessions }: { cards: TrendCard[]; sessions: RawSessi
   for (const c of cards) {
     if (c.deltaPct == null) continue;
     const dirGood = c.higherIsBetter ? c.deltaPct > 3 : c.deltaPct < -3;
-    if (dirGood) insights.push(`${c.label} ${c.deltaPct >= 0 ? "improved" : "improved (lower)"} ${Math.abs(c.deltaPct).toFixed(1)}%.`);
+    if (dirGood)
+      insights.push(
+        `${c.label} ${c.deltaPct >= 0 ? "improved" : "improved (lower)"} ${Math.abs(c.deltaPct).toFixed(1)}%.`,
+      );
   }
   if (!insights.length) {
-    insights.push(`Latest session: ${sessions[0]?.sport ?? "—"} for ${Math.round(durationMin(sessions[0] ?? ({} as RawSession)))} min.`);
+    insights.push(
+      `Latest session: ${sessions[0]?.sport ?? "—"} for ${Math.round(durationMin(sessions[0] ?? ({} as RawSession)))} min.`,
+    );
   }
   return (
     <VCard className="bg-vyro-elev/75">
-      <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">AI readout</p>
+      <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">
+        AI readout
+      </p>
       <div className="mt-5 space-y-4">
-        {insights.slice(0, 4).map((line, i) => <InsightBox key={i}>{line}</InsightBox>)}
+        {insights.slice(0, 4).map((line, i) => (
+          <InsightBox key={i}>{line}</InsightBox>
+        ))}
       </div>
     </VCard>
   );
 }
 
-function RecoveryTrend({ baselines, sessions }: { baselines: Baselines | null; sessions: RawSession[] }) {
+function RecoveryTrend({
+  baselines,
+  sessions,
+}: {
+  baselines: Baselines | null;
+  sessions: RawSession[];
+}) {
   const load = trainingLoad7d(sessions);
-  const recoveryHint = load >= 70 ? "High 7-day load — protect sleep tonight." : load >= 40 ? "Moderate load — typical session OK." : "Low load — fine to push tomorrow.";
+  const recoveryHint =
+    load >= 70
+      ? "High 7-day load — protect sleep tonight."
+      : load >= 40
+        ? "Moderate load — typical session OK."
+        : "Low load — fine to push tomorrow.";
   return (
     <VCard className="border-vyro-text/42">
-      <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">7-day training load</p>
-      <p className="mt-6 text-[34px] font-black leading-none tracking-[-0.04em] tabular-nums text-vyro-text">{load}<span className="text-[20px] text-vyro-mute">/100</span></p>
+      <p className="font-mono text-[9px] font-medium uppercase tracking-[0.26em] text-vyro-mute">
+        7-day training load
+      </p>
+      <p className="mt-6 text-[34px] font-black leading-none tracking-[-0.04em] tabular-nums text-vyro-text">
+        {load}
+        <span className="text-[20px] text-vyro-mute">/100</span>
+      </p>
       <p className="mt-4 font-mono text-[10.5px] tracking-[0.1em] text-vyro-mute">
         {baselines?.hrvMs ? `HRV baseline ${Math.round(baselines.hrvMs)}ms` : "Tracking baselines…"}
       </p>
@@ -188,7 +244,15 @@ function RecoveryTrend({ baselines, sessions }: { baselines: Baselines | null; s
   );
 }
 
-function CalendarView({ sessions, lastNight, loadToday }: { sessions: RawSession[]; lastNight: number | null; loadToday: number }) {
+function CalendarView({
+  sessions,
+  lastNight,
+  loadToday,
+}: {
+  sessions: RawSession[];
+  lastNight: number | null;
+  loadToday: number;
+}) {
   const days = useMemo(() => {
     const ref = Date.now();
     return Array.from({ length: 12 }).map((_, i) => {
@@ -200,9 +264,15 @@ function CalendarView({ sessions, lastNight, loadToday }: { sessions: RawSession
         return t >= dayStart.getTime() && t < dayEnd;
       });
       const avgAgility = inDay.length
-        ? Math.round(inDay.map(agilityScore).filter((v): v is number => v != null).reduce((a, b) => a + b, 0) / Math.max(1, inDay.length))
+        ? Math.round(
+            inDay
+              .map(agilityScore)
+              .filter((v): v is number => v != null)
+              .reduce((a, b) => a + b, 0) / Math.max(1, inDay.length),
+          )
         : 0;
-      const tone = avgAgility >= 75 ? "good" : avgAgility >= 60 ? "warn" : avgAgility > 0 ? "bad" : "off";
+      const tone =
+        avgAgility >= 75 ? "good" : avgAgility >= 60 ? "warn" : avgAgility > 0 ? "bad" : "off";
       return { day: dayStart.getDate(), score: avgAgility, tone, active: i === 11 };
     });
   }, [sessions]);
@@ -214,22 +284,40 @@ function CalendarView({ sessions, lastNight, loadToday }: { sessions: RawSession
           <p className="flex items-center gap-2 font-mono text-[9px] font-medium uppercase tracking-[0.24em] text-vyro-mute">
             <CalendarDays className="h-4 w-4" /> Calendar view
           </p>
-          <h3 className="mt-4 text-[20px] font-black leading-tight tracking-[-0.03em] text-vyro-text">Recent training history</h3>
+          <h3 className="mt-4 text-[20px] font-black leading-tight tracking-[-0.03em] text-vyro-text">
+            Recent training history
+          </h3>
           <p className="mt-3 text-[13px] leading-relaxed text-vyro-mute">
             Daily agility score from your saved sessions. Empty cells = no session that day.
           </p>
         </div>
       </div>
       <div className="mt-8 grid grid-cols-7 gap-2 text-center font-mono text-[10px] text-vyro-mute">
-        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <span key={`${d}-${i}`}>{d}</span>)}
+        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+          <span key={`${d}-${i}`}>{d}</span>
+        ))}
       </div>
       <div className="mt-5 grid grid-cols-7 gap-2">
-        {days.map((day, i) => <CalendarDay key={i} {...day} />)}
+        {days.map((day, i) => (
+          <CalendarDay key={i} {...day} />
+        ))}
       </div>
       <div className="mt-6 space-y-4">
-        <CalendarMetric icon={<Activity className="h-5 w-5" />} label="7d load" value={`${loadToday}/100`} />
-        <CalendarMetric icon={<Moon className="h-5 w-5" />} label="Sleep" value={lastNight != null ? String(lastNight) : "—"} />
-        <CalendarMetric icon={<Zap className="h-5 w-5" />} label="Sessions" value={String(sessions.length)} />
+        <CalendarMetric
+          icon={<Activity className="h-5 w-5" />}
+          label="7d load"
+          value={`${loadToday}/100`}
+        />
+        <CalendarMetric
+          icon={<Moon className="h-5 w-5" />}
+          label="Sleep"
+          value={lastNight != null ? String(lastNight) : "—"}
+        />
+        <CalendarMetric
+          icon={<Zap className="h-5 w-5" />}
+          label="Sessions"
+          value={String(sessions.length)}
+        />
       </div>
     </VCard>
   );
@@ -238,7 +326,9 @@ function CalendarView({ sessions, lastNight, loadToday }: { sessions: RawSession
 function MetricTrendStack({ cards }: { cards: TrendCard[] }) {
   return (
     <div className="space-y-5">
-      {cards.map((card) => <MetricTrendCard key={card.label} card={card} />)}
+      {cards.map((card) => (
+        <MetricTrendCard key={card.label} card={card} />
+      ))}
     </div>
   );
 }
@@ -248,7 +338,9 @@ function MetricTrendCard({ card }: { card: TrendCard }) {
     <VCard className="bg-vyro-elev/75">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-[15px] font-black tracking-[-0.02em] text-vyro-text">{card.label}</h3>
+          <h3 className="truncate text-[15px] font-black tracking-[-0.02em] text-vyro-text">
+            {card.label}
+          </h3>
           <p className="mt-1 font-mono text-[10px] text-vyro-mute">
             {card.previous != null ? `Previous ${card.previous}${card.unit}` : "No prior window"}
           </p>
@@ -267,7 +359,10 @@ function MetricTrendCard({ card }: { card: TrendCard }) {
         {card.spark.length >= 2 ? <SmallSpark data={card.spark} /> : <div className="h-[72px]" />}
       </div>
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-vyro-text/8">
-        <span className="block h-full rounded-full bg-linear-to-r from-vyro-mint/70 to-vyro-mint transition-[width] duration-500 ease-out" style={{ width: `${Math.max(0, Math.min(100, card.progress))}%` }} />
+        <span
+          className="block h-full rounded-full bg-linear-to-r from-vyro-mint/70 to-vyro-mint transition-[width] duration-500 ease-out"
+          style={{ width: `${Math.max(0, Math.min(100, card.progress))}%` }}
+        />
       </div>
     </VCard>
   );
@@ -302,8 +397,12 @@ function Badge({ icon, children }: { icon: ReactNode; children: ReactNode }) {
 function TrajectoryMetric({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <div className="rounded-[16px] border border-vyro-line bg-vyro-text/[0.03] p-4 transition-colors duration-200 hover:bg-vyro-text/[0.055]">
-      <p className="font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-vyro-mute">{label}</p>
-      <p className="mt-2.5 text-[30px] font-black leading-none tracking-[-0.04em] tabular-nums text-vyro-text">{value}</p>
+      <p className="font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-vyro-mute">
+        {label}
+      </p>
+      <p className="mt-2.5 text-[30px] font-black leading-none tracking-[-0.04em] tabular-nums text-vyro-text">
+        {value}
+      </p>
       <p className="mt-2 text-[11.5px] text-vyro-mute">{hint}</p>
     </div>
   );
@@ -318,40 +417,111 @@ function InsightBox({ children }: { children: ReactNode }) {
   );
 }
 
-
 function SmallSpark({ data }: { data: number[] }) {
   return <GraphSvg data={data} height={72} compact />;
 }
 
-function GraphSvg({ data, height, className = "", stroke = "var(--vyro-mint)", fill = "var(--vyro-mint)", compact = false }: { data: number[]; height: number; className?: string; stroke?: string; fill?: string; compact?: boolean }) {
+function GraphSvg({
+  data,
+  height,
+  className = "",
+  stroke = "var(--vyro-mint)",
+  fill = "var(--vyro-mint)",
+  compact = false,
+}: {
+  data: number[];
+  height: number;
+  className?: string;
+  stroke?: string;
+  fill?: string;
+  compact?: boolean;
+}) {
   const width = 300;
   const pad = compact ? 6 : 10;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
   const step = (width - pad * 2) / Math.max(1, data.length - 1);
-  const coords = data.map((value, index) => [pad + index * step, pad + (height - pad * 2) * (1 - (value - min) / range)] as const);
-  const path = coords.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const coords = data.map(
+    (value, index) =>
+      [pad + index * step, pad + (height - pad * 2) * (1 - (value - min) / range)] as const,
+  );
+  const path = coords
+    .map(([x, y], index) => `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`)
+    .join(" ");
   const area = `${path} L${width - pad},${height - pad} L${pad},${height - pad} Z`;
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className={`block w-full ${className}`} aria-hidden="true">
-      {!compact && Array.from({ length: 7 }).map((_, i) => <line key={`v-${i}`} x1={(width / 6) * i} x2={(width / 6) * i} y1="0" y2={height} stroke="var(--vyro-line)" />)}
-      {!compact && Array.from({ length: 5 }).map((_, i) => <line key={`h-${i}`} x1="0" x2={width} y1={(height / 4) * i} y2={(height / 4) * i} stroke="var(--vyro-line)" />)}
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className={`block w-full ${className}`}
+      aria-hidden="true"
+    >
+      {!compact &&
+        Array.from({ length: 7 }).map((_, i) => (
+          <line
+            key={`v-${i}`}
+            x1={(width / 6) * i}
+            x2={(width / 6) * i}
+            y1="0"
+            y2={height}
+            stroke="var(--vyro-line)"
+          />
+        ))}
+      {!compact &&
+        Array.from({ length: 5 }).map((_, i) => (
+          <line
+            key={`h-${i}`}
+            x1="0"
+            x2={width}
+            y1={(height / 4) * i}
+            y2={(height / 4) * i}
+            stroke="var(--vyro-line)"
+          />
+        ))}
       <path d={area} fill={fill} opacity="0.16" />
-      <path d={path} fill="none" stroke={stroke} strokeLinecap="round" strokeLinejoin="round" strokeWidth={compact ? 3 : 2.4} />
-      {!compact && coords.map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="2.4" fill={stroke} />)}
+      <path
+        d={path}
+        fill="none"
+        stroke={stroke}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={compact ? 3 : 2.4}
+      />
+      {!compact &&
+        coords.map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="2.4" fill={stroke} />)}
     </svg>
   );
 }
 
-function CalendarDay({ day, score, tone, active }: { day: number; score: number; tone: string; active?: boolean }) {
-  const dot = tone === "good" ? "bg-vyro-mint" : tone === "bad" ? "bg-vyro-rose" : tone === "warn" ? "bg-vyro-amber" : "bg-vyro-line";
+function CalendarDay({
+  day,
+  score,
+  tone,
+  active,
+}: {
+  day: number;
+  score: number;
+  tone: string;
+  active?: boolean;
+}) {
+  const dot =
+    tone === "good"
+      ? "bg-vyro-mint"
+      : tone === "bad"
+        ? "bg-vyro-rose"
+        : tone === "warn"
+          ? "bg-vyro-amber"
+          : "bg-vyro-line";
   return (
-    <div className={`relative min-h-[48px] rounded-[12px] border bg-vyro-text/[0.03] p-2 text-left transition-colors duration-200 ${active ? "border-vyro-text" : "border-vyro-line"}`}>
+    <div
+      className={`relative min-h-[48px] rounded-[12px] border bg-vyro-text/[0.03] p-2 text-left transition-colors duration-200 ${active ? "border-vyro-text" : "border-vyro-line"}`}
+    >
       <span className={`absolute right-3 top-3 h-2.5 w-2.5 rounded-full ${dot}`} />
       <span className="block text-[15px] font-black text-vyro-text">{day}</span>
-      <span className="mt-2 block text-[18px] font-black leading-none tabular-nums text-vyro-text">{score || "—"}</span>
+      <span className="mt-2 block text-[18px] font-black leading-none tabular-nums text-vyro-text">
+        {score || "—"}
+      </span>
     </div>
   );
 }
@@ -359,8 +529,13 @@ function CalendarDay({ day, score, tone, active }: { day: number; score: number;
 function CalendarMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-[16px] border border-vyro-line bg-vyro-text/[0.03] p-4 transition-colors duration-200 hover:bg-vyro-text/[0.055]">
-      <p className="flex items-center gap-2 font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-vyro-mute">{icon}{label}</p>
-      <p className="mt-4 text-[24px] font-black leading-none tracking-[-0.035em] tabular-nums text-vyro-text">{value}</p>
+      <p className="flex items-center gap-2 font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-vyro-mute">
+        {icon}
+        {label}
+      </p>
+      <p className="mt-4 text-[24px] font-black leading-none tracking-[-0.035em] tabular-nums text-vyro-text">
+        {value}
+      </p>
     </div>
   );
 }

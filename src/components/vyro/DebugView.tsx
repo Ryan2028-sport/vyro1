@@ -84,7 +84,9 @@ function Section({
   return (
     <div className="mb-3 rounded-[18px] border border-vyro-line bg-vyro-panel bg-[linear-gradient(160deg,rgba(255,255,255,0.04),transparent_40%)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] transition-colors duration-200 hover:border-vyro-text/[0.12]">
       <div className="mb-2.5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <div className="text-[13.5px] font-extrabold leading-tight tracking-[-0.015em] text-vyro-text">{title}</div>
+        <div className="text-[13.5px] font-extrabold leading-tight tracking-[-0.015em] text-vyro-text">
+          {title}
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           {rightSlot}
           <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-vyro-mute">
@@ -121,14 +123,15 @@ function Section({
   );
 }
 
-
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const fmt = (v: number | null | undefined, d = 0, u = "") =>
   isNum(v) ? `${v.toFixed(d)}${u}` : "—";
 
 /** Track when each value last changed (became defined or changed) so the
  *  Debug rows can show "updated 4s ago" / "stale 2m ago". */
-function useFreshness<T extends Record<string, unknown>>(values: T): Record<keyof T, number | undefined> {
+function useFreshness<T extends Record<string, unknown>>(
+  values: T,
+): Record<keyof T, number | undefined> {
   const lastRef = useRef<Record<string, { v: unknown; t: number }>>({});
   // Use the JSON shape as the dep — values are scalars/small structs.
   const sig = JSON.stringify(values);
@@ -292,12 +295,11 @@ export function DebugView() {
     },
     {
       label: "SMP (MCUmgr) service",
-      value:
-        (inspector.discovered?.services ?? []).some(
-          (s) => s.uuid.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
-        )
-          ? "available (OTA supported)"
-          : "not exposed by firmware (OTA blocked)",
+      value: (inspector.discovered?.services ?? []).some(
+        (s) => s.uuid.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
+      )
+        ? "available (OTA supported)"
+        : "not exposed by firmware (OTA blocked)",
       ok: (inspector.discovered?.services ?? []).some(
         (s) => s.uuid.toLowerCase() === "8d53dc1d-1db7-4cd3-868b-8a527460aa84",
       ),
@@ -306,13 +308,55 @@ export function DebugView() {
   ];
 
   const health: Row[] = [
-    { label: "Heart rate", value: fmt(ctx.heartRateBpm, 0, " bpm"), ok: hardwareSeen(ctx.heartRateBpm, ctx.heartRateAt), source: "Goodix PPG · realtime HR / measure frame", ageMs: signalAge(ctx.heartRateAt) },
-    { label: "Resting HR", value: fmt(ctx.restingHrBpm, 0, " bpm"), ok: hardwareSeen(ctx.restingHrBpm, ctx.signalAt.restingHrAt), source: "5-min live HR buffer · 5th percentile", ageMs: signalAge(ctx.signalAt.restingHrAt) },
-    { label: "HRV (RMSSD)", value: fmt(ctx.hrvMs, 0, " ms"), ok: hardwareSeen(ctx.hrvMs, ctx.signalAt.hrvAt), source: "QCBand hardware · 0x39 history / 0x69 measure", ageMs: signalAge(ctx.signalAt.hrvAt) },
-    { label: "SpO₂", value: fmt(ctx.spo2Pct, 0, " %"), ok: hardwareSeen(ctx.spo2Pct, ctx.signalAt.spo2At), source: "QCBand hardware · 0x69 / V2 0xbc / notify", ageMs: signalAge(ctx.signalAt.spo2At) },
-    { label: "Skin temp", value: fmt(ctx.skinTempC, 1, " °C"), ok: hardwareSeen(ctx.skinTempC, ctx.signalAt.skinTempAt), source: "QCBand hardware · 0x69 / V2 0xbc / notify", ageMs: signalAge(ctx.signalAt.skinTempAt) },
-    { label: "Respiration", value: fmt(ctx.respRateBrpm, 1, " brpm"), ok: hardwareSeen(ctx.respRateBrpm, ctx.signalAt.respirationAt), source: `Goodix PPG · respiratory sinus arrhythmia · ${ctx.metricPipeline.respiration.detail}`, ageMs: signalAge(ctx.signalAt.respirationAt) },
-    { label: "Stress", value: fmt(ctx.stressScore, 0, "/100"), ok: hardwareSeen(ctx.stressScore, ctx.signalAt.stressAt), source: "QCBand hardware · 0x37 history / 0x69 measure", ageMs: signalAge(ctx.signalAt.stressAt) },
+    {
+      label: "Heart rate",
+      value: fmt(ctx.heartRateBpm, 0, " bpm"),
+      ok: hardwareSeen(ctx.heartRateBpm, ctx.heartRateAt),
+      source: "Goodix PPG · realtime HR / measure frame",
+      ageMs: signalAge(ctx.heartRateAt),
+    },
+    {
+      label: "Resting HR",
+      value: fmt(ctx.restingHrBpm, 0, " bpm"),
+      ok: hardwareSeen(ctx.restingHrBpm, ctx.signalAt.restingHrAt),
+      source: "5-min live HR buffer · 5th percentile",
+      ageMs: signalAge(ctx.signalAt.restingHrAt),
+    },
+    {
+      label: "HRV (RMSSD)",
+      value: fmt(ctx.hrvMs, 0, " ms"),
+      ok: hardwareSeen(ctx.hrvMs, ctx.signalAt.hrvAt),
+      source: "QCBand hardware · 0x39 history / 0x69 measure",
+      ageMs: signalAge(ctx.signalAt.hrvAt),
+    },
+    {
+      label: "SpO₂",
+      value: fmt(ctx.spo2Pct, 0, " %"),
+      ok: hardwareSeen(ctx.spo2Pct, ctx.signalAt.spo2At),
+      source: "QCBand hardware · 0x69 / V2 0xbc / notify",
+      ageMs: signalAge(ctx.signalAt.spo2At),
+    },
+    {
+      label: "Skin temp",
+      value: fmt(ctx.skinTempC, 1, " °C"),
+      ok: hardwareSeen(ctx.skinTempC, ctx.signalAt.skinTempAt),
+      source: "QCBand hardware · 0x69 / V2 0xbc / notify",
+      ageMs: signalAge(ctx.signalAt.skinTempAt),
+    },
+    {
+      label: "Respiration",
+      value: fmt(ctx.respRateBrpm, 1, " brpm"),
+      ok: hardwareSeen(ctx.respRateBrpm, ctx.signalAt.respirationAt),
+      source: `Goodix PPG · respiratory sinus arrhythmia · ${ctx.metricPipeline.respiration.detail}`,
+      ageMs: signalAge(ctx.signalAt.respirationAt),
+    },
+    {
+      label: "Stress",
+      value: fmt(ctx.stressScore, 0, "/100"),
+      ok: hardwareSeen(ctx.stressScore, ctx.signalAt.stressAt),
+      source: "QCBand hardware · 0x37 history / 0x69 measure",
+      ageMs: signalAge(ctx.signalAt.stressAt),
+    },
     {
       label: "Blood pressure",
       value: ctx.bloodPressure ? `${ctx.bloodPressure.sbp}/${ctx.bloodPressure.dbp}` : "—",
@@ -320,7 +364,13 @@ export function DebugView() {
       source: "QCBand 0x69(0x05) one-key payload",
       ageMs: signalAge(ctx.signalAt.bloodPressureAt),
     },
-    { label: "Battery", value: fmt(ctx.batteryPct, 0, " %"), ok: hardwareSeen(ctx.batteryPct, ctx.signalAt.batteryAt), source: "GATT 0x2A19 · QCBand 0x03", ageMs: signalAge(ctx.signalAt.batteryAt) },
+    {
+      label: "Battery",
+      value: fmt(ctx.batteryPct, 0, " %"),
+      ok: hardwareSeen(ctx.batteryPct, ctx.signalAt.batteryAt),
+      source: "GATT 0x2A19 · QCBand 0x03",
+      ageMs: signalAge(ctx.signalAt.batteryAt),
+    },
   ];
 
   const measurementPipeline: Row[] = [
@@ -330,40 +380,106 @@ export function DebugView() {
       ok: !ctx.sensorHold,
       source: "One optical metric at a time; HR resumes right after each measurement",
     },
-    ...([
-      ["SpO₂", "spo2"],
-      ["Skin temperature", "skinTemp"],
-      ["HRV", "hrv"],
-      ["Stress", "stress"],
-      ["Blood pressure", "bloodPressure"],
-    ] as const).map(([label, key]) => {
+    ...(
+      [
+        ["SpO₂", "spo2"],
+        ["Skin temperature", "skinTemp"],
+        ["HRV", "hrv"],
+        ["Stress", "stress"],
+        ["Blood pressure", "bloodPressure"],
+      ] as const
+    ).map(([label, key]) => {
       const entry = ctx.metricPipeline[key];
       return {
         label,
         value: entry.status,
         ok: entry.status === "received",
-        source: entry.subType == null ? entry.detail : `0x${entry.subType.toString(16)} · ${entry.detail}`,
+        source:
+          entry.subType == null
+            ? entry.detail
+            : `0x${entry.subType.toString(16)} · ${entry.detail}`,
         ageMs: signalAge(entry.respondedAt ?? entry.requestedAt),
       };
     }),
   ];
 
-
   const activity: Row[] = [
-    { label: "Steps today", value: fmt(ctx.stepsToday, 0), ok: hardwareSeen(ctx.stepsToday, ctx.signalAt.stepsAt), source: "QCBand summary / live / history packet", ageMs: signalAge(ctx.signalAt.stepsAt) },
-    { label: "Distance", value: fmt(ctx.distanceM, 0, " m"), ok: hardwareSeen(ctx.distanceM, ctx.signalAt.distanceAt), source: "QCBand activity payload", ageMs: signalAge(ctx.signalAt.distanceAt) },
-    { label: "Calories", value: fmt(ctx.caloriesKcal, 0, " kcal"), ok: hardwareSeen(ctx.caloriesKcal, ctx.signalAt.caloriesAt), source: "QCBand activity payload", ageMs: signalAge(ctx.signalAt.caloriesAt) },
+    {
+      label: "Steps today",
+      value: fmt(ctx.stepsToday, 0),
+      ok: hardwareSeen(ctx.stepsToday, ctx.signalAt.stepsAt),
+      source: "QCBand summary / live / history packet",
+      ageMs: signalAge(ctx.signalAt.stepsAt),
+    },
+    {
+      label: "Distance",
+      value: fmt(ctx.distanceM, 0, " m"),
+      ok: hardwareSeen(ctx.distanceM, ctx.signalAt.distanceAt),
+      source: "QCBand activity payload",
+      ageMs: signalAge(ctx.signalAt.distanceAt),
+    },
+    {
+      label: "Calories",
+      value: fmt(ctx.caloriesKcal, 0, " kcal"),
+      ok: hardwareSeen(ctx.caloriesKcal, ctx.signalAt.caloriesAt),
+      source: "QCBand activity payload",
+      ageMs: signalAge(ctx.signalAt.caloriesAt),
+    },
   ];
 
   const imu: Row[] = [
-    { label: "Peak G", value: fmt(m.peakG, 2, " g"), ok: m.peakG > 0, source: "VYRO motion · 0x10/0x11/0x12", ageMs: fresh.peakG },
-    { label: "Peak gyro", value: fmt(m.peakDps, 0, " dps"), ok: m.peakDps > 0, source: "VYRO motion · gyroPeakDps", ageMs: fresh.peakDps },
-    { label: "Peak jerk", value: fmt(m.peakJerk, 0, " g/s"), ok: m.peakJerk > 0, source: "VYRO motion · jerkPeakGps", ageMs: fresh.peakJerk },
-    { label: "Swing intensity (max)", value: fmt(m.swingIntMax, 2), ok: m.swingIntMax > 0, source: "VYRO motion · swing.intensity" },
-    { label: "Swing duration (max)", value: fmt(m.swingDurMax, 0, " ms"), ok: m.swingDurMax > 0, source: "VYRO motion · swing.durationMs" },
-    { label: "Reaction (min)", value: fmt(m.reactMin, 0, " ms"), ok: isNum(m.reactMin), source: "VYRO motion · direction_change.gapMs" },
-    { label: "Events last 60s", value: String(m.eventsLastMin), ok: m.eventsLastMin > 0, source: "in-memory event buffer", ageMs: fresh.eventsLastMin },
-    { label: "Events total (buffered)", value: String(m.events.length), ok: m.events.length > 0, source: "last 120 events" },
+    {
+      label: "Peak G",
+      value: fmt(m.peakG, 2, " g"),
+      ok: m.peakG > 0,
+      source: "VYRO motion · 0x10/0x11/0x12",
+      ageMs: fresh.peakG,
+    },
+    {
+      label: "Peak gyro",
+      value: fmt(m.peakDps, 0, " dps"),
+      ok: m.peakDps > 0,
+      source: "VYRO motion · gyroPeakDps",
+      ageMs: fresh.peakDps,
+    },
+    {
+      label: "Peak jerk",
+      value: fmt(m.peakJerk, 0, " g/s"),
+      ok: m.peakJerk > 0,
+      source: "VYRO motion · jerkPeakGps",
+      ageMs: fresh.peakJerk,
+    },
+    {
+      label: "Swing intensity (max)",
+      value: fmt(m.swingIntMax, 2),
+      ok: m.swingIntMax > 0,
+      source: "VYRO motion · swing.intensity",
+    },
+    {
+      label: "Swing duration (max)",
+      value: fmt(m.swingDurMax, 0, " ms"),
+      ok: m.swingDurMax > 0,
+      source: "VYRO motion · swing.durationMs",
+    },
+    {
+      label: "Reaction (min)",
+      value: fmt(m.reactMin, 0, " ms"),
+      ok: isNum(m.reactMin),
+      source: "VYRO motion · direction_change.gapMs",
+    },
+    {
+      label: "Events last 60s",
+      value: String(m.eventsLastMin),
+      ok: m.eventsLastMin > 0,
+      source: "in-memory event buffer",
+      ageMs: fresh.eventsLastMin,
+    },
+    {
+      label: "Events total (buffered)",
+      value: String(m.events.length),
+      ok: m.events.length > 0,
+      source: "last 120 events",
+    },
   ];
 
   const session: Row[] = [
@@ -377,7 +493,9 @@ export function DebugView() {
     {
       label: "Event counts",
       value: m.counts
-        ? Object.entries(m.counts).map(([k, v]) => `${k}:${v}`).join(" ") || "—"
+        ? Object.entries(m.counts)
+            .map(([k, v]) => `${k}:${v}`)
+            .join(" ") || "—"
         : "—",
       ok: !!m.counts && Object.keys(m.counts).length > 0,
       source: "useVyroBand.counts",
@@ -417,13 +535,43 @@ export function DebugView() {
 
   const tabs: Row[] = [
     { label: "Athlete tab", value: "wired", ok: true, source: "AthleteView ← ctx + baselines" },
-    { label: "Sport › Overview / CourtDB / Motion", value: "wired", ok: true, source: "SportView ← IMU stream" },
-    { label: "Sport › Heat Map / Tendencies", value: "static", ok: false, source: "no live source (intentional)" },
-    { label: "Recovery (all 4 views)", value: "wired", ok: true, source: "RecoveryView ← HR buffer + baselines" },
+    {
+      label: "Sport › Overview / CourtDB / Motion",
+      value: "wired",
+      ok: true,
+      source: "SportView ← IMU stream",
+    },
+    {
+      label: "Sport › Heat Map / Tendencies",
+      value: "static",
+      ok: false,
+      source: "no live source (intentional)",
+    },
+    {
+      label: "Recovery (all 4 views)",
+      value: "wired",
+      ok: true,
+      source: "RecoveryView ← HR buffer + baselines",
+    },
     { label: "Session", value: "wired", ok: true, source: "SessionView ← ctx" },
-    { label: "Sleep", value: lastSleep ? "live" : "awaiting frames", ok: !!lastSleep, source: "SleepView" },
-    { label: "Trends", value: "wired to Cloud sessions", ok: true, source: "TrendsView ← getMySessions" },
-    { label: "Coach", value: "wired (heuristics)", ok: true, source: "CoachView ← live ctx + baselines" },
+    {
+      label: "Sleep",
+      value: lastSleep ? "live" : "awaiting frames",
+      ok: !!lastSleep,
+      source: "SleepView",
+    },
+    {
+      label: "Trends",
+      value: "wired to Cloud sessions",
+      ok: true,
+      source: "TrendsView ← getMySessions",
+    },
+    {
+      label: "Coach",
+      value: "wired (heuristics)",
+      ok: true,
+      source: "CoachView ← live ctx + baselines",
+    },
   ];
 
   const firmwareDiagnosticRows: Row[] = useMemo(() => {
@@ -449,7 +597,10 @@ export function DebugView() {
         value: durationLabel(now - diagnosticStartRef.current),
         ok: now - diagnosticStartRef.current >= FIRMWARE_DIAGNOSTIC_MS,
         source: "15-minute firmware diagnostic window",
-        note: now - diagnosticStartRef.current >= FIRMWARE_DIAGNOSTIC_MS ? "minimum complete; still recording" : `${durationLabel(FIRMWARE_DIAGNOSTIC_MS - (now - diagnosticStartRef.current))} remaining`,
+        note:
+          now - diagnosticStartRef.current >= FIRMWARE_DIAGNOSTIC_MS
+            ? "minimum complete; still recording"
+            : `${durationLabel(FIRMWARE_DIAGNOSTIC_MS - (now - diagnosticStartRef.current))} remaining`,
       },
       {
         label: "Notifications captured",
@@ -477,7 +628,12 @@ export function DebugView() {
         value: String(stepsDelta),
         ok: stepsDelta > 0,
         source: "opcodes 0x09 / 0x07 / 0x43 / 0x48",
-        ageMs: Math.min(opAge(0x09) ?? Infinity, opAge(0x07) ?? Infinity, opAge(0x43) ?? Infinity, opAge(0x48) ?? Infinity),
+        ageMs: Math.min(
+          opAge(0x09) ?? Infinity,
+          opAge(0x07) ?? Infinity,
+          opAge(0x43) ?? Infinity,
+          opAge(0x48) ?? Infinity,
+        ),
       },
       {
         label: "Optical measure path",
@@ -520,10 +676,7 @@ export function DebugView() {
 
   // Per-characteristic counter table.
   const charStats: CharStat[] = useMemo(
-    () =>
-      Object.values(inspector.perChar).sort(
-        (a, b) => b.lastAt - a.lastAt,
-      ),
+    () => Object.values(inspector.perChar).sort((a, b) => b.lastAt - a.lastAt),
     [inspector.perChar],
   );
 
@@ -548,7 +701,12 @@ export function DebugView() {
     return [
       mk("Realtime HR frames", 0x1e, "QCBand opcode 0x1e", "HR works if this increments"),
       mk("Battery replies", 0x03, "QCBand opcode 0x03", "sent every 60s"),
-      mk("Steps / summary replies", 0x09, "QCBand opcode 0x09", "also check opcode 0x07 / 0x43 below"),
+      mk(
+        "Steps / summary replies",
+        0x09,
+        "QCBand opcode 0x09",
+        "also check opcode 0x07 / 0x43 below",
+      ),
       mk("Steps alt replies", 0x07, "QCBand opcode 0x07", "older daily total"),
       mk("Activity history", 0x43, "QCBand opcode 0x43", "hourly activity sync"),
       mk("Measurement frames", 0x69, "QCBand opcode 0x69", "SpO₂/temp/HRV/stress one-key/manual"),
@@ -578,12 +736,10 @@ export function DebugView() {
   //   cmd written → notif received (opcode) → value stored (signalAt timestamp).
   // A grey stage tells you exactly where in the chain a tile is dying.
   const pipelineRows = useMemo(() => {
-    const op = (code: number) =>
-      inspector.perOpcode[`0x${code.toString(16).padStart(2, "0")}`];
+    const op = (code: number) => inspector.perOpcode[`0x${code.toString(16).padStart(2, "0")}`];
     const writeForOp = (codes: number[]) =>
       inspector.writeLog.find((w) => w.opcode != null && codes.includes(w.opcode));
-    const sumOp = (codes: number[]) =>
-      codes.reduce((acc, c) => acc + (op(c)?.count ?? 0), 0);
+    const sumOp = (codes: number[]) => codes.reduce((acc, c) => acc + (op(c)?.count ?? 0), 0);
     const lastOp = (codes: number[]) => {
       let t = 0;
       for (const c of codes) {
@@ -603,20 +759,86 @@ export function DebugView() {
       value: string;
     };
     const rows: P[] = [
-      { metric: "Heart rate",     cmdOps: [0x1e],              notifOps: [0x1e],                    storedAt: ctx.heartRateAt,             value: fmt(ctx.heartRateBpm, 0, " bpm") },
+      {
+        metric: "Heart rate",
+        cmdOps: [0x1e],
+        notifOps: [0x1e],
+        storedAt: ctx.heartRateAt,
+        value: fmt(ctx.heartRateBpm, 0, " bpm"),
+      },
       // SpO₂/temp/HRV/stress/BP arrive INSIDE 0x69 composite frames that the
       // watch pushes on its own cadence — no explicit cmd is required.
-      { metric: "SpO₂",           pushOnly: true,  cmdOps: [],  notifOps: [0x69, 0x73, 0xbc],       storedAt: ctx.signalAt.spo2At,         value: fmt(ctx.spo2Pct, 0, " %") },
-      { metric: "Skin temp",      pushOnly: true,  cmdOps: [],  notifOps: [0x69, 0x73, 0xbc, 0x87], storedAt: ctx.signalAt.skinTempAt,     value: fmt(ctx.skinTempC, 1, " °C") },
-      { metric: "HRV",            pushOnly: true,  cmdOps: [],  notifOps: [0x39, 0x69],             storedAt: ctx.signalAt.hrvAt,          value: fmt(ctx.hrvMs, 0, " ms") },
-      { metric: "Stress",         pushOnly: true,  cmdOps: [],  notifOps: [0x37, 0x69],             storedAt: ctx.signalAt.stressAt,       value: fmt(ctx.stressScore, 0) },
-      { metric: "Blood pressure", pushOnly: true,  cmdOps: [],  notifOps: [0x69, 0x89],             storedAt: ctx.signalAt.bloodPressureAt, value: ctx.bloodPressure ? `${ctx.bloodPressure.sbp}/${ctx.bloodPressure.dbp}` : "—" },
-      { metric: "Steps",          cmdOps: [0x09, 0x07, 0x43, 0x48], notifOps: [0x09, 0x07, 0x43, 0x48, 0x73], storedAt: ctx.signalAt.stepsAt, value: fmt(ctx.stepsToday, 0) },
+      {
+        metric: "SpO₂",
+        pushOnly: true,
+        cmdOps: [],
+        notifOps: [0x69, 0x73, 0xbc],
+        storedAt: ctx.signalAt.spo2At,
+        value: fmt(ctx.spo2Pct, 0, " %"),
+      },
+      {
+        metric: "Skin temp",
+        pushOnly: true,
+        cmdOps: [],
+        notifOps: [0x69, 0x73, 0xbc, 0x87],
+        storedAt: ctx.signalAt.skinTempAt,
+        value: fmt(ctx.skinTempC, 1, " °C"),
+      },
+      {
+        metric: "HRV",
+        pushOnly: true,
+        cmdOps: [],
+        notifOps: [0x39, 0x69],
+        storedAt: ctx.signalAt.hrvAt,
+        value: fmt(ctx.hrvMs, 0, " ms"),
+      },
+      {
+        metric: "Stress",
+        pushOnly: true,
+        cmdOps: [],
+        notifOps: [0x37, 0x69],
+        storedAt: ctx.signalAt.stressAt,
+        value: fmt(ctx.stressScore, 0),
+      },
+      {
+        metric: "Blood pressure",
+        pushOnly: true,
+        cmdOps: [],
+        notifOps: [0x69, 0x89],
+        storedAt: ctx.signalAt.bloodPressureAt,
+        value: ctx.bloodPressure ? `${ctx.bloodPressure.sbp}/${ctx.bloodPressure.dbp}` : "—",
+      },
+      {
+        metric: "Steps",
+        cmdOps: [0x09, 0x07, 0x43, 0x48],
+        notifOps: [0x09, 0x07, 0x43, 0x48, 0x73],
+        storedAt: ctx.signalAt.stepsAt,
+        value: fmt(ctx.stepsToday, 0),
+      },
       // Battery on this firmware: response often piggybacks the 0x09 today-
       // summary path even though encodeQcBandBatteryRequest writes 0x03.
-      { metric: "Battery",        cmdOps: [0x03, 0x09],        notifOps: [0x03, 0x09],              storedAt: ctx.signalAt.batteryAt,      value: fmt(ctx.batteryPct, 0, " %") },
-      { metric: "Motion (IMU)",   pushOnly: true,  cmdOps: [], notifOps: [0x69, 0x73, 0x87, 0x89],  storedAt: m.peakG > 0 ? now : null,    value: m.peakG > 0 ? fmt(m.peakG, 2, " g (derived)") : "—" },
-      { metric: "Sleep",          cmdOps: [0x32],              notifOps: [0x32],                    storedAt: lastSleep ? Date.now() : null, value: lastSleep ? `${lastSleep.score}/100` : "—" },
+      {
+        metric: "Battery",
+        cmdOps: [0x03, 0x09],
+        notifOps: [0x03, 0x09],
+        storedAt: ctx.signalAt.batteryAt,
+        value: fmt(ctx.batteryPct, 0, " %"),
+      },
+      {
+        metric: "Motion (IMU)",
+        pushOnly: true,
+        cmdOps: [],
+        notifOps: [0x69, 0x73, 0x87, 0x89],
+        storedAt: m.peakG > 0 ? now : null,
+        value: m.peakG > 0 ? fmt(m.peakG, 2, " g (derived)") : "—",
+      },
+      {
+        metric: "Sleep",
+        cmdOps: [0x32],
+        notifOps: [0x32],
+        storedAt: lastSleep ? Date.now() : null,
+        value: lastSleep ? `${lastSleep.score}/100` : "—",
+      },
     ];
     const FRESH_MS = 60_000;
     return rows.map((r) => {
@@ -636,7 +858,8 @@ export function DebugView() {
       let note: string;
       if (fresh) note = `live ${ageLabel(now - (r.storedAt ?? 0))}`;
       else if (stored) note = `last value ${ageLabel(now - (r.storedAt ?? 0))} — watch silent`;
-      else if (notifCount > 0) note = "frames arrive but decoder gets no value (firmware empty payload)";
+      else if (notifCount > 0)
+        note = "frames arrive but decoder gets no value (firmware empty payload)";
       else if (r.pushOnly) note = "watch firmware never pushes this opcode";
       else if (!cmd) note = "command never sent";
       else note = "cmd sent, no notification reply";
@@ -657,7 +880,14 @@ export function DebugView() {
   const capabilityRows: Row[] = useMemo(() => {
     const entries = Object.entries(inspector.perOpcode);
     if (entries.length === 0) {
-      return [{ label: "No frames received yet", value: "—", ok: false, source: "connect the watch and wait ~10s" }];
+      return [
+        {
+          label: "No frames received yet",
+          value: "—",
+          ok: false,
+          source: "connect the watch and wait ~10s",
+        },
+      ];
     }
     const interpret = (opHex: string, lastHex: string): { verdict: string; ok: boolean } => {
       const code = parseInt(opHex, 16);
@@ -668,12 +898,33 @@ export function DebugView() {
         const sub = b1;
         const hr = bytes[3] ?? 0;
         const spo2 = bytes[5] ?? 0;
-        return { verdict: `composite sub=0x${sub.toString(16)} → hr=${hr} spo2=${spo2} (no temp/HRV/BP bytes)`, ok: hr > 0 || spo2 > 0 };
+        return {
+          verdict: `composite sub=0x${sub.toString(16)} → hr=${hr} spo2=${spo2} (no temp/HRV/BP bytes)`,
+          ok: hr > 0 || spo2 > 0,
+        };
       }
-      if (code === 0x43) return { verdict: b1 === 0xff ? "watch reports NO activity history (0xff)" : `activity sub=0x${b1.toString(16)}`, ok: b1 !== 0xff };
-      if (code === 0x48) return { verdict: b1 === 0 && (bytes[2] ?? 0) === 0 ? "today-sports all-zero (watch hasn't logged steps today)" : "today-sports payload present", ok: b1 !== 0 || (bytes[2] ?? 0) !== 0 };
+      if (code === 0x43)
+        return {
+          verdict:
+            b1 === 0xff
+              ? "watch reports NO activity history (0xff)"
+              : `activity sub=0x${b1.toString(16)}`,
+          ok: b1 !== 0xff,
+        };
+      if (code === 0x48)
+        return {
+          verdict:
+            b1 === 0 && (bytes[2] ?? 0) === 0
+              ? "today-sports all-zero (watch hasn't logged steps today)"
+              : "today-sports payload present",
+          ok: b1 !== 0 || (bytes[2] ?? 0) !== 0,
+        };
       if (code === 0x87 || code === 0x89) {
-        if (b1 === 0xee) return { verdict: "status 0xee = keep-alive / feature unsupported on this firmware", ok: false };
+        if (b1 === 0xee)
+          return {
+            verdict: "status 0xee = keep-alive / feature unsupported on this firmware",
+            ok: false,
+          };
         return { verdict: `payload b1=0x${b1.toString(16)} — investigate`, ok: true };
       }
       if (code === 0x03) return { verdict: `battery level=${b1}%`, ok: b1 > 0 };
@@ -682,7 +933,7 @@ export function DebugView() {
       return { verdict: `unknown opcode payload b1=0x${b1.toString(16)}`, ok: false };
     };
     return entries
-      .sort((a, b) => (b[1].count - a[1].count))
+      .sort((a, b) => b[1].count - a[1].count)
       .map(([opHex, stat]) => {
         const v = interpret(opHex, stat.lastHex);
         return {
@@ -778,24 +1029,37 @@ export function DebugView() {
       unknownOpcodes: inspector.unknownOpcodes,
     },
     perOpcode: Object.fromEntries(
-      Object.entries(inspector.perOpcode).map(([k, v]) => [k, {
-        count: v.count,
-        lastAt: v.lastAt,
-        lastHex: v.lastHex,
-        intervalsMs: v.recentAt.slice(1).map((at, index) => at - v.recentAt[index]),
-      }]),
+      Object.entries(inspector.perOpcode).map(([k, v]) => [
+        k,
+        {
+          count: v.count,
+          lastAt: v.lastAt,
+          lastHex: v.lastHex,
+          intervalsMs: v.recentAt.slice(1).map((at, index) => at - v.recentAt[index]),
+        },
+      ]),
     ),
     perChar: Object.fromEntries(
-      Object.entries(inspector.perChar).map(([k, v]) => [k, { count: v.count, lastAt: v.lastAt, lastOpcode: v.lastOpcode, lastHex: v.lastHex }]),
+      Object.entries(inspector.perChar).map(([k, v]) => [
+        k,
+        { count: v.count, lastAt: v.lastAt, lastOpcode: v.lastOpcode, lastHex: v.lastHex },
+      ]),
     ),
-    pipeline: pipelineRows.map((r) => ({ metric: r.label, value: r.value, ok: r.ok, stages: r.source, note: r.note })),
+    pipeline: pipelineRows.map((r) => ({
+      metric: r.label,
+      value: r.value,
+      ok: r.ok,
+      stages: r.source,
+      note: r.note,
+    })),
     decoderOutput: decoded,
     recentNotifications: inspector.recent,
     writeLog: inspector.writeLog,
-    gatt: inspector.discovered?.services.map((s) => ({
-      service: s.uuid,
-      characteristics: s.characteristics.map((c) => ({ uuid: c.uuid, properties: c.properties })),
-    })) ?? [],
+    gatt:
+      inspector.discovered?.services.map((s) => ({
+        service: s.uuid,
+        characteristics: s.characteristics.map((c) => ({ uuid: c.uuid, properties: c.properties })),
+      })) ?? [],
     ctx: {
       heartRateBpm: ctx.heartRateBpm,
       spo2Pct: ctx.spo2Pct,
@@ -808,7 +1072,13 @@ export function DebugView() {
       distanceM: ctx.distanceM,
       batteryPct: ctx.batteryPct,
     },
-    motion: { peakG: m.peakG, peakDps: m.peakDps, peakJerk: m.peakJerk, eventsLastMin: m.eventsLastMin, sessionState: m.sessionState },
+    motion: {
+      peakG: m.peakG,
+      peakDps: m.peakDps,
+      peakJerk: m.peakJerk,
+      eventsLastMin: m.eventsLastMin,
+      sessionState: m.sessionState,
+    },
   });
 
   const [bundleCopied, setBundleCopied] = useState<string | null>(null);
@@ -829,7 +1099,7 @@ export function DebugView() {
         setBundleCopied("Copied to clipboard");
       } catch {
         setBundleCopied("Copy failed — see console");
-        // eslint-disable-next-line no-console
+
         console.log("[debug-bundle]", json);
       }
     }
@@ -896,14 +1166,12 @@ export function DebugView() {
           {m.connected ? "Band live — streaming" : "Band offline"}
         </div>
         <div className="leading-relaxed text-vyro-mute">
-          Green dot = metric flowing right now. Grey = silent. If a metric stays
-          grey while the band is connected, check (1) the GATT services list — is
-          the characteristic even advertised? (2) the per-characteristic notify
-          count — is it incrementing? (3) the raw bytes — do they match the
-          decoder. Every value below is real or empty, never demo.
+          Green dot = metric flowing right now. Grey = silent. If a metric stays grey while the band
+          is connected, check (1) the GATT services list — is the characteristic even advertised?
+          (2) the per-characteristic notify count — is it incrementing? (3) the raw bytes — do they
+          match the decoder. Every value below is real or empty, never demo.
         </div>
       </div>
-
 
       <Section title="Connection" rows={connection} />
       <Section title="Device info (BLE DIS)" rows={deviceInfo} />
@@ -929,7 +1197,10 @@ export function DebugView() {
         }
       />
       <Section title="Per-metric pipeline (cmd → notif → live)" rows={pipelineRows} />
-      <Section title="Firmware capability (what each opcode actually contains)" rows={capabilityRows} />
+      <Section
+        title="Firmware capability (what each opcode actually contains)"
+        rows={capabilityRows}
+      />
       <Section title="Decoder outcomes" rows={decoderRows} />
       <Section title="Decoder output per metric (raw bytes → JS value)" rows={decoderOutputRows} />
       <Section title="Measurement request pipeline" rows={measurementPipeline} />
@@ -964,8 +1235,8 @@ export function DebugView() {
         </div>
         {gattRows.length === 0 ? (
           <div style={{ opacity: 0.6, fontSize: 12 }}>
-            No service tree yet — the bridge hasn’t emitted a `discovered` event.
-            On iOS this is normal until the watch finishes pairing.
+            No service tree yet — the bridge hasn’t emitted a `discovered` event. On iOS this is
+            normal until the watch finishes pairing.
           </div>
         ) : (
           <div style={{ display: "grid", gap: 8 }}>
@@ -1023,14 +1294,10 @@ export function DebugView() {
           }}
         >
           <div style={{ fontWeight: 700, fontSize: 14 }}>Opcode counters</div>
-          <div style={{ opacity: 0.6, fontSize: 11 }}>
-            {opcodeStats.length} opcodes seen
-          </div>
+          <div style={{ opacity: 0.6, fontSize: 11 }}>{opcodeStats.length} opcodes seen</div>
         </div>
         {opcodeStats.length === 0 ? (
-          <div style={{ opacity: 0.6, fontSize: 12 }}>
-            No decodable opcodes yet.
-          </div>
+          <div style={{ opacity: 0.6, fontSize: 12 }}>No decodable opcodes yet.</div>
         ) : (
           <div style={{ display: "grid", gap: 6 }}>
             {opcodeStats.map((s) => {
@@ -1095,14 +1362,12 @@ export function DebugView() {
           }}
         >
           <div style={{ fontWeight: 700, fontSize: 14 }}>Per-characteristic notify counters</div>
-          <div style={{ opacity: 0.6, fontSize: 11 }}>
-            {charStats.length} channels active
-          </div>
+          <div style={{ opacity: 0.6, fontSize: 11 }}>{charStats.length} channels active</div>
         </div>
         {charStats.length === 0 ? (
           <div style={{ opacity: 0.6, fontSize: 12 }}>
-            No notifications received yet. If this stays empty for &gt;30s after
-            connect, the band is silent on every subscribed characteristic.
+            No notifications received yet. If this stays empty for &gt;30s after connect, the band
+            is silent on every subscribed characteristic.
           </div>
         ) : (
           <div style={{ display: "grid", gap: 6 }}>
@@ -1126,8 +1391,7 @@ export function DebugView() {
                         {shortUuid(s.service)} → {shortUuid(s.characteristic)}
                       </div>
                       <div style={{ opacity: 0.55, fontSize: 10 }}>
-                        op 0x{(s.lastOpcode ?? 0).toString(16).padStart(2, "0")} ·{" "}
-                        {ageLabel(age)}
+                        op 0x{(s.lastOpcode ?? 0).toString(16).padStart(2, "0")} · {ageLabel(age)}
                       </div>
                     </div>
                     <div
@@ -1186,9 +1450,7 @@ export function DebugView() {
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                   <span style={{ opacity: 0.7 }}>
                     {ageLabel(now - r.ts)} · {shortUuid(r.characteristic)}
-                    {r.opcode != null
-                      ? ` · 0x${r.opcode.toString(16).padStart(2, "0")}`
-                      : ""}
+                    {r.opcode != null ? ` · 0x${r.opcode.toString(16).padStart(2, "0")}` : ""}
                   </span>
                 </div>
                 <div style={{ opacity: 0.85, wordBreak: "break-all" }}>{r.hex || "—"}</div>
@@ -1222,8 +1484,8 @@ export function DebugView() {
         </div>
         {inspector.writeLog.length === 0 ? (
           <div style={{ opacity: 0.6, fontSize: 12 }}>
-            No commands sent yet. If this stays empty after connect, the app
-            never issued a measurement command — the band has nothing to reply to.
+            No commands sent yet. If this stays empty after connect, the app never issued a
+            measurement command — the band has nothing to reply to.
           </div>
         ) : (
           <div style={{ display: "grid", gap: 4 }}>
@@ -1240,18 +1502,14 @@ export function DebugView() {
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                   <span style={{ opacity: 0.75 }}>
                     {ageLabel(now - w.ts)} · {shortUuid(w.characteristic)}
-                    {w.opcode != null
-                      ? ` · 0x${w.opcode.toString(16).padStart(2, "0")}`
-                      : ""}
+                    {w.opcode != null ? ` · 0x${w.opcode.toString(16).padStart(2, "0")}` : ""}
                   </span>
                   <span style={{ color: w.success ? "#22c55e" : "#ef4444", fontWeight: 700 }}>
                     {w.success ? "ok" : "fail"}
                   </span>
                 </div>
                 <div style={{ opacity: 0.85, wordBreak: "break-all" }}>{w.hex || "—"}</div>
-                {w.error ? (
-                  <div style={{ color: "#fca5a5", marginTop: 2 }}>{w.error}</div>
-                ) : null}
+                {w.error ? <div style={{ color: "#fca5a5", marginTop: 2 }}>{w.error}</div> : null}
               </div>
             ))}
           </div>

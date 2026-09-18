@@ -5,7 +5,32 @@ export type LiveMetrics = ReturnType<typeof useLiveMetrics>;
 
 export function useLiveMetrics() {
   const ctx = useVyroBandCtx();
-  const { events, counts, connected, sessionState, ble, pairedId, pairedName, heartRateBpm, heartRateAt, batteryPct, batteryCharging, spo2Pct, skinTempC, stepsToday, distanceM, caloriesKcal, bloodPressure, restingHrBpm, hrvMs, respRateBrpm, stressScore, signalAt, metricPipeline, sensorHold } = ctx;
+  const {
+    events,
+    counts,
+    connected,
+    sessionState,
+    ble,
+    pairedId,
+    pairedName,
+    heartRateBpm,
+    heartRateAt,
+    batteryPct,
+    batteryCharging,
+    spo2Pct,
+    skinTempC,
+    stepsToday,
+    distanceM,
+    caloriesKcal,
+    bloodPressure,
+    restingHrBpm,
+    hrvMs,
+    respRateBrpm,
+    stressScore,
+    signalAt,
+    metricPipeline,
+    sensorHold,
+  } = ctx;
   const connecting = ble.connectionState === "connecting";
   const [now, setNow] = useState(() => Date.now());
 
@@ -47,20 +72,29 @@ export function useLiveMetrics() {
   const liveSkinTempC = isFresh(signalAt.skinTempAt, skinTempC, 30 * 60_000) ? skinTempC : null;
   const liveStepsToday = isFresh(signalAt.stepsAt, stepsToday, 5 * 60_000) ? stepsToday : null;
   const liveDistanceM = isFresh(signalAt.distanceAt, distanceM, 5 * 60_000) ? distanceM : null;
-  const liveCaloriesKcal = isFresh(signalAt.caloriesAt, caloriesKcal, 5 * 60_000) ? caloriesKcal : null;
-  const liveBloodPressure = isFresh(signalAt.bloodPressureAt, bloodPressure ? 1 : null, 30 * 60_000) ? bloodPressure : null;
+  const liveCaloriesKcal = isFresh(signalAt.caloriesAt, caloriesKcal, 5 * 60_000)
+    ? caloriesKcal
+    : null;
+  const liveBloodPressure = isFresh(signalAt.bloodPressureAt, bloodPressure ? 1 : null, 30 * 60_000)
+    ? bloodPressure
+    : null;
   // Resting HR is derived from the rolling HR buffer, so it legitimately holds
   // its value across a measurement pause.
-  const liveRestingHrBpm = isFresh(signalAt.restingHrAt, restingHrBpm, 15 * 60_000) ? restingHrBpm : null;
+  const liveRestingHrBpm = isFresh(signalAt.restingHrAt, restingHrBpm, 15 * 60_000)
+    ? restingHrBpm
+    : null;
   const liveHrvMs = isFresh(signalAt.hrvAt, hrvMs, 30 * 60_000) ? hrvMs : null;
-  const liveRespRateBrpm = isFresh(signalAt.respirationAt, respRateBrpm, 10 * 60_000) ? respRateBrpm : null;
+  const liveRespRateBrpm = isFresh(signalAt.respirationAt, respRateBrpm, 10 * 60_000)
+    ? respRateBrpm
+    : null;
   const liveStressScore = isFresh(signalAt.stressAt, stressScore, 30 * 60_000) ? stressScore : null;
 
-
-
   const derived = useMemo(() => {
-    let peakG = 0, peakDps = 0, peakJerk = 0;
-    let swingIntMax = 0, swingDurMax = 0;
+    let peakG = 0,
+      peakDps = 0,
+      peakJerk = 0;
+    let swingIntMax = 0,
+      swingDurMax = 0;
     let reactMin = Infinity;
     const swingInts: number[] = [];
     const swingDurs: number[] = [];
@@ -194,25 +228,32 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
   // Cardio Recovery — current HR vs resting headroom. Lower headroom = better.
   // Require both HR and resting HR; a hardcoded fallback RHR creates nonsense
   // scores for real athletes.
-  const cardio = i.heartRateBpm == null || i.restingHrBpm == null ? null : (() => {
-    const headroom = Math.max(0, (i.heartRateBpm as number) - i.restingHrBpm!);
-    return Math.round(Math.max(0, Math.min(100, 100 - (headroom / 60) * 100)));
-  })();
+  const cardio =
+    i.heartRateBpm == null || i.restingHrBpm == null
+      ? null
+      : (() => {
+          const headroom = Math.max(0, (i.heartRateBpm as number) - i.restingHrBpm!);
+          return Math.round(Math.max(0, Math.min(100, 100 - (headroom / 60) * 100)));
+        })();
 
   // Muscle Readiness — IMU jerk + recent event load.
   const hasImuLoad = i.peakJerk != null || (i.eventsLastMin ?? 0) > 0;
-  const muscle = !hasImuLoad ? null : (() => {
-    const jerkPenalty = Math.min(60, (i.peakJerk ?? 0) / 4);
-    const eventPenalty = Math.min(40, (i.eventsLastMin ?? 0) * 0.6);
-    return Math.round(Math.max(0, 100 - jerkPenalty - eventPenalty));
-  })();
+  const muscle = !hasImuLoad
+    ? null
+    : (() => {
+        const jerkPenalty = Math.min(60, (i.peakJerk ?? 0) / 4);
+        const eventPenalty = Math.min(40, (i.eventsLastMin ?? 0) * 0.6);
+        return Math.round(Math.max(0, 100 - jerkPenalty - eventPenalty));
+      })();
 
   // Load Debt — accumulated session load. Higher load = lower readiness.
-  const loadDebt = !hasImuLoad ? null : (() => {
-    const base = Math.min(100, (i.eventsLastMin ?? 0) * 1.5);
-    const intensity = Math.min(30, (i.peakJerk ?? 0) / 6);
-    return Math.round(Math.max(0, 100 - Math.min(100, base * 0.7 + intensity)));
-  })();
+  const loadDebt = !hasImuLoad
+    ? null
+    : (() => {
+        const base = Math.min(100, (i.eventsLastMin ?? 0) * 1.5);
+        const intensity = Math.min(30, (i.peakJerk ?? 0) / 6);
+        return Math.round(Math.max(0, 100 - Math.min(100, base * 0.7 + intensity)));
+      })();
 
   // Recovery Environment — SpO₂, skin temp deviation, HRV.
   const envParts: number[] = [];
@@ -222,20 +263,21 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
     envParts.push(Math.max(0, 100 - dev * 25));
   }
   if (i.hrvMs != null) envParts.push(Math.max(0, Math.min(100, ((i.hrvMs - 20) / 70) * 100)));
-  const environment = envParts.length === 0
-    ? null
-    : Math.round(envParts.reduce((a, b) => a + b, 0) / envParts.length);
+  const environment =
+    envParts.length === 0
+      ? null
+      : Math.round(envParts.reduce((a, b) => a + b, 0) / envParts.length);
 
   // Signal Confidence — trust layer over the 5 named channels:
   //   HR/HRV · IMU load · skin temp · sleep · wear-time.
   // Each channel contributes equally (20%). Wear-time defaults to TRUE
   // whenever the band is currently connected and streaming.
   const channels = [
-    i.heartRateBpm != null || i.hrvMs != null,            // HR / HRV
+    i.heartRateBpm != null || i.hrvMs != null, // HR / HRV
     i.connected && (i.peakJerk != null || (i.eventsLastMin ?? 0) > 0), // IMU load
-    i.skinTempC != null,                                   // skin temp
-    i.sleepScore != null,                                  // sleep
-    i.wearTimeOk ?? i.connected,                           // wear-time
+    i.skinTempC != null, // skin temp
+    i.sleepScore != null, // sleep
+    i.wearTimeOk ?? i.connected, // wear-time
   ];
   const present = channels.filter(Boolean).length;
   // No channels → confidence is unknown, NOT zero. A "0" confidence reading
@@ -263,7 +305,7 @@ export function computeLiveRecovery(i: LiveRecoveryInputs): {
   const weighted: { v: number | null; w: number }[] = [
     { v: cardio, w: 0.25 },
     { v: muscle, w: 0.25 },
-    { v: loadDebt, w: 0.20 },
+    { v: loadDebt, w: 0.2 },
     { v: environment, w: 0.15 },
   ];
   const presentScores = weighted.filter((p) => p.v != null);
@@ -361,17 +403,41 @@ function heartLoadReadinessScore(heartRateBpm: number, restingHrBpm: number): nu
   return clamp100(32 - (headroom - 45) * 1.1);
 }
 
-export function computeReadiness(i: ReadinessInputs): { score: number | null; parts: Record<string, number> } {
+export function computeReadiness(i: ReadinessInputs): {
+  score: number | null;
+  parts: Record<string, number>;
+} {
   if (!i.connected || i.heartRateBpm == null) return { score: null, parts: {} };
   const parts: Record<string, number> = {};
   const w: Record<string, number> = {};
-  if (i.hrvMs != null) { parts.hrv = hrvReadinessScore(i.hrvMs) / 100; w.hrv = 0.24; }
-  if (i.restingHrBpm != null) { parts.rhr = restingHrReadinessScore(i.restingHrBpm) / 100; w.rhr = 0.14; }
-  if (i.heartRateBpm != null && i.restingHrBpm != null) { parts.hrLoad = heartLoadReadinessScore(i.heartRateBpm, i.restingHrBpm) / 100; w.hrLoad = 0.16; }
-  if (i.sleepScore != null) { parts.sleep = clamp01(i.sleepScore / 100); w.sleep = 0.18; }
-  if (i.recoveryScore != null) { parts.recovery = clamp01(i.recoveryScore / 100); w.recovery = 0.12; }
-  if (i.stress != null) { parts.stress = stressReadinessScore(i.stress) / 100; w.stress = 0.12; }
-  if (i.spo2 != null) { parts.spo2 = spo2ReadinessScore(i.spo2) / 100; w.spo2 = 0.06; }
+  if (i.hrvMs != null) {
+    parts.hrv = hrvReadinessScore(i.hrvMs) / 100;
+    w.hrv = 0.24;
+  }
+  if (i.restingHrBpm != null) {
+    parts.rhr = restingHrReadinessScore(i.restingHrBpm) / 100;
+    w.rhr = 0.14;
+  }
+  if (i.heartRateBpm != null && i.restingHrBpm != null) {
+    parts.hrLoad = heartLoadReadinessScore(i.heartRateBpm, i.restingHrBpm) / 100;
+    w.hrLoad = 0.16;
+  }
+  if (i.sleepScore != null) {
+    parts.sleep = clamp01(i.sleepScore / 100);
+    w.sleep = 0.18;
+  }
+  if (i.recoveryScore != null) {
+    parts.recovery = clamp01(i.recoveryScore / 100);
+    w.recovery = 0.12;
+  }
+  if (i.stress != null) {
+    parts.stress = stressReadinessScore(i.stress) / 100;
+    w.stress = 0.12;
+  }
+  if (i.spo2 != null) {
+    parts.spo2 = spo2ReadinessScore(i.spo2) / 100;
+    w.spo2 = 0.06;
+  }
   if (i.peakJerk != null && i.peakJerk > 0) {
     parts.load = clamp01(1 - Math.min(i.peakJerk, 200) / 200);
     w.load = 0.08;
@@ -389,7 +455,8 @@ export function computeReadiness(i: ReadinessInputs): { score: number | null; pa
     i.recoveryScore != null,
     i.peakJerk != null && i.peakJerk > 0,
   ].filter(Boolean).length;
-  if (Object.keys(w).length < 4 || independentSignals < 3 || total === 0) return { score: null, parts };
+  if (Object.keys(w).length < 4 || independentSignals < 3 || total === 0)
+    return { score: null, parts };
   let sum = 0;
   for (const k in w) sum += parts[k] * w[k];
   return { score: Math.round((sum / total) * 100), parts };
@@ -398,10 +465,10 @@ export function computeReadiness(i: ReadinessInputs): { score: number | null; pa
 // Live "base readiness" subscores derived only from the current live band
 // connection. Cached/persisted readings must never publish a score.
 export type SubScores = {
-  fatigue: number | null;   // 0-100, higher = MORE fatigued
-  recovery: number | null;  // 0-100
-  agility: number | null;   // 0-100
-  sleep: number | null;     // 0-100
+  fatigue: number | null; // 0-100, higher = MORE fatigued
+  recovery: number | null; // 0-100
+  agility: number | null; // 0-100
+  sleep: number | null; // 0-100
   /** Where the fatigue number came from, so the UI can be honest about it. */
   fatigueSource: "motion" | "autonomic" | null;
   /** Why agility is missing, when it is. */
@@ -418,7 +485,7 @@ export type SubScoreInputs = {
   peakJerk?: number | null;
   peakG?: number | null;
   eventsLastMin?: number | null;
-  reactMin?: number | null;       // ms — lower = sharper
+  reactMin?: number | null; // ms — lower = sharper
   recentSessionLoad?: number | null; // 0-200
   /** Personal 7-day baselines, when available. */
   hrvBaselineMs?: number | null;
@@ -427,7 +494,14 @@ export type SubScoreInputs = {
 
 export function computeSubScores(i: SubScoreInputs): SubScores {
   if (!i.connected) {
-    return { fatigue: null, recovery: null, agility: null, sleep: null, fatigueSource: null, agilityReason: "Band not connected" };
+    return {
+      fatigue: null,
+      recovery: null,
+      agility: null,
+      sleep: null,
+      fatigueSource: null,
+      agilityReason: "Band not connected",
+    };
   }
 
   // Fatigue — accumulated load + stress, capped so a single big spike
@@ -439,7 +513,8 @@ export function computeSubScores(i: SubScoreInputs): SubScores {
     (i.recentSessionLoad != null && i.recentSessionLoad > 0);
   if (i.peakJerk != null && i.peakJerk > 0) loadParts.push(clamp01(i.peakJerk / 200));
   if (i.eventsLastMin != null && i.eventsLastMin > 0) loadParts.push(clamp01(i.eventsLastMin / 90));
-  if (i.recentSessionLoad != null && i.recentSessionLoad > 0) loadParts.push(clamp01(i.recentSessionLoad / 120));
+  if (i.recentSessionLoad != null && i.recentSessionLoad > 0)
+    loadParts.push(clamp01(i.recentSessionLoad / 120));
   if (i.stress != null) loadParts.push(clamp01(i.stress / 100));
 
   let fatigue: number | null = null;
@@ -478,9 +553,8 @@ export function computeSubScores(i: SubScoreInputs): SubScores {
   if (i.restingHrBpm != null) recParts.push({ v: clamp01((70 - i.restingHrBpm) / 25), w: 0.3 });
   if (i.stress != null) recParts.push({ v: clamp01(1 - i.stress / 100), w: 0.2 });
   const recW = recParts.reduce((a, b) => a + b.w, 0);
-  const recovery = recW > 0
-    ? Math.round((recParts.reduce((a, b) => a + b.v * b.w, 0) / recW) * 100)
-    : null;
+  const recovery =
+    recW > 0 ? Math.round((recParts.reduce((a, b) => a + b.v * b.w, 0) / recW) * 100) : null;
 
   // Agility — best evidence first: IMU explosiveness (peak g) and measured
   // reaction time. When the band streams no motion frames (this firmware only
@@ -509,16 +583,15 @@ export function computeSubScores(i: SubScoreInputs): SubScores {
     if (est.length >= 2) {
       const w = est.reduce((a, b) => a + b.w, 0);
       agility = Math.round((est.reduce((a, b) => a + b.v * b.w, 0) / w) * 100);
-      agilityReason = "Estimated from autonomic readiness — run a reaction test for a measured score";
+      agilityReason =
+        "Estimated from autonomic readiness — run a reaction test for a measured score";
     } else {
       agilityReason = "Needs motion or a reaction test";
     }
   }
-
 
   // Sleep — passed through from the sleep engine when present.
   const sleep = i.sleepScore != null ? Math.round(clamp01(i.sleepScore / 100) * 100) : null;
 
   return { fatigue, recovery, agility, sleep, fatigueSource, agilityReason };
 }
-

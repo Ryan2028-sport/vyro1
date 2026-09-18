@@ -40,7 +40,6 @@ const UNSTABLE_MEAN_DIFF = 17;
 /** Blob samples a segment needs before its court fit is trusted. */
 const MIN_COURT_SAMPLES = 25;
 
-
 export type ScanStage = "load" | "scan" | "track" | "frames" | "done";
 export type ScanProgress = { ratio: number; label: string; stage: ScanStage; elapsedSec: number };
 
@@ -108,7 +107,6 @@ export type SegmentInfo = {
   /** "you" resolved against the tapped kit colour inside this segment */
   identityResolved: boolean;
 };
-
 
 export class ScanAborted extends Error {
   constructor() {
@@ -180,7 +178,12 @@ export async function sampleSigAt(image: string, x: number, y: number): Promise<
   const py = Math.round(Math.min(canvas.height - 1, Math.max(0, y * canvas.height)));
   const sx = Math.max(0, Math.min(canvas.width - size, px - Math.round(size / 2)));
   const sy = Math.max(0, Math.min(canvas.height - size, py - Math.round(size / 2)));
-  const data = ctx.getImageData(sx, sy, Math.min(size, canvas.width), Math.min(size, canvas.height)).data;
+  const data = ctx.getImageData(
+    sx,
+    sy,
+    Math.min(size, canvas.width),
+    Math.min(size, canvas.height),
+  ).data;
   const rs: number[] = [];
   const gs: number[] = [];
   const bs: number[] = [];
@@ -195,8 +198,6 @@ export async function sampleSigAt(image: string, x: number, y: number): Promise<
   };
   return sigOf(med(rs), med(gs), med(bs));
 }
-
-
 
 function seek(video: HTMLVideoElement, time: number): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -239,7 +240,10 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
     video.addEventListener("loadedmetadata", ok, { once: true });
     video.addEventListener(
       "error",
-      () => reject(new Error("This video format can't be read in this browser. Try an MP4 (H.264) export.")),
+      () =>
+        reject(
+          new Error("This video format can't be read in this browser. Try an MP4 (H.264) export."),
+        ),
       { once: true },
     );
   });
@@ -269,7 +273,10 @@ function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray, px: Uint8Clam
     let sr = 0;
     let sg = 0;
     let sb = 0;
-    let minX = GRID, maxX = 0, minY = GRID, maxY = 0;
+    let minX = GRID,
+      maxX = 0,
+      minY = GRID,
+      maxY = 0;
 
     while (stack.length) {
       const idx = stack.pop()!;
@@ -288,10 +295,22 @@ function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray, px: Uint8Clam
       if (gy < minY) minY = gy;
       if (gy > maxY) maxY = gy;
 
-      if (gx > 0 && mask[idx - 1] && !seen[idx - 1]) { seen[idx - 1] = 1; stack.push(idx - 1); }
-      if (gx < GRID - 1 && mask[idx + 1] && !seen[idx + 1]) { seen[idx + 1] = 1; stack.push(idx + 1); }
-      if (gy > 0 && mask[idx - GRID] && !seen[idx - GRID]) { seen[idx - GRID] = 1; stack.push(idx - GRID); }
-      if (gy < GRID - 1 && mask[idx + GRID] && !seen[idx + GRID]) { seen[idx + GRID] = 1; stack.push(idx + GRID); }
+      if (gx > 0 && mask[idx - 1] && !seen[idx - 1]) {
+        seen[idx - 1] = 1;
+        stack.push(idx - 1);
+      }
+      if (gx < GRID - 1 && mask[idx + 1] && !seen[idx + 1]) {
+        seen[idx + 1] = 1;
+        stack.push(idx + 1);
+      }
+      if (gy > 0 && mask[idx - GRID] && !seen[idx - GRID]) {
+        seen[idx - GRID] = 1;
+        stack.push(idx - GRID);
+      }
+      if (gy < GRID - 1 && mask[idx + GRID] && !seen[idx + GRID]) {
+        seen[idx + GRID] = 1;
+        stack.push(idx + GRID);
+      }
     }
 
     if (cells < MIN_BLOB_CELLS || cells > limit || mass <= 0) continue;
@@ -308,12 +327,11 @@ function extractBlobs(mask: Uint8Array, weight: Uint8ClampedArray, px: Uint8Clam
     });
   }
 
-
   // Body-like: reasonably tall and compact. Score by mass with a shape bonus.
   const score = (b: Blob) => {
     const aspect = b.h / Math.max(0.02, b.w);
     const shape = aspect >= 0.8 && aspect <= 4 ? 1.35 : aspect >= 0.5 ? 1 : 0.7;
-    const fill = b.cells / Math.max(1, (b.w * GRID) * (b.h * GRID));
+    const fill = b.cells / Math.max(1, b.w * GRID * (b.h * GRID));
     const solid = fill > 0.25 ? 1.15 : 1;
     return b.mass * shape * solid;
   };
@@ -354,7 +372,12 @@ export async function probeForIdentity(
   const url = URL.createObjectURL(file);
 
   try {
-    onProgress?.({ ratio: 0.05, label: "Looking for a frame with both players…", stage: "load", elapsedSec: elapsed() });
+    onProgress?.({
+      ratio: 0.05,
+      label: "Looking for a frame with both players…",
+      stage: "load",
+      elapsedSec: elapsed(),
+    });
     const video = await loadVideo(url);
     const duration = video.duration;
 
@@ -432,7 +455,12 @@ export async function probeForIdentity(
       const apart = Math.hypot(a.x - b.x, a.y - b.y);
       const colourGap = sigDist(a.sig, b.sig);
       if (apart < 0.18) continue;
-      scored.push({ t: times[i]!, index: i, blobs, score: apart * 2 + colourGap + Math.min(1, (a.mass + b.mass) / 8000) });
+      scored.push({
+        t: times[i]!,
+        index: i,
+        blobs,
+        score: apart * 2 + colourGap + Math.min(1, (a.mass + b.mass) / 8000),
+      });
     }
 
     scored.sort((x, y) => y.score - x.score);
@@ -459,17 +487,27 @@ export async function probeForIdentity(
     // Even with no confident detection the user can still tap themselves, so
     // always hand back some frames to tap on.
     if (!candidates.length) {
-      const fallbackTimes = times.filter((_, i) => i % Math.max(1, Math.floor(times.length / 3)) === 0).slice(0, 3);
+      const fallbackTimes = times
+        .filter((_, i) => i % Math.max(1, Math.floor(times.length / 3)) === 0)
+        .slice(0, 3);
       for (const t of fallbackTimes) {
         if (signal?.aborted) throw new ScanAborted();
         await seek(video, t);
         bctx.drawImage(video, 0, 0, big.width, big.height);
-        candidates.push({ t: Number(t.toFixed(2)), image: big.toDataURL("image/jpeg", 0.72), players: [] });
+        candidates.push({
+          t: Number(t.toFixed(2)),
+          image: big.toDataURL("image/jpeg", 0.72),
+          players: [],
+        });
       }
     }
 
-
-    onProgress?.({ ratio: 1, label: "Ready to identify players", stage: "done", elapsedSec: elapsed() });
+    onProgress?.({
+      ratio: 1,
+      label: "Ready to identify players",
+      stage: "done",
+      elapsedSec: elapsed(),
+    });
     return candidates;
   } finally {
     URL.revokeObjectURL(url);
@@ -483,14 +521,12 @@ export type ScanResult = {
   segments: SegmentInfo[];
 };
 
-
 export async function scanSquashVideo(
   file: File,
   onProgress: (p: ScanProgress) => void,
   signal?: AbortSignal,
   identity?: IdentityPick,
 ): Promise<ScanResult> {
-
   const started = Date.now();
   const elapsed = () => Number(((Date.now() - started) / 1000).toFixed(1));
   const abortIfNeeded = () => {
@@ -505,7 +541,8 @@ export async function scanSquashVideo(
 
     const step = Math.max(1 / TARGET_FPS, duration / MAX_CHECKPOINTS);
     const times: number[] = [];
-    for (let t = 0.05; t < duration - 0.03 && times.length < MAX_CHECKPOINTS; t += step) times.push(t);
+    for (let t = 0.05; t < duration - 0.03 && times.length < MAX_CHECKPOINTS; t += step)
+      times.push(t);
     if (!times.length) times.push(0);
 
     const small = document.createElement("canvas");
@@ -585,7 +622,11 @@ export async function scanSquashVideo(
         let motionTotal = 0;
         let fgCells = 0;
         for (let p = 0; p < GRID * GRID; p++) {
-          if (ignore[p]) { mask[p] = 0; weight[p] = 0; continue; }
+          if (ignore[p]) {
+            mask[p] = 0;
+            weight[p] = 0;
+            continue;
+          }
           const g = gray[p]!;
           const dFrame = Math.abs(g - prev[p]!);
           const dBg = Math.abs(g - bg[p]!);
@@ -629,7 +670,12 @@ export async function scanSquashVideo(
     }
 
     abortIfNeeded();
-    onProgress({ ratio: 0.62, label: "Splitting the clip into camera shots…", stage: "track", elapsedSec: elapsed() });
+    onProgress({
+      ratio: 0.62,
+      label: "Splitting the clip into camera shots…",
+      stage: "track",
+      elapsedSec: elapsed(),
+    });
 
     // ---- segment triage ----------------------------------------------------
     const segments: SegmentInfo[] = [];
@@ -655,7 +701,8 @@ export async function scanSquashVideo(
       if (seconds < MIN_SEGMENT_SECONDS || settledFrames.length < 3) label = "too-short";
       else if (percentile(fracs, 0.5) > CLOSEUP_CELL_FRACTION) label = "close-up";
       else if (percentile(diffs, 0.5) > UNSTABLE_MEAN_DIFF) label = "unstable";
-      else if (withOne < settledFrames.length * 0.4 || withTwo < settledFrames.length * 0.15) label = "no-play";
+      else if (withOne < settledFrames.length * 0.4 || withTwo < settledFrames.length * 0.15)
+        label = "no-play";
 
       segments.push({
         index: s,
@@ -685,7 +732,8 @@ export async function scanSquashVideo(
       };
     };
     const allSigs: ColourSig[] = [];
-    for (const s of playable) for (let i = s.from; i <= s.to; i++) for (const b of frames[i]!.blobs) allSigs.push(b.sig);
+    for (const s of playable)
+      for (let i = s.from; i <= s.to; i++) for (const b of frames[i]!.blobs) allSigs.push(b.sig);
     const refMean = meanSig(allSigs);
 
     /** Re-balance a kit signature from one camera's colour cast to another's. */
@@ -695,7 +743,12 @@ export async function scanSquashVideo(
       const g = Math.max(0, sig.g - from.g + to.g);
       const b = Math.max(0, sig.b - from.b + to.b);
       const sum = Math.max(1e-4, r + g + b);
-      return { r: r / sum, g: g / sum, b: b / sum, l: Math.max(0, Math.min(1, sig.l - from.l + to.l)) };
+      return {
+        r: r / sum,
+        g: g / sum,
+        b: b / sum,
+        l: Math.max(0, Math.min(1, sig.l - from.l + to.l)),
+      };
     };
 
     // ---- per-segment court fit + identity tracking ------------------------
@@ -723,13 +776,17 @@ export async function scanSquashVideo(
     let identityFrames = 0;
     let identityConfidentFrames = 0;
 
-    const predict = (tr: Track | null): Pos => (tr ? { x: tr.pos.x + tr.vel.x, y: tr.pos.y + tr.vel.y } : null);
+    const predict = (tr: Track | null): Pos =>
+      tr ? { x: tr.pos.x + tr.vel.x, y: tr.pos.y + tr.vel.y } : null;
     const gap = (p: Pos, b: Blob) => (p ? Math.hypot(p.x - b.x, p.y - b.y) : 1.5);
     const update = (tr: Track | null, b: Blob): Track => {
       if (!tr) return { pos: { x: b.x, y: b.y }, vel: { x: 0, y: 0 }, miss: 0, sig: b.sig };
       return {
         pos: { x: b.x, y: b.y },
-        vel: { x: (b.x - tr.pos.x) * 0.6 + tr.vel.x * 0.4, y: (b.y - tr.pos.y) * 0.6 + tr.vel.y * 0.4 },
+        vel: {
+          x: (b.x - tr.pos.x) * 0.6 + tr.vel.x * 0.4,
+          y: (b.y - tr.pos.y) * 0.6 + tr.vel.y * 0.4,
+        },
         miss: 0,
         sig: blendSig(tr.sig, b.sig, 0.12),
       };
@@ -743,7 +800,11 @@ export async function scanSquashVideo(
       const ys: number[] = [];
       const segSigs: ColourSig[] = [];
       for (let i = s.from; i <= s.to; i++) {
-        for (const b of frames[i]!.blobs) { xs.push(b.x); ys.push(b.y); segSigs.push(b.sig); }
+        for (const b of frames[i]!.blobs) {
+          xs.push(b.x);
+          ys.push(b.y);
+          segSigs.push(b.sig);
+        }
       }
       xs.sort((a, b) => a - b);
       ys.sort((a, b) => a - b);
@@ -798,17 +859,37 @@ export async function scanSquashVideo(
               // survive a cut, it just picks you up again on the far side.
               const d1 = sigDist(seedSelf, b1.sig);
               const d2 = sigDist(seedSelf, b2.sig);
-              if (d1 <= d2) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+              if (d1 <= d2) {
+                pickA = b1;
+                pickB = b2;
+              } else {
+                pickA = b2;
+                pickB = b1;
+              }
               if (Math.abs(d1 - d2) > 0.045) acquired = true;
               if (!seedOther) seedOther = pickB.sig;
             } else {
               // No tap: the camera sits behind the court, so lower = nearer.
-              if (b1.y >= b2.y) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+              if (b1.y >= b2.y) {
+                pickA = b1;
+                pickB = b2;
+              } else {
+                pickA = b2;
+                pickB = b1;
+              }
             }
           } else {
-            const straight = gap(pa, b1) + gap(pb, b2) + (colourCost(ra, b1) + colourCost(rb, b2)) * COLOUR_WEIGHT;
-            const swapped = gap(pa, b2) + gap(pb, b1) + (colourCost(ra, b2) + colourCost(rb, b1)) * COLOUR_WEIGHT;
-            if (straight <= swapped) { pickA = b1; pickB = b2; } else { pickA = b2; pickB = b1; }
+            const straight =
+              gap(pa, b1) + gap(pb, b2) + (colourCost(ra, b1) + colourCost(rb, b2)) * COLOUR_WEIGHT;
+            const swapped =
+              gap(pa, b2) + gap(pb, b1) + (colourCost(ra, b2) + colourCost(rb, b1)) * COLOUR_WEIGHT;
+            if (straight <= swapped) {
+              pickA = b1;
+              pickB = b2;
+            } else {
+              pickA = b2;
+              pickB = b1;
+            }
             if (identity) {
               identityFrames += 1;
               if (Math.abs(straight - swapped) > 0.06) identityConfidentFrames += 1;
@@ -925,7 +1006,6 @@ export async function scanSquashVideo(
     // the whole broadcast, which includes replays and crowd shots.
     const restSeconds = Math.max(0.1, usableSeconds - activeSeconds);
 
-
     // ---- contacts: per-player strike signal -------------------------------
     const speed = (list: Pos[], i: number) => {
       if (!linked(i - 1, i)) return 0;
@@ -957,14 +1037,15 @@ export async function scanSquashVideo(
     const playerFloor = massFloor(playerMass);
     const opponentFloor = massFloor(opponentMass);
 
-    type RawContact = { i: number; t: number; actor: "player" | "opponent"; score: number; motion: number };
+    type RawContact = {
+      i: number;
+      t: number;
+      actor: "player" | "opponent";
+      score: number;
+      motion: number;
+    };
     const raw: RawContact[] = [];
-    const strikeSignal = (
-      m: number[],
-      pos: Pos[],
-      floor: number,
-      i: number,
-    ): number => {
+    const strikeSignal = (m: number[], pos: Pos[], floor: number, i: number): number => {
       const v = m[i] ?? 0;
       if (!Number.isFinite(floor) || v < floor) return 0;
       const prevV = m[i - 1] ?? 0;
@@ -982,8 +1063,10 @@ export async function scanSquashVideo(
 
       const ps = strikeSignal(playerMass, playerPos, playerFloor, i);
       const os = strikeSignal(opponentMass, opponentPos, opponentFloor, i);
-      if (ps >= 1.35 && ps >= os) raw.push({ i, t: frames[i]!.t, actor: "player", score: ps, motion: frames[i]!.motion });
-      else if (os >= 1.35) raw.push({ i, t: frames[i]!.t, actor: "opponent", score: os, motion: frames[i]!.motion });
+      if (ps >= 1.35 && ps >= os)
+        raw.push({ i, t: frames[i]!.t, actor: "player", score: ps, motion: frames[i]!.motion });
+      else if (os >= 1.35)
+        raw.push({ i, t: frames[i]!.t, actor: "opponent", score: os, motion: frames[i]!.motion });
     }
 
     // Suppress duplicates: a real squash contact rate is < ~2/s per player,
@@ -992,7 +1075,10 @@ export async function scanSquashVideo(
     const contactsRaw: RawContact[] = [];
     for (const c of raw.sort((a, b) => a.t - b.t)) {
       const last = contactsRaw[contactsRaw.length - 1];
-      if (!last) { contactsRaw.push(c); continue; }
+      if (!last) {
+        contactsRaw.push(c);
+        continue;
+      }
       const dt = c.t - last.t;
       if (dt < MIN_GAP) {
         if (c.score > last.score) contactsRaw[contactsRaw.length - 1] = c;
@@ -1021,7 +1107,8 @@ export async function scanSquashVideo(
         t: Number(c.t.toFixed(2)),
         actor: striker ? c.actor : "unknown",
         zone: striker ? zoneOf(striker) : "mid-centre",
-        opponentZone: c.actor === "player" ? (them ? zoneOf(them) : undefined) : me ? zoneOf(me) : undefined,
+        opponentZone:
+          c.actor === "player" ? (them ? zoneOf(them) : undefined) : me ? zoneOf(me) : undefined,
         motion: c.motion,
       });
       // Heat maps count where each player STRUCK, not where they stood.
@@ -1035,12 +1122,14 @@ export async function scanSquashVideo(
         for (let j = c.i + 1; j < horizon; j++) {
           if (!linked(c.i, j)) break;
           if (inT(playerPos[j] ?? null)) {
-            tReturnEvents.push({ t: Number(c.t.toFixed(2)), secondsToT: Number(((j - c.i) * step).toFixed(2)) });
+            tReturnEvents.push({
+              t: Number(c.t.toFixed(2)),
+              secondsToT: Number(((j - c.i) * step).toFixed(2)),
+            });
             break;
           }
         }
       }
-
     }
 
     // ---- rally segmentation with shot counts ------------------------------
@@ -1085,7 +1174,6 @@ export async function scanSquashVideo(
         tSamples += 1;
         longestOffT = Math.max(longestOffT, offTRun);
         offTRun = 0;
-
       } else if (active[i]) {
         offTRun += step;
       }
@@ -1103,9 +1191,13 @@ export async function scanSquashVideo(
     const lastThird = mean(usableMotions.slice(-third));
     const fatigueDrift = firstThird > 0 ? ((lastThird - firstThird) / firstThird) * 100 : 0;
 
-
     // ---- evidence frames at real detected contacts ------------------------
-    onProgress({ ratio: 0.76, label: "Capturing evidence frames at detected contacts…", stage: "frames", elapsedSec: elapsed() });
+    onProgress({
+      ratio: 0.76,
+      label: "Capturing evidence frames at detected contacts…",
+      stage: "frames",
+      elapsedSec: elapsed(),
+    });
 
     const pickContacts = (() => {
       if (contacts.length <= MAX_EVIDENCE) return contacts.slice();
@@ -1197,13 +1289,17 @@ export async function scanSquashVideo(
       tReturnCount: tReturnEvents.length,
       avgSecondsToT: toSeconds.length ? Number(mean(toSeconds).toFixed(2)) : 0,
       medianSecondsToT: toSeconds.length ? Number(percentile(toSeconds, 0.5).toFixed(2)) : 0,
-      tTimePercent: playerSeen ? Number(((tSamples || countT(playerPos, inT)) / playerSeen * 100).toFixed(1)) : 0,
+      tTimePercent: playerSeen
+        ? Number((((tSamples || countT(playerPos, inT)) / playerSeen) * 100).toFixed(1))
+        : 0,
       longestOffTSeconds: Number(Math.min(600, longestOffT).toFixed(1)),
       playerHeatmap: normalise(playerHist),
       opponentHeatmap: normalise(opponentHist),
       playerHeatCounts: playerHist,
       opponentHeatCounts: opponentHist,
-      twoPlayerTrackPercent: activeFrames ? Number(((twoBlobFrames / activeFrames) * 100).toFixed(1)) : 0,
+      twoPlayerTrackPercent: activeFrames
+        ? Number(((twoBlobFrames / activeFrames) * 100).toFixed(1))
+        : 0,
       averageMotion: Number(averageMotion.toFixed(1)),
       peakMotion,
       fatigueDriftPercent: Number(Math.max(-100, Math.min(100, fatigueDrift)).toFixed(1)),
@@ -1214,7 +1310,9 @@ export async function scanSquashVideo(
       playableSegments: playable.length,
       usableSeconds: Number(usableSeconds.toFixed(1)),
       measurableSeconds: Number(measurableSeconds.toFixed(1)),
-      coveragePercent: Number(Math.min(100, (usableSeconds / Math.max(0.1, duration)) * 100).toFixed(1)),
+      coveragePercent: Number(
+        Math.min(100, (usableSeconds / Math.max(0.1, duration)) * 100).toFixed(1),
+      ),
       rejectedSeconds: {
         closeUp: Number(secondsWhere("close-up").toFixed(1)),
         unstable: Number(secondsWhere("unstable").toFixed(1)),
@@ -1223,9 +1321,12 @@ export async function scanSquashVideo(
       },
     };
 
-
-
-    onProgress({ ratio: 0.93, label: "Verifying frames with the AI…", stage: "done", elapsedSec: elapsed() });
+    onProgress({
+      ratio: 0.93,
+      label: "Verifying frames with the AI…",
+      stage: "done",
+      elapsedSec: elapsed(),
+    });
 
     return {
       measured,

@@ -11,14 +11,8 @@ type BTRemoteGATTCharacteristic = {
   writeValue: (buf: BufferSource) => Promise<void>;
   startNotifications: () => Promise<BTRemoteGATTCharacteristic>;
   stopNotifications: () => Promise<BTRemoteGATTCharacteristic>;
-  addEventListener: (
-    type: "characteristicvaluechanged",
-    cb: (e: Event) => void,
-  ) => void;
-  removeEventListener: (
-    type: "characteristicvaluechanged",
-    cb: (e: Event) => void,
-  ) => void;
+  addEventListener: (type: "characteristicvaluechanged", cb: (e: Event) => void) => void;
+  removeEventListener: (type: "characteristicvaluechanged", cb: (e: Event) => void) => void;
 };
 
 type BTRemoteGATTServer = {

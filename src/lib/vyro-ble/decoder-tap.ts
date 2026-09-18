@@ -44,7 +44,11 @@ function fmt(value: unknown): string {
   if (value == null) return "—";
   if (typeof value === "number") return String(Math.round(value * 100) / 100);
   if (typeof value === "object") {
-    try { return JSON.stringify(value); } catch { return String(value); }
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
   }
   return String(value);
 }
@@ -65,7 +69,11 @@ export function tapDecoded(metric: MetricKey, value: unknown, raw?: Uint8Array |
     lastRaw: rawHex,
   };
   for (const fn of listeners) {
-    try { fn({ ...state }); } catch { /* ignore */ }
+    try {
+      fn({ ...state });
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -76,5 +84,7 @@ export function getDecodedSnapshot(): DecodedSnapshot {
 export function subscribeDecoded(fn: Listener): () => void {
   listeners.add(fn);
   fn({ ...state });
-  return () => { listeners.delete(fn); };
+  return () => {
+    listeners.delete(fn);
+  };
 }

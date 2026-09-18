@@ -5,16 +5,16 @@
 
 ## Modules
 
-| File | Role |
-| --- | --- |
-| `uuids.ts` | Service and characteristic UUIDs |
-| `web-transport.ts` | Web Bluetooth transport (Chromium, native shell) |
-| `packets.ts` | Frame build/parse + unit tests (`packets.test.ts`) |
-| `qcband.ts` | Opcode dispatch, measurement frames, history decoding |
-| `session-control.ts` | Measurement start/stop sequencing |
-| `respiration.ts` | Respiration estimation from HR/IMU (`respiration.test.ts`) |
-| `smp.ts`, `cbor.ts`, `ota.ts` | MCUmgr/SMP OTA firmware update |
-| `decoder-tap.ts` | Diagnostic tap feeding the Debug tab |
+| File                          | Role                                                       |
+| ----------------------------- | ---------------------------------------------------------- |
+| `uuids.ts`                    | Service and characteristic UUIDs                           |
+| `web-transport.ts`            | Web Bluetooth transport (Chromium, native shell)           |
+| `packets.ts`                  | Frame build/parse + unit tests (`packets.test.ts`)         |
+| `qcband.ts`                   | Opcode dispatch, measurement frames, history decoding      |
+| `session-control.ts`          | Measurement start/stop sequencing                          |
+| `respiration.ts`              | Respiration estimation from HR/IMU (`respiration.test.ts`) |
+| `smp.ts`, `cbor.ts`, `ota.ts` | MCUmgr/SMP OTA firmware update                             |
+| `decoder-tap.ts`              | Diagnostic tap feeding the Debug tab                       |
 
 ## Connection lifecycle
 

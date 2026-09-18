@@ -111,7 +111,8 @@ export function useSleepNights() {
     // Merge with any local unsynced entries.
     const byDay = new Map<string, SleepNight>();
     for (const n of merged) byDay.set(n.endAt.slice(0, 10), n);
-    for (const n of read()) if (!byDay.has(n.endAt.slice(0, 10))) byDay.set(n.endAt.slice(0, 10), n);
+    for (const n of read())
+      if (!byDay.has(n.endAt.slice(0, 10))) byDay.set(n.endAt.slice(0, 10), n);
     const list = [...byDay.values()].sort((a, b) => a.endAt.localeCompare(b.endAt));
     setNights(list);
     write(list);
@@ -130,7 +131,14 @@ export function useSleepNights() {
   }, []);
 
   const last = nights.length ? nights[nights.length - 1] : null;
-  return { nights, last, scores: nights.slice().reverse().map((n) => n.score) };
+  return {
+    nights,
+    last,
+    scores: nights
+      .slice()
+      .reverse()
+      .map((n) => n.score),
+  };
 }
 
 /** Format minutes as `Xh YYm`. */

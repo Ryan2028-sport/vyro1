@@ -53,9 +53,8 @@ export function ComingSoonView({
         }
       >
         <p className="text-xs leading-relaxed text-vyro-text/65">
-          The current watch firmware only emits motion (IMU) data. This tab activates
-          automatically once the band starts publishing the signals listed below — no
-          app update required.
+          The current watch firmware only emits motion (IMU) data. This tab activates automatically
+          once the band starts publishing the signals listed below — no app update required.
         </p>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2">
           {spec.needs.map((n) => (

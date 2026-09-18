@@ -32,7 +32,11 @@ async function callGateway(
 ): Promise<{ text: string | null; error: string | null }> {
   const res = await fetch(GATEWAY, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "fetch" },
+    headers: {
+      "Content-Type": "application/json",
+      "Lovable-API-Key": key,
+      "X-Lovable-AIG-SDK": "fetch",
+    },
     body: JSON.stringify({
       model: VISION_MODEL,
       messages: [
@@ -53,7 +57,10 @@ async function callGateway(
 }
 
 function emptyCounts(framesSent: number): VerifiedCounts {
-  const family = FAMILY.reduce((acc, k) => ({ ...acc, [k]: 0 }), {} as Record<(typeof FAMILY)[number], number>);
+  const family = FAMILY.reduce(
+    (acc, k) => ({ ...acc, [k]: 0 }),
+    {} as Record<(typeof FAMILY)[number], number>,
+  );
   return {
     framesSent,
     framesLabelled: 0,
@@ -86,7 +93,11 @@ async function verifyFrames(
       times: (data.frameTimes ?? []).slice(i, i + FRAMES_PER_SEGMENT),
       hints: (data.frameMeta ?? [])
         .slice(i, i + FRAMES_PER_SEGMENT)
-        .map((meta) => (meta ? `${meta.actor === "player" ? "near player" : meta.actor === "opponent" ? "far player" : "unsure who"} striking in ${meta.zone}` : "")),
+        .map((meta) =>
+          meta
+            ? `${meta.actor === "player" ? "near player" : meta.actor === "opponent" ? "far player" : "unsure who"} striking in ${meta.zone}`
+            : "",
+        ),
     });
   }
 
@@ -99,14 +110,20 @@ async function verifyFrames(
       slice.map(async (batch) => {
         const content: ChatContent = [];
         batch.frames.forEach((b64, i) => {
-          content.push({ type: "text", text: `frame ${i + 1} · ${(batch.times[i] ?? 0).toFixed(1)}s` });
+          content.push({
+            type: "text",
+            text: `frame ${i + 1} · ${(batch.times[i] ?? 0).toFixed(1)}s`,
+          });
           content.push({ type: "image_url", image_url: { url: b64 } });
         });
         content.push({ type: "text", text: buildVerifyPrompt(batch.times, batch.hints) });
         try {
           return await callGateway(key, VERIFY_SYSTEM, content);
         } catch (e) {
-          return { text: null, error: e instanceof Error ? `segment failed: ${e.message}` : "segment failed" };
+          return {
+            text: null,
+            error: e instanceof Error ? `segment failed: ${e.message}` : "segment failed",
+          };
         }
       }),
     );
@@ -120,7 +137,8 @@ async function verifyFrames(
       const labels = parseSegmentLabels(text);
       if (!labels || labels.length === 0) {
         counts.segmentsFailed += 1;
-        if (counts.failureReasons.length < 4) counts.failureReasons.push(`unreadable reply: ${text.slice(0, 120)}`);
+        if (counts.failureReasons.length < 4)
+          counts.failureReasons.push(`unreadable reply: ${text.slice(0, 120)}`);
         continue;
       }
       counts.segmentsOk += 1;
@@ -129,7 +147,8 @@ async function verifyFrames(
         if (label.striking === "none") continue;
         if (label.striking === "near") counts.playerStrikes += 1;
         else if (label.striking === "far") counts.opponentStrikes += 1;
-        if (label.striking === "unclear" && label.side === "unclear" && label.family === "unclear") continue;
+        if (label.striking === "unclear" && label.side === "unclear" && label.family === "unclear")
+          continue;
         counts.framesLabelled += 1;
         counts.side[label.side] += 1;
         counts.depth[label.depth] += 1;
@@ -141,25 +160,30 @@ async function verifyFrames(
     }
   }
 
-
   // Scale the verified shot mix up to the measured contact total, but only
   // when the sample is big enough to mean anything.
   const named = FAMILY.filter((f) => f !== "unclear").reduce((a, f) => a + counts.family[f], 0);
   if (named >= 6 && data.measured.contactCount > 0) {
     const factor = data.measured.contactCount / named;
-    counts.scaledShotMix = FAMILY.reduce((acc, f) => {
-      acc[f] = f === "unclear" ? 0 : Math.round(counts.family[f] * factor);
-      return acc;
-    }, {} as Record<(typeof FAMILY)[number], number>);
+    counts.scaledShotMix = FAMILY.reduce(
+      (acc, f) => {
+        acc[f] = f === "unclear" ? 0 : Math.round(counts.family[f] * factor);
+        return acc;
+      },
+      {} as Record<(typeof FAMILY)[number], number>,
+    );
   }
   return counts;
 }
 
-export async function runClipAnalysis(
-  data: ClipInput,
-): Promise<{ insight: SquashInsight | null; verified: VerifiedCounts | null; error: string | null }> {
+export async function runClipAnalysis(data: ClipInput): Promise<{
+  insight: SquashInsight | null;
+  verified: VerifiedCounts | null;
+  error: string | null;
+}> {
   const key = process.env.LOVABLE_API_KEY;
-  if (!key) return { insight: null, verified: null, error: "AI is not configured for this project." };
+  if (!key)
+    return { insight: null, verified: null, error: "AI is not configured for this project." };
 
   let verified: VerifiedCounts | null = null;
   try {
@@ -169,14 +193,19 @@ export async function runClipAnalysis(
   }
 
   try {
-    const { text, error } = await callGateway(key, SYNTHESIS_SYSTEM, buildSynthesisPrompt(data, verified));
+    const { text, error } = await callGateway(
+      key,
+      SYNTHESIS_SYSTEM,
+      buildSynthesisPrompt(data, verified),
+    );
     if (error) return { insight: null, verified, error };
     const insight = text ? parseInsight(text) : null;
     if (!insight) {
       return {
         insight: null,
         verified,
-        error: "The coaching write-up came back unreadable — the measured numbers below are still valid.",
+        error:
+          "The coaching write-up came back unreadable — the measured numbers below are still valid.",
       };
     }
     return { insight, verified, error: null };

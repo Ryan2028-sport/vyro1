@@ -46,10 +46,7 @@ export interface SmpHeader {
   id: number;
 }
 
-export function encodeSmpFrame(
-  header: SmpHeader,
-  payload: Record<string, unknown>,
-): Uint8Array {
+export function encodeSmpFrame(header: SmpHeader, payload: Record<string, unknown>): Uint8Array {
   const body = cborEncode(payload as never);
   const buf = new Uint8Array(8 + body.length);
   buf[0] = header.op;
@@ -148,15 +145,17 @@ export class SmpClient {
   private seq = 0;
   private pending = new Map<
     number,
-    { resolve: (v: SmpResponseMap) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
+    {
+      resolve: (v: SmpResponseMap) => void;
+      reject: (e: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
   >();
   private reassembler = new SmpReassembler((frame) => this.handleFrame(frame));
   private offNotify: () => void;
 
   constructor(private transport: SmpTransport) {
-    this.offNotify = transport.onNotify((chunk) =>
-      this.reassembler.feed(chunk),
-    );
+    this.offNotify = transport.onNotify((chunk) => this.reassembler.feed(chunk));
   }
 
   close(): Promise<void> {
@@ -192,10 +191,7 @@ export class SmpClient {
     timeoutMs = 8000,
   ): Promise<SmpResponseMap> {
     const seq = this.seq++ & 0xff;
-    const frame = encodeSmpFrame(
-      { op, flags: 0, length: 0, group, seq, id },
-      payload,
-    );
+    const frame = encodeSmpFrame({ op, flags: 0, length: 0, group, seq, id }, payload);
     const promise = new Promise<SmpResponseMap>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(seq);

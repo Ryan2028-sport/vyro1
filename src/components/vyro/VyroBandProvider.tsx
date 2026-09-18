@@ -18,10 +18,7 @@ import { saveDebugSnapshot } from "@/lib/debug-snapshot.functions";
 import { useVyroBand } from "@/hooks/use-vyro-band";
 import { useMetricsPersistence } from "./useMetricsPersistence";
 import { startKeepAlive, pokeKeepAlive } from "@/lib/keep-alive";
-import {
-  ensureBleInspectorInitialized,
-  getBleInspectorSnapshot,
-} from "./use-ble-inspector";
+import { ensureBleInspectorInitialized, getBleInspectorSnapshot } from "./use-ble-inspector";
 import { getDecodedSnapshot } from "@/lib/vyro-ble/decoder-tap";
 
 type VyroBandCtx = ReturnType<typeof useVyroBand> & {
@@ -104,7 +101,11 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
   // link survives the app being backgrounded.
   useEffect(() => {
     function onVis() {
-      if (document.visibilityState === "visible" && pairedId && !sameDeviceId(ble.connectedId, pairedId)) {
+      if (
+        document.visibilityState === "visible" &&
+        pairedId &&
+        !sameDeviceId(ble.connectedId, pairedId)
+      ) {
         const target = ble.devices.find((d) => sameDeviceId(d.id, pairedId));
         if (target) void ble.connect(target.id);
         else void ble.scan([], 10_000);
@@ -133,7 +134,6 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     pokeKeepAlive();
   }, [ble.connectionState, ble.connectedId]);
-
 
   // Remote diagnostics: as soon as a band is live, push a full pipeline
   // snapshot to the account (and refresh it every 30s) so the whole picture —
@@ -174,7 +174,9 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
                 serialNumber: v.serialNumber ?? null,
                 smpServiceAvailable,
                 otaTransport: smpServiceAvailable
-                  ? v.ble.isNative ? "native-bridge-required" : "web"
+                  ? v.ble.isNative
+                    ? "native-bridge-required"
+                    : "web"
                   : "none",
               },
               vitals: {
@@ -210,33 +212,42 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
                 unknownOpcodes: inspector.unknownOpcodes,
                 writes: inspector.writes,
                 perOpcode: Object.fromEntries(
-                  Object.entries(inspector.perOpcode).map(([key, stat]) => [key, {
-                    count: stat.count,
-                    lastAt: stat.lastAt,
-                    lastHex: stat.lastHex,
-                    service: stat.service,
-                    characteristic: stat.characteristic,
-                    intervalsMs: stat.recentAt.slice(1).map((at, index) => at - stat.recentAt[index]),
-                  }]),
+                  Object.entries(inspector.perOpcode).map(([key, stat]) => [
+                    key,
+                    {
+                      count: stat.count,
+                      lastAt: stat.lastAt,
+                      lastHex: stat.lastHex,
+                      service: stat.service,
+                      characteristic: stat.characteristic,
+                      intervalsMs: stat.recentAt
+                        .slice(1)
+                        .map((at, index) => at - stat.recentAt[index]),
+                    },
+                  ]),
                 ),
                 perCharacteristic: Object.fromEntries(
-                  Object.entries(inspector.perChar).map(([key, stat]) => [key, {
-                    count: stat.count,
-                    lastAt: stat.lastAt,
-                    lastOpcode: stat.lastOpcode,
-                    lastHex: stat.lastHex,
-                  }]),
+                  Object.entries(inspector.perChar).map(([key, stat]) => [
+                    key,
+                    {
+                      count: stat.count,
+                      lastAt: stat.lastAt,
+                      lastOpcode: stat.lastOpcode,
+                      lastHex: stat.lastHex,
+                    },
+                  ]),
                 ),
                 recentNotifications: inspector.recent.slice(0, 40),
                 recentWrites: inspector.writeLog.slice(0, 25),
                 decoded,
-                gatt: inspector.discovered?.services.map((service) => ({
-                  uuid: service.uuid,
-                  characteristics: service.characteristics.map((characteristic) => ({
-                    uuid: characteristic.uuid,
-                    properties: characteristic.properties,
-                  })),
-                })) ?? [],
+                gatt:
+                  inspector.discovered?.services.map((service) => ({
+                    uuid: service.uuid,
+                    characteristics: service.characteristics.map((characteristic) => ({
+                      uuid: characteristic.uuid,
+                      properties: characteristic.properties,
+                    })),
+                  })) ?? [],
               },
             },
           },
@@ -249,7 +260,6 @@ export function VyroBandProvider({ children }: { children: ReactNode }) {
     const id = window.setInterval(send, 30_000);
     return () => window.clearInterval(id);
   }, [ble.connectedId, pushSnapshot]);
-
 
   return (
     <Ctx.Provider value={{ ...vyro, pairedId, pairedName }}>

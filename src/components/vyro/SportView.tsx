@@ -17,26 +17,33 @@ function fmt(n: number | null | undefined, digits = 0, unit = ""): string {
   return `${n.toFixed(digits)}${unit}`;
 }
 
-export const SPORT_META: Record<SportId, {
-  label: string;
-  emoji: string;
-  /** wrist → racket-head lever arm in metres, used for head-speed estimation */
-  leverArmM: number;
-  /** effective racket + ball mass in kg, used for impact force estimation */
-  effectiveMassKg: number;
-  routes: string[];
-  courtNote: string;
-}> = {
+export const SPORT_META: Record<
+  SportId,
+  {
+    label: string;
+    emoji: string;
+    /** wrist → racket-head lever arm in metres, used for head-speed estimation */
+    leverArmM: number;
+    /** effective racket + ball mass in kg, used for impact force estimation */
+    effectiveMassKg: number;
+    routes: string[];
+    courtNote: string;
+  }
+> = {
   squash: {
     label: "Squash",
     emoji: "🎾",
-    leverArmM: 0.40,
+    leverArmM: 0.4,
     effectiveMassKg: 0.18,
     routes: [
-      "T → Front Left", "T → Front Right",
-      "T → Middle Left", "T → Middle Right",
-      "T → Back Left", "T → Back Right",
-      "Corner ↔ Corner", "Lunge + Recovery",
+      "T → Front Left",
+      "T → Front Right",
+      "T → Middle Left",
+      "T → Middle Right",
+      "T → Back Left",
+      "T → Back Right",
+      "Corner ↔ Corner",
+      "Lunge + Recovery",
     ],
     courtNote: "T-zone recovery drives squash movement scoring.",
   },
@@ -44,11 +51,14 @@ export const SPORT_META: Record<SportId, {
     label: "Tennis",
     emoji: "🎾",
     leverArmM: 0.55,
-    effectiveMassKg: 0.30,
+    effectiveMassKg: 0.3,
     routes: [
-      "Center → Short Left", "Center → Short Right",
-      "Center → Deep Left", "Center → Deep Right",
-      "Center → Wide Left", "Center → Wide Right",
+      "Center → Short Left",
+      "Center → Short Right",
+      "Center → Deep Left",
+      "Center → Deep Right",
+      "Center → Wide Left",
+      "Center → Wide Right",
       "Baseline → Net approach",
     ],
     courtNote: "Baseline recovery and wide-ball coverage drive tennis movement scoring.",
@@ -107,7 +117,9 @@ export function SportSwitcher() {
                 : "font-semibold text-vyro-mute hover:bg-vyro-text/[0.05] hover:text-vyro-text"
             }`}
           >
-            <span aria-hidden="true" className="text-[12px] leading-none">{SPORT_META[id].emoji}</span>
+            <span aria-hidden="true" className="text-[12px] leading-none">
+              {SPORT_META[id].emoji}
+            </span>
             {SPORT_META[id].label}
           </button>
         );
@@ -116,19 +128,34 @@ export function SportSwitcher() {
   );
 }
 
-
 function EventCountsCard({ m }: { m: LiveMetrics }) {
   return (
     <Card
       eyebrow="IMU event counts"
       title="Per-packet totals from the band"
-      action={m.connected ? <Pill tone="live" pulse>LIVE</Pill> : <Pill tone="off">offline</Pill>}
+      action={
+        m.connected ? (
+          <Pill tone="live" pulse>
+            LIVE
+          </Pill>
+        ) : (
+          <Pill tone="off">offline</Pill>
+        )
+      }
     >
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Swings" value={m.connected ? m.counts.swing : "—"} hint="SWING packet" />
-        <Stat label="Rapid starts" value={m.connected ? m.counts.rapid_start : "—"} hint="RAPID_START packet" />
+        <Stat
+          label="Rapid starts"
+          value={m.connected ? m.counts.rapid_start : "—"}
+          hint="RAPID_START packet"
+        />
         <Stat label="Bursts" value={m.connected ? m.counts.burst : "—"} hint="BURST packet" />
-        <Stat label="Direction changes" value={m.connected ? m.counts.direction_change : "—"} hint="DIR_CHANGE packet" />
+        <Stat
+          label="Direction changes"
+          value={m.connected ? m.counts.direction_change : "—"}
+          hint="DIR_CHANGE packet"
+        />
       </div>
       <p className="mt-3 text-[11px] text-vyro-mute">
         Events in the last minute:{" "}
@@ -144,12 +171,24 @@ function SwingCard({ m }: { m: LiveMetrics }) {
     <Card eyebrow="Swing packet" title="Swing intensity & duration">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Intensity max" value={hasSwing ? fmt(m.swingIntMax, 0) : "—"} unit="/100" />
-        <Stat label="Intensity avg" value={hasSwing ? fmt(m.swingIntAvg, 0) : "—"} unit="/100" hint="rolling 10" />
+        <Stat
+          label="Intensity avg"
+          value={hasSwing ? fmt(m.swingIntAvg, 0) : "—"}
+          unit="/100"
+          hint="rolling 10"
+        />
         <Stat label="Duration max" value={hasSwing ? fmt(m.swingDurMax, 0) : "—"} unit="ms" />
-        <Stat label="Duration avg" value={hasSwing ? fmt(m.swingDurAvg, 0) : "—"} unit="ms" hint="rolling 10" />
+        <Stat
+          label="Duration avg"
+          value={hasSwing ? fmt(m.swingDurAvg, 0) : "—"}
+          unit="ms"
+          hint="rolling 10"
+        />
       </div>
       {!hasSwing && (
-        <p className="mt-3 text-[11px] text-vyro-mute">No swings detected yet. Take a few practice strokes with the band on.</p>
+        <p className="mt-3 text-[11px] text-vyro-mute">
+          No swings detected yet. Take a few practice strokes with the band on.
+        </p>
       )}
     </Card>
   );
@@ -177,8 +216,10 @@ export function MovementPanel() {
   const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
   const firstStep = hasMotion && m.peakJerk > 0 ? clamp(m.peakJerk / 2.5) : null;
   const lateralCut = hasMotion && m.peakG > 0 ? clamp(m.peakG * 16) : null;
-  const cod = m.connected && m.counts.direction_change > 0 ? clamp(m.counts.direction_change * 4) : null;
-  const retCtrl = m.connected && m.reactMin != null ? clamp(100 - Math.min(m.reactMin, 600) / 6) : null;
+  const cod =
+    m.connected && m.counts.direction_change > 0 ? clamp(m.counts.direction_change * 4) : null;
+  const retCtrl =
+    m.connected && m.reactMin != null ? clamp(100 - Math.min(m.reactMin, 600) / 6) : null;
 
   return (
     <div className="space-y-4">
@@ -186,18 +227,36 @@ export function MovementPanel() {
         eyebrow={`${meta.label} · movement`}
         title="Court movement & agility"
         subtitle={meta.courtNote}
-        action={<Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>{m.connected ? "BAND LIVE" : "BAND OFFLINE"}</Pill>}
+        action={
+          <Pill tone={m.connected ? "live" : "off"} pulse={m.connected}>
+            {m.connected ? "BAND LIVE" : "BAND OFFLINE"}
+          </Pill>
+        }
       />
       <SportSwitcher />
 
       <Card eyebrow="Motion peaks" title="Per-session maxima across all packets">
         <div className="grid grid-cols-3 gap-2">
-          <Stat label="Peak accel" value={hasMotion && m.peakG > 0 ? fmt(m.peakG, 2) : "—"} unit="g" />
-          <Stat label="Peak angular" value={hasMotion && m.peakDps > 0 ? fmt(m.peakDps, 0) : "—"} unit="dps" />
-          <Stat label="Peak jerk" value={hasMotion && m.peakJerk > 0 ? fmt(m.peakJerk, 0) : "—"} unit="g/s" />
+          <Stat
+            label="Peak accel"
+            value={hasMotion && m.peakG > 0 ? fmt(m.peakG, 2) : "—"}
+            unit="g"
+          />
+          <Stat
+            label="Peak angular"
+            value={hasMotion && m.peakDps > 0 ? fmt(m.peakDps, 0) : "—"}
+            unit="dps"
+          />
+          <Stat
+            label="Peak jerk"
+            value={hasMotion && m.peakJerk > 0 ? fmt(m.peakJerk, 0) : "—"}
+            unit="g/s"
+          />
         </div>
         <p className="mt-3 text-[11px] text-vyro-mute">
-          Source: <span className="font-mono text-vyro-text">accelPeakG / gyroPeakDps / jerkPeakGps</span> on each packet.
+          Source:{" "}
+          <span className="font-mono text-vyro-text">accelPeakG / gyroPeakDps / jerkPeakGps</span>{" "}
+          on each packet.
         </p>
       </Card>
 
@@ -205,18 +264,32 @@ export function MovementPanel() {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat label="First-step burst" value={firstStep ?? "—"} unit="/100" hint="jerk peak" />
           <Stat label="Lateral cut" value={lateralCut ?? "—"} unit="/100" hint="peak g" />
-          <Stat label="Change of direction" value={cod ?? "—"} unit="/100" hint="DIR_CHANGE count" />
+          <Stat
+            label="Change of direction"
+            value={cod ?? "—"}
+            unit="/100"
+            hint="DIR_CHANGE count"
+          />
           <Stat label="Return control" value={retCtrl ?? "—"} unit="/100" hint="reaction window" />
         </div>
       </Card>
 
       <Card eyebrow="DIR_CHANGE packet" title="Reaction window">
         <div className="grid grid-cols-2 gap-2">
-          <Stat label="Fastest gap" value={m.connected && m.reactMin != null ? fmt(m.reactMin, 0) : "—"} unit="ms" />
-          <Stat label="Avg gap (last 10)" value={reactAvg != null ? fmt(reactAvg, 0) : "—"} unit="ms" />
+          <Stat
+            label="Fastest gap"
+            value={m.connected && m.reactMin != null ? fmt(m.reactMin, 0) : "—"}
+            unit="ms"
+          />
+          <Stat
+            label="Avg gap (last 10)"
+            value={reactAvg != null ? fmt(reactAvg, 0) : "—"}
+            unit="ms"
+          />
         </div>
         <p className="mt-3 text-[11px] text-vyro-mute">
-          Gap between consecutive direction changes — the only reaction-time proxy the firmware emits today.
+          Gap between consecutive direction changes — the only reaction-time proxy the firmware
+          emits today.
         </p>
       </Card>
 
@@ -251,25 +324,40 @@ function SnapshotCard() {
   const m = s.m;
   const meta = SPORT_META[s.sport];
   const hasSwing = m.connected && m.counts.swing > 0;
-  const racketMph = hasSwing && m.peakDps > 0
-    ? (m.peakDps * (Math.PI / 180)) * meta.leverArmM * 2.23694
-    : null;
+  const racketMph =
+    hasSwing && m.peakDps > 0 ? m.peakDps * (Math.PI / 180) * meta.leverArmM * 2.23694 : null;
   const ballForceN = hasSwing && m.peakG > 0 ? m.peakG * 9.81 * meta.effectiveMassKg : null;
   const contactQ = hasSwing ? m.swingIntAvg : null;
   return (
     <Card
       eyebrow={`${meta.label} snapshot`}
       title="Where you stand right now"
-      action={m.connected ? <Pill tone="live" pulse>LIVE</Pill> : <Pill tone="off">offline</Pill>}
+      action={
+        m.connected ? (
+          <Pill tone="live" pulse>
+            LIVE
+          </Pill>
+        ) : (
+          <Pill tone="off">offline</Pill>
+        )
+      }
     >
       <p className="mb-3 text-[11px] text-vyro-mute">
-        Derived from the SWING IMU packet using {meta.label.toLowerCase()} constants
-        (lever arm {meta.leverArmM.toFixed(2)} m, effective mass {meta.effectiveMassKg.toFixed(2)} kg).
+        Derived from the SWING IMU packet using {meta.label.toLowerCase()} constants (lever arm{" "}
+        {meta.leverArmM.toFixed(2)} m, effective mass {meta.effectiveMassKg.toFixed(2)} kg).
       </p>
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Racket head speed" value={racketMph != null ? fmt(racketMph, 0) : "—"} unit="mph" />
+        <Stat
+          label="Racket head speed"
+          value={racketMph != null ? fmt(racketMph, 0) : "—"}
+          unit="mph"
+        />
         <Stat label="Ball force" value={ballForceN != null ? fmt(ballForceN, 0) : "—"} unit="N" />
-        <Stat label="Contact quality" value={contactQ != null ? fmt(contactQ, 0) : "—"} unit="/100" />
+        <Stat
+          label="Contact quality"
+          value={contactQ != null ? fmt(contactQ, 0) : "—"}
+          unit="/100"
+        />
       </div>
     </Card>
   );
@@ -307,20 +395,63 @@ function PerformanceLensesCard() {
     const firstStep = on && m.peakJerk > 0 ? clamp(m.peakJerk / 2.5) : null;
     const accel = on && m.peakG > 0 ? clamp(m.peakG * 16) : null;
     const hasSwing = on && m.counts.swing > 0;
-    const rhsScore = hasSwing && m.peakDps > 0 ? clamp(m.peakDps / (s.sport === "tennis" ? 14 : 10)) : null;
+    const rhsScore =
+      hasSwing && m.peakDps > 0 ? clamp(m.peakDps / (s.sport === "tennis" ? 14 : 10)) : null;
     const forceScore = hasSwing && m.peakG > 0 ? clamp(m.peakG * 12) : null;
     const cod = on && m.counts.direction_change > 0 ? clamp(m.counts.direction_change * 4) : null;
     const retCtrl = on && m.reactMin != null ? clamp(100 - Math.min(m.reactMin, 600) / 6) : null;
-    const sessLoad = on && m.eventsLastMin > 0 ? clamp(100 - Math.min(m.eventsLastMin, 120) * 0.7) : null;
-    const decay = on && m.heartRateBpm != null && m.restingHrBpm != null
-      ? clamp(100 - Math.max(0, m.heartRateBpm - m.restingHrBpm) * 1.2)
-      : null;
+    const sessLoad =
+      on && m.eventsLastMin > 0 ? clamp(100 - Math.min(m.eventsLastMin, 120) * 0.7) : null;
+    const decay =
+      on && m.heartRateBpm != null && m.restingHrBpm != null
+        ? clamp(100 - Math.max(0, m.heartRateBpm - m.restingHrBpm) * 1.2)
+        : null;
 
-    const movement: Lens = { id: "movement", title: "Movement", headline: avgNonNull([firstStep, accel]), subs: [{ label: "First-step burst", value: firstStep }, { label: "Acceleration", value: accel }] };
-    const shot: Lens = { id: "shot", title: "Shot quality", headline: avgNonNull([rhsScore, forceScore]), subs: [{ label: "Racket head speed", value: rhsScore }, { label: "Ball force", value: forceScore }] };
-    const court: Lens = { id: "court", title: "Court positioning", headline: avgNonNull([cod, retCtrl]), subs: [{ label: "Change of direction", value: cod }, { label: "Return control", value: retCtrl }] };
-    const fatigueLens: Lens = { id: "fatigue", title: "Fatigue", headline: avgNonNull([sessLoad, decay]), subs: [{ label: "Session load", value: sessLoad }, { label: "Decay resistance", value: decay }] };
-    const tactical: Lens = { id: "tactical", title: "Tactical patterns", headline: null, subs: [{ label: "Pattern read confidence", value: null }, { label: "Pressure adaptation", value: null }] };
+    const movement: Lens = {
+      id: "movement",
+      title: "Movement",
+      headline: avgNonNull([firstStep, accel]),
+      subs: [
+        { label: "First-step burst", value: firstStep },
+        { label: "Acceleration", value: accel },
+      ],
+    };
+    const shot: Lens = {
+      id: "shot",
+      title: "Shot quality",
+      headline: avgNonNull([rhsScore, forceScore]),
+      subs: [
+        { label: "Racket head speed", value: rhsScore },
+        { label: "Ball force", value: forceScore },
+      ],
+    };
+    const court: Lens = {
+      id: "court",
+      title: "Court positioning",
+      headline: avgNonNull([cod, retCtrl]),
+      subs: [
+        { label: "Change of direction", value: cod },
+        { label: "Return control", value: retCtrl },
+      ],
+    };
+    const fatigueLens: Lens = {
+      id: "fatigue",
+      title: "Fatigue",
+      headline: avgNonNull([sessLoad, decay]),
+      subs: [
+        { label: "Session load", value: sessLoad },
+        { label: "Decay resistance", value: decay },
+      ],
+    };
+    const tactical: Lens = {
+      id: "tactical",
+      title: "Tactical patterns",
+      headline: null,
+      subs: [
+        { label: "Pattern read confidence", value: null },
+        { label: "Pressure adaptation", value: null },
+      ],
+    };
     // Readiness lens = the canonical recovery composite, verbatim.
     const ready: Lens = {
       id: "ready",
@@ -342,7 +473,9 @@ function PerformanceLensesCard() {
           return (
             <div key={lens.id} className="rounded-2xl border border-vyro-line bg-vyro-panel/60 p-3">
               <div className="flex items-baseline justify-between">
-                <div className="font-mono text-[10px] uppercase tracking-wider text-vyro-mute">{lens.title}</div>
+                <div className="font-mono text-[10px] uppercase tracking-wider text-vyro-mute">
+                  {lens.title}
+                </div>
                 <Pill tone={band.tone}>{band.text}</Pill>
               </div>
               <div className="mt-1 text-2xl font-bold text-vyro-text">{lens.headline ?? "—"}</div>
@@ -359,8 +492,9 @@ function PerformanceLensesCard() {
         })}
       </div>
       <p className="mt-3 text-[11px] text-vyro-mute">
-        Movement comes from BURST/RAPID_START, Shot quality from SWING, Court positioning from DIR_CHANGE,
-        Fatigue from event density + HR, and Readiness from the same LIVE Recovery composite the Recovery tab shows.
+        Movement comes from BURST/RAPID_START, Shot quality from SWING, Court positioning from
+        DIR_CHANGE, Fatigue from event density + HR, and Readiness from the same LIVE Recovery
+        composite the Recovery tab shows.
       </p>
     </Card>
   );

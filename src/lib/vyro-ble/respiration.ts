@@ -40,7 +40,7 @@ export function estimateRespirationFromHeartRate(
   if (current.length) segments.push(current);
   const recent = segments
     .slice()
-    .sort((a, b) => (b[b.length - 1].t - b[0].t) - (a[a.length - 1].t - a[0].t))[0];
+    .sort((a, b) => b[b.length - 1].t - b[0].t - (a[a.length - 1].t - a[0].t))[0];
   if (!recent || recent.length < 30) return null;
   const start = recent[0]?.t;
   const segmentEnd = recent[recent.length - 1]?.t;
@@ -53,7 +53,6 @@ export function estimateRespirationFromHeartRate(
   gaps.sort((a, b) => a - b);
   const medianGap = gaps[Math.floor(gaps.length / 2)] ?? Infinity;
   if (medianGap > 6) return null;
-
 
   // Remove the linear HR trend before testing respiratory frequencies. A
   // Lomb-style projection works directly on the bridge's irregular timestamps.
@@ -69,7 +68,8 @@ export function estimateRespirationFromHeartRate(
   }
   const slope = timeVariance > 0 ? covariance / timeVariance : 0;
   const residuals = values.map((value, index) => value - (meanY + slope * (times[index] - meanT)));
-  const residualVariance = residuals.reduce((sum, value) => sum + value * value, 0) / residuals.length;
+  const residualVariance =
+    residuals.reduce((sum, value) => sum + value * value, 0) / residuals.length;
   if (residualVariance < 0.02) return null;
 
   // Search 0.12–0.5 Hz (7.2–30 brpm). The band edges are excluded from peak
@@ -100,7 +100,8 @@ export function estimateRespirationFromHeartRate(
   }
   // Only accept interior peaks — at least one bin-width away from either edge.
   const interior = powers.filter(
-    (entry) => entry.frequency > FREQ_MIN + FREQ_STEP * 2 && entry.frequency < FREQ_MAX - FREQ_STEP * 2,
+    (entry) =>
+      entry.frequency > FREQ_MIN + FREQ_STEP * 2 && entry.frequency < FREQ_MAX - FREQ_STEP * 2,
   );
   const sortedInterior = [...interior].sort((a, b) => b.power - a.power);
   const peak = sortedInterior[0];
@@ -120,7 +121,6 @@ export function estimateRespirationFromHeartRate(
   const explained = peak.power / Math.max(residualVariance * recent.length, 0.0001);
   const confidence = Math.min(1, Math.min(peakRatio / 4, explained / 0.25));
   if (peakRatio >= 1.8 && explained >= 0.05 && confidence >= 0.2) {
-
     return {
       brpm: Math.round(peak.frequency * 600) / 10,
       confidence: Math.round(confidence * 100) / 100,

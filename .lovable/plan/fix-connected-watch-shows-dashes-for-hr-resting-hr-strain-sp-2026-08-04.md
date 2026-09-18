@@ -9,17 +9,25 @@ The optical metrics themselves (SpO2 / temp / HRV / BP) are separately blocked b
 ## The fix
 
 1. **Heart rate never goes dark.**
-  - Delay the first measurement cycle to ~60s after connect so HR, Resting HR and Strain establish first.
-  - Restart the realtime HR stream immediately after *each* metric instead of only at the end of the whole cycle, and cap a single cycle's total sensor-hold time (~45s) so HR is never suspended for long.
-  - While a measurement holds the sensor, keep showing the last HR value and label it "measuring" instead of dropping to a dash (widen the HR freshness window to cover the hold, using the same gate config).
+
+- Delay the first measurement cycle to ~60s after connect so HR, Resting HR and Strain establish first.
+- Restart the realtime HR stream immediately after _each_ metric instead of only at the end of the whole cycle, and cap a single cycle's total sensor-hold time (~45s) so HR is never suspended for long.
+- While a measurement holds the sensor, keep showing the last HR value and label it "measuring" instead of dropping to a dash (widen the HR freshness window to cover the hold, using the same gate config).
+
 2. **Resting HR, Strain, Readiness stop collapsing.**
-  - Keep the HR ring buffer across the measurement hold rather than resetting on a gap, so Resting HR persists.
-  - Strain keeps its last computed value with a "holding" label during the hold instead of going null.
+
+- Keep the HR ring buffer across the measurement hold rather than resetting on a gap, so Resting HR persists.
+- Strain keeps its last computed value with a "holding" label during the hold instead of going null.
+
 3. **Stop wasting the sensor on sub-types this firmware refuses.**
-  - After a metric answers only `0x87` / `0x89` unsupported bytes on all its sub-types for two consecutive cycles, mark it `unsupported` and back off to once every ~30 minutes instead of every cycle. That frees the PPG for HR and the metrics that do work (stress via history, steps).
+
+- After a metric answers only `0x87` / `0x89` unsupported bytes on all its sub-types for two consecutive cycles, mark it `unsupported` and back off to once every ~30 minutes instead of every cycle. That frees the PPG for HR and the metrics that do work (stress via history, steps).
+
 4. **Honest labels instead of a uniform "awaiting signal".**
-  - Per-metric text driven by the existing pipeline state: "measuring", "no response from watch", "not supported by this firmware", "awaiting firmware field" (Respiration Rate).
-  - Debug tab pipeline table shows requested/responded timestamps and the last raw reply byte per metric, so it's clear which are firmware limits vs app bugs.
+
+- Per-metric text driven by the existing pipeline state: "measuring", "no response from watch", "not supported by this firmware", "awaiting firmware field" (Respiration Rate).
+- Debug tab pipeline table shows requested/responded timestamps and the last raw reply byte per metric, so it's clear which are firmware limits vs app bugs.
+
 5. **Score gates made consistent** (from the audit): Fatigue and Agility currently publish from a single loose signal while Recovery requires two independent channels; Fatigue/Agility get the same 2-evidence rule and a recency window, and the Recovery/Sleep legend stops being gated on `readiness` being non-null.
 
 ## Technical details

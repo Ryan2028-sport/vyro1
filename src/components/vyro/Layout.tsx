@@ -50,11 +50,22 @@ function Logo() {
   return (
     <div className="flex items-center gap-2">
       <svg viewBox="0 0 32 32" className="h-6 w-6 text-vyro-mint">
-        <path d="M3 6 L16 26 L29 6" stroke="currentColor" strokeWidth="3" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+        <path
+          d="M3 6 L16 26 L29 6"
+          stroke="currentColor"
+          strokeWidth="3"
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
       </svg>
       <div className="flex flex-col leading-none">
-        <span className="font-mono text-[13px] font-black tracking-[0.22em] text-vyro-text">VYRO</span>
-        <span className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.3em] text-vyro-mute">Own the edge</span>
+        <span className="font-mono text-[13px] font-black tracking-[0.22em] text-vyro-text">
+          VYRO
+        </span>
+        <span className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.3em] text-vyro-mute">
+          Own the edge
+        </span>
       </div>
     </div>
   );
@@ -64,12 +75,16 @@ function SyncPill() {
   const ctx = useVyroBandCtx();
   const live = ctx.connected;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] ${
-      live
-        ? "border-vyro-mint/40 bg-vyro-mint/10 text-vyro-mint"
-        : "border-vyro-text/15 bg-vyro-text/5 text-vyro-mute"
-    }`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-vyro-mint shadow-[0_0_8px_currentColor]" : "bg-vyro-mute"}`} />
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] ${
+        live
+          ? "border-vyro-mint/40 bg-vyro-mint/10 text-vyro-mint"
+          : "border-vyro-text/15 bg-vyro-text/5 text-vyro-mute"
+      }`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${live ? "bg-vyro-mint shadow-[0_0_8px_currentColor]" : "bg-vyro-mute"}`}
+      />
       {live ? "Sync · live" : "Sync · idle"}
     </span>
   );
@@ -118,8 +133,7 @@ export function Layout({
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-vyro-line bg-vyro-ink/95 backdrop-blur">
         <div className="mx-auto grid max-w-[640px] grid-cols-5">
           {navItems.map(({ id, label, icon: Icon }) => {
-            const active =
-              activeView === id || (id === "more" && MORE_IDS.includes(activeView));
+            const active = activeView === id || (id === "more" && MORE_IDS.includes(activeView));
             return (
               <button
                 key={id}

@@ -32,7 +32,11 @@ export function HistoryView() {
         eyebrow="Player Dashboard · Progress"
         title="Session history"
         subtitle="Every metric here comes from real sessions you've saved. Cards stay blank until the data exists."
-        action={<Pill tone={count > 0 ? "live" : "off"}>{count} session{count === 1 ? "" : "s"}</Pill>}
+        action={
+          <Pill tone={count > 0 ? "live" : "off"}>
+            {count} session{count === 1 ? "" : "s"}
+          </Pill>
+        }
       />
 
       <Card eyebrow="Session log · verified" title="Recent sessions">
@@ -65,9 +69,15 @@ export function HistoryView() {
                 </div>
                 {Object.keys(summary).length > 0 && (
                   <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-                    {summary.peakG != null && <Mini label="Peak g" v={Number(summary.peakG).toFixed(2)} />}
-                    {summary.peakDps != null && <Mini label="Peak dps" v={Math.round(summary.peakDps)} />}
-                    {summary.peakJerk != null && <Mini label="Peak jerk" v={Number(summary.peakJerk).toFixed(1)} />}
+                    {summary.peakG != null && (
+                      <Mini label="Peak g" v={Number(summary.peakG).toFixed(2)} />
+                    )}
+                    {summary.peakDps != null && (
+                      <Mini label="Peak dps" v={Math.round(summary.peakDps)} />
+                    )}
+                    {summary.peakJerk != null && (
+                      <Mini label="Peak jerk" v={Number(summary.peakJerk).toFixed(1)} />
+                    )}
                   </div>
                 )}
               </div>
@@ -79,9 +89,11 @@ export function HistoryView() {
       <Card eyebrow="Trends" title="All-time progress">
         <EmptyState
           title={count < 2 ? "Need at least two sessions" : "Trends live in the Trends tab"}
-          hint={count < 2
-            ? "Record a second session and trend graphs will compute themselves from the saved summaries — no synthetic data."
-            : "Open the Trends tab for the full progression view derived directly from these sessions."}
+          hint={
+            count < 2
+              ? "Record a second session and trend graphs will compute themselves from the saved summaries — no synthetic data."
+              : "Open the Trends tab for the full progression view derived directly from these sessions."
+          }
         />
       </Card>
     </div>

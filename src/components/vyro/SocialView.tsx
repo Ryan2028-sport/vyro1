@@ -27,10 +27,15 @@ export function SocialView() {
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {CATEGORIES.map(({ id, label, icon: Icon }) => (
-          <div key={id} className="flex flex-col items-start gap-2 rounded-2xl border border-vyro-line bg-vyro-panel p-3">
+          <div
+            key={id}
+            className="flex flex-col items-start gap-2 rounded-2xl border border-vyro-line bg-vyro-panel p-3"
+          >
             <Icon className="h-4 w-4 text-vyro-mute" />
             <div className="text-[12px] font-bold text-vyro-text">{label}</div>
-            <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">No entrants</div>
+            <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">
+              No entrants
+            </div>
           </div>
         ))}
       </div>

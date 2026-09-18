@@ -17,20 +17,20 @@ export const QCBAND_COMMAND_V2_CHAR_UUID = "de5bf72a-d711-4e47-af26-65e3012a5dc7
 export const QCBAND_NOTIFY_V2_CHAR_UUID = "de5bf729-d711-4e47-af26-65e3012a5dc7";
 
 // Opcodes (selected — see Oudmon protocol).
-export const QCBAND_CMD_SET_TIME = 0x01;         // 1 — required setup on some H59/QC firmwares
-export const QCBAND_CMD_BATTERY = 0x03;          // 3
-export const QCBAND_CMD_TODAY_SUMMARY = 0x09;    // 9 — steps/distance/calories
+export const QCBAND_CMD_SET_TIME = 0x01; // 1 — required setup on some H59/QC firmwares
+export const QCBAND_CMD_BATTERY = 0x03; // 3
+export const QCBAND_CMD_TODAY_SUMMARY = 0x09; // 9 — steps/distance/calories
 export const QCBAND_CMD_HEART_RATE_HISTORY = 0x15; // 21 — 5-min HR history
-export const QCBAND_CMD_HEART_RATE_LOG = 0x16;   // 22 — automatic HR logging preference
-export const QCBAND_CMD_SYNC_STRESS = 0x37;      // 55 — 30-min stress history
-export const QCBAND_CMD_SYNC_HRV = 0x39;         // 57 — 30-min HRV/RMSSD history
-export const QCBAND_CMD_SYNC_ACTIVITY = 0x43;    // 67 — hourly steps/activity history
-export const QCBAND_CMD_TODAY_SPORTS = 0x48;     // 72 — total steps/running/cal/distance
-export const QCBAND_CMD_REALTIME_HR = 0x1e;      // 30 — start/end/hold poll
-export const QCBAND_CMD_START_MEASURE = 0x69;    // 105 — start HR/SpO2/temp/one-key
-export const QCBAND_CMD_STOP_MEASURE = 0x6a;     // 106 — stop measurement
-export const QCBAND_CMD_NOTIFICATION = 0x73;      // 115 — live activity/battery notifications
-export const QCBAND_CMD_BIG_DATA_V2 = 0xbc;       // 188 — V2 history payloads
+export const QCBAND_CMD_HEART_RATE_LOG = 0x16; // 22 — automatic HR logging preference
+export const QCBAND_CMD_SYNC_STRESS = 0x37; // 55 — 30-min stress history
+export const QCBAND_CMD_SYNC_HRV = 0x39; // 57 — 30-min HRV/RMSSD history
+export const QCBAND_CMD_SYNC_ACTIVITY = 0x43; // 67 — hourly steps/activity history
+export const QCBAND_CMD_TODAY_SPORTS = 0x48; // 72 — total steps/running/cal/distance
+export const QCBAND_CMD_REALTIME_HR = 0x1e; // 30 — start/end/hold poll
+export const QCBAND_CMD_START_MEASURE = 0x69; // 105 — start HR/SpO2/temp/one-key
+export const QCBAND_CMD_STOP_MEASURE = 0x6a; // 106 — stop measurement
+export const QCBAND_CMD_NOTIFICATION = 0x73; // 115 — live activity/battery notifications
+export const QCBAND_CMD_BIG_DATA_V2 = 0xbc; // 188 — V2 history payloads
 
 export const QCBAND_CMD_AUTO_SPO2_PREF = 0x2c;
 export const QCBAND_CMD_AUTO_STRESS_PREF = 0x36;
@@ -79,10 +79,26 @@ export const QCBAND_MEASURE_HRV = 0x0e;
 export const QCBAND_MEASURE_HR_TYPES = [QCBAND_MEASURE_HR, QCBAND_MEASURE_HR_SDK] as const;
 export const QCBAND_MEASURE_BP_TYPES = [QCBAND_MEASURE_BP] as const;
 export const QCBAND_MEASURE_SPO2_TYPES = [QCBAND_MEASURE_SPO2, QCBAND_MEASURE_SPO2_SDK] as const;
-export const QCBAND_MEASURE_ONE_KEY_TYPES = [QCBAND_MEASURE_ONE_KEY_HR, QCBAND_MEASURE_ONE_KEY, QCBAND_MEASURE_ONE_KEY_SDK] as const;
-export const QCBAND_MEASURE_TEMP_TYPES = [QCBAND_MEASURE_TEMP_SDK, QCBAND_MEASURE_TEMP, QCBAND_MEASURE_TEMP_LEGACY] as const;
-export const QCBAND_MEASURE_STRESS_TYPES = [QCBAND_MEASURE_PRESSURE_SDK, QCBAND_MEASURE_STRESS, QCBAND_MEASURE_STRESS_SDK] as const;
-export const QCBAND_MEASURE_HRV_TYPES = [QCBAND_MEASURE_HRV_DATA_REQUEST, QCBAND_MEASURE_HRV, QCBAND_MEASURE_HRV_SDK] as const;
+export const QCBAND_MEASURE_ONE_KEY_TYPES = [
+  QCBAND_MEASURE_ONE_KEY_HR,
+  QCBAND_MEASURE_ONE_KEY,
+  QCBAND_MEASURE_ONE_KEY_SDK,
+] as const;
+export const QCBAND_MEASURE_TEMP_TYPES = [
+  QCBAND_MEASURE_TEMP_SDK,
+  QCBAND_MEASURE_TEMP,
+  QCBAND_MEASURE_TEMP_LEGACY,
+] as const;
+export const QCBAND_MEASURE_STRESS_TYPES = [
+  QCBAND_MEASURE_PRESSURE_SDK,
+  QCBAND_MEASURE_STRESS,
+  QCBAND_MEASURE_STRESS_SDK,
+] as const;
+export const QCBAND_MEASURE_HRV_TYPES = [
+  QCBAND_MEASURE_HRV_DATA_REQUEST,
+  QCBAND_MEASURE_HRV,
+  QCBAND_MEASURE_HRV_SDK,
+] as const;
 
 export type QcBandRealtimeHrCommand = "start" | "end" | "hold";
 
@@ -106,7 +122,7 @@ function sdkCommand(bytes: number[]): Uint8Array {
 
 function decToBcd(v: number): number {
   const n = Math.max(0, Math.min(99, Math.trunc(v)));
-  return (((Math.floor(n / 10) << 4) | (n % 10)) & 0xff);
+  return ((Math.floor(n / 10) << 4) | (n % 10)) & 0xff;
 }
 
 // ---- Setup / feature enabling --------------------------------------------
@@ -268,8 +284,8 @@ export function encodeQcBandSpo2IntervalHistoryRequest(daysAgo = 0, pocketIndex 
 // we probe the neighbouring type space instead of giving up: any frame whose
 // payload decodes to a physiologically plausible value is adopted.
 export const QCBAND_BIG_DATA_PROBE_TYPES = [
-  0x25, 0x26, 0x27, 0x28, 0x29, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
-  0x30, 0x31, 0x32, 0x33, 0x60, 0x61, 0x62, 0x63, 0x74, 0x75,
+  0x25, 0x26, 0x27, 0x28, 0x29, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x60, 0x61,
+  0x62, 0x63, 0x74, 0x75,
 ] as const;
 
 // Sub-types under 0x69 that are not already part of a named family.
@@ -277,7 +293,10 @@ export const QCBAND_MEASURE_PROBE_TYPES = [
   0x06, 0x07, 0x08, 0x0a, 0x0b, 0x0c, 0x0f, 0x10, 0x11, 0x12,
 ] as const;
 
-export function encodeQcBandBigDataProbe(type: number, payload: number[] = [0x00, 0x00]): Uint8Array {
+export function encodeQcBandBigDataProbe(
+  type: number,
+  payload: number[] = [0x00, 0x00],
+): Uint8Array {
   return bigDataV2Request(type, payload);
 }
 
@@ -313,7 +332,6 @@ export function scanBloodPressurePair(
   return null;
 }
 
-
 function bcdByte(v: number): number {
   return ((v >> 4) & 0x0f) * 10 + (v & 0x0f);
 }
@@ -323,17 +341,15 @@ export function decodeQcBandTodaySummary(
 ): { steps: number; distanceM: number; calories: number } | null {
   if (bytes.length < 8) return null;
   const op = bytes[0];
-  if (
-    op !== QCBAND_CMD_TODAY_SUMMARY &&
-    op !== QCBAND_CMD_STEPS_ALT1
-  )
-    return null;
+  if (op !== QCBAND_CMD_TODAY_SUMMARY && op !== QCBAND_CMD_STEPS_ALT1) return null;
   const u16le = (i: number) => bytes[i] | (bytes[i + 1] << 8);
   const u16be = (i: number) => (bytes[i] << 8) | bytes[i + 1];
   const u24le = (i: number) => bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16);
   const u24be = (i: number) => ((bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]) >>> 0;
-  const u32 = (i: number) => (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0;
-  const candidates: Array<{ steps: number; distanceM: number; calories: number; score: number }> = [];
+  const u32 = (i: number) =>
+    (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0;
+  const candidates: Array<{ steps: number; distanceM: number; calories: number; score: number }> =
+    [];
 
   const push = (steps: number, distanceM: number, calories: number, score = 0) => {
     if (!Number.isFinite(steps) || steps < 0 || steps > 200_000) return;
@@ -402,7 +418,8 @@ export function decodeQcBandTodaySports(
     calories = u24le(7);
     distanceM = u24le(10);
   }
-  if (steps < 0 || steps > 200_000 || distanceM < 0 || distanceM > 250_000 || calories > 25_000) return null;
+  if (steps < 0 || steps > 200_000 || distanceM < 0 || distanceM > 250_000 || calories > 25_000)
+    return null;
   return { steps, runningSteps, distanceM, calories };
 }
 
@@ -415,14 +432,22 @@ export function decodeQcBandLiveActivityNotification(
     (bytes[1] !== QCBAND_NOTIFICATION_LIVE_ACTIVITY &&
       bytes[1] !== QCBAND_NOTIFICATION_STEPS &&
       bytes[1] !== QCBAND_NOTIFICATION_ACTIVITY)
-  ) return null;
+  )
+    return null;
   // Live notification is cumulative for today. Gadgetbridge decodes the 24-bit
   // fields as [high, mid, low] from bytes 2..4 / 5..7 / 8..10.
   const u24be = (i: number) => ((bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]) >>> 0;
   const u24le = (i: number) => (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16)) >>> 0;
-  const u32le = (i: number) => (i + 3 < bytes.length ? (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0 : NaN);
-  const u32be = (i: number) => (i + 3 < bytes.length ? ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0 : NaN);
-  const candidates: Array<{ steps: number; distanceM: number; calories: number; score: number }> = [];
+  const u32le = (i: number) =>
+    i + 3 < bytes.length
+      ? (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0
+      : NaN;
+  const u32be = (i: number) =>
+    i + 3 < bytes.length
+      ? ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0
+      : NaN;
+  const candidates: Array<{ steps: number; distanceM: number; calories: number; score: number }> =
+    [];
   const push = (steps: number, distanceM = 0, calories = 0, score = 0) => {
     if (!Number.isFinite(steps) || steps < 0 || steps > 200_000) return;
     if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > 250_000) return;
@@ -430,7 +455,12 @@ export function decodeQcBandLiveActivityNotification(
     candidates.push({ steps, distanceM, calories, score });
   };
   if (bytes.length >= 11) {
-    push(u24be(2), u24be(8), Math.round(u24be(5) / 10), bytes[1] === QCBAND_NOTIFICATION_LIVE_ACTIVITY ? 8 : 6);
+    push(
+      u24be(2),
+      u24be(8),
+      Math.round(u24be(5) / 10),
+      bytes[1] === QCBAND_NOTIFICATION_LIVE_ACTIVITY ? 8 : 6,
+    );
     push(u24le(2), u24le(8), Math.round(u24le(5) / 10), 5);
   }
   if (bytes.length >= 6) {
@@ -448,12 +478,22 @@ export function decodeQcBandLiveActivityNotification(
 }
 
 export function decodeQcBandTemperatureNotification(bytes: Uint8Array): number | null {
-  if (bytes.length < 4 || bytes[0] !== QCBAND_CMD_NOTIFICATION || bytes[1] !== QCBAND_NOTIFICATION_TEMPERATURE) return null;
+  if (
+    bytes.length < 4 ||
+    bytes[0] !== QCBAND_CMD_NOTIFICATION ||
+    bytes[1] !== QCBAND_NOTIFICATION_TEMPERATURE
+  )
+    return null;
   return decodeQcBandTempPayload(bytes.slice(2));
 }
 
 export function decodeQcBandSpo2Notification(bytes: Uint8Array): number | null {
-  if (bytes.length < 3 || bytes[0] !== QCBAND_CMD_NOTIFICATION || bytes[1] !== QCBAND_NOTIFICATION_BLOOD_OXYGEN) return null;
+  if (
+    bytes.length < 3 ||
+    bytes[0] !== QCBAND_CMD_NOTIFICATION ||
+    bytes[1] !== QCBAND_NOTIFICATION_BLOOD_OXYGEN
+  )
+    return null;
   const v = bytes[2] & 0xff;
   return v >= 70 && v <= 100 ? v : null;
 }
@@ -548,7 +588,6 @@ function latestPlausibleTemperature(bytes: Uint8Array, start = 0): number | null
   return latest;
 }
 
-
 export function decodeQcBandTemperatureHistory(bytes: Uint8Array): number | null {
   const tempTypes = [
     QCBAND_BIG_DATA_TYPE_TEMPERATURE,
@@ -558,13 +597,23 @@ export function decodeQcBandTemperatureHistory(bytes: Uint8Array): number | null
   if (bytes.length >= 5 && tempTypes.includes(bytes[0])) {
     // Some bridges deliver the SDK-unpacked payload directly, e.g. 0x74
     // interval temperature: [op, interval, pocketCount, pocketIndex, records...].
-    return latestPlausibleTemperature(bytes, bytes[0] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL ? 4 : 1);
+    return latestPlausibleTemperature(
+      bytes,
+      bytes[0] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL ? 4 : 1,
+    );
   }
-  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || !tempTypes.includes(bytes[1])) return null;
+  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || !tempTypes.includes(bytes[1]))
+    return null;
   const length = bytes[2] | (bytes[3] << 8);
   if (length <= 0) return null;
-  if (bytes[1] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL || bytes[1] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_MANUAL) {
-    return latestPlausibleTemperature(bytes.slice(6), bytes[1] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL ? 4 : 0);
+  if (
+    bytes[1] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL ||
+    bytes[1] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_MANUAL
+  ) {
+    return latestPlausibleTemperature(
+      bytes.slice(6),
+      bytes[1] === QCBAND_BIG_DATA_TYPE_TEMPERATURE_INTERVAL ? 4 : 0,
+    );
   }
   let idx = 6;
   let latestToday: number | null = null;
@@ -600,7 +649,8 @@ export function decodeQcBandSpo2History(bytes: Uint8Array): number | null {
     }
     return latest;
   }
-  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || !spo2Types.includes(bytes[1])) return null;
+  if (bytes.length < 8 || bytes[0] !== QCBAND_CMD_BIG_DATA_V2 || !spo2Types.includes(bytes[1]))
+    return null;
   if (bytes[1] === QCBAND_BIG_DATA_TYPE_SPO2_INTERVAL) {
     let latest: number | null = null;
     for (let i = 10; i < bytes.length; i++) {
@@ -672,16 +722,18 @@ export type QcBandMeasureFrame = {
 export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame | null {
   if (bytes.length < 3) return null;
   if (bytes[0] !== QCBAND_CMD_START_MEASURE && bytes[0] !== QCBAND_CMD_STOP_MEASURE) return null;
-  const newSdkNoErrorByte = ([
-    QCBAND_MEASURE_HR_SDK,
-    QCBAND_MEASURE_SPO2_SDK,
-    QCBAND_MEASURE_ONE_KEY_SDK,
-    QCBAND_MEASURE_STRESS_SDK,
-    QCBAND_MEASURE_HRV_SDK,
-    QCBAND_MEASURE_PRESSURE_SDK,
-    QCBAND_MEASURE_TEMP_SDK,
-    QCBAND_MEASURE_ONE_KEY_HR,
-  ] as readonly number[]).includes(bytes[1]);
+  const newSdkNoErrorByte = (
+    [
+      QCBAND_MEASURE_HR_SDK,
+      QCBAND_MEASURE_SPO2_SDK,
+      QCBAND_MEASURE_ONE_KEY_SDK,
+      QCBAND_MEASURE_STRESS_SDK,
+      QCBAND_MEASURE_HRV_SDK,
+      QCBAND_MEASURE_PRESSURE_SDK,
+      QCBAND_MEASURE_TEMP_SDK,
+      QCBAND_MEASURE_ONE_KEY_HR,
+    ] as readonly number[]
+  ).includes(bytes[1]);
   if (newSdkNoErrorByte && bytes[2] !== 0) {
     return {
       subType: bytes[1],
@@ -697,7 +749,8 @@ export function decodeQcBandMeasureFrame(bytes: Uint8Array): QcBandMeasureFrame 
     if ((QCBAND_MEASURE_SPO2_TYPES as readonly number[]).includes(sub)) return v >= 70 && v <= 100;
     if ((QCBAND_MEASURE_HRV_TYPES as readonly number[]).includes(sub)) return v >= 5 && v < 250;
     if ((QCBAND_MEASURE_STRESS_TYPES as readonly number[]).includes(sub)) return v > 0 && v <= 100;
-    if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(sub)) return decodeQcBandTempPayload(bytes.slice(2)) != null;
+    if ((QCBAND_MEASURE_TEMP_TYPES as readonly number[]).includes(sub))
+      return decodeQcBandTempPayload(bytes.slice(2)) != null;
     if ((QCBAND_MEASURE_BP_TYPES as readonly number[]).includes(sub)) {
       return bytes.length >= 5 && v > 30 && v < 220 && bytes[3] > 60 && bytes[4] > 30;
     }
@@ -763,7 +816,8 @@ export function decodeQcBandOneKeyPayload(data: Uint8Array): {
       stress: legacyStress,
       rriMs: null as number | null,
     };
-    if (legacySpo2 != null || (legacyTemp != null && legacyHrv != null && legacyStress != null)) return legacy;
+    if (legacySpo2 != null || (legacyTemp != null && legacyHrv != null && legacyStress != null))
+      return legacy;
   }
 
   // New SDK real one-key HR model:
@@ -772,7 +826,14 @@ export function decodeQcBandOneKeyPayload(data: Uint8Array): {
   const rriB = data[3] >= 300 && data[3] <= 2000 ? data[3] : null;
   const tempU16A = u16(5);
   const tempU16B = u16(4);
-  const sdkTemp = tempFrom(tempU16A / 10, tempU16A / 100, tempU16B / 10, tempU16B / 100, data[4] / 10, data[5] / 10);
+  const sdkTemp = tempFrom(
+    tempU16A / 10,
+    tempU16A / 100,
+    tempU16B / 10,
+    tempU16B / 100,
+    data[4] / 10,
+    data[5] / 10,
+  );
   return {
     hr: validHr(data[0]),
     sbp: data.length >= 9 ? validSbp(data[7]) : data.length >= 7 ? validSbp(data[5]) : null,

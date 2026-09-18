@@ -83,7 +83,9 @@ function CourtHeatmap({
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-vyro-mute">{title}</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-vyro-mute">
+          {title}
+        </div>
         <div className="text-[10px] text-vyro-mute">{total} contacts</div>
       </div>
       <div className="relative overflow-hidden rounded-2xl border border-vyro-line bg-vyro-text/[0.02] p-1.5">
@@ -97,8 +99,12 @@ function CourtHeatmap({
                 className="relative rounded-lg border border-vyro-line/70 px-1 py-3.5 text-center"
                 style={{ background: `rgba(${hue} / ${alpha})` }}
               >
-                <div className="text-[9px] uppercase tracking-wider text-vyro-mute">{ZONE_LABELS[zone]}</div>
-                <div className="text-[13px] font-bold tabular-nums text-vyro-text">{counts[i] ?? 0}</div>
+                <div className="text-[9px] uppercase tracking-wider text-vyro-mute">
+                  {ZONE_LABELS[zone]}
+                </div>
+                <div className="text-[13px] font-bold tabular-nums text-vyro-text">
+                  {counts[i] ?? 0}
+                </div>
               </div>
             );
           })}
@@ -107,7 +113,9 @@ function CourtHeatmap({
         <div className="pointer-events-none absolute inset-x-1.5 top-[36%] h-px bg-vyro-text/25" />
         <div className="pointer-events-none absolute left-1/2 top-[36%] h-[28%] w-px -translate-x-1/2 bg-vyro-text/25" />
       </div>
-      <div className="text-[10px] text-vyro-mute">Front wall at the top · numbers are counted contacts</div>
+      <div className="text-[10px] text-vyro-mute">
+        Front wall at the top · numbers are counted contacts
+      </div>
     </div>
   );
 }
@@ -164,9 +172,18 @@ function MeasuredPanels({ measured: s }: { measured: MeasuredStats }) {
         </div>
       </Card>
 
-      <Card eyebrow="Court coverage" title="Where the shots were struck" action={<Source kind="measured" />}>
+      <Card
+        eyebrow="Court coverage"
+        title="Where the shots were struck"
+        action={<Source kind="measured" />}
+      >
         <div className="grid gap-4 sm:grid-cols-2">
-          <CourtHeatmap title="Your shots" values={s.playerHeatmap} counts={s.playerHeatCounts} tone="player" />
+          <CourtHeatmap
+            title="Your shots"
+            values={s.playerHeatmap}
+            counts={s.playerHeatCounts}
+            tone="player"
+          />
           <CourtHeatmap
             title="Opponent shots"
             values={s.opponentHeatmap}
@@ -214,29 +231,35 @@ function CoveragePanel({ measured: s }: { measured: MeasuredStats }) {
       </div>
       {dropped > 0 && (
         <p className="mt-3 text-[12px] leading-snug text-vyro-text/70">
-          Skipped {mins(dropped)}: {mins(rejected.closeUp)} close-ups and replays, {mins(rejected.unstable)} pans
-          and wipes, {mins(rejected.noPlay)} with no live play, {mins(rejected.tooShort)} too short to measure.
-          Every remaining shot got its own court fit, so nothing from a different framing is mixed in.
+          Skipped {mins(dropped)}: {mins(rejected.closeUp)} close-ups and replays,{" "}
+          {mins(rejected.unstable)} pans and wipes, {mins(rejected.noPlay)} with no live play,{" "}
+          {mins(rejected.tooShort)} too short to measure. Every remaining shot got its own court
+          fit, so nothing from a different framing is mixed in.
         </p>
       )}
       {s.measurableSeconds === 0 && (
         <p className="mt-3 text-[12px] leading-snug text-vyro-amber">
-          No shot in this clip gave a readable court view with you identified, so T discipline and the heat maps
-          below are empty. A single continuous camera behind the court fixes this.
+          No shot in this clip gave a readable court view with you identified, so T discipline and
+          the heat maps below are empty. A single continuous camera behind the court fixes this.
         </p>
       )}
       {thin && (
         <p className="mt-3 text-[12px] leading-snug text-vyro-text/70">
-          Only {mins(s.measurableSeconds)} of court-fitted play — treat the court numbers as indicative, not exact.
+          Only {mins(s.measurableSeconds)} of court-fitted play — treat the court numbers as
+          indicative, not exact.
         </p>
       )}
     </Card>
   );
 }
 
-
-
-function VerifiedPanel({ verified: v, measured }: { verified: VerifiedCounts; measured: MeasuredStats }) {
+function VerifiedPanel({
+  verified: v,
+  measured,
+}: {
+  verified: VerifiedCounts;
+  measured: MeasuredStats;
+}) {
   const mix = v.scaledShotMix;
   const sideTotal = v.side.forehand + v.side.backhand;
   return (
@@ -248,8 +271,8 @@ function VerifiedPanel({ verified: v, measured }: { verified: VerifiedCounts; me
       >
         {v.framesLabelled === 0 ? (
           <p className="text-[13px] leading-snug text-vyro-text/75">
-            The vision pass could not confidently read a single contact frame, so no shot mix is shown
-            rather than a guessed one.
+            The vision pass could not confidently read a single contact frame, so no shot mix is
+            shown rather than a guessed one.
           </p>
         ) : (
           <>
@@ -270,7 +293,8 @@ function VerifiedPanel({ verified: v, measured }: { verified: VerifiedCounts; me
             {mix ? (
               <>
                 <div className="mt-3 text-[11px] uppercase tracking-wider text-vyro-mute">
-                  Shot families, scaled from the verified sample to {measured.contactCount} measured contacts
+                  Shot families, scaled from the verified sample to {measured.contactCount} measured
+                  contacts
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <Stat label="Drives" value={mix.drive} />
@@ -285,8 +309,8 @@ function VerifiedPanel({ verified: v, measured }: { verified: VerifiedCounts; me
               </>
             ) : (
               <p className="mt-3 text-[12px] leading-snug text-vyro-text/70">
-                Too few frames were readable to scale a shot-family breakdown — raw verified counts only:
-                {" "}
+                Too few frames were readable to scale a shot-family breakdown — raw verified counts
+                only:{" "}
                 {Object.entries(v.family)
                   .filter(([, n]) => n > 0)
                   .map(([k, n]) => `${k} ${n}`)
@@ -298,7 +322,10 @@ function VerifiedPanel({ verified: v, measured }: { verified: VerifiedCounts; me
               <Stat label="Prep high" value={v.racketPrep.high} />
               <Stat label="Prep low" value={v.racketPrep.low} />
               <Stat label="Prep late" value={v.racketPrep.late} />
-              <Stat label="Segments ok" value={`${v.segmentsOk}/${v.segmentsOk + v.segmentsFailed}`} />
+              <Stat
+                label="Segments ok"
+                value={`${v.segmentsOk}/${v.segmentsOk + v.segmentsFailed}`}
+              />
             </div>
           </>
         )}
@@ -307,17 +334,17 @@ function VerifiedPanel({ verified: v, measured }: { verified: VerifiedCounts; me
       <Card eyebrow="Outcomes" title="Winners & errors">
         {v.rallyEndFrames > 0 ? (
           <p className="text-[13px] leading-snug text-vyro-text/85">
-            {v.rallyEndFrames} of the {v.framesSent} sampled contact frames looked like a rally ending.
-            That is a sample, not a full count — a complete winner / forced / unforced breakdown needs
-            ball tracking this camera angle can't give.
+            {v.rallyEndFrames} of the {v.framesSent} sampled contact frames looked like a rally
+            ending. That is a sample, not a full count — a complete winner / forced / unforced
+            breakdown needs ball tracking this camera angle can't give.
           </p>
         ) : (
           <div className="space-y-2">
             <Source kind="none" />
             <p className="text-[13px] leading-snug text-vyro-text/75">
-              No winner or error count is shown. Deciding a winner from a forced or unforced error needs
-              the ball's bounce and the wall it hit, which isn't recoverable from this footage — so the
-              app reports nothing instead of inventing numbers.
+              No winner or error count is shown. Deciding a winner from a forced or unforced error
+              needs the ball's bounce and the wall it hit, which isn't recoverable from this footage
+              — so the app reports nothing instead of inventing numbers.
             </p>
           </div>
         )}
@@ -364,7 +391,9 @@ export function AiVideoView() {
       const found = await probeForIdentity(f, setProgress);
       setCandidates(found);
       if (!found.length) {
-        toast.info("Could not read frames to identify players — the scan will label players by camera depth.");
+        toast.info(
+          "Could not read frames to identify players — the scan will label players by camera depth.",
+        );
       }
     } catch {
       toast.error("Could not read frames from that video.");
@@ -375,10 +404,7 @@ export function AiVideoView() {
   };
 
   /** A tap anywhere on the frame reads the kit colour from the real pixels. */
-  const onTapFrame = async (
-    e: React.MouseEvent<HTMLDivElement>,
-    candidate: IdentityCandidate,
-  ) => {
+  const onTapFrame = async (e: React.MouseEvent<HTMLDivElement>, candidate: IdentityCandidate) => {
     const rect = e.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const x = (e.clientX - rect.left) / rect.width;
@@ -412,7 +438,6 @@ export function AiVideoView() {
     setPending(null);
   };
 
-
   const run = useMutation({
     mutationFn: async (input: { f: File; identity: IdentityPick | null }): Promise<MatchReport> => {
       const { f } = input;
@@ -439,7 +464,11 @@ export function AiVideoView() {
       setAiStage("Verifying contact frames with the AI, then writing your report…");
 
       const res = await analyze({ data: payload });
-      const full: MatchReport = { ...base, verified: res.verified ?? null, insight: res.insight ?? null };
+      const full: MatchReport = {
+        ...base,
+        verified: res.verified ?? null,
+        insight: res.insight ?? null,
+      };
       setReport(full);
       if (res.error) toast.error(res.error);
 
@@ -491,7 +520,6 @@ export function AiVideoView() {
     [history.data],
   );
 
-
   return (
     <div className="space-y-4">
       <PageHeader
@@ -535,7 +563,11 @@ export function AiVideoView() {
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-vyro-mint px-4 py-3 text-sm font-bold text-black disabled:opacity-40"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            {busy ? "Analysing…" : identity ? "Analyse match" : "Analyse match (auto-detect players)"}
+            {busy
+              ? "Analysing…"
+              : identity
+                ? "Analyse match"
+                : "Analyse match (auto-detect players)"}
           </button>
           {!busy && !report && (
             <p className="text-[11px] leading-snug text-vyro-mute">
@@ -549,12 +581,16 @@ export function AiVideoView() {
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-vyro-text/10">
                 <div
                   className="h-full rounded-full bg-vyro-mint transition-all"
-                  style={{ width: `${Math.round((aiStage ? 0.97 : (progress?.ratio ?? 0)) * 100)}%` }}
+                  style={{
+                    width: `${Math.round((aiStage ? 0.97 : (progress?.ratio ?? 0)) * 100)}%`,
+                  }}
                 />
               </div>
               <div className="flex items-center justify-between gap-2 text-[11px] text-vyro-mute">
                 <span className="truncate">{aiStage ?? progress?.label}</span>
-                {progress && <span className="shrink-0 tabular-nums">{Math.round(progress.elapsedSec)}s</span>}
+                {progress && (
+                  <span className="shrink-0 tabular-nums">{Math.round(progress.elapsedSec)}s</span>
+                )}
               </div>
               <button
                 type="button"
@@ -637,7 +673,6 @@ export function AiVideoView() {
                     }}
                   />
                 )}
-
               </div>
 
               {pending ? (
@@ -702,11 +737,8 @@ export function AiVideoView() {
               )}
             </div>
           )}
-
         </Card>
       )}
-
-
 
       {!report && !busy && (
         <EmptyState
@@ -719,7 +751,11 @@ export function AiVideoView() {
         <>
           <Card
             eyebrow="Player identity"
-            title={report.measured.identitySource === "tapped" ? "You picked yourself" : "Players detected automatically"}
+            title={
+              report.measured.identitySource === "tapped"
+                ? "You picked yourself"
+                : "Players detected automatically"
+            }
           >
             <p className="text-[13px] leading-snug text-vyro-text/85">
               {report.measured.identitySource === "tapped"
@@ -739,8 +775,6 @@ export function AiVideoView() {
 
           <CoveragePanel measured={report.measured} />
 
-
-
           {insight && (
             <Card eyebrow={`Confidence · ${insight.confidence}`} title={insight.headline}>
               <p className="text-[13px] leading-relaxed text-vyro-text/85">{insight.summary}</p>
@@ -753,27 +787,40 @@ export function AiVideoView() {
             <Card eyebrow="Coach read" title="On your T discipline">
               <p className="text-[13px] leading-snug text-vyro-text/85">{insight.tNote}</p>
               {insight.heatmapNote && (
-                <p className="mt-2 text-[13px] leading-snug text-vyro-text/85">{insight.heatmapNote}</p>
+                <p className="mt-2 text-[13px] leading-snug text-vyro-text/85">
+                  {insight.heatmapNote}
+                </p>
               )}
               {insight.rallyNote && (
-                <p className="mt-2 text-[13px] leading-snug text-vyro-text/85">{insight.rallyNote}</p>
+                <p className="mt-2 text-[13px] leading-snug text-vyro-text/85">
+                  {insight.rallyNote}
+                </p>
               )}
             </Card>
           )}
 
-          {report.verified && <VerifiedPanel verified={report.verified} measured={report.measured} />}
+          {report.verified && (
+            <VerifiedPanel verified={report.verified} measured={report.measured} />
+          )}
 
           {insight && insight.timeline.length > 0 && (
             <Card eyebrow="Timeline" title="Key moments">
               <div className="space-y-3">
                 {insight.timeline.map((row, i) => (
-                  <div key={i} className="rounded-2xl border border-vyro-line bg-vyro-text/[0.03] p-3">
+                  <div
+                    key={i}
+                    className="rounded-2xl border border-vyro-line bg-vyro-text/[0.03] p-3"
+                  >
                     <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-wider text-vyro-mute">
                       <span className="tabular-nums">{row.time}</span>
                       <span className="truncate">{row.phase}</span>
                     </div>
-                    <div className="mt-1 text-[13px] font-semibold text-vyro-text">{row.keyShot}</div>
-                    <div className="text-[13px] leading-snug text-vyro-text/80">{row.observation}</div>
+                    <div className="mt-1 text-[13px] font-semibold text-vyro-text">
+                      {row.keyShot}
+                    </div>
+                    <div className="text-[13px] leading-snug text-vyro-text/80">
+                      {row.observation}
+                    </div>
                     <div className="mt-1.5 flex gap-2 text-[12px] text-vyro-mint">
                       <Target className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       <span>{row.coachingCue}</span>
@@ -840,13 +887,16 @@ export function AiVideoView() {
                 onClick={() => {
                   const saved = row.insight as unknown as MatchReport | null;
                   if (saved?.measured) setReport(saved);
-                  else toast.info("That report was saved by an older version and can't be reopened.");
+                  else
+                    toast.info("That report was saved by an older version and can't be reopened.");
                 }}
                 className="flex w-full items-center gap-3 rounded-2xl border border-vyro-line bg-vyro-text/[0.03] p-3 text-left"
               >
                 <Flame className="h-4 w-4 shrink-0 text-vyro-mint" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-semibold text-vyro-text">{row.video_name}</div>
+                  <div className="truncate text-[13px] font-semibold text-vyro-text">
+                    {row.video_name}
+                  </div>
                   <div className="text-[11px] text-vyro-mute">
                     {new Date(row.created_at).toLocaleString()} · {Math.round(row.duration_sec)}s
                   </div>

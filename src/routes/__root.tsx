@@ -15,7 +15,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 
-
 function NotFoundComponent() {
   const navigate = useNavigate();
 
@@ -152,13 +151,10 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   usePushNotifications();
 
-
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <Toaster />
     </QueryClientProvider>
   );
-
 }
-

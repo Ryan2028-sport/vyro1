@@ -100,7 +100,9 @@ export function Stat({
         <span className="text-[22px] font-black leading-none tracking-[-0.045em] tabular-nums text-vyro-text">
           {value}
         </span>
-        {unit && <span className="font-mono text-[9.5px] font-semibold text-vyro-mute">{unit}</span>}
+        {unit && (
+          <span className="font-mono text-[9.5px] font-semibold text-vyro-mute">{unit}</span>
+        )}
       </div>
       {hint && <div className="mt-1.5 font-mono text-[9.5px] text-vyro-mute">{hint}</div>}
     </div>
@@ -149,7 +151,9 @@ export function MetricTile({
         <span className="text-[24px] font-black leading-none tracking-[-0.045em] tabular-nums text-vyro-text">
           {value}
         </span>
-        {unit && <span className="font-mono text-[9.5px] font-semibold text-vyro-mute">{unit}</span>}
+        {unit && (
+          <span className="font-mono text-[9.5px] font-semibold text-vyro-mute">{unit}</span>
+        )}
       </div>
       {delta && <div className="mt-2 font-mono text-[9.5px] text-vyro-mint">{delta}</div>}
       {progress != null && (
@@ -181,7 +185,9 @@ export function SectionHeader({
             {eyebrow}
           </div>
         )}
-        <h3 className="mt-1 truncate text-base font-extrabold tracking-[-0.028em] text-vyro-text">{title}</h3>
+        <h3 className="mt-1 truncate text-base font-extrabold tracking-[-0.028em] text-vyro-text">
+          {title}
+        </h3>
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
@@ -246,7 +252,12 @@ export function Sparkline({
   tone?: "mint" | "amber" | "rose" | "spatial";
 }) {
   if (points.length < 2) {
-    return <div className="h-[34px] rounded-lg border border-dashed border-vyro-line" style={{ height }} />;
+    return (
+      <div
+        className="h-[34px] rounded-lg border border-dashed border-vyro-line"
+        style={{ height }}
+      />
+    );
   }
   const stroke =
     tone === "amber"
@@ -268,7 +279,14 @@ export function Sparkline({
     .join(" ");
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ height }} className="w-full">
-      <path d={d} fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <path
+        d={d}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
     </svg>
   );
 }
@@ -285,7 +303,9 @@ export function EmptyState({
   return (
     <div className="rounded-[18px] border border-dashed border-vyro-line bg-vyro-text/[0.02] p-6 text-center">
       <div className="text-sm font-extrabold tracking-[-0.02em] text-vyro-text">{title}</div>
-      {hint && <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-vyro-mute">{hint}</p>}
+      {hint && (
+        <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-vyro-mute">{hint}</p>
+      )}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -313,13 +333,14 @@ export function PageHeader({
         <h2 className="mt-1.5 text-[26px] font-black leading-[1.06] tracking-[-0.04em] text-vyro-text">
           {title}
         </h2>
-        {subtitle && <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-vyro-mute">{subtitle}</p>}
+        {subtitle && (
+          <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-vyro-mute">{subtitle}</p>
+        )}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
-
 
 // Circular progress ring used for the readiness hero. Pure SVG so it
 // renders crisp at any size and doesn't pull in a charting library.
@@ -344,7 +365,11 @@ export function Ring({
   const c = 2 * Math.PI * r;
   const pct = value == null ? 0 : Math.max(0, Math.min(1, value / max));
   const color =
-    tone === "amber" ? "var(--vyro-amber)" : tone === "rose" ? "var(--vyro-rose)" : "var(--vyro-mint)";
+    tone === "amber"
+      ? "var(--vyro-amber)"
+      : tone === "rose"
+        ? "var(--vyro-rose)"
+        : "var(--vyro-mint)";
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg
@@ -354,7 +379,14 @@ export function Ring({
         className="-rotate-90 block"
         style={{ overflow: "visible" }}
       >
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--vyro-line)" strokeWidth={stroke} fill="none" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="var(--vyro-line)"
+          strokeWidth={stroke}
+          fill="none"
+        />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -373,7 +405,9 @@ export function Ring({
           {value ?? "—"}
         </div>
         {label && (
-          <div className="mt-1.5 font-mono text-[8px] uppercase tracking-[0.22em] text-vyro-mute">{label}</div>
+          <div className="mt-1.5 font-mono text-[8px] uppercase tracking-[0.22em] text-vyro-mute">
+            {label}
+          </div>
         )}
         {sub && <div className="mt-1 font-mono text-[8px] text-vyro-mute">{sub}</div>}
       </div>

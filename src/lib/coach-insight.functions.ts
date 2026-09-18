@@ -32,7 +32,8 @@ export type CoachInsight = {
 
 const FallbackInsight: CoachInsight = {
   headline: "Waiting on band signals…",
-  opportunity: "Once HRV, sleep and load stream from the band, your top opportunity for the day will appear here.",
+  opportunity:
+    "Once HRV, sleep and load stream from the band, your top opportunity for the day will appear here.",
   risk: "Risk callouts unlock as soon as the band reports recovery, stress and accumulated load.",
 };
 
@@ -76,7 +77,7 @@ export const getCoachInsight = createServerFn({ method: "POST" })
       "Only reason over the metrics provided — never invent values. " +
       "Tone: confident, specific, plain English, no hedging, no emojis. " +
       "Each field is one sentence (≤ 22 words). " +
-      "Output strict JSON: {\"headline\": string, \"opportunity\": string, \"risk\": string}.";
+      'Output strict JSON: {"headline": string, "opportunity": string, "risk": string}.';
 
     const user =
       `Athlete metrics right now:\n${metricBlock}\n\n` +
@@ -104,7 +105,8 @@ export const getCoachInsight = createServerFn({ method: "POST" })
       if (!res.ok) {
         const body = await res.text().catch(() => "");
         if (res.status === 429) throw new Error("Coach is rate-limited. Try again in a moment.");
-        if (res.status === 402) throw new Error("AI credits exhausted. Add credits to keep using the coach.");
+        if (res.status === 402)
+          throw new Error("AI credits exhausted. Add credits to keep using the coach.");
         throw new Error(`Coach unavailable (${res.status}): ${body.slice(0, 160)}`);
       }
 
