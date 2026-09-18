@@ -11,11 +11,13 @@
 /** Row shape returned by the sleep-nights server function. */
 type RemoteSleepRow = {
   end_at: string;
-  score: number | null;
-  asleep_min: number | null;
-  in_bed_min: number | null;
-  wakeups: number | null;
-  [key: string]: unknown;
+  score: number;
+  asleep_min: number;
+  in_bed_min: number;
+  wakeups: number;
+  stages?: SleepNight["stages"] | null;
+  debt_min?: number | null;
+  hypnogram?: SleepNight["hypnogram"] | null;
 };
 
 import { useEffect, useState } from "react";

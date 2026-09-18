@@ -27953,25 +27953,23 @@ Error generating stack: ` +
                               t.jsxs("div", {
                                 className: "social-comments",
                                 children: [
-                                  j.comments
-                                    .slice(-2)
-                                    .map((S, E) =>
-                                      t.jsxs(
-                                        "div",
-                                        {
-                                          className: "text-[11px] text-muted-foreground",
-                                          children: [
-                                            t.jsx("span", {
-                                              className: "text-foreground font-semibold",
-                                              children: E === 0 ? "Coach" : "Teammate",
-                                            }),
-                                            " ",
-                                            S,
-                                          ],
-                                        },
-                                        E,
-                                      ),
+                                  j.comments.slice(-2).map((S, E) =>
+                                    t.jsxs(
+                                      "div",
+                                      {
+                                        className: "text-[11px] text-muted-foreground",
+                                        children: [
+                                          t.jsx("span", {
+                                            className: "text-foreground font-semibold",
+                                            children: E === 0 ? "Coach" : "Teammate",
+                                          }),
+                                          " ",
+                                          S,
+                                        ],
+                                      },
+                                      E,
                                     ),
+                                  ),
                                   t.jsxs("div", {
                                     className: "flex gap-2 mt-2",
                                     children: [
@@ -29662,33 +29660,31 @@ Error generating stack: ` +
                 "text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2",
               children: r,
             }),
-            a
-              .slice(0, 3)
-              .map((o, d) =>
-                t.jsxs(
-                  "div",
-                  {
-                    className: "flex items-center justify-between py-1 text-[11px]",
-                    children: [
-                      t.jsxs("span", {
-                        className: "flex items-center gap-2",
-                        children: [
-                          t.jsx("span", {
-                            className: `w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${d === 0 ? "bg-teal/20 text-teal" : "bg-[hsl(var(--muted))] text-muted-foreground"}`,
-                            children: d + 1,
-                          }),
-                          o.name,
-                        ],
-                      }),
-                      t.jsxs("span", {
-                        className: "font-bold tabular-nums",
-                        children: [o.value.toLocaleString(), i],
-                      }),
-                    ],
-                  },
-                  d,
-                ),
+            a.slice(0, 3).map((o, d) =>
+              t.jsxs(
+                "div",
+                {
+                  className: "flex items-center justify-between py-1 text-[11px]",
+                  children: [
+                    t.jsxs("span", {
+                      className: "flex items-center gap-2",
+                      children: [
+                        t.jsx("span", {
+                          className: `w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${d === 0 ? "bg-teal/20 text-teal" : "bg-[hsl(var(--muted))] text-muted-foreground"}`,
+                          children: d + 1,
+                        }),
+                        o.name,
+                      ],
+                    }),
+                    t.jsxs("span", {
+                      className: "font-bold tabular-nums",
+                      children: [o.value.toLocaleString(), i],
+                    }),
+                  ],
+                },
+                d,
               ),
+            ),
           ],
         });
       }

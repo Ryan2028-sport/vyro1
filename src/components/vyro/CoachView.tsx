@@ -385,7 +385,7 @@ function planItems(
   return items;
 }
 
-function Mini({ label, v }: { label: string; v: unknown }) {
+function Mini({ label, v }: { label: string; v: React.ReactNode }) {
   return (
     <div className="rounded-lg bg-vyro-text/[0.04] py-1">
       <div className="font-mono text-[8px] uppercase tracking-wider text-vyro-mute">{label}</div>

@@ -3,6 +3,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMySessions } from "@/lib/sessions.functions";
 import { Card, EmptyState, PageHeader, Pill } from "./shared";
 
+/** Numeric roll-up stored alongside a recorded session. */
+type SessionSummary = Partial<Record<string, number>>;
+
 // =============================================================================
 // History view — strict real-data mode. Trends only render once we have
 // at least two saved sessions; otherwise every card shows an empty state.
@@ -49,7 +52,7 @@ export function HistoryView() {
         )}
         <div className="space-y-3">
           {sessions?.map((s) => {
-            const summary = (s.summary || {}) as Record<string, unknown>;
+            const summary = (s.summary || {}) as SessionSummary;
             return (
               <div key={s.id} className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -100,7 +103,7 @@ export function HistoryView() {
   );
 }
 
-function Mini({ label, v }: { label: string; v: unknown }) {
+function Mini({ label, v }: { label: string; v: React.ReactNode }) {
   return (
     <div className="rounded-lg bg-vyro-text/[0.04] py-1.5">
       <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">{label}</div>
