@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { parseSegmentLabels } from "./video-analysis-core";
 
-const label = { t: 1.5, striker: "player", side: "forehand", depth: "front", family: "drop" };
+const label = {
+  frame: 1,
+  striking: "near",
+  side: "forehand",
+  depth: "front",
+  family: "drop",
+  racketPrep: "high",
+  rallyEnd: false,
+  note: "",
+};
 
 describe("parseSegmentLabels", () => {
   it("accepts the documented {labels:[...]} shape", () => {

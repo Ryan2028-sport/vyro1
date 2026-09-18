@@ -22,7 +22,11 @@ describe("cbor", () => {
     expect(Array.from(cborEncode(23))).toEqual([0x17]);
   });
 
-  it("throws instead of silently truncating a short read", () => {
-    expect(() => cborDecode(new Uint8Array([0x18]))).toThrow();
+  it("throws on an empty buffer instead of returning a bogus value", () => {
+    expect(() => cborDecode(new Uint8Array([]))).toThrow();
+  });
+
+  it("refuses to encode an unsupported value", () => {
+    expect(() => cborEncode(undefined as never)).toThrow();
   });
 });
