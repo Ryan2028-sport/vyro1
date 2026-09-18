@@ -82,11 +82,7 @@ export interface DirectionChangeEvent {
   currLrG: SatValue;
 }
 
-export type VyroMotionEvent =
-  | SwingEvent
-  | RapidStartEvent
-  | BurstEvent
-  | DirectionChangeEvent;
+export type VyroMotionEvent = SwingEvent | RapidStartEvent | BurstEvent | DirectionChangeEvent;
 
 export class DecodeError extends Error {}
 
@@ -97,9 +93,7 @@ function asBytes(input: ArrayBuffer | Uint8Array | DataView): Uint8Array {
 }
 
 /** Decode a single motion event packet. Throws DecodeError on bad input. */
-export function decodeMotionEvent(
-  input: ArrayBuffer | Uint8Array | DataView,
-): VyroMotionEvent {
+export function decodeMotionEvent(input: ArrayBuffer | Uint8Array | DataView): VyroMotionEvent {
   const bytes = asBytes(input);
   if (bytes.length < 2) throw new DecodeError("packet too short");
   const type = bytes[0];
@@ -167,8 +161,7 @@ export function hexToBytes(hex: string): Uint8Array {
   const clean = hex.replace(/[^0-9a-fA-F]/g, "");
   if (clean.length % 2) throw new DecodeError("odd hex length");
   const out = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < out.length; i++)
-    out[i] = parseInt(clean.substr(i * 2, 2), 16);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.substr(i * 2, 2), 16);
   return out;
 }
 
@@ -184,7 +177,6 @@ export function base64ToBytes(b64: string): Uint8Array {
 export function decodeMotionEventFromString(value: string): VyroMotionEvent {
   // Hex if it only contains hex chars/whitespace/colons and has even nibble count.
   const isHex =
-    /^[0-9a-fA-F\s:]+$/.test(value) &&
-    value.replace(/[^0-9a-fA-F]/g, "").length % 2 === 0;
+    /^[0-9a-fA-F\s:]+$/.test(value) && value.replace(/[^0-9a-fA-F]/g, "").length % 2 === 0;
   return decodeMotionEvent(isHex ? hexToBytes(value) : base64ToBytes(value));
 }

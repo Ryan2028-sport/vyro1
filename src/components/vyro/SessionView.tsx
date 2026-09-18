@@ -53,13 +53,28 @@ function Spark({
   const H = height;
   const step = W / (points.length - 1);
   const path = points
-    .map((v, i) => `${i === 0 ? "M" : "L"}${(i * step).toFixed(1)},${(H - ((v - lo) / span) * (H - 6) - 3).toFixed(1)}`)
+    .map(
+      (v, i) =>
+        `${i === 0 ? "M" : "L"}${(i * step).toFixed(1)},${(H - ((v - lo) / span) * (H - 6) - 3).toFixed(1)}`,
+    )
     .join(" ");
   const area = `${path} L${W},${H} L0,${H} Z`;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block w-full" style={{ height }}>
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      className="block w-full"
+      style={{ height }}
+    >
       {fill && <path d={area} fill={color} opacity={0.15} />}
-      <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -119,7 +134,8 @@ export function SessionView() {
   //  - "T recoveries" = direction_change count (last gap < 1.2s = sharp return)
   const bursts = live.counts.burst + live.counts.rapid_start;
   const recoveries = live.counts.direction_change;
-  const tControl = bursts === 0 ? 0 : Math.round(Math.min(1, recoveries / Math.max(1, bursts)) * 100);
+  const tControl =
+    bursts === 0 ? 0 : Math.round(Math.min(1, recoveries / Math.max(1, bursts)) * 100);
 
   async function onStart() {
     setStartedAt(Date.now());
@@ -131,12 +147,20 @@ export function SessionView() {
     }
   }
   async function onPause() {
-    try { await band.pauseSession(); } catch (e) { console.warn("[vyro] pauseSession failed", e); }
+    try {
+      await band.pauseSession();
+    } catch (e) {
+      console.warn("[vyro] pauseSession failed", e);
+    }
   }
   async function onEnd() {
     const ended = Date.now();
     const started = startedAt ?? ended;
-    try { await band.endSession(); } catch (e) { console.warn("[vyro] endSession failed", e); }
+    try {
+      await band.endSession();
+    } catch (e) {
+      console.warn("[vyro] endSession failed", e);
+    }
     try {
       await saveMut.mutateAsync({
         data: {
@@ -206,7 +230,6 @@ export function SessionView() {
     return { buckets, total };
   }, [sessionHr]);
 
-
   return (
     <div className="space-y-4">
       <PageHeader
@@ -225,7 +248,9 @@ export function SessionView() {
         eyebrow="VYRO Band"
         title={band.pairedName ?? "VYRO Motion"}
         action={
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">v0.4-alpha</span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">
+            v0.4-alpha
+          </span>
         }
       >
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -265,7 +290,8 @@ export function SessionView() {
       {idle && (
         <Card eyebrow="Start session" title="Ready to track">
           <p className="text-xs leading-relaxed text-vyro-mute">
-            Press start when you step on court. VYRO will detect every burst to a corner and recovery back to the T.
+            Press start when you step on court. VYRO will detect every burst to a corner and
+            recovery back to the T.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {SPORTS.map((s) => (
@@ -352,7 +378,11 @@ export function SessionView() {
           <Card
             eyebrow="Heart rate · 60s"
             title={live.heartRateBpm != null ? `${live.heartRateBpm} bpm` : "Live HR stream"}
-            action={currentZone ? <Pill tone={currentZone >= 4 ? "warn" : "live"}>Z{currentZone}</Pill> : undefined}
+            action={
+              currentZone ? (
+                <Pill tone={currentZone >= 4 ? "warn" : "live"}>Z{currentZone}</Pill>
+              ) : undefined
+            }
           >
             {hrSpark.length >= 2 ? (
               <Spark
@@ -365,7 +395,9 @@ export function SessionView() {
               />
             ) : (
               <div className="flex h-[88px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-vyro-line text-center">
-                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-vyro-mute">waiting for HR</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-vyro-mute">
+                  waiting for HR
+                </span>
                 <span className="text-[10px] text-vyro-mute">
                   HR samples arrive every few seconds once the band's PPG sensor warms up.
                 </span>
@@ -381,17 +413,40 @@ export function SessionView() {
               </span>
             }
           >
-            <Spark points={accelSeries} color="var(--vyro-mint)" fill height={88} min={0} max={Math.max(4, ...(accelSeries.length ? [Math.max(...accelSeries)] : [4]))} />
+            <Spark
+              points={accelSeries}
+              color="var(--vyro-mint)"
+              fill
+              height={88}
+              min={0}
+              max={Math.max(4, ...(accelSeries.length ? [Math.max(...accelSeries)] : [4]))}
+            />
             <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-vyro-mute">
-              <div>events/min · <span className="text-vyro-text">{live.eventsLastMin}</span></div>
-              <div>peak ω · <span className="text-vyro-text">{fmtNum(live.peakDps, live.connected, 0)} dps</span></div>
-              <div>fastest Δ · <span className="text-vyro-text">{fmtNum(live.reactMin, live.connected, 0, " ms")}</span></div>
+              <div>
+                events/min · <span className="text-vyro-text">{live.eventsLastMin}</span>
+              </div>
+              <div>
+                peak ω ·{" "}
+                <span className="text-vyro-text">
+                  {fmtNum(live.peakDps, live.connected, 0)} dps
+                </span>
+              </div>
+              <div>
+                fastest Δ ·{" "}
+                <span className="text-vyro-text">
+                  {fmtNum(live.reactMin, live.connected, 0, " ms")}
+                </span>
+              </div>
             </div>
           </Card>
 
           <Card
             eyebrow="HR Zone distribution (live)"
-            title={zoneDist.total > 0 ? `${Math.round(zoneDist.total / 1000)}s recorded` : "Awaiting HR stream"}
+            title={
+              zoneDist.total > 0
+                ? `${Math.round(zoneDist.total / 1000)}s recorded`
+                : "Awaiting HR stream"
+            }
           >
             <ul className="space-y-1.5">
               {["Z1", "Z2", "Z3", "Z4", "Z5"].map((z, i) => {
@@ -406,9 +461,14 @@ export function SessionView() {
                 ];
                 return (
                   <li key={z} className="flex items-center gap-2">
-                    <span className="w-8 font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">{z}</span>
+                    <span className="w-8 font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mute">
+                      {z}
+                    </span>
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-vyro-elev">
-                      <div className={`h-full ${colors[i]} transition-[width] duration-500`} style={{ width: `${pct}%` }} />
+                      <div
+                        className={`h-full ${colors[i]} transition-[width] duration-500`}
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
                     <span className="w-10 text-right font-mono text-[10px] text-vyro-mute">
                       {zoneDist.total > 0 ? `${Math.round(pct)}%` : "—"}
@@ -418,7 +478,8 @@ export function SessionView() {
               })}
             </ul>
             <p className="mt-2 text-[10px] text-vyro-mute">
-              Zones computed against max HR {maxHr} bpm · Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4 80–90% · Z5 90%+.
+              Zones computed against max HR {maxHr} bpm · Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4
+              80–90% · Z5 90%+.
             </p>
           </Card>
 
@@ -444,35 +505,44 @@ export function SessionView() {
       {live.events.length > 0 && (
         <Card eyebrow="Event stream" title={`Last ${Math.min(20, live.events.length)} events`}>
           <ul className="divide-y divide-black/[0.06]">
-            {[...live.events].slice(-20).reverse().map((e, i) => {
-              const ev = e.event as {
-                type: string;
-                accelPeakG?: { value: number };
-                gyroPeakDps?: { value: number };
-                intensity?: number;
-                durationMs?: number;
-              };
-              const time = new Date(e.ts).toLocaleTimeString();
-              return (
-                <li key={`${e.ts}-${i}`} className="flex items-center justify-between gap-2 py-2 text-xs">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mint">{ev.type}</span>
-                  <span className="font-mono text-[10px] text-vyro-mute">{time}</span>
-                  <span className="text-right font-mono text-[10px] text-vyro-mute">
-                    {ev.accelPeakG?.value != null && `g ${ev.accelPeakG.value.toFixed(2)} `}
-                    {ev.gyroPeakDps?.value != null && `· ω ${ev.gyroPeakDps.value.toFixed(0)} `}
-                    {ev.intensity != null && `· i ${ev.intensity} `}
-                    {ev.durationMs != null && `· ${ev.durationMs}ms`}
-                  </span>
-                </li>
-              );
-            })}
+            {[...live.events]
+              .slice(-20)
+              .reverse()
+              .map((e, i) => {
+                const ev = e.event as {
+                  type: string;
+                  accelPeakG?: { value: number };
+                  gyroPeakDps?: { value: number };
+                  intensity?: number;
+                  durationMs?: number;
+                };
+                const time = new Date(e.ts).toLocaleTimeString();
+                return (
+                  <li
+                    key={`${e.ts}-${i}`}
+                    className="flex items-center justify-between gap-2 py-2 text-xs"
+                  >
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-vyro-mint">
+                      {ev.type}
+                    </span>
+                    <span className="font-mono text-[10px] text-vyro-mute">{time}</span>
+                    <span className="text-right font-mono text-[10px] text-vyro-mute">
+                      {ev.accelPeakG?.value != null && `g ${ev.accelPeakG.value.toFixed(2)} `}
+                      {ev.gyroPeakDps?.value != null && `· ω ${ev.gyroPeakDps.value.toFixed(0)} `}
+                      {ev.intensity != null && `· i ${ev.intensity} `}
+                      {ev.durationMs != null && `· ${ev.durationMs}ms`}
+                    </span>
+                  </li>
+                );
+              })}
           </ul>
         </Card>
       )}
 
       {/* Hidden marker so reviewers know nothing here is faked */}
       <div className="pt-1 text-center font-mono text-[9px] uppercase tracking-[0.2em] text-vyro-mute">
-        <Activity className="mr-1 inline h-3 w-3" /> all values streamed from band · no synthetic data
+        <Activity className="mr-1 inline h-3 w-3" /> all values streamed from band · no synthetic
+        data
       </div>
     </div>
   );

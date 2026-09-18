@@ -7,7 +7,6 @@ import {
   Brain,
   CalendarDays,
   ChevronDown,
-
   Gauge,
   Heart,
   LineChart,
@@ -51,7 +50,6 @@ import { SegmentedTabs } from "./shared";
 import { AiVideoView } from "./AiVideoView";
 import "./app2-reference.css";
 
-
 // Baselines, recovery, readiness, strain and RTP all come from
 // <VyroScoresProvider /> now — see VyroScoresProvider.tsx. This file no longer
 // computes any score of its own, which is what caused the same metric to read
@@ -83,7 +81,6 @@ const dateLabel = new Date().toLocaleDateString([], {
   day: "numeric",
 });
 
-
 function toneVar(value: number | null | undefined) {
   if (value == null) return "hsl(0 0% 100% / 0.28)";
   if (value >= 67) return "var(--vyro-mint)";
@@ -97,7 +94,17 @@ function toneVar(value: number | null | undefined) {
    existed before still renders through these.
 --------------------------------------------------------------------------- */
 
-type Accent = "green" | "blue" | "teal" | "orange" | "red" | "indigo" | "pink" | "yellow" | "purple" | "mute";
+type Accent =
+  | "green"
+  | "blue"
+  | "teal"
+  | "orange"
+  | "red"
+  | "indigo"
+  | "pink"
+  | "yellow"
+  | "purple"
+  | "mute";
 
 const ACCENT: Record<Accent, string> = {
   green: "var(--vyro-mint)",
@@ -166,9 +173,7 @@ function Disclosure({
           <span className="block truncate text-[14px] font-bold tracking-[-0.02em] text-vyro-text">
             {title}
           </span>
-          {hint && (
-            <span className="mt-0.5 block truncate text-[11px] text-vyro-mute">{hint}</span>
-          )}
+          {hint && <span className="mt-0.5 block truncate text-[11px] text-vyro-mute">{hint}</span>}
         </span>
         <ChevronDown
           size={17}
@@ -201,7 +206,11 @@ function SectionHeader({
         {Icon && (
           <span
             className="grid h-8 w-8 shrink-0 place-items-center rounded-[11px] border"
-            style={{ background: `color-mix(in oklab, ${color} 16%, transparent)`, borderColor: `color-mix(in oklab, ${color} 26%, transparent)`, color }}
+            style={{
+              background: `color-mix(in oklab, ${color} 16%, transparent)`,
+              borderColor: `color-mix(in oklab, ${color} 26%, transparent)`,
+              color,
+            }}
           >
             <Icon size={15} strokeWidth={2.4} />
           </span>
@@ -225,7 +234,6 @@ function SectionHeader({
   );
 }
 
-
 /** Apple Activity-style concentric rings: readiness (outer), recovery, sleep. */
 function Ring({
   value,
@@ -242,8 +250,20 @@ function Ring({
   const hasReadiness = value != null && Number.isFinite(value);
   const arcs = [
     { r: 50, width: 11, v: value, color: toneVar(value), id: "readiness" },
-    { r: 37, width: 10, v: hasReadiness ? recovery ?? null : null, color: "var(--vyro-blue)", id: "recovery" },
-    { r: 25, width: 9, v: hasReadiness ? sleep ?? null : null, color: "var(--vyro-indigo)", id: "sleep" },
+    {
+      r: 37,
+      width: 10,
+      v: hasReadiness ? (recovery ?? null) : null,
+      color: "var(--vyro-blue)",
+      id: "recovery",
+    },
+    {
+      r: 25,
+      width: 9,
+      v: hasReadiness ? (sleep ?? null) : null,
+      color: "var(--vyro-indigo)",
+      id: "sleep",
+    },
   ];
   const color = toneVar(value);
   const pending = !hasReadiness;
@@ -344,10 +364,15 @@ function Ring({
         )}
 
         <div className="mt-2.5 max-w-[132px] text-[10px] font-semibold leading-tight tracking-[-0.01em] text-vyro-mute">
-          {pending ? "Calibrating baseline" : value >= 75 ? "Primed to perform" : value >= 50 ? "Train with control" : "Prioritise recovery"}
+          {pending
+            ? "Calibrating baseline"
+            : value >= 75
+              ? "Primed to perform"
+              : value >= 50
+                ? "Train with control"
+                : "Prioritise recovery"}
         </div>
       </div>
-
     </div>
   );
 }
@@ -386,7 +411,6 @@ function RingLegend({
   );
 }
 
-
 /** Whoop-style scannable metric row: mini arc, label, status, value, track. */
 function MetricRow({
   label,
@@ -413,8 +437,20 @@ function MetricRow({
   return (
     <div className="flex items-center gap-3.5 py-3 first:pt-0 last:pb-0">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90 block">
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(0 0% 100% / 0.08)" strokeWidth={3.5} />
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="-rotate-90 block"
+        >
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke="hsl(0 0% 100% / 0.08)"
+            strokeWidth={3.5}
+          />
           {has && (
             <circle
               cx={size / 2}
@@ -434,15 +470,21 @@ function MetricRow({
           )}
         </svg>
         {!has && (
-          <span className="absolute inset-0 grid place-items-center text-[9px] font-bold text-white/25">?</span>
+          <span className="absolute inset-0 grid place-items-center text-[9px] font-bold text-white/25">
+            ?
+          </span>
         )}
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[12.5px] font-bold tracking-[-0.015em] text-white">{label}</div>
+        <div className="truncate text-[12.5px] font-bold tracking-[-0.015em] text-white">
+          {label}
+        </div>
         <div
           className="mt-0.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
-          style={{ color: has ? `color-mix(in oklab, ${color} 70%, white)` : "rgba(235,235,245,0.3)" }}
+          style={{
+            color: has ? `color-mix(in oklab, ${color} 70%, white)` : "rgba(235,235,245,0.3)",
+          }}
         >
           {has ? (status ?? (invert ? "load index" : "score")) : (emptyHint ?? "awaiting signal")}
         </div>
@@ -463,7 +505,10 @@ function MetricRow({
             {Math.round(value as number)}
           </span>
         ) : (
-          <span className="block h-[18px] w-[34px] animate-pulse rounded-md bg-white/[0.07]" aria-hidden />
+          <span
+            className="block h-[18px] w-[34px] animate-pulse rounded-md bg-white/[0.07]"
+            aria-hidden
+          />
         )}
         <span className="text-[9.5px] font-bold text-white/30">/100</span>
       </div>
@@ -501,7 +546,9 @@ function VitalRow({
       />
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-[11.5px] font-bold uppercase tracking-[0.09em] text-white/80">{label}</span>
+          <span className="truncate text-[11.5px] font-bold uppercase tracking-[0.09em] text-white/80">
+            {label}
+          </span>
           {live && (
             <span
               aria-label="live"
@@ -512,14 +559,19 @@ function VitalRow({
         </div>
         <div
           className="mt-0.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
-          style={{ color: dim ? "rgba(235,235,245,0.28)" : `color-mix(in oklab, ${color} 65%, white)` }}
+          style={{
+            color: dim ? "rgba(235,235,245,0.28)" : `color-mix(in oklab, ${color} 65%, white)`,
+          }}
         >
           {dim ? "awaiting signal" : (trend ?? "live")}
         </div>
       </div>
       <div className="flex shrink-0 items-baseline gap-[3px]">
         {dim ? (
-          <span className="block h-[16px] w-[30px] animate-pulse rounded-md bg-white/[0.07]" aria-hidden />
+          <span
+            className="block h-[16px] w-[30px] animate-pulse rounded-md bg-white/[0.07]"
+            aria-hidden
+          />
         ) : (
           <span className="font-[family-name:var(--font-display)] text-[21px] font-extrabold leading-none tracking-[-0.05em] tabular-nums text-white">
             {value}
@@ -532,8 +584,6 @@ function VitalRow({
 }
 
 function MiniMetric({
-
-
   label,
   value,
   unit,
@@ -555,7 +605,11 @@ function MiniMetric({
   return (
     <div
       className="group relative overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.045] p-3.5 transition-all duration-200 ease-out hover:border-white/[0.16] hover:bg-white/[0.075] active:scale-[0.985]"
-      style={!dim ? { boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 12%, transparent)` } : undefined}
+      style={
+        !dim
+          ? { boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 12%, transparent)` }
+          : undefined
+      }
     >
       {!dim && (
         <div
@@ -588,14 +642,17 @@ function MiniMetric({
 
       {dim ? (
         <div className="relative mt-3 flex items-center gap-2">
-          <span className="block h-[26px] w-[52px] animate-pulse rounded-lg bg-white/[0.07]" aria-hidden />
-          <span className="text-[10px] font-semibold tracking-[-0.01em] text-white/25">awaiting signal</span>
+          <span
+            className="block h-[26px] w-[52px] animate-pulse rounded-lg bg-white/[0.07]"
+            aria-hidden
+          />
+          <span className="text-[10px] font-semibold tracking-[-0.01em] text-white/25">
+            awaiting signal
+          </span>
         </div>
       ) : (
         <div className="relative mt-2 flex items-baseline gap-[3px]">
-          <span
-            className="font-[family-name:var(--font-display)] text-[28px] font-extrabold leading-none tracking-[-0.05em] tabular-nums text-white"
-          >
+          <span className="font-[family-name:var(--font-display)] text-[28px] font-extrabold leading-none tracking-[-0.05em] tabular-nums text-white">
             {value}
           </span>
           {unit && (
@@ -631,7 +688,6 @@ function MiniMetric({
   );
 }
 
-
 function InfoCard({
   eyebrow,
   title,
@@ -649,14 +705,26 @@ function InfoCard({
 }) {
   return (
     <GlassCard glow={ACCENT[accent]}>
-      <SectionHeader icon={icon} eyebrow={eyebrow} title={title} accent={accent} trailing={trailing} />
+      <SectionHeader
+        icon={icon}
+        eyebrow={eyebrow}
+        title={title}
+        accent={accent}
+        trailing={trailing}
+      />
       <div className="mt-4">{children}</div>
     </GlassCard>
   );
 }
 
 /** Compact insight banner: icon chip, headline, supporting line. */
-function OpportunityCard({ agility, recovery }: { agility: number | null; recovery: number | null }) {
+function OpportunityCard({
+  agility,
+  recovery,
+}: {
+  agility: number | null;
+  recovery: number | null;
+}) {
   const { headline, detail, accent } = useMemo(() => {
     if (agility != null && agility >= 75) {
       return {
@@ -737,7 +805,10 @@ function GaugeRow({
               {Math.round(value as number)}
             </span>
           ) : (
-            <span className="block h-[15px] w-[26px] animate-pulse rounded-md bg-white/[0.08]" aria-hidden />
+            <span
+              className="block h-[15px] w-[26px] animate-pulse rounded-md bg-white/[0.08]"
+              aria-hidden
+            />
           )}
           <span className="text-[9px] font-bold text-white/30">/100</span>
         </span>
@@ -754,7 +825,9 @@ function GaugeRow({
       </div>
       <div
         className="mt-1.5 truncate text-[10px] font-semibold tracking-[-0.01em]"
-        style={{ color: has ? `color-mix(in oklab, ${color} 65%, white)` : "rgba(235,235,245,0.28)" }}
+        style={{
+          color: has ? `color-mix(in oklab, ${color} 65%, white)` : "rgba(235,235,245,0.28)",
+        }}
       >
         {has ? (note ?? "live") : "awaiting signal"}
       </div>
@@ -793,7 +866,11 @@ function PlanRow({
       </span>
       <div
         className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] border border-white/[0.07] bg-white/[0.035] px-3.5 py-3 transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.06]"
-        style={live ? { boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 32%, transparent)` } : undefined}
+        style={
+          live
+            ? { boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 32%, transparent)` }
+            : undefined
+        }
       >
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
@@ -803,9 +880,13 @@ function PlanRow({
             >
               {time}
             </span>
-            <span className="truncate text-[13.5px] font-bold tracking-[-0.025em] text-vyro-text">{title}</span>
+            <span className="truncate text-[13.5px] font-bold tracking-[-0.025em] text-vyro-text">
+              {title}
+            </span>
           </div>
-          {load && <div className="mt-1 truncate text-[10.5px] font-semibold text-vyro-mute">{load}</div>}
+          {load && (
+            <div className="mt-1 truncate text-[10.5px] font-semibold text-vyro-mute">{load}</div>
+          )}
         </div>
         {onRemove ? (
           <button
@@ -816,7 +897,10 @@ function PlanRow({
             ×
           </button>
         ) : (
-          <span className="shrink-0 text-[9px] font-bold uppercase tracking-[0.12em]" style={{ color }}>
+          <span
+            className="shrink-0 text-[9px] font-bold uppercase tracking-[0.12em]"
+            style={{ color }}
+          >
             live
           </span>
         )}
@@ -824,7 +908,6 @@ function PlanRow({
     </div>
   );
 }
-
 
 function CognitiveFatigueCard({
   m,
@@ -867,10 +950,19 @@ function CognitiveFatigueCard({
       const sign = diff >= 0 ? "+" : "−";
       let status: string;
       let vyroRead: string;
-      if (diff < 60) { status = "Normal"; vyroRead = "Sharp"; }
-      else if (diff < 150) { status = "Slowing"; vyroRead = "Mild fatigue"; }
-      else if (diff < 250) { status = "Elevated"; vyroRead = "Watch decision speed"; }
-      else { status = "Diverged"; vyroRead = "Cognitively fried"; }
+      if (diff < 60) {
+        status = "Normal";
+        vyroRead = "Sharp";
+      } else if (diff < 150) {
+        status = "Slowing";
+        vyroRead = "Mild fatigue";
+      } else if (diff < 250) {
+        status = "Elevated";
+        vyroRead = "Watch decision speed";
+      } else {
+        status = "Diverged";
+        vyroRead = "Cognitively fried";
+      }
       return {
         delay: `${sign}${Math.abs(Math.round(diff))}ms`,
         status,
@@ -899,10 +991,19 @@ function CognitiveFatigueCard({
       const drop = -pct; // positive = suppression
       let status: string;
       let vyroRead: string;
-      if (drop < 5) { status = "Normal"; vyroRead = "Sharp"; }
-      else if (drop < 12) { status = "Slowing"; vyroRead = "Mild cognitive load"; }
-      else if (drop < 20) { status = "Elevated"; vyroRead = "Watch decision speed"; }
-      else { status = "Diverged"; vyroRead = "Cognitively fried"; }
+      if (drop < 5) {
+        status = "Normal";
+        vyroRead = "Sharp";
+      } else if (drop < 12) {
+        status = "Slowing";
+        vyroRead = "Mild cognitive load";
+      } else if (drop < 20) {
+        status = "Elevated";
+        vyroRead = "Watch decision speed";
+      } else {
+        status = "Diverged";
+        vyroRead = "Cognitively fried";
+      }
       return {
         delay: `${sign}${Math.abs(Math.round(pct))}%`,
         status,
@@ -925,7 +1026,6 @@ function CognitiveFatigueCard({
 
   const hasDelay = delay !== "—";
   const indigo = ACCENT.indigo;
-
 
   return (
     <GlassCard glow={indigo}>
@@ -960,12 +1060,17 @@ function CognitiveFatigueCard({
                   {delay}
                 </span>
               ) : (
-                <span className="block h-[26px] w-[74px] animate-pulse rounded-lg bg-white/[0.07]" aria-hidden />
+                <span
+                  className="block h-[26px] w-[74px] animate-pulse rounded-lg bg-white/[0.07]"
+                  aria-hidden
+                />
               )}
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-[9.5px] font-bold uppercase tracking-[0.13em] text-vyro-mute">baseline</div>
+            <div className="text-[9.5px] font-bold uppercase tracking-[0.13em] text-vyro-mute">
+              baseline
+            </div>
             <div className="mt-1 font-[family-name:var(--font-display)] text-[14px] font-extrabold tabular-nums text-white/80">
               {baselineText}
             </div>
@@ -993,15 +1098,22 @@ function CognitiveFatigueCard({
         </div>
       </div>
 
-
       <div className="mt-2.5 grid grid-cols-2 gap-2.5">
         <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.03] p-3">
-          <div className="text-[9px] font-bold uppercase tracking-[0.13em] text-vyro-mute">heart rate</div>
-          <div className="mt-1.5 text-[13.5px] font-bold tracking-[-0.02em] text-vyro-text">{hrStatus}</div>
+          <div className="text-[9px] font-bold uppercase tracking-[0.13em] text-vyro-mute">
+            heart rate
+          </div>
+          <div className="mt-1.5 text-[13.5px] font-bold tracking-[-0.02em] text-vyro-text">
+            {hrStatus}
+          </div>
         </div>
         <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.03] p-3">
-          <div className="text-[9px] font-bold uppercase tracking-[0.13em] text-vyro-mute">vyro read</div>
-          <div className="mt-1.5 truncate text-[13.5px] font-bold tracking-[-0.02em] text-vyro-text">{vyroRead}</div>
+          <div className="text-[9px] font-bold uppercase tracking-[0.13em] text-vyro-mute">
+            vyro read
+          </div>
+          <div className="mt-1.5 truncate text-[13.5px] font-bold tracking-[-0.02em] text-vyro-text">
+            {vyroRead}
+          </div>
         </div>
       </div>
 
@@ -1017,10 +1129,7 @@ function CognitiveFatigueCard({
       </div>
     </GlassCard>
   );
-
 }
-
-
 
 function EmbeddedView({
   view,
@@ -1148,7 +1257,6 @@ function SportTabs() {
   );
 }
 
-
 function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   const fetchProfile = useServerFn(getMyProfile);
   const { data: profile } = useQuery({
@@ -1186,12 +1294,28 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
   const addMutation = useMutation({ mutationFn: addItem, onSuccess: invalidatePlan });
   const deleteMutation = useMutation({ mutationFn: removeItem, onSuccess: invalidatePlan });
   const items = planItems ?? [];
-  const [draft, setDraft] = useState({ time: "", title: "", load: "", tone: "green" as PlanItem["color"] });
+  const [draft, setDraft] = useState({
+    time: "",
+    title: "",
+    load: "",
+    tone: "green" as PlanItem["color"],
+  });
   const [showAllVitals, setShowAllVitals] = useState(false);
 
-
   // Every score below is the GLOBAL value — identical on every other tab.
-  const { readiness, recovery, sleep, fatigue, fatigueSource, agility, agilityReason, strain, statusLabel, baselines, rtp } = s;
+  const {
+    readiness,
+    recovery,
+    sleep,
+    fatigue,
+    fatigueSource,
+    agility,
+    agilityReason,
+    strain,
+    statusLabel,
+    baselines,
+    rtp,
+  } = s;
 
   const trend = (
     cur: number | null | undefined,
@@ -1210,37 +1334,133 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
 
   const vitals = useMemo(
     () => [
-      { label: "Current HR", value: liveCell(m.heartRateBpm), unit: "bpm", accent: "red" as Accent,
-        trend: m.connected ? trend(m.heartRateBpm, m.restingHrBpm, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs rest`) : undefined,
-        live: m.connected && m.heartRateBpm != null },
-      { label: "Resting HR", value: liveCell(m.restingHrBpm), unit: "bpm", accent: "pink" as Accent,
-        trend: trend(m.restingHrBpm, baselines.restingHr, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs 7d`),
-        live: m.connected && m.restingHrBpm != null },
-      { label: "HRV (RMSSD)", value: liveCell(m.hrvMs), unit: "ms", accent: "green" as Accent,
-        trend: trend(m.hrvMs, baselines.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`) ?? m.metricPipeline.hrv.detail,
-        live: m.connected && m.hrvMs != null },
-      { label: "Steps", value: liveCell(m.stepsToday), unit: "", accent: "teal" as Accent,
-        trend: m.connected && m.distanceM != null ? `${(m.distanceM / 1000).toFixed(2)} km` : undefined,
-        live: m.connected && m.stepsToday != null },
-      { label: "Skin Temp", value: m.connected && m.skinTempC != null ? m.skinTempC.toFixed(1) : "—", unit: "°C", accent: "orange" as Accent, trend: m.skinTempC == null ? m.metricPipeline.skinTemp.detail : undefined,
-        live: m.connected && m.skinTempC != null },
-      { label: "Blood Pressure", value: m.connected && m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—", unit: "mmHg", accent: "purple" as Accent, trend: m.bloodPressure == null ? m.metricPipeline.bloodPressure.detail : undefined,
-        live: m.connected && m.bloodPressure != null },
-      { label: "Strain", value: fmtCell(strain), unit: "/100", accent: "yellow" as Accent,
-        trend: strain != null ? (strain > 70 ? "overload" : strain > 40 ? "tempo" : "easy") : undefined,
-        live: m.connected && strain != null },
-      { label: "SpO₂", value: liveCell(m.spo2Pct), unit: "%", accent: "blue" as Accent,
-        trend: m.connected && m.spo2Pct != null ? (m.spo2Pct >= 95 ? "stable" : "low") : m.metricPipeline.spo2.detail,
-        live: m.connected && m.spo2Pct != null },
-      { label: "Resp Rate", value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—", unit: "brpm", accent: "indigo" as Accent, trend: m.respRateBrpm == null ? m.metricPipeline.respiration.detail : undefined,
-        live: m.connected && m.respRateBrpm != null },
-      { label: "Stress", value: liveCell(m.stressScore), unit: "/100", accent: "orange" as Accent,
-        trend: m.connected && m.stressScore != null ? (m.stressScore < 40 ? "calm" : m.stressScore < 70 ? "alert" : "high") : m.metricPipeline.stress.detail,
-        live: m.connected && m.stressScore != null },
+      {
+        label: "Current HR",
+        value: liveCell(m.heartRateBpm),
+        unit: "bpm",
+        accent: "red" as Accent,
+        trend: m.connected
+          ? trend(
+              m.heartRateBpm,
+              m.restingHrBpm,
+              (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs rest`,
+            )
+          : undefined,
+        live: m.connected && m.heartRateBpm != null,
+      },
+      {
+        label: "Resting HR",
+        value: liveCell(m.restingHrBpm),
+        unit: "bpm",
+        accent: "pink" as Accent,
+        trend: trend(
+          m.restingHrBpm,
+          baselines.restingHr,
+          (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs 7d`,
+        ),
+        live: m.connected && m.restingHrBpm != null,
+      },
+      {
+        label: "HRV (RMSSD)",
+        value: liveCell(m.hrvMs),
+        unit: "ms",
+        accent: "green" as Accent,
+        trend:
+          trend(m.hrvMs, baselines.hrv, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} ms`) ??
+          m.metricPipeline.hrv.detail,
+        live: m.connected && m.hrvMs != null,
+      },
+      {
+        label: "Steps",
+        value: liveCell(m.stepsToday),
+        unit: "",
+        accent: "teal" as Accent,
+        trend:
+          m.connected && m.distanceM != null ? `${(m.distanceM / 1000).toFixed(2)} km` : undefined,
+        live: m.connected && m.stepsToday != null,
+      },
+      {
+        label: "Skin Temp",
+        value: m.connected && m.skinTempC != null ? m.skinTempC.toFixed(1) : "—",
+        unit: "°C",
+        accent: "orange" as Accent,
+        trend: m.skinTempC == null ? m.metricPipeline.skinTemp.detail : undefined,
+        live: m.connected && m.skinTempC != null,
+      },
+      {
+        label: "Blood Pressure",
+        value:
+          m.connected && m.bloodPressure ? `${m.bloodPressure.sbp}/${m.bloodPressure.dbp}` : "—",
+        unit: "mmHg",
+        accent: "purple" as Accent,
+        trend: m.bloodPressure == null ? m.metricPipeline.bloodPressure.detail : undefined,
+        live: m.connected && m.bloodPressure != null,
+      },
+      {
+        label: "Strain",
+        value: fmtCell(strain),
+        unit: "/100",
+        accent: "yellow" as Accent,
+        trend:
+          strain != null ? (strain > 70 ? "overload" : strain > 40 ? "tempo" : "easy") : undefined,
+        live: m.connected && strain != null,
+      },
+      {
+        label: "SpO₂",
+        value: liveCell(m.spo2Pct),
+        unit: "%",
+        accent: "blue" as Accent,
+        trend:
+          m.connected && m.spo2Pct != null
+            ? m.spo2Pct >= 95
+              ? "stable"
+              : "low"
+            : m.metricPipeline.spo2.detail,
+        live: m.connected && m.spo2Pct != null,
+      },
+      {
+        label: "Resp Rate",
+        value: m.connected && m.respRateBrpm != null ? m.respRateBrpm.toFixed(1) : "—",
+        unit: "brpm",
+        accent: "indigo" as Accent,
+        trend: m.respRateBrpm == null ? m.metricPipeline.respiration.detail : undefined,
+        live: m.connected && m.respRateBrpm != null,
+      },
+      {
+        label: "Stress",
+        value: liveCell(m.stressScore),
+        unit: "/100",
+        accent: "orange" as Accent,
+        trend:
+          m.connected && m.stressScore != null
+            ? m.stressScore < 40
+              ? "calm"
+              : m.stressScore < 70
+                ? "alert"
+                : "high"
+            : m.metricPipeline.stress.detail,
+        live: m.connected && m.stressScore != null,
+      },
     ],
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [m.connected, m.heartRateBpm, m.restingHrBpm, m.hrvMs, m.stepsToday, m.distanceM, m.skinTempC, m.bloodPressure, m.spo2Pct, m.respRateBrpm, m.stressScore, m.metricPipeline, strain, baselines.hrv, baselines.restingHr],
+    [
+      m.connected,
+      m.heartRateBpm,
+      m.restingHrBpm,
+      m.hrvMs,
+      m.stepsToday,
+      m.distanceM,
+      m.skinTempC,
+      m.bloodPressure,
+      m.spo2Pct,
+      m.respRateBrpm,
+      m.stressScore,
+      m.metricPipeline,
+      strain,
+      baselines.hrv,
+      baselines.restingHr,
+    ],
   );
 
   // Auto-injected live training block (from the active session)
@@ -1282,12 +1502,10 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             {dateLabel}
           </span>
           <h1 className="app2-greet-title">
-            Good morning,{" "}
-            <span className="app2-greet-name">{firstName}</span>
+            Good morning, <span className="app2-greet-name">{firstName}</span>
           </h1>
           <div className="app2-greet-rule" aria-hidden="true" />
         </header>
-
 
         {/* ---- Readiness hero -------------------------------------------- */}
         <GlassCard
@@ -1315,7 +1533,11 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
               {statusLabel}
             </span>
             <span className="truncate text-[9.5px] font-bold uppercase tracking-[0.16em] text-vyro-mute">
-              {m.connected && readiness != null ? "Live · VYRO Band" : m.connected ? "Collecting signals" : "Awaiting band"}
+              {m.connected && readiness != null
+                ? "Live · VYRO Band"
+                : m.connected
+                  ? "Collecting signals"
+                  : "Awaiting band"}
             </span>
           </div>
 
@@ -1325,20 +1547,30 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             <RingLegend
               items={[
                 { label: "Readiness", value: readiness, color: toneVar(readiness) },
-                { label: "Recovery", value: readiness == null ? null : recovery, color: "var(--vyro-blue)" },
-                { label: "Sleep", value: readiness == null ? null : sleep, color: "var(--vyro-indigo)" },
+                {
+                  label: "Recovery",
+                  value: readiness == null ? null : recovery,
+                  color: "var(--vyro-blue)",
+                },
+                {
+                  label: "Sleep",
+                  value: readiness == null ? null : sleep,
+                  color: "var(--vyro-indigo)",
+                },
               ]}
             />
-
           </div>
         </GlassCard>
-
 
         <div className="space-y-4">
           <OpportunityCard agility={agility} recovery={recovery} />
 
-
-          <InfoCard eyebrow="Watch-derived readiness" title="Core metrics" icon={Gauge} accent="green">
+          <InfoCard
+            eyebrow="Watch-derived readiness"
+            title="Core metrics"
+            icon={Gauge}
+            accent="green"
+          >
             <div className="divide-y divide-white/[0.06]">
               <MetricRow
                 label="Fatigue"
@@ -1357,8 +1589,11 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 accent="green"
                 value={recovery}
                 status={
-                  trend(recovery, baselines.recovery, (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`) ??
-                  undefined
+                  trend(
+                    recovery,
+                    baselines.recovery,
+                    (d) => `${d > 0 ? "+" : ""}${Math.round(d)} vs base`,
+                  ) ?? undefined
                 }
               />
               <MetricRow
@@ -1385,11 +1620,8 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
                 emptyHint="Unlocks after a night wearing the band"
                 status={sleep != null ? (sleep >= 80 ? "Rested" : "Short") : undefined}
               />
-
-
             </div>
           </InfoCard>
-
 
           <InfoCard
             eyebrow="Vitals"
@@ -1397,8 +1629,12 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             icon={Heart}
             accent="blue"
             trailing={
-              <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${m.connected ? "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint" : "border-white/10 bg-white/[0.06] text-vyro-mute"}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${m.connected ? "animate-pulse bg-vyro-mint" : "bg-vyro-mute/60"}`} />
+              <span
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${m.connected ? "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint" : "border-white/10 bg-white/[0.06] text-vyro-mute"}`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${m.connected ? "animate-pulse bg-vyro-mint" : "bg-vyro-mute/60"}`}
+                />
                 {m.connected ? "streaming" : "offline"}
               </span>
             }
@@ -1433,209 +1669,244 @@ function AthleteHome({ setView }: { setView: (view: App2View) => void }) {
             />
           </Disclosure>
 
-          <Disclosure title="Return-to-play & training plan" hint="RTP validator and today's blocks">
+          <Disclosure
+            title="Return-to-play & training plan"
+            hint="RTP validator and today's blocks"
+          >
             <div className="space-y-4">
-
-
-          <InfoCard
-            eyebrow="Return-to-play"
-            title="RTP Validator"
-            icon={ShieldCheck}
-            accent={rtp.withinBaseline ? "green" : "orange"}
-            trailing={
-              <span className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${rtp.withinBaseline ? "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint" : "border-vyro-amber/25 bg-vyro-amber/10 text-vyro-amber"}`}>
-                {rtp.wearablePower == null || rtp.baseline == null ? "calibrating" : rtp.withinBaseline ? "cleared" : "hold"}
-              </span>
-            }
-          >
-            {rtp.wearablePower == null || rtp.baseline == null ? (
-              <div className="rounded-[20px] border border-vyro-amber/18 bg-vyro-amber/[0.06] p-3.5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-vyro-amber">
-                    baseline capture
+              <InfoCard
+                eyebrow="Return-to-play"
+                title="RTP Validator"
+                icon={ShieldCheck}
+                accent={rtp.withinBaseline ? "green" : "orange"}
+                trailing={
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${rtp.withinBaseline ? "border-vyro-mint/25 bg-vyro-mint/10 text-vyro-mint" : "border-vyro-amber/25 bg-vyro-amber/10 text-vyro-amber"}`}
+                  >
+                    {rtp.wearablePower == null || rtp.baseline == null
+                      ? "calibrating"
+                      : rtp.withinBaseline
+                        ? "cleared"
+                        : "hold"}
                   </span>
-                  <span className="font-[family-name:var(--font-display)] text-[13px] font-extrabold tabular-nums text-vyro-text">
-                    {baselines.days}
-                    <span className="text-[10px] font-bold text-white/35">/7 days</span>
-                  </span>
+                }
+              >
+                {rtp.wearablePower == null || rtp.baseline == null ? (
+                  <div className="rounded-[20px] border border-vyro-amber/18 bg-vyro-amber/[0.06] p-3.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-vyro-amber">
+                        baseline capture
+                      </span>
+                      <span className="font-[family-name:var(--font-display)] text-[13px] font-extrabold tabular-nums text-vyro-text">
+                        {baselines.days}
+                        <span className="text-[10px] font-bold text-white/35">/7 days</span>
+                      </span>
+                    </div>
+                    <div className="mt-2.5 flex gap-1">
+                      {Array.from({ length: 7 }).map((_, i) => (
+                        <span
+                          key={i}
+                          className="h-[5px] flex-1 rounded-full transition-colors duration-500"
+                          style={{
+                            background:
+                              i < baselines.days ? ACCENT.orange : "hsl(0 0% 100% / 0.08)",
+                            boxShadow:
+                              i < baselines.days
+                                ? `0 0 8px color-mix(in oklab, ${ACCENT.orange} 55%, transparent)`
+                                : "none",
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <p className="mt-2.5 text-[11.5px] leading-relaxed text-vyro-mute">
+                      RTP clearance unlocks once a full week of your own readiness history is
+                      stored.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[12.5px] leading-relaxed text-vyro-mute">
+                    {rtp.withinBaseline
+                      ? `Cleared — wearable power within ±5% of your ${baselines.days}-day baseline (${rtp.deviationPct!.toFixed(1)}%).`
+                      : `Hold — wearable power ${rtp.deviationPct! > 0 ? "above" : "below"} baseline by ${Math.abs(rtp.deviationPct!).toFixed(1)}% (target ±5%).`}
+                  </p>
+                )}
+
+                <div className="mt-3.5 divide-y divide-white/[0.06] overflow-hidden rounded-[20px] border border-white/[0.07] bg-white/[0.03] px-3.5">
+                  <GaugeRow
+                    label="Wearable power"
+                    accent="green"
+                    value={rtp.wearablePower}
+                    note={rtp.baseline != null ? `baseline ${rtp.baseline}` : undefined}
+                  />
+                  <GaugeRow
+                    label="Clearance"
+                    accent="blue"
+                    value={rtp.clearance}
+                    note={
+                      rtp.withinBaseline
+                        ? "in range"
+                        : rtp.deviationPct != null
+                          ? "out of range"
+                          : undefined
+                    }
+                  />
+                  <GaugeRow
+                    label="Muscle readiness"
+                    accent="orange"
+                    value={s.parts.muscle}
+                    note="IMU load"
+                  />
+                  <GaugeRow
+                    label="Recovery environment"
+                    accent="teal"
+                    value={s.parts.environment}
+                    note="SpO₂ · temp · HRV"
+                  />
                 </div>
-                <div className="mt-2.5 flex gap-1">
-                  {Array.from({ length: 7 }).map((_, i) => (
+              </InfoCard>
+
+              <InfoCard
+                eyebrow="Today's plan"
+                title="Training blocks"
+                icon={ListChecks}
+                accent="purple"
+                trailing={
+                  <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-vyro-mute">
+                    {items.length + (liveSessionBlock ? 1 : 0)} block
+                    {items.length + (liveSessionBlock ? 1 : 0) === 1 ? "" : "s"}
+                  </span>
+                }
+              >
+                {items.length === 0 && !liveSessionBlock ? (
+                  <div className="rounded-[20px] border border-dashed border-white/[0.12] bg-white/[0.02] px-4 py-6 text-center">
+                    <div className="text-[13px] font-bold tracking-[-0.02em] text-vyro-text">
+                      Nothing scheduled
+                    </div>
+                    <p className="mx-auto mt-1 max-w-[240px] text-[11.5px] leading-relaxed text-vyro-mute">
+                      Add your first block below and VYRO will score the load against today's
+                      readiness.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="relative pl-[26px]">
                     <span
-                      key={i}
-                      className="h-[5px] flex-1 rounded-full transition-colors duration-500"
-                      style={{
-                        background: i < baselines.days ? ACCENT.orange : "hsl(0 0% 100% / 0.08)",
-                        boxShadow: i < baselines.days ? `0 0 8px color-mix(in oklab, ${ACCENT.orange} 55%, transparent)` : "none",
-                      }}
+                      aria-hidden
+                      className="absolute left-[7px] top-2 bottom-2 w-px bg-gradient-to-b from-white/[0.16] via-white/[0.09] to-transparent"
                     />
-                  ))}
-                </div>
-                <p className="mt-2.5 text-[11.5px] leading-relaxed text-vyro-mute">
-                  RTP clearance unlocks once a full week of your own readiness history is stored.
-                </p>
-              </div>
-            ) : (
-              <p className="text-[12.5px] leading-relaxed text-vyro-mute">
-                {rtp.withinBaseline
-                  ? `Cleared — wearable power within ±5% of your ${baselines.days}-day baseline (${rtp.deviationPct!.toFixed(1)}%).`
-                  : `Hold — wearable power ${rtp.deviationPct! > 0 ? "above" : "below"} baseline by ${Math.abs(rtp.deviationPct!).toFixed(1)}% (target ±5%).`}
-              </p>
-            )}
+                    <div className="space-y-2">
+                      {liveSessionBlock && (
+                        <PlanRow
+                          time={liveSessionBlock.time}
+                          title={liveSessionBlock.title}
+                          load={`${liveSessionBlock.load} · live now`}
+                          tone="green"
+                          live
+                        />
+                      )}
+                      {items.map((item) => (
+                        <PlanRow
+                          key={item.id}
+                          time={item.time_label}
+                          title={item.title}
+                          load={item.load_label}
+                          tone={(item.tone as PlanItem["color"]) ?? "green"}
+                          onRemove={() => deleteMutation.mutate({ data: { id: item.id } })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            <div className="mt-3.5 divide-y divide-white/[0.06] overflow-hidden rounded-[20px] border border-white/[0.07] bg-white/[0.03] px-3.5">
-              <GaugeRow
-                label="Wearable power"
-                accent="green"
-                value={rtp.wearablePower}
-                note={rtp.baseline != null ? `baseline ${rtp.baseline}` : undefined}
-              />
-              <GaugeRow
-                label="Clearance"
-                accent="blue"
-                value={rtp.clearance}
-                note={rtp.withinBaseline ? "in range" : rtp.deviationPct != null ? "out of range" : undefined}
-              />
-              <GaugeRow label="Muscle readiness" accent="orange" value={s.parts.muscle} note="IMU load" />
-              <GaugeRow
-                label="Recovery environment"
-                accent="teal"
-                value={s.parts.environment}
-                note="SpO₂ · temp · HRV"
-              />
-            </div>
-          </InfoCard>
+                <div className="mt-4 rounded-[20px] border border-white/[0.08] bg-white/[0.035] p-3">
+                  <div className="flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em] text-vyro-mute">
+                    <Plus size={11} strokeWidth={3} />
+                    add a block
+                  </div>
 
-
-
-          <InfoCard
-            eyebrow="Today's plan"
-            title="Training blocks"
-            icon={ListChecks}
-            accent="purple"
-            trailing={
-              <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-vyro-mute">
-                {items.length + (liveSessionBlock ? 1 : 0)} block{items.length + (liveSessionBlock ? 1 : 0) === 1 ? "" : "s"}
-              </span>
-            }
-          >
-            {items.length === 0 && !liveSessionBlock ? (
-              <div className="rounded-[20px] border border-dashed border-white/[0.12] bg-white/[0.02] px-4 py-6 text-center">
-                <div className="text-[13px] font-bold tracking-[-0.02em] text-vyro-text">Nothing scheduled</div>
-                <p className="mx-auto mt-1 max-w-[240px] text-[11.5px] leading-relaxed text-vyro-mute">
-                  Add your first block below and VYRO will score the load against today's readiness.
-                </p>
-              </div>
-            ) : (
-              <div className="relative pl-[26px]">
-                <span
-                  aria-hidden
-                  className="absolute left-[7px] top-2 bottom-2 w-px bg-gradient-to-b from-white/[0.16] via-white/[0.09] to-transparent"
-                />
-                <div className="space-y-2">
-                  {liveSessionBlock && (
-                    <PlanRow
-                      time={liveSessionBlock.time}
-                      title={liveSessionBlock.title}
-                      load={`${liveSessionBlock.load} · live now`}
-                      tone="green"
-                      live
+                  <div className="mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-2">
+                    <input
+                      className="rounded-[12px] border border-white/[0.08] bg-black/25 px-2.5 py-2.5 text-center text-[12.5px] font-bold tabular-nums text-vyro-text outline-none transition-colors placeholder:font-semibold placeholder:text-vyro-mute/50 focus:border-vyro-mint/45"
+                      placeholder="7:30"
+                      value={draft.time}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, time: event.target.value }))
+                      }
                     />
-                  )}
-                  {items.map((item) => (
-                    <PlanRow
-                      key={item.id}
-                      time={item.time_label}
-                      title={item.title}
-                      load={item.load_label}
-                      tone={(item.tone as PlanItem["color"]) ?? "green"}
-                      onRemove={() => deleteMutation.mutate({ data: { id: item.id } })}
+                    <input
+                      className="rounded-[12px] border border-white/[0.08] bg-black/25 px-3 py-2.5 text-[12.5px] font-semibold text-vyro-text outline-none transition-colors placeholder:font-medium placeholder:text-vyro-mute/50 focus:border-vyro-mint/45"
+                      placeholder="Session name"
+                      value={draft.title}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, title: event.target.value }))
+                      }
                     />
-                  ))}
+                  </div>
+
+                  <input
+                    className="mt-2 w-full rounded-[12px] border border-white/[0.08] bg-black/25 px-3 py-2.5 text-[12.5px] font-semibold text-vyro-text outline-none transition-colors placeholder:font-medium placeholder:text-vyro-mute/50 focus:border-vyro-mint/45"
+                    placeholder="Load — e.g. 45 min · zone 3"
+                    value={draft.load}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, load: event.target.value }))
+                    }
+                  />
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="flex min-w-0 flex-1 gap-1 rounded-[12px] border border-white/[0.07] bg-black/25 p-1">
+                      {(
+                        [
+                          { value: "green", label: "Optimal", accent: "green" as Accent },
+                          { value: "amber", label: "Elevated", accent: "orange" as Accent },
+                          { value: "red", label: "High", accent: "red" as Accent },
+                        ] as const
+                      ).map((tone) => {
+                        const active = draft.tone === tone.value;
+                        const color = ACCENT[tone.accent];
+                        return (
+                          <button
+                            key={tone.value}
+                            onClick={() =>
+                              setDraft((current) => ({
+                                ...current,
+                                tone: tone.value as PlanItem["color"],
+                              }))
+                            }
+                            className="min-w-0 flex-1 truncate rounded-[9px] px-1 py-[7px] text-[10px] font-bold uppercase tracking-[0.02em] transition-all duration-200"
+                            style={
+                              active
+                                ? {
+                                    background: `color-mix(in oklab, ${color} 20%, transparent)`,
+                                    color,
+                                    boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 45%, transparent)`,
+                                  }
+                                : { color: "rgba(235,235,245,0.4)" }
+                            }
+                          >
+                            {tone.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[12px] bg-vyro-mint text-vyro-ink shadow-[0_6px_18px_-6px_var(--vyro-mint)] transition-all duration-200 hover:brightness-110 active:scale-[0.94] disabled:opacity-40"
+                      onClick={addPlan}
+                      disabled={addMutation.isPending || !draft.title.trim()}
+                      aria-label="Add plan item"
+                    >
+                      <Plus size={17} strokeWidth={2.8} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            <div className="mt-4 rounded-[20px] border border-white/[0.08] bg-white/[0.035] p-3">
-              <div className="flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em] text-vyro-mute">
-                <Plus size={11} strokeWidth={3} />
-                add a block
-              </div>
-
-              <div className="mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-2">
-                <input
-                  className="rounded-[12px] border border-white/[0.08] bg-black/25 px-2.5 py-2.5 text-center text-[12.5px] font-bold tabular-nums text-vyro-text outline-none transition-colors placeholder:font-semibold placeholder:text-vyro-mute/50 focus:border-vyro-mint/45"
-                  placeholder="7:30"
-                  value={draft.time}
-                  onChange={(event) => setDraft((current) => ({ ...current, time: event.target.value }))}
-                />
-                <input
-                  className="rounded-[12px] border border-white/[0.08] bg-black/25 px-3 py-2.5 text-[12.5px] font-semibold text-vyro-text outline-none transition-colors placeholder:font-medium placeholder:text-vyro-mute/50 focus:border-vyro-mint/45"
-                  placeholder="Session name"
-                  value={draft.title}
-                  onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-                />
-              </div>
-
-              <input
-                className="mt-2 w-full rounded-[12px] border border-white/[0.08] bg-black/25 px-3 py-2.5 text-[12.5px] font-semibold text-vyro-text outline-none transition-colors placeholder:font-medium placeholder:text-vyro-mute/50 focus:border-vyro-mint/45"
-                placeholder="Load — e.g. 45 min · zone 3"
-                value={draft.load}
-                onChange={(event) => setDraft((current) => ({ ...current, load: event.target.value }))}
-              />
-
-              <div className="mt-3 flex items-center gap-2">
-                <div className="flex min-w-0 flex-1 gap-1 rounded-[12px] border border-white/[0.07] bg-black/25 p-1">
-                  {([
-                    { value: "green", label: "Optimal", accent: "green" as Accent },
-                    { value: "amber", label: "Elevated", accent: "orange" as Accent },
-                    { value: "red", label: "High", accent: "red" as Accent },
-                  ] as const).map((tone) => {
-                    const active = draft.tone === tone.value;
-                    const color = ACCENT[tone.accent];
-                    return (
-                      <button
-                        key={tone.value}
-                        onClick={() => setDraft((current) => ({ ...current, tone: tone.value as PlanItem["color"] }))}
-                        className="min-w-0 flex-1 truncate rounded-[9px] px-1 py-[7px] text-[10px] font-bold uppercase tracking-[0.02em] transition-all duration-200"
-                        style={
-                          active
-                            ? {
-                                background: `color-mix(in oklab, ${color} 20%, transparent)`,
-                                color,
-                                boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 45%, transparent)`,
-                              }
-                            : { color: "rgba(235,235,245,0.4)" }
-                        }
-                      >
-                        {tone.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[12px] bg-vyro-mint text-vyro-ink shadow-[0_6px_18px_-6px_var(--vyro-mint)] transition-all duration-200 hover:brightness-110 active:scale-[0.94] disabled:opacity-40"
-                  onClick={addPlan}
-                  disabled={addMutation.isPending || !draft.title.trim()}
-                  aria-label="Add plan item"
-                >
-                  <Plus size={17} strokeWidth={2.8} />
-                </button>
-              </div>
-            </div>
-          </InfoCard>
+              </InfoCard>
             </div>
           </Disclosure>
-
         </div>
-
       </div>
     </main>
   );
 }
 
 export function App2ReferenceShell() {
-
   const [view, setView] = useState<App2View>("athlete");
   const fetchProfile = useServerFn(getMyProfile);
   const { data: profile } = useQuery({
@@ -1675,7 +1946,6 @@ export function App2ReferenceShell() {
     { id: "coach" as App2View, label: "Coach", icon: UserRound },
     { id: "social" as App2View, label: "Social", icon: MessageCircle },
   ];
-
 
   return (
     <div className="app2-ref">

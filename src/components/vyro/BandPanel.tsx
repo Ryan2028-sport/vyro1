@@ -18,7 +18,6 @@ import { Card, Pill } from "./shared";
 import { QCBAND_SERVICE_UUID } from "@/lib/vyro-ble/qcband";
 import { useRoles } from "@/hooks/use-roles";
 
-
 function fmtSat(v: { value: number; saturated: boolean }, unit: string, dp = 2) {
   const s = v.value.toFixed(dp);
   return v.saturated ? `≥${s}${unit}` : `${s}${unit}`;
@@ -49,9 +48,7 @@ function isLikelyBand(device: { name?: string; services?: string[] }): boolean {
     /vyro|qc|band|watch|oudmon|smart/i.test(name) ||
     services.some(
       (s) =>
-        s.includes(QCBAND_SERVICE_UUID.toLowerCase()) ||
-        s.includes("180d") ||
-        s.includes("180f"),
+        s.includes(QCBAND_SERVICE_UUID.toLowerCase()) || s.includes("180d") || s.includes("180f"),
     )
   );
 }
@@ -68,7 +65,16 @@ export function BandPanel({
   const vyro = useVyroBandCtx();
   const { isAdmin } = useRoles();
   const inspector = useBleInspector();
-  const { ble, connected, events, sessionState: _s, sport: _sp, setSport, firmwareRevision, hardwareRevision } = vyro;
+  const {
+    ble,
+    connected,
+    events,
+    sessionState: _s,
+    sport: _sp,
+    setSport,
+    firmwareRevision,
+    hardwareRevision,
+  } = vyro;
   const updateProfile = useServerFn(updateMyProfile);
 
   useEffect(() => {
@@ -78,7 +84,10 @@ export function BandPanel({
 
   useEffect(() => {
     if (!ble.scanning && ble.devices.length === 0) {
-      console.log("[BandPanel] kicking initial scan", { isNative: ble.isNative, powerState: ble.powerState });
+      console.log("[BandPanel] kicking initial scan", {
+        isNative: ble.isNative,
+        powerState: ble.powerState,
+      });
       void ble.scan([], 8000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -185,7 +194,12 @@ export function BandPanel({
       const device = await requestVyroBand();
       const transport = await openSmpTransport(device);
       await runOtaUpload(transport, { image, onProgress: setOtaProgress });
-      setOtaProgress({ fraction: 1, bytesSent: otaFile.size, bytesTotal: otaFile.size, phase: "done" });
+      setOtaProgress({
+        fraction: 1,
+        bytesSent: otaFile.size,
+        bytesTotal: otaFile.size,
+        phase: "done",
+      });
       setOtaSuccess(true);
     } catch (e) {
       setOtaError((e as Error)?.message || String(e));
@@ -212,7 +226,11 @@ export function BandPanel({
             ? ble.devices.find((d) => d.id === ble.connectedId)?.name || "Connected"
             : pairedName || "Not paired"
         }
-        action={<Pill tone={connected ? "live" : "off"} pulse={connected}>{connected ? "Live" : "Offline"}</Pill>}
+        action={
+          <Pill tone={connected ? "live" : "off"} pulse={connected}>
+            {connected ? "Live" : "Offline"}
+          </Pill>
+        }
       >
         <div className="mb-3 flex items-center gap-3">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-vyro-text/10 bg-vyro-text/[0.03]">
@@ -260,7 +278,9 @@ export function BandPanel({
         </div>
         {ble.powerState !== "on" && ble.isNative && (
           <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Bluetooth state is <span className="font-mono">{ble.powerState}</span>. On Android, enable Nearby devices/Bluetooth and Location for VYRO, then tap Scan again. On iOS, enable Bluetooth in Settings → VYRO.
+            Bluetooth state is <span className="font-mono">{ble.powerState}</span>. On Android,
+            enable Nearby devices/Bluetooth and Location for VYRO, then tap Scan again. On iOS,
+            enable Bluetooth in Settings → VYRO.
           </div>
         )}
         {ble.error && (
@@ -277,7 +297,9 @@ export function BandPanel({
                 className="flex items-center justify-between gap-3 rounded-xl border border-vyro-text/[0.07] bg-vyro-text/[0.02] px-3 py-2"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-vyro-text">{d.name || "Unknown"}</div>
+                  <div className="truncate text-sm font-semibold text-vyro-text">
+                    {d.name || "Unknown"}
+                  </div>
                   <div className="truncate font-mono text-[10px] text-vyro-text/45">{d.id}</div>
                 </div>
                 <button
@@ -298,156 +320,183 @@ export function BandPanel({
 
       {/* Live feed — admin (debug) accounts only */}
       {isAdmin && (
-      <Card
-        eyebrow="Live motion"
-        title="Recent events"
-        action={
-          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-vyro-text/45">
-            <Activity className="h-3 w-3" /> {events.length}
-          </span>
-        }
-      >
-        <div className="max-h-64 space-y-1 overflow-auto">
-          {events.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-vyro-text/15 bg-vyro-text/[0.02] px-3 py-6 text-center text-xs text-vyro-text/45">
-              {connected ? "Move the band to see events." : "Pair the band to start receiving events."}
-            </div>
-          ) : (
-            [...events].reverse().map((e, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between gap-2 rounded-lg border border-vyro-text/[0.05] bg-vyro-text/[0.02] px-2.5 py-1.5"
-              >
-                <span className="shrink-0 rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px] font-mono text-[10px] uppercase text-vyro-text/70">
-                  {e.event.type.replace("_", " ")}
-                </span>
-                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-vyro-text/70">{summarise(e.event)}</span>
-                <span className="shrink-0 font-mono text-[10px] text-vyro-text/40">{new Date(e.ts).toLocaleTimeString()}</span>
+        <Card
+          eyebrow="Live motion"
+          title="Recent events"
+          action={
+            <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-vyro-text/45">
+              <Activity className="h-3 w-3" /> {events.length}
+            </span>
+          }
+        >
+          <div className="max-h-64 space-y-1 overflow-auto">
+            {events.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-vyro-text/15 bg-vyro-text/[0.02] px-3 py-6 text-center text-xs text-vyro-text/45">
+                {connected
+                  ? "Move the band to see events."
+                  : "Pair the band to start receiving events."}
               </div>
-            ))
-          )}
-        </div>
-      </Card>
+            ) : (
+              [...events].reverse().map((e, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-vyro-text/[0.05] bg-vyro-text/[0.02] px-2.5 py-1.5"
+                >
+                  <span className="shrink-0 rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px] font-mono text-[10px] uppercase text-vyro-text/70">
+                    {e.event.type.replace("_", " ")}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-vyro-text/70">
+                    {summarise(e.event)}
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] text-vyro-text/40">
+                    {new Date(e.ts).toLocaleTimeString()}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
       )}
 
       {/* OTA — admin (debug) accounts only */}
       {isAdmin && (
-      <Card eyebrow="Update" title="Watch software update">
-        {/* Current firmware / hardware — read from BLE Device Information Service (0x180a). */}
-        <div className="mb-3 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-vyro-text/55">
-          <span className="rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px]">
-            firmware: {firmwareRevision || (connected ? "reading…" : "—")}
-          </span>
-          {hardwareRevision && (
+        <Card eyebrow="Update" title="Watch software update">
+          {/* Current firmware / hardware — read from BLE Device Information Service (0x180a). */}
+          <div className="mb-3 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-vyro-text/55">
             <span className="rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px]">
-              hardware: {hardwareRevision}
+              firmware: {firmwareRevision || (connected ? "reading…" : "—")}
             </span>
-          )}
-          <span
-            className={`rounded-md border px-1.5 py-[1px] ${
-              smpAvailable
-                ? "border-emerald-500/30 bg-emerald-50 text-emerald-700"
-                : "border-amber-500/30 bg-amber-50 text-amber-800"
-            }`}
-          >
-            SMP: {smpAvailable ? "available" : "not exposed by firmware"}
-          </span>
-        </div>
-
-        {/* Update-available banner from the manifest URL. */}
-        {firmwareCheck?.updateAvailable && firmwareCheck.manifest && (
-          <div className="mb-3 rounded-xl border border-vyro-mint/40 bg-vyro-mint/10 px-3 py-2 text-xs text-vyro-ink">
-            <div className="mb-1 flex items-center gap-2 font-semibold">
-              <Download className="h-4 w-4" /> Firmware update available: {firmwareCheck.manifest.latestVersion}
-              {firmwareRevision ? <span className="font-normal text-vyro-text/60">(you have {firmwareRevision})</span> : null}
-            </div>
-            {firmwareCheck.manifest.notes && (
-              <p className="mb-2 text-[11px] leading-relaxed text-vyro-text/70">{firmwareCheck.manifest.notes}</p>
+            {hardwareRevision && (
+              <span className="rounded-md border border-vyro-text/10 bg-vyro-panel px-1.5 py-[1px]">
+                hardware: {hardwareRevision}
+              </span>
             )}
-            <button
-              disabled={downloadingUpdate}
-              onClick={downloadUpdate}
-              className="rounded-lg border border-vyro-text/15 bg-vyro-panel px-3 py-1.5 text-[11px] font-semibold text-vyro-text hover:bg-vyro-text/[0.04] disabled:opacity-40"
+            <span
+              className={`rounded-md border px-1.5 py-[1px] ${
+                smpAvailable
+                  ? "border-emerald-500/30 bg-emerald-50 text-emerald-700"
+                  : "border-amber-500/30 bg-amber-50 text-amber-800"
+              }`}
             >
-              {downloadingUpdate ? "Downloading…" : "Download image"}
+              SMP: {smpAvailable ? "available" : "not exposed by firmware"}
+            </span>
+          </div>
+
+          {/* Update-available banner from the manifest URL. */}
+          {firmwareCheck?.updateAvailable && firmwareCheck.manifest && (
+            <div className="mb-3 rounded-xl border border-vyro-mint/40 bg-vyro-mint/10 px-3 py-2 text-xs text-vyro-ink">
+              <div className="mb-1 flex items-center gap-2 font-semibold">
+                <Download className="h-4 w-4" /> Firmware update available:{" "}
+                {firmwareCheck.manifest.latestVersion}
+                {firmwareRevision ? (
+                  <span className="font-normal text-vyro-text/60">
+                    (you have {firmwareRevision})
+                  </span>
+                ) : null}
+              </div>
+              {firmwareCheck.manifest.notes && (
+                <p className="mb-2 text-[11px] leading-relaxed text-vyro-text/70">
+                  {firmwareCheck.manifest.notes}
+                </p>
+              )}
+              <button
+                disabled={downloadingUpdate}
+                onClick={downloadUpdate}
+                className="rounded-lg border border-vyro-text/15 bg-vyro-panel px-3 py-1.5 text-[11px] font-semibold text-vyro-text hover:bg-vyro-text/[0.04] disabled:opacity-40"
+              >
+                {downloadingUpdate ? "Downloading…" : "Download image"}
+              </button>
+            </div>
+          )}
+          {firmwareChecking && !firmwareCheck?.updateAvailable && (
+            <div className="mb-3 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-[11px] text-vyro-text/60">
+              Checking for firmware updates…
+            </div>
+          )}
+          {!isManifestConfigured() && (
+            <div className="mb-3 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-[11px] text-vyro-text/60">
+              Set <span className="font-mono">VITE_FIRMWARE_MANIFEST_URL</span> in project env to
+              enable automatic firmware update checks. Manifest shape:{" "}
+              <span className="font-mono">{"{ latestVersion, downloadUrl, sha256?, notes? }"}</span>
+              .
+            </div>
+          )}
+          {!smpAvailable && connected && (
+            <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+              This watch does not expose the MCUmgr/SMP GATT service, so this app cannot flash it
+              directly. Ask Armand to enable SMP in the firmware, or provide the QCBand-proprietary
+              OTA opcodes and we'll wire up a custom installer.
+            </div>
+          )}
+
+          <p className="mb-3 text-xs leading-relaxed text-vyro-text/60">
+            Choose an update file to install on your watch. It will restart and reconnect
+            automatically once the update finishes.
+          </p>
+          <input
+            ref={otaInputRef}
+            type="file"
+            accept=".bin"
+            className="hidden"
+            onChange={(e) => {
+              setOtaFile(e.target.files?.[0] ?? null);
+              setOtaError(null);
+              setOtaSuccess(false);
+              setOtaProgress(null);
+            }}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => otaInputRef.current?.click()}
+              className="rounded-xl border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-xs font-semibold text-vyro-text hover:bg-vyro-text/[0.04]"
+            >
+              Choose file
+            </button>
+            <div className="min-w-0 flex-1 truncate font-mono text-[11px] text-vyro-text/55">
+              {otaFile
+                ? `${otaFile.name} · ${(otaFile.size / 1024).toFixed(1)} KB`
+                : "No file selected"}
+            </div>
+            <button
+              disabled={
+                !otaFile ||
+                !smpAvailable ||
+                (!!otaProgress && otaProgress.phase !== "done" && !otaError)
+              }
+              onClick={runOta}
+              className="rounded-xl bg-vyro-mint px-4 py-2 text-xs font-bold text-vyro-ink disabled:opacity-30"
+            >
+              {otaProgress && otaProgress.phase !== "done" && !otaError
+                ? "Updating…"
+                : "Start update"}
             </button>
           </div>
-        )}
-        {firmwareChecking && !firmwareCheck?.updateAvailable && (
-          <div className="mb-3 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-[11px] text-vyro-text/60">
-            Checking for firmware updates…
-          </div>
-        )}
-        {!isManifestConfigured() && (
-          <div className="mb-3 rounded-lg border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-[11px] text-vyro-text/60">
-            Set <span className="font-mono">VITE_FIRMWARE_MANIFEST_URL</span> in project env to enable automatic
-            firmware update checks. Manifest shape: <span className="font-mono">{"{ latestVersion, downloadUrl, sha256?, notes? }"}</span>.
-          </div>
-        )}
-        {!smpAvailable && connected && (
-          <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-            This watch does not expose the MCUmgr/SMP GATT service, so this app cannot flash it directly. Ask
-            Armand to enable SMP in the firmware, or provide the QCBand-proprietary OTA opcodes and we'll wire
-            up a custom installer.
-          </div>
-        )}
-
-        <p className="mb-3 text-xs leading-relaxed text-vyro-text/60">
-          Choose an update file to install on your watch. It will restart and
-          reconnect automatically once the update finishes.
-        </p>
-        <input
-          ref={otaInputRef}
-          type="file"
-          accept=".bin"
-          className="hidden"
-          onChange={(e) => {
-            setOtaFile(e.target.files?.[0] ?? null);
-            setOtaError(null);
-            setOtaSuccess(false);
-            setOtaProgress(null);
-          }}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => otaInputRef.current?.click()}
-            className="rounded-xl border border-vyro-text/10 bg-vyro-panel px-3 py-2 text-xs font-semibold text-vyro-text hover:bg-vyro-text/[0.04]"
-          >
-            Choose file
-          </button>
-          <div className="min-w-0 flex-1 truncate font-mono text-[11px] text-vyro-text/55">
-            {otaFile ? `${otaFile.name} · ${(otaFile.size / 1024).toFixed(1)} KB` : "No file selected"}
-          </div>
-          <button
-            disabled={!otaFile || !smpAvailable || (!!otaProgress && otaProgress.phase !== "done" && !otaError)}
-            onClick={runOta}
-            className="rounded-xl bg-vyro-mint px-4 py-2 text-xs font-bold text-vyro-ink disabled:opacity-30"
-          >
-            {otaProgress && otaProgress.phase !== "done" && !otaError ? "Updating…" : "Start update"}
-          </button>
-        </div>
-        {otaProgress && (
-          <div className="mt-4">
-            <div className="mb-1 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest text-vyro-text/55">
-              <span className="truncate">{phaseLabel[otaProgress.phase]}</span>
-              <span className="shrink-0">{(otaProgress.fraction * 100).toFixed(0)}%</span>
+          {otaProgress && (
+            <div className="mt-4">
+              <div className="mb-1 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest text-vyro-text/55">
+                <span className="truncate">{phaseLabel[otaProgress.phase]}</span>
+                <span className="shrink-0">{(otaProgress.fraction * 100).toFixed(0)}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-vyro-text/[0.06]">
+                <div
+                  className="h-full bg-vyro-mint/100 transition-all"
+                  style={{ width: `${otaProgress.fraction * 100}%` }}
+                />
+              </div>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-vyro-text/[0.06]">
-              <div className="h-full bg-vyro-mint/100 transition-all" style={{ width: `${otaProgress.fraction * 100}%` }} />
+          )}
+          {otaSuccess && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-vyro-mint/10 px-3 py-2 text-xs text-vyro-mint">
+              <CheckCircle2 className="h-4 w-4" /> Update installed. Your watch is restarting — it
+              will reconnect automatically.
             </div>
-          </div>
-        )}
-        {otaSuccess && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-vyro-mint/10 px-3 py-2 text-xs text-vyro-mint">
-            <CheckCircle2 className="h-4 w-4" /> Update installed. Your watch is restarting — it will reconnect automatically.
-          </div>
-        )}
-        {otaError && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-            <XCircle className="h-4 w-4" /> {otaError}
-          </div>
-        )}
-      </Card>
+          )}
+          {otaError && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+              <XCircle className="h-4 w-4" /> {otaError}
+            </div>
+          )}
+        </Card>
       )}
     </div>
   );

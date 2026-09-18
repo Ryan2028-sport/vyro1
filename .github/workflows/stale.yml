@@ -1,0 +1,32 @@
+name: Stale triage
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-stale: 45
+          days-before-close: 14
+          stale-issue-label: stale
+          stale-pr-label: stale
+          exempt-issue-labels: "pinned,roadmap,firmware,security"
+          exempt-pr-labels: "pinned,security"
+          stale-issue-message: >
+            No activity for 45 days. If this still reproduces on the current build, add a
+            comment (a Debug-tab bundle helps for band issues) and it will stay open.
+          stale-pr-message: >
+            No activity for 45 days. Rebase on `main` and comment to keep this open.
+          close-issue-message: >
+            Closing as stale. Reopen with fresh reproduction details if it still happens.
+          close-pr-message: >
+            Closing as stale. Reopen once the branch is rebased and ready for review.

@@ -3,6 +3,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMySessions } from "@/lib/sessions.functions";
 import { Card, EmptyState, PageHeader, Pill } from "./shared";
 
+/** Numeric roll-up stored alongside a recorded session. */
+type SessionSummary = Partial<Record<string, number>>;
+
 // =============================================================================
 // History view — strict real-data mode. Trends only render once we have
 // at least two saved sessions; otherwise every card shows an empty state.
@@ -32,7 +35,11 @@ export function HistoryView() {
         eyebrow="Player Dashboard · Progress"
         title="Session history"
         subtitle="Every metric here comes from real sessions you've saved. Cards stay blank until the data exists."
-        action={<Pill tone={count > 0 ? "live" : "off"}>{count} session{count === 1 ? "" : "s"}</Pill>}
+        action={
+          <Pill tone={count > 0 ? "live" : "off"}>
+            {count} session{count === 1 ? "" : "s"}
+          </Pill>
+        }
       />
 
       <Card eyebrow="Session log · verified" title="Recent sessions">
@@ -44,8 +51,8 @@ export function HistoryView() {
           />
         )}
         <div className="space-y-3">
-          {sessions?.map((s: any) => {
-            const summary = (s.summary || {}) as Record<string, any>;
+          {sessions?.map((s) => {
+            const summary = (s.summary || {}) as SessionSummary;
             return (
               <div key={s.id} className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -65,9 +72,15 @@ export function HistoryView() {
                 </div>
                 {Object.keys(summary).length > 0 && (
                   <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-                    {summary.peakG != null && <Mini label="Peak g" v={Number(summary.peakG).toFixed(2)} />}
-                    {summary.peakDps != null && <Mini label="Peak dps" v={Math.round(summary.peakDps)} />}
-                    {summary.peakJerk != null && <Mini label="Peak jerk" v={Number(summary.peakJerk).toFixed(1)} />}
+                    {summary.peakG != null && (
+                      <Mini label="Peak g" v={Number(summary.peakG).toFixed(2)} />
+                    )}
+                    {summary.peakDps != null && (
+                      <Mini label="Peak dps" v={Math.round(summary.peakDps)} />
+                    )}
+                    {summary.peakJerk != null && (
+                      <Mini label="Peak jerk" v={Number(summary.peakJerk).toFixed(1)} />
+                    )}
                   </div>
                 )}
               </div>
@@ -79,16 +92,18 @@ export function HistoryView() {
       <Card eyebrow="Trends" title="All-time progress">
         <EmptyState
           title={count < 2 ? "Need at least two sessions" : "Trends live in the Trends tab"}
-          hint={count < 2
-            ? "Record a second session and trend graphs will compute themselves from the saved summaries — no synthetic data."
-            : "Open the Trends tab for the full progression view derived directly from these sessions."}
+          hint={
+            count < 2
+              ? "Record a second session and trend graphs will compute themselves from the saved summaries — no synthetic data."
+              : "Open the Trends tab for the full progression view derived directly from these sessions."
+          }
         />
       </Card>
     </div>
   );
 }
 
-function Mini({ label, v }: { label: string; v: any }) {
+function Mini({ label, v }: { label: string; v: React.ReactNode }) {
   return (
     <div className="rounded-lg bg-vyro-text/[0.04] py-1.5">
       <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">{label}</div>

@@ -12,9 +12,11 @@ export function SwingView() {
         eyebrow="Per-swing · IMU"
         title="Swing & racket motion"
         subtitle="Live wrist-IMU shot detection. Pair AI Video for face angle and contact labels."
-        action={<Pill tone={m.connected ? "live" : "off"} pulse={m.sessionState === "live"}>
-          {m.sessionState === "live" ? "RECORDING" : m.connected ? "READY" : "OFFLINE"}
-        </Pill>}
+        action={
+          <Pill tone={m.connected ? "live" : "off"} pulse={m.sessionState === "live"}>
+            {m.sessionState === "live" ? "RECORDING" : m.connected ? "READY" : "OFFLINE"}
+          </Pill>
+        }
       />
 
       <Card eyebrow="Detection · live" title="Swing counts">
@@ -38,7 +40,11 @@ export function SwingView() {
       <Card eyebrow="Per-swing" title="Quality & duration">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat label="Max intensity" value={fmtNum(m.swingIntMax, m.connected, 0)} unit="/100" />
-          <Stat label="Avg (10) intensity" value={fmtNum(m.swingIntAvg, m.connected, 0)} unit="/100" />
+          <Stat
+            label="Avg (10) intensity"
+            value={fmtNum(m.swingIntAvg, m.connected, 0)}
+            unit="/100"
+          />
           <Stat label="Max duration" value={fmtNum(m.swingDurMax, m.connected, 0)} unit="ms" />
           <Stat label="Avg (10) duration" value={fmtNum(m.swingDurAvg, m.connected, 0)} unit="ms" />
         </div>

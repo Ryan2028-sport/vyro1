@@ -6,9 +6,15 @@
 import { z } from "zod";
 
 export const ZONE_KEYS = [
-  "front-forehand", "front-centre", "front-backhand",
-  "mid-forehand", "mid-centre", "mid-backhand",
-  "back-forehand", "back-centre", "back-backhand",
+  "front-forehand",
+  "front-centre",
+  "front-backhand",
+  "mid-forehand",
+  "mid-centre",
+  "mid-backhand",
+  "back-forehand",
+  "back-centre",
+  "back-backhand",
 ] as const;
 
 export type ZoneKey = (typeof ZONE_KEYS)[number];
@@ -19,9 +25,18 @@ const Heat9 = z.array(z.number().min(0).max(100_000)).length(9);
 export const MeasuredSchema = z.object({
   scannedFrames: z.number().min(1).max(6000),
   sampleEverySec: z.number().min(0.05).max(10),
-  scanSeconds: z.number().min(0).max(60 * 60),
-  activeSeconds: z.number().min(0).max(60 * 60 * 3),
-  restSeconds: z.number().min(0).max(60 * 60 * 3),
+  scanSeconds: z
+    .number()
+    .min(0)
+    .max(60 * 60),
+  activeSeconds: z
+    .number()
+    .min(0)
+    .max(60 * 60 * 3),
+  restSeconds: z
+    .number()
+    .min(0)
+    .max(60 * 60 * 3),
   workRestRatio: z.number().min(0).max(50),
   rallyCount: z.number().min(0).max(2000),
   avgShotsPerRally: z.number().min(0).max(200),
@@ -60,27 +75,52 @@ export const MeasuredSchema = z.object({
   /** Shots that showed live court play from a readable angle. */
   playableSegments: z.number().min(0).max(5000).default(1),
   /** Seconds of footage that produced motion measurements. */
-  usableSeconds: z.number().min(0).max(60 * 60 * 3).default(0),
+  usableSeconds: z
+    .number()
+    .min(0)
+    .max(60 * 60 * 3)
+    .default(0),
   /** Seconds where the court was fitted AND "you" was identified. */
-  measurableSeconds: z.number().min(0).max(60 * 60 * 3).default(0),
+  measurableSeconds: z
+    .number()
+    .min(0)
+    .max(60 * 60 * 3)
+    .default(0),
   /** usableSeconds as a share of the clip. */
   coveragePercent: z.number().min(0).max(100).default(0),
   rejectedSeconds: z
     .object({
-      closeUp: z.number().min(0).max(60 * 60 * 3).default(0),
-      unstable: z.number().min(0).max(60 * 60 * 3).default(0),
-      noPlay: z.number().min(0).max(60 * 60 * 3).default(0),
-      tooShort: z.number().min(0).max(60 * 60 * 3).default(0),
+      closeUp: z
+        .number()
+        .min(0)
+        .max(60 * 60 * 3)
+        .default(0),
+      unstable: z
+        .number()
+        .min(0)
+        .max(60 * 60 * 3)
+        .default(0),
+      noPlay: z
+        .number()
+        .min(0)
+        .max(60 * 60 * 3)
+        .default(0),
+      tooShort: z
+        .number()
+        .min(0)
+        .max(60 * 60 * 3)
+        .default(0),
     })
     .default({ closeUp: 0, unstable: 0, noPlay: 0, tooShort: 0 }),
 });
 
-
-
 export type MeasuredStats = z.infer<typeof MeasuredSchema>;
 
 export const FrameMetaSchema = z.object({
-  t: z.number().min(0).max(60 * 60 * 3),
+  t: z
+    .number()
+    .min(0)
+    .max(60 * 60 * 3),
   actor: z.enum(["player", "opponent", "unknown"]),
   zone: z.string().min(3).max(32),
   opponentZone: z.string().min(3).max(32).optional(),
@@ -88,29 +128,64 @@ export const FrameMetaSchema = z.object({
 
 export const ClipInputSchema = z.object({
   videoName: z.string().min(1).max(255),
-  durationSec: z.number().min(0).max(60 * 60 * 3),
+  durationSec: z
+    .number()
+    .min(0)
+    .max(60 * 60 * 3),
   sampleEverySec: z.number().min(0.05).max(10),
   frames: z.array(z.string().min(10).max(900_000)).min(1).max(40),
-  frameTimes: z.array(z.number().min(0).max(60 * 60 * 3)).max(40).optional(),
+  frameTimes: z
+    .array(
+      z
+        .number()
+        .min(0)
+        .max(60 * 60 * 3),
+    )
+    .max(40)
+    .optional(),
   frameMeta: z.array(FrameMetaSchema).max(40).optional(),
-  motionTimeline: z.array(z.object({
-    t: z.number().min(0).max(60 * 60 * 3),
-    motion: z.number().min(0).max(100),
-    x: z.number().min(0).max(1),
-    y: z.number().min(0).max(1),
-    zone: z.string().min(3).max(32),
-  })).max(600).optional(),
-  contacts: z.array(z.object({
-    t: z.number().min(0).max(60 * 60 * 3),
-    actor: z.enum(["player", "opponent", "unknown"]),
-    zone: z.string().min(3).max(32),
-    opponentZone: z.string().min(3).max(32).optional(),
-    motion: z.number().min(0).max(100),
-  })).max(600).optional(),
-  tReturnEvents: z.array(z.object({
-    t: z.number().min(0).max(60 * 60 * 3),
-    secondsToT: z.number().min(0).max(120),
-  })).max(600).optional(),
+  motionTimeline: z
+    .array(
+      z.object({
+        t: z
+          .number()
+          .min(0)
+          .max(60 * 60 * 3),
+        motion: z.number().min(0).max(100),
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+        zone: z.string().min(3).max(32),
+      }),
+    )
+    .max(600)
+    .optional(),
+  contacts: z
+    .array(
+      z.object({
+        t: z
+          .number()
+          .min(0)
+          .max(60 * 60 * 3),
+        actor: z.enum(["player", "opponent", "unknown"]),
+        zone: z.string().min(3).max(32),
+        opponentZone: z.string().min(3).max(32).optional(),
+        motion: z.number().min(0).max(100),
+      }),
+    )
+    .max(600)
+    .optional(),
+  tReturnEvents: z
+    .array(
+      z.object({
+        t: z
+          .number()
+          .min(0)
+          .max(60 * 60 * 3),
+        secondsToT: z.number().min(0).max(120),
+      }),
+    )
+    .max(600)
+    .optional(),
   measured: MeasuredSchema,
 });
 
@@ -122,7 +197,16 @@ export type ClipInput = z.infer<typeof ClipInputSchema>;
 
 export const SIDE = ["forehand", "backhand", "unclear"] as const;
 export const DEPTH = ["front", "mid", "back", "unclear"] as const;
-export const FAMILY = ["drive", "cross-court", "boast", "drop", "lob", "volley", "serve", "unclear"] as const;
+export const FAMILY = [
+  "drive",
+  "cross-court",
+  "boast",
+  "drop",
+  "lob",
+  "volley",
+  "serve",
+  "unclear",
+] as const;
 
 export const FrameLabelSchema = z.object({
   frame: z.number().int().min(1).max(40),
@@ -161,7 +245,6 @@ export function parseSegmentLabels(raw: string): FrameLabel[] | null {
   return parsed.success ? parsed.data.labels : null;
 }
 
-
 /** Counts fused from the AI-verified frames — always carries its sample size. */
 export type VerifiedCounts = {
   framesSent: number;
@@ -195,13 +278,18 @@ export const InsightSchema = z.object({
   tNote: z.string().max(600).catch(""),
   heatmapNote: z.string().max(600).catch(""),
   rallyNote: z.string().max(600).catch(""),
-  timeline: z.array(z.object({
-    time: Str.catch(""),
-    phase: Str.catch(""),
-    observation: Str.catch(""),
-    keyShot: Str.catch(""),
-    coachingCue: Str.catch(""),
-  })).max(10).catch([]),
+  timeline: z
+    .array(
+      z.object({
+        time: Str.catch(""),
+        phase: Str.catch(""),
+        observation: Str.catch(""),
+        keyShot: Str.catch(""),
+        coachingCue: Str.catch(""),
+      }),
+    )
+    .max(10)
+    .catch([]),
   shotBreakdown: List(),
   swingPath: List(),
   explosiveSteps: List(),
@@ -237,10 +325,12 @@ export const VERIFY_SYSTEM =
   "frame is not a normal court view, or you cannot see a strike, or cannot tell a detail, answer 'none' or " +
   "'unclear' — never guess. Reply with STRICT JSON only, no markdown, no commentary.";
 
-
 export function buildVerifyPrompt(times: number[], hints: string[]): string {
   const rows = times
-    .map((t, i) => `frame ${i + 1}: ${t.toFixed(1)}s${hints[i] ? ` (motion tracker thinks: ${hints[i]})` : ""}`)
+    .map(
+      (t, i) =>
+        `frame ${i + 1}: ${t.toFixed(1)}s${hints[i] ? ` (motion tracker thinks: ${hints[i]})` : ""}`,
+    )
     .join("\n");
   return (
     `Annotate these ${times.length} frames from one squash match.\n${rows}\n\n` +
@@ -294,11 +384,9 @@ export function buildSynthesisPrompt(data: ClipInput, verified: VerifiedCounts |
     `  Everything below was measured only inside the readable shots. Do not describe the whole clip as if it were all court play.\n\n` +
     `MEASURED BY THE SCAN (trust these, they come from the pixels):\n` +
     `  checkpoints ${m.scannedFrames} every ${m.sampleEverySec}s; both players tracked cleanly in ${m.twoPlayerTrackPercent}% of active frames\n` +
-
     (m.identitySource === "tapped"
       ? `  which player is "you": chosen by the user on a frame and followed by kit colour (clear separation in ${m.identityConfidencePercent}% of tracked frames)\n`
       : `  which player is "you": inferred from camera depth, not confirmed by the user — do not make claims that depend on the two players not being mixed up\n`) +
-
     `  contacts detected ${m.contactCount} (you ${m.playerContacts}, opponent ${m.opponentContacts})\n` +
     `  rallies ${m.rallyCount}, avg ${m.avgShotsPerRally} shots/rally, longest ${m.longestRallyShots} shots, buckets ${JSON.stringify(m.rallyBuckets)}\n` +
     `  work ${m.activeSeconds}s vs rest ${m.restSeconds}s (ratio ${m.workRestRatio})\n` +
@@ -321,7 +409,11 @@ export function buildSynthesisPrompt(data: ClipInput, verified: VerifiedCounts |
 
 /** Parse a model reply that may be an object OR an array, fenced or not. */
 export function parseJsonValue(raw: string): unknown | null {
-  const cleaned = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/, "")
+    .trim();
   try {
     return JSON.parse(cleaned);
   } catch {
@@ -344,7 +436,6 @@ export function parseJsonObject(raw: string): unknown | null {
   const value = parseJsonValue(raw);
   return value && !Array.isArray(value) ? value : null;
 }
-
 
 export function parseInsight(raw: string): SquashInsight | null {
   const obj = parseJsonObject(raw);

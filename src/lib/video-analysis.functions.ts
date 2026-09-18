@@ -11,10 +11,12 @@ export const analyzeSquashClip = createServerFn({ method: "POST" })
   .handler(
     async ({
       data,
-    }): Promise<{ insight: SquashInsight | null; verified: VerifiedCounts | null; error: string | null }> =>
-      runClipAnalysis(data),
+    }): Promise<{
+      insight: SquashInsight | null;
+      verified: VerifiedCounts | null;
+      error: string | null;
+    }> => runClipAnalysis(data),
   );
-
 
 export const saveVideoAnalysis = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -22,7 +24,10 @@ export const saveVideoAnalysis = createServerFn({ method: "POST" })
     z
       .object({
         video_name: z.string().min(1).max(255),
-        duration_sec: z.number().min(0).max(60 * 60 * 3),
+        duration_sec: z
+          .number()
+          .min(0)
+          .max(60 * 60 * 3),
         insight: z.record(z.string(), z.any()),
       })
       .parse(input),

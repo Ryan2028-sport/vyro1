@@ -91,3 +91,13 @@ bun run build
 - [ ] Works at 390px width and with reduced motion
 - [ ] Migrations are additive and reversible in practice
 - [ ] Docs/README updated when behaviour or setup changed
+
+## Local checks before opening a pull request
+
+```bash
+bun run lint && bun run format:check && bun run typecheck && bun run test && bun run build
+```
+
+CI runs these as four parallel jobs and gates merges on a single `CI passed` check. See
+[`docs/TESTING.md`](docs/TESTING.md) for the test strategy and
+[`docs/RELEASING.md`](docs/RELEASING.md) for how releases are cut.

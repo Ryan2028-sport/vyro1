@@ -50,7 +50,9 @@ export const recordMetricSamples = createServerFn({ method: "POST" })
         .limit(2000);
       if (aggErr) throw aggErr;
       if (!agg || agg.length === 0) continue;
-      let min = Infinity, max = -Infinity, sum = 0;
+      let min = Infinity,
+        max = -Infinity,
+        sum = 0;
       for (const r of agg) {
         const v = Number(r.value);
         if (v < min) min = v;
@@ -88,7 +90,9 @@ export const listRecentMetrics = createServerFn({ method: "GET" })
     const since = new Date(Date.now() - data.days * 86_400_000).toISOString().slice(0, 10);
     const { data: rows, error } = await context.supabase
       .from("daily_metrics")
-      .select("day, metric, min_value, avg_value, max_value, last_value, sample_count, last_recorded_at")
+      .select(
+        "day, metric, min_value, avg_value, max_value, last_value, sample_count, last_recorded_at",
+      )
       .eq("user_id", context.userId)
       .gte("day", since)
       .order("day", { ascending: false });

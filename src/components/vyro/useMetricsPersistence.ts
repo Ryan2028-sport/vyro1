@@ -27,7 +27,14 @@ export function useMetricsPersistence() {
     if (!ctx.connected) return;
     const sample = () => {
       const now = Date.now();
-      const push = (metric: string, value: number | null | undefined, unit: string | null, at: number | null | undefined, minGapMs = 60_000, minDelta = 0) => {
+      const push = (
+        metric: string,
+        value: number | null | undefined,
+        unit: string | null,
+        at: number | null | undefined,
+        minGapMs = 60_000,
+        minDelta = 0,
+      ) => {
         if (value == null || !Number.isFinite(value)) return;
         const stamp = at ?? now;
         const prev = lastRef.current[metric];
@@ -52,8 +59,22 @@ export function useMetricsPersistence() {
       push("respiration", ctx.respRateBrpm, "brpm", null, 5 * 60_000, 1);
       if (ctx.bloodPressure && ctx.signalAt.bloodPressureAt) {
         const bp = ctx.bloodPressure as { systolic?: number; diastolic?: number };
-        push("bp_systolic", bp.systolic ?? null, "mmHg", ctx.signalAt.bloodPressureAt, 5 * 60_000, 1);
-        push("bp_diastolic", bp.diastolic ?? null, "mmHg", ctx.signalAt.bloodPressureAt, 5 * 60_000, 1);
+        push(
+          "bp_systolic",
+          bp.systolic ?? null,
+          "mmHg",
+          ctx.signalAt.bloodPressureAt,
+          5 * 60_000,
+          1,
+        );
+        push(
+          "bp_diastolic",
+          bp.diastolic ?? null,
+          "mmHg",
+          ctx.signalAt.bloodPressureAt,
+          5 * 60_000,
+          1,
+        );
       }
       if (ctx.batteryPct != null) {
         push("battery", ctx.batteryPct, "%", ctx.signalAt.batteryAt, 15 * 60_000, 2);
@@ -77,7 +98,9 @@ export function useMetricsPersistence() {
       }
     };
     const id = window.setInterval(send, FLUSH_MS);
-    const onHide = () => { void send(); };
+    const onHide = () => {
+      void send();
+    };
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", onHide);
     return () => {

@@ -6,10 +6,14 @@ import { z } from "zod";
 
 export const saveDebugSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({
-    kind: z.enum(["full", "live"]).default("full"),
-    payload: z.unknown(),
-  }).parse(input))
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        kind: z.enum(["full", "live"]).default("full"),
+        payload: z.unknown(),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     // Raw diagnostics are intentionally bounded. This protects storage if a
     // future bridge accidentally supplies an unbounded notification history.

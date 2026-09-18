@@ -73,8 +73,8 @@ const MAX_WRITE_LOG = 25;
 // this set lands in "unknown" and is what to investigate first when a tile is
 // grey but notifications are flowing.
 const KNOWN_OPCODES = new Set<number>([
-  0x03, 0x07, 0x09, 0x12, 0x1e, 0x20, 0x32, 0x37, 0x39,
-  0x43, 0x48, 0x69, 0x6a, 0x73, 0x87, 0x89, 0xbc,
+  0x03, 0x07, 0x09, 0x12, 0x1e, 0x20, 0x32, 0x37, 0x39, 0x43, 0x48, 0x69, 0x6a, 0x73, 0x87, 0x89,
+  0xbc,
 ]);
 
 const emptyWrites = () => ({
@@ -146,7 +146,11 @@ function bytesToHex(b: Uint8Array, max = 32): string {
 
 function notify(s: ReturnType<typeof getStore>) {
   for (const fn of s.subs) {
-    try { fn(s.state); } catch { /* ignore */ }
+    try {
+      fn(s.state);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -269,7 +273,9 @@ export function useBleInspector(): BleInspectorState {
   useEffect(() => {
     s.subs.add(setState);
     setState(s.state);
-    return () => { s.subs.delete(setState); };
+    return () => {
+      s.subs.delete(setState);
+    };
   }, [s]);
   return state;
 }

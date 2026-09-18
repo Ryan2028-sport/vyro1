@@ -119,13 +119,7 @@ export async function runOtaUpload(
         phase: "resetting",
       });
       try {
-        await client.request(
-          SMP_OP.WRITE,
-          SMP_GROUP.DEFAULT,
-          SMP_DEFAULT_CMD.RESET,
-          {},
-          5000,
-        );
+        await client.request(SMP_OP.WRITE, SMP_GROUP.DEFAULT, SMP_DEFAULT_CMD.RESET, {}, 5000);
       } catch {
         // Reset commonly drops the link before responding — ignore.
       }
@@ -138,10 +132,7 @@ export async function runOtaUpload(
 }
 
 /** Mark the freshly-booted image as permanent. Run after reconnecting. */
-export async function confirmOta(
-  transport: SmpTransport,
-  hash: Uint8Array,
-): Promise<void> {
+export async function confirmOta(transport: SmpTransport, hash: Uint8Array): Promise<void> {
   const client = new SmpClient(transport);
   try {
     await client.request(

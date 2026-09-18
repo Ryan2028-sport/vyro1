@@ -1,0 +1,12 @@
+# Default owners for everything in the repo.
+*                               @shivp01
+
+# Band protocol and firmware-facing code needs a protocol review.
+/src/lib/vyro-ble/              @shivp01
+/docs/BLE.md                    @shivp01
+
+# Backend schema changes are irreversible in production — review carefully.
+/supabase/migrations/           @shivp01
+
+# Repo automation and release process.
+/.github/                       @shivp01

@@ -21,9 +21,8 @@ import {
 // runtime) before claiming native.
 export function hasDespiaMessageHandler(): boolean {
   if (typeof window === "undefined") return false;
-  const handlers = (
-    window as unknown as { webkit?: { messageHandlers?: Record<string, unknown> } }
-  ).webkit?.messageHandlers;
+  const handlers = (window as unknown as { webkit?: { messageHandlers?: Record<string, unknown> } })
+    .webkit?.messageHandlers;
   if (!handlers) return false;
   try {
     return Object.keys(handlers).length > 0;
@@ -78,7 +77,6 @@ function detectNative(): boolean {
   }
   return false;
 }
-
 
 export const isNative = detectNative();
 
@@ -307,7 +305,8 @@ async function ensureCapacitorBle(): Promise<boolean> {
       // one of the filtered devices, which makes nearby headphones appear but
       // the watch disappear. Let the plugin request the needed permission and
       // keep Location Services on so the raw watch advertisement is visible.
-      const initOptions = getNativePlatform() === "android" ? undefined : { androidNeverForLocation: true };
+      const initOptions =
+        getNativePlatform() === "android" ? undefined : { androidNeverForLocation: true };
       await BleClient.initialize(initOptions);
       capacitorBleReady = true;
     }
@@ -317,7 +316,10 @@ async function ensureCapacitorBle(): Promise<boolean> {
         await BleClient.requestEnable();
         enabled = await BleClient.isEnabled();
       } catch (err) {
-        emit("event", { type: "android_ble_enable_failed", message: (err as Error)?.message || String(err) });
+        emit("event", {
+          type: "android_ble_enable_failed",
+          message: (err as Error)?.message || String(err),
+        });
       }
     }
     if (getNativePlatform() === "android") {
@@ -327,7 +329,10 @@ async function ensureCapacitorBle(): Promise<boolean> {
           emit("event", { type: "android_location_services_off" });
         }
       } catch (err) {
-        emit("event", { type: "android_location_check_failed", message: (err as Error)?.message || String(err) });
+        emit("event", {
+          type: "android_location_check_failed",
+          message: (err as Error)?.message || String(err),
+        });
       }
     }
     emit("state", { state: enabled ? "on" : "off" });
@@ -375,7 +380,9 @@ async function emitConnectedCapacitorDevices(services: string[] = []): Promise<B
         seen.set(mapped.id, {
           ...existing,
           ...mapped,
-          services: Array.from(new Set([...(existing?.services || []), ...(mapped.services || []), service])),
+          services: Array.from(
+            new Set([...(existing?.services || []), ...(mapped.services || []), service]),
+          ),
         });
       }
     } catch (err) {
@@ -429,11 +436,7 @@ if (typeof window !== "undefined") {
             ? e.char
             : "";
       const value =
-        typeof e.valueHex === "string"
-          ? e.valueHex
-          : typeof e.value === "string"
-            ? e.value
-            : "";
+        typeof e.valueHex === "string" ? e.valueHex : typeof e.value === "string" ? e.value : "";
       if (id && characteristic && value) emit("data", { id, service, characteristic, value });
       return;
     }

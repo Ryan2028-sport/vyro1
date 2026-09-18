@@ -82,7 +82,12 @@ export async function checkFirmwareUpdate(
   }
   const manifest = await fetchFirmwareManifest();
   if (!manifest) {
-    return { manifest: null, currentVersion, updateAvailable: false, error: "manifest unavailable" };
+    return {
+      manifest: null,
+      currentVersion,
+      updateAvailable: false,
+      error: "manifest unavailable",
+    };
   }
   const updateAvailable =
     !!currentVersion && compareVersions(manifest.latestVersion, currentVersion) > 0;

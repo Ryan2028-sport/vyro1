@@ -118,7 +118,11 @@ function pickAvg(xs: number[]): number | null {
 
 export function buildTrendCards(
   sessions: RawSession[],
-  baselines: { hrvMs?: number | null; restingHrBpm?: number | null; reactMs?: number | null } | null,
+  baselines: {
+    hrvMs?: number | null;
+    restingHrBpm?: number | null;
+    reactMs?: number | null;
+  } | null,
   sleepScores: number[], // most-recent-first list of nightly sleep scores
 ): TrendCard[] {
   const ref = Date.now();
@@ -212,7 +216,10 @@ export function trainingLoad7d(sessions: RawSession[]): number {
     if (!withinDays(s, 7, ref)) continue;
     const dur = durationMin(s);
     const events =
-      (s.swing_count ?? 0) + (s.burst_count ?? 0) + (s.dir_change_count ?? 0) + (s.rapid_count ?? 0);
+      (s.swing_count ?? 0) +
+      (s.burst_count ?? 0) +
+      (s.dir_change_count ?? 0) +
+      (s.rapid_count ?? 0);
     load += dur * 0.6 + events * 0.4;
   }
   return Math.min(100, Math.round(load / 4));

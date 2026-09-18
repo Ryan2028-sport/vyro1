@@ -33,7 +33,7 @@ export type KeepAliveStatus = {
 let audioEl: HTMLAudioElement | null = null;
 let wakeLock: { release: () => Promise<void> } | null = null;
 let started = false;
-let listeners = new Set<(s: KeepAliveStatus) => void>();
+const listeners = new Set<(s: KeepAliveStatus) => void>();
 
 const status: KeepAliveStatus = { active: false, audio: false, wakeLock: false, native: false };
 
@@ -86,13 +86,12 @@ async function ensureWakeLock() {
     status.wakeLock = true;
     emit();
     // Wake locks are auto-released when the page hides; re-acquire on show.
-    (wakeLock as unknown as EventTarget & { addEventListener?: Function }).addEventListener?.(
-      "release",
-      () => {
-        status.wakeLock = false;
-        emit();
-      },
-    );
+    (
+      wakeLock as unknown as EventTarget & { addEventListener?: EventTarget["addEventListener"] }
+    ).addEventListener?.("release", () => {
+      status.wakeLock = false;
+      emit();
+    });
   } catch {
     status.wakeLock = false;
   }

@@ -98,20 +98,21 @@ export function useSleepNights() {
 
   useEffect(() => {
     if (!remote || !Array.isArray(remote)) return;
-    const merged: SleepNight[] = remote.map((r: any) => ({
+    const merged: SleepNight[] = remote.map((r) => ({
       endAt: r.end_at,
       score: r.score,
       asleepMin: r.asleep_min,
       inBedMin: r.in_bed_min,
       wakeups: r.wakeups,
-      stages: r.stages ?? { awake: 0, light: 0, deep: 0, rem: 0 },
+      stages: (r.stages as SleepNight["stages"] | null) ?? { awake: 0, light: 0, deep: 0, rem: 0 },
       debtMin: r.debt_min ?? undefined,
-      hypnogram: r.hypnogram ?? undefined,
+      hypnogram: (r.hypnogram as SleepNight["hypnogram"] | null) ?? undefined,
     }));
     // Merge with any local unsynced entries.
     const byDay = new Map<string, SleepNight>();
     for (const n of merged) byDay.set(n.endAt.slice(0, 10), n);
-    for (const n of read()) if (!byDay.has(n.endAt.slice(0, 10))) byDay.set(n.endAt.slice(0, 10), n);
+    for (const n of read())
+      if (!byDay.has(n.endAt.slice(0, 10))) byDay.set(n.endAt.slice(0, 10), n);
     const list = [...byDay.values()].sort((a, b) => a.endAt.localeCompare(b.endAt));
     setNights(list);
     write(list);
@@ -130,7 +131,14 @@ export function useSleepNights() {
   }, []);
 
   const last = nights.length ? nights[nights.length - 1] : null;
-  return { nights, last, scores: nights.slice().reverse().map((n) => n.score) };
+  return {
+    nights,
+    last,
+    scores: nights
+      .slice()
+      .reverse()
+      .map((n) => n.score),
+  };
 }
 
 /** Format minutes as `Xh YYm`. */

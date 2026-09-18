@@ -91,10 +91,13 @@
   --color-vyro-coach: var(--vyro-amber);
 }
 
-
 /* Slim scrollbar for a "thin" feel */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
 
 :root {
   --radius: 0.625rem;
@@ -132,26 +135,23 @@
   --sidebar-ring: oklch(0.704 0.04 256.788);
 
   /* VYRO dark tokens — Apple iOS system colour set (dark appearance) */
-  --vyro-ink: #000000;                        /* true black page base */
-  --vyro-panel: rgba(255, 255, 255, 0.055);   /* card surface */
-  --vyro-elev: rgba(255, 255, 255, 0.085);    /* elevated inner panel */
-  --vyro-line: rgba(255, 255, 255, 0.1);      /* hairline border */
-  --vyro-text: #f5f5f7;                       /* primary text */
-  --vyro-mute: rgba(235, 235, 245, 0.6);      /* secondary label */
-  --vyro-faint: rgba(235, 235, 245, 0.35);    /* tertiary label */
-  --vyro-mint: #30d158;                       /* systemGreen */
-  --vyro-amber: #ff9f0a;                      /* systemOrange */
-  --vyro-rose: #ff453a;                       /* systemRed */
-  --vyro-blue: #0a84ff;                       /* systemBlue */
-  --vyro-teal: #40c8e0;                       /* systemTeal */
-  --vyro-indigo: #5e5ce6;                     /* systemIndigo */
-  --vyro-pink: #ff375f;                       /* systemPink */
-  --vyro-yellow: #ffd60a;                     /* systemYellow */
-  --vyro-purple: #bf5af2;                     /* systemPurple */
-  --vyro-spatial: #0a84ff;                    /* informational blue */
-
-
-
+  --vyro-ink: #000000; /* true black page base */
+  --vyro-panel: rgba(255, 255, 255, 0.055); /* card surface */
+  --vyro-elev: rgba(255, 255, 255, 0.085); /* elevated inner panel */
+  --vyro-line: rgba(255, 255, 255, 0.1); /* hairline border */
+  --vyro-text: #f5f5f7; /* primary text */
+  --vyro-mute: rgba(235, 235, 245, 0.6); /* secondary label */
+  --vyro-faint: rgba(235, 235, 245, 0.35); /* tertiary label */
+  --vyro-mint: #30d158; /* systemGreen */
+  --vyro-amber: #ff9f0a; /* systemOrange */
+  --vyro-rose: #ff453a; /* systemRed */
+  --vyro-blue: #0a84ff; /* systemBlue */
+  --vyro-teal: #40c8e0; /* systemTeal */
+  --vyro-indigo: #5e5ce6; /* systemIndigo */
+  --vyro-pink: #ff375f; /* systemPink */
+  --vyro-yellow: #ffd60a; /* systemYellow */
+  --vyro-purple: #bf5af2; /* systemPurple */
+  --vyro-spatial: #0a84ff; /* informational blue */
 }
 
 .dark {
@@ -205,7 +205,8 @@
     width: 100%;
   }
 
-  html, body {
+  html,
+  body {
     position: relative;
   }
 
@@ -214,7 +215,13 @@
     color: var(--vyro-text);
     margin: 0;
     padding: 0;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial;
   }
 }
-

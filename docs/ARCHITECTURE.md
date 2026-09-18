@@ -18,15 +18,15 @@ addons in server code. Prefer pure JS, Web APIs, or WASM builds.
 
 ## Layers
 
-| Layer | Location | Responsibility |
-| --- | --- | --- |
-| Routes | `src/routes` | URL surface, head metadata, loaders, auth gate |
-| Surfaces | `src/components/vyro` | Product screens and the app shell |
-| Primitives | `src/components/ui` | shadcn components, styling-only |
-| State | `VyroBandProvider`, `VyroScoresProvider` | Connection + metric pipeline; derived scores |
-| Domain | `src/lib` | Scoring, sessions, video analysis, server functions |
-| Protocol | `src/lib/vyro-ble` | Packet framing, decoders, OTA, transport |
-| Data | `supabase/migrations` | Schema, grants, RLS policies |
+| Layer      | Location                                 | Responsibility                                      |
+| ---------- | ---------------------------------------- | --------------------------------------------------- |
+| Routes     | `src/routes`                             | URL surface, head metadata, loaders, auth gate      |
+| Surfaces   | `src/components/vyro`                    | Product screens and the app shell                   |
+| Primitives | `src/components/ui`                      | shadcn components, styling-only                     |
+| State      | `VyroBandProvider`, `VyroScoresProvider` | Connection + metric pipeline; derived scores        |
+| Domain     | `src/lib`                                | Scoring, sessions, video analysis, server functions |
+| Protocol   | `src/lib/vyro-ble`                       | Packet framing, decoders, OTA, transport            |
+| Data       | `supabase/migrations`                    | Schema, grants, RLS policies                        |
 
 ## Score pipeline
 

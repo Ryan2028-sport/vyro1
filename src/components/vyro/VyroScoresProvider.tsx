@@ -110,9 +110,14 @@ function median(xs: number[]): number | null {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-function avgOf(rows: { metric: string; avg_value: number | null }[], metric: string): number | null {
+function avgOf(
+  rows: { metric: string; avg_value: number | null }[],
+  metric: string,
+): number | null {
   const xs = rows
-    .filter((r) => r.metric === metric && r.avg_value != null && Number.isFinite(Number(r.avg_value)))
+    .filter(
+      (r) => r.metric === metric && r.avg_value != null && Number.isFinite(Number(r.avg_value)),
+    )
     .map((r) => Number(r.avg_value));
   if (!xs.length) return null;
   return Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10;
@@ -263,7 +268,6 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-
   // ---- Strain (accumulated cardiovascular load, TRIMP-style) --------------
   // Instantaneous HR margin made the tile read ~8/100 while resting and whip
   // around with every beat. Strain is a *load* metric: integrate heart-rate
@@ -314,8 +318,6 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.connected, strainNonce]);
 
-
-
   const sessionLoad = useMemo(() => {
     if (!m.connected) return null;
     if ((m.eventsLastMin ?? 0) <= 0 && (m.peakJerk ?? 0) <= 0) return null;
@@ -332,9 +334,16 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
 
   // ---- One classification used by EVERY status tag in the app -------------
   const band = recoveryBand(recovery);
-  const bandTone = band === "green" ? "live" : band === "yellow" ? "warn" : band === "red" ? "off" : "neutral";
+  const bandTone =
+    band === "green" ? "live" : band === "yellow" ? "warn" : band === "red" ? "off" : "neutral";
   const statusLabel =
-    band === "green" ? "Ready" : band === "yellow" ? "Manage" : band === "red" ? "Recover" : "Calibrating";
+    band === "green"
+      ? "Ready"
+      : band === "yellow"
+        ? "Manage"
+        : band === "red"
+          ? "Recover"
+          : "Calibrating";
   const bandLabel =
     band === "green"
       ? "Green — Ready"
@@ -364,7 +373,8 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
     baseline: rtpBaseline != null ? Math.round(rtpBaseline) : null,
     deviationPct,
     withinBaseline: deviationPct != null && Math.abs(deviationPct) <= 5,
-    clearance: deviationPct != null ? Math.round(Math.max(0, 100 - Math.abs(deviationPct) * 4)) : null,
+    clearance:
+      deviationPct != null ? Math.round(Math.max(0, 100 - Math.abs(deviationPct) * 4)) : null,
   };
 
   // ---- Persist the composites so tomorrow has a real baseline ------------
@@ -378,9 +388,12 @@ export function VyroScoresProvider({ children }: { children: ReactNode }) {
     lastPersistRef.current = now;
     const samples: { metric: string; value: number; unit: string; recorded_at: string }[] = [];
     const at = new Date(now).toISOString();
-    if (recovery != null) samples.push({ metric: "recovery", value: recovery, unit: "score", recorded_at: at });
-    if (readiness != null) samples.push({ metric: "readiness", value: readiness, unit: "score", recorded_at: at });
-    if (strain != null) samples.push({ metric: "strain", value: strain, unit: "score", recorded_at: at });
+    if (recovery != null)
+      samples.push({ metric: "recovery", value: recovery, unit: "score", recorded_at: at });
+    if (readiness != null)
+      samples.push({ metric: "readiness", value: readiness, unit: "score", recorded_at: at });
+    if (strain != null)
+      samples.push({ metric: "strain", value: strain, unit: "score", recorded_at: at });
     if (!samples.length) return;
     void flush({ data: { samples } }).catch(() => undefined);
   }, [m.connected, recovery, readiness, strain, flush]);

@@ -31,21 +31,24 @@ export const FEATURE_SPECS: NavSpec[] = [
     label: "Sport selector",
     eyebrow: "Pick a sport",
     icon: Trophy,
-    blurb: "Open the Morphos suite for Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, or Tennis.",
+    blurb:
+      "Open the Morphos suite for Baseball, Basketball, Football, Golf, Hockey, Soccer, Squash, or Tennis.",
   },
   {
     id: "athlete",
     label: "Athlete health",
     eyebrow: "24/7 · live",
     icon: HeartPulse,
-    blurb: "Live HR, HRV, SpO₂, respiratory rate, skin temp, steps, calories, wear time, signal confidence.",
+    blurb:
+      "Live HR, HRV, SpO₂, respiratory rate, skin temp, steps, calories, wear time, signal confidence.",
   },
   {
     id: "recovery",
     label: "Recovery & fatigue",
     eyebrow: "Readiness · live",
     icon: Activity,
-    blurb: "LIVE recovery score, status band, total fatigue, time-to-ready, Return-to-Play validator.",
+    blurb:
+      "LIVE recovery score, status band, total fatigue, time-to-ready, Return-to-Play validator.",
   },
   {
     id: "sleep",
@@ -66,7 +69,8 @@ export const FEATURE_SPECS: NavSpec[] = [
     label: "Swing & racket",
     eyebrow: "Per-swing · IMU",
     icon: Zap,
-    blurb: "Racket head speed, swing force, contact quality, face angle, swing consistency profiles.",
+    blurb:
+      "Racket head speed, swing force, contact quality, face angle, swing consistency profiles.",
   },
   {
     id: "coach",

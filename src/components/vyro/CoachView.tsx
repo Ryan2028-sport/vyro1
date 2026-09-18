@@ -67,7 +67,13 @@ function buildSelfRoster(
   const decel = recent ? Math.min(100, Math.round(agilityScore(recent) ?? 0)) : 0;
   const recovery = liveRecovery ?? 0;
   const status: Status =
-    recovery >= 75 ? "ready" : recovery >= 50 ? "modified" : recovery > 0 ? "attention" : "unavailable";
+    recovery >= 75
+      ? "ready"
+      : recovery >= 50
+        ? "modified"
+        : recovery > 0
+          ? "attention"
+          : "unavailable";
   const action =
     status === "ready"
       ? "Greenlight hard block"
@@ -118,9 +124,12 @@ export function CoachView() {
   );
 
   const ROSTER: Roster[] = [self];
-  const filtered = statusFilter === "all" ? ROSTER : ROSTER.filter((r) => r.status === statusFilter);
+  const filtered =
+    statusFilter === "all" ? ROSTER : ROSTER.filter((r) => r.status === statusFilter);
   const active = ROSTER.filter((r) => r.status !== "unavailable");
-  const avgRecovery = active.length ? Math.round(active.reduce((s, r) => s + r.recovery, 0) / active.length) : 0;
+  const avgRecovery = active.length
+    ? Math.round(active.reduce((s, r) => s + r.recovery, 0) / active.length)
+    : 0;
   const greenCount = ROSTER.filter((r) => r.status === "ready").length;
   const redCount = ROSTER.filter((r) => r.status === "attention").length;
   const load = trainingLoad7d(sessions);
@@ -131,7 +140,11 @@ export function CoachView() {
         eyebrow="Coach · iPad view"
         title="Coach"
         subtitle="Live roster of athletes whose bands are linked to your account. Aggregated and per-athlete views populate as more athletes opt in."
-        action={<Pill tone={live.connected ? "live" : "neutral"} pulse={live.connected}>{live.connected ? "Live roster" : "Offline"}</Pill>}
+        action={
+          <Pill tone={live.connected ? "live" : "neutral"} pulse={live.connected}>
+            {live.connected ? "Live roster" : "Offline"}
+          </Pill>
+        }
       />
 
       <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
@@ -171,7 +184,9 @@ export function CoachView() {
               <button
                 onClick={() => setCompare((c) => !c)}
                 className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
-                  compare ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
+                  compare
+                    ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
+                    : "border-vyro-line bg-vyro-panel text-vyro-mute"
                 }`}
               >
                 Compare mode
@@ -213,8 +228,12 @@ export function CoachView() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">Live Recovery</div>
-                        <div className="text-lg font-black tabular-nums text-vyro-text">{r.recovery || "—"}</div>
+                        <div className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute">
+                          Live Recovery
+                        </div>
+                        <div className="text-lg font-black tabular-nums text-vyro-text">
+                          {r.recovery || "—"}
+                        </div>
                       </div>
                     </div>
                     <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
@@ -224,7 +243,9 @@ export function CoachView() {
                       <Mini label="Agility" v={r.decel || "—"} />
                     </div>
                     <div className="mt-2 text-[11px] text-vyro-mute">
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute/80">Coach action · </span>
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-vyro-mute/80">
+                        Coach action ·{" "}
+                      </span>
                       {r.action}
                     </div>
                   </li>
@@ -232,7 +253,8 @@ export function CoachView() {
               </ul>
             )}
             <p className="mt-3 text-[11px] text-vyro-mute">
-              Sessions on file: <span className="text-vyro-text font-semibold">{sessions.length}</span>
+              Sessions on file:{" "}
+              <span className="text-vyro-text font-semibold">{sessions.length}</span>
             </p>
           </Card>
         </>
@@ -272,7 +294,10 @@ export function CoachView() {
           <Card eyebrow="Today's recommendations" title="Derived from your readiness + 7-day load">
             <ul className="space-y-2 text-sm text-vyro-text">
               {planItems(recovery, load).map((p, i) => (
-                <li key={i} className="flex items-start gap-2 rounded-xl border border-vyro-line bg-vyro-elev p-3">
+                <li
+                  key={i}
+                  className="flex items-start gap-2 rounded-xl border border-vyro-line bg-vyro-elev p-3"
+                >
                   <Pill tone={p.tone}>{p.label}</Pill>
                   <span>{p.text}</span>
                 </li>
@@ -291,10 +316,16 @@ export function CoachView() {
               <div className="bg-vyro-rose" style={{ width: "32%" }} />
             </div>
             <div className="mt-1.5 flex justify-between font-mono text-[9px] uppercase tracking-wider text-vyro-mute">
-              <span>Rest</span><span>Easy</span><span>Hard</span>
+              <span>Rest</span>
+              <span>Easy</span>
+              <span>Hard</span>
             </div>
             <p className="mt-3 text-[11px] text-vyro-mute">
-              {load >= 70 ? "→ Easy session recommended today." : load >= 40 ? "→ Moderate intensity is fine." : "→ Plenty of headroom to push."}
+              {load >= 70
+                ? "→ Easy session recommended today."
+                : load >= 40
+                  ? "→ Moderate intensity is fine."
+                  : "→ Plenty of headroom to push."}
             </p>
           </Card>
         </>
@@ -309,7 +340,9 @@ export function CoachView() {
           <ul className="mt-3 space-y-2 text-[12px]">
             <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5">
               <span className="font-semibold text-vyro-text">Avg HR:</span>{" "}
-              <span className="text-vyro-mute">{fmtNum(live.heartRateBpm, live.connected, 0)} bpm</span>
+              <span className="text-vyro-mute">
+                {fmtNum(live.heartRateBpm, live.connected, 0)} bpm
+              </span>
             </li>
             <li className="rounded-lg border border-vyro-line bg-vyro-elev p-2.5">
               <span className="font-semibold text-vyro-text">HRV baseline:</span>{" "}
@@ -326,22 +359,33 @@ export function CoachView() {
   );
 }
 
-function planItems(recovery: number | null, load: number): { tone: "live" | "warn" | "off" | "neutral"; label: string; text: string }[] {
+function planItems(
+  recovery: number | null,
+  load: number,
+): { tone: "live" | "warn" | "off" | "neutral"; label: string; text: string }[] {
   const items: { tone: "live" | "warn" | "off" | "neutral"; label: string; text: string }[] = [];
   if (recovery == null) {
     items.push({ tone: "neutral", label: "Pending", text: "Pair the band to compute readiness." });
     return items;
   }
-  if (recovery >= 75 && load < 70) items.push({ tone: "live", label: "Cleared", text: "Hard interval session cleared." });
-  else if (recovery >= 50) items.push({ tone: "warn", label: "Cap", text: "Cap court time at 50 min." });
-  else items.push({ tone: "off", label: "Hold", text: "Recovery focus today — skip the hard block." });
+  if (recovery >= 75 && load < 70)
+    items.push({ tone: "live", label: "Cleared", text: "Hard interval session cleared." });
+  else if (recovery >= 50)
+    items.push({ tone: "warn", label: "Cap", text: "Cap court time at 50 min." });
+  else
+    items.push({ tone: "off", label: "Hold", text: "Recovery focus today — skip the hard block." });
 
-  if (load >= 70) items.push({ tone: "warn", label: "Drill", text: "Drill: deceleration to T — keep intensity low." });
+  if (load >= 70)
+    items.push({
+      tone: "warn",
+      label: "Drill",
+      text: "Drill: deceleration to T — keep intensity low.",
+    });
   else items.push({ tone: "neutral", label: "Drill", text: "Reactive ghosting × 6 sets." });
   return items;
 }
 
-function Mini({ label, v }: { label: string; v: any }) {
+function Mini({ label, v }: { label: string; v: React.ReactNode }) {
   return (
     <div className="rounded-lg bg-vyro-text/[0.04] py-1">
       <div className="font-mono text-[8px] uppercase tracking-wider text-vyro-mute">{label}</div>
@@ -350,7 +394,13 @@ function Mini({ label, v }: { label: string; v: any }) {
   );
 }
 
-function CoachSportTab({ roster, live }: { roster: Roster[]; live: ReturnType<typeof useLiveMetrics> }) {
+function CoachSportTab({
+  roster,
+  live,
+}: {
+  roster: Roster[];
+  live: ReturnType<typeof useLiveMetrics>;
+}) {
   const active = roster.filter((r) => r.status !== "unavailable");
   const [mode, setMode] = useState<"aggregated" | "individual">("individual");
   const athlete = active[0];
@@ -365,7 +415,9 @@ function CoachSportTab({ roster, live }: { roster: Roster[]; live: ReturnType<ty
             <button
               onClick={() => setMode("aggregated")}
               className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
-                mode === "aggregated" ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
+                mode === "aggregated"
+                  ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
+                  : "border-vyro-line bg-vyro-panel text-vyro-mute"
               }`}
             >
               Aggregated
@@ -373,7 +425,9 @@ function CoachSportTab({ roster, live }: { roster: Roster[]; live: ReturnType<ty
             <button
               onClick={() => setMode("individual")}
               className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
-                mode === "individual" ? "border-vyro-mint bg-vyro-mint text-vyro-ink" : "border-vyro-line bg-vyro-panel text-vyro-mute"
+                mode === "individual"
+                  ? "border-vyro-mint bg-vyro-mint text-vyro-ink"
+                  : "border-vyro-line bg-vyro-panel text-vyro-mute"
               }`}
             >
               Per athlete
@@ -383,25 +437,26 @@ function CoachSportTab({ roster, live }: { roster: Roster[]; live: ReturnType<ty
       >
         {mode === "aggregated" ? (
           <p className="text-[12px] text-vyro-mute">
-            Aggregated view activates with ≥2 athletes on linked bands. You currently have {active.length}.
+            Aggregated view activates with ≥2 athletes on linked bands. You currently have{" "}
+            {active.length}.
           </p>
+        ) : athlete ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label="Recovery" value={athlete.recovery} unit="%" />
+            <Stat label="T-Ctl" value={athlete.tControl} unit="%" />
+            <Stat label="Swing" value={athlete.swingConsistency} unit="%" />
+            <Stat label="Agility" value={athlete.decel} unit="%" />
+          </div>
         ) : (
-          athlete ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="Recovery" value={athlete.recovery} unit="%" />
-              <Stat label="T-Ctl" value={athlete.tControl} unit="%" />
-              <Stat label="Swing" value={athlete.swingConsistency} unit="%" />
-              <Stat label="Agility" value={athlete.decel} unit="%" />
-            </div>
-          ) : (
-            <EmptyState title="No athletes linked" hint="Pair a band to view sport metrics." />
-          )
+          <EmptyState title="No athletes linked" hint="Pair a band to view sport metrics." />
         )}
       </Card>
 
       <div className="rounded-2xl border border-vyro-line bg-vyro-panel/40 p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-vyro-mute">Embedded · Sport selector</span>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-vyro-mute">
+            Embedded · Sport selector
+          </span>
           <Pill tone={live.connected ? "live" : "neutral"}>
             {athlete ? `Solo · ${athlete.name}` : "—"}
           </Pill>

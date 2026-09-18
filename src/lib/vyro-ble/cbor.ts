@@ -3,15 +3,7 @@
 // text strings, arrays, booleans, null. No tags, no floats beyond what SMP
 // might echo back (handled as numbers).
 
-type Cbor =
-  | number
-  | bigint
-  | string
-  | boolean
-  | null
-  | Uint8Array
-  | Cbor[]
-  | { [k: string]: Cbor };
+type Cbor = number | bigint | string | boolean | null | Uint8Array | Cbor[] | { [k: string]: Cbor };
 
 // --------------------------- ENCODE ---------------------------
 
@@ -21,19 +13,12 @@ function writeHeader(major: number, n: number, buf: number[]): void {
   else if (n < 0x100) buf.push(mt | 24, n);
   else if (n < 0x10000) buf.push(mt | 25, (n >> 8) & 0xff, n & 0xff);
   else if (n < 0x100000000)
-    buf.push(
-      mt | 26,
-      (n >>> 24) & 0xff,
-      (n >>> 16) & 0xff,
-      (n >>> 8) & 0xff,
-      n & 0xff,
-    );
+    buf.push(mt | 26, (n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff);
   else {
     // 64-bit length — used for very large byte strings. Encode via BigInt.
     const big = BigInt(n);
     buf.push(mt | 27);
-    for (let i = 7; i >= 0; i--)
-      buf.push(Number((big >> BigInt(8 * i)) & 0xffn));
+    for (let i = 7; i >= 0; i--) buf.push(Number((big >> BigInt(8 * i)) & 0xffn));
   }
 }
 
@@ -127,10 +112,7 @@ function readHeader(
   return { major, info, n, next };
 }
 
-function decodeValue(
-  bytes: Uint8Array,
-  off: number,
-): { value: Cbor; next: number } {
+function decodeValue(bytes: Uint8Array, off: number): { value: Cbor; next: number } {
   const h = readHeader(bytes, off);
   switch (h.major) {
     case 0:
@@ -160,8 +142,7 @@ function decodeValue(
       let p = h.next;
       for (let i = 0; i < h.n; i++) {
         const k = decodeValue(bytes, p);
-        if (typeof k.value !== "string")
-          throw new Error("CBOR: non-string map key");
+        if (typeof k.value !== "string") throw new Error("CBOR: non-string map key");
         const val = decodeValue(bytes, k.next);
         obj[k.value] = val.value;
         p = val.next;
