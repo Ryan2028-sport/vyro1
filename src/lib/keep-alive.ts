@@ -86,13 +86,12 @@ async function ensureWakeLock() {
     status.wakeLock = true;
     emit();
     // Wake locks are auto-released when the page hides; re-acquire on show.
-    (wakeLock as unknown as EventTarget & { addEventListener?: EventTarget["addEventListener"] }).addEventListener?.(
-      "release",
-      () => {
-        status.wakeLock = false;
-        emit();
-      },
-    );
+    (
+      wakeLock as unknown as EventTarget & { addEventListener?: EventTarget["addEventListener"] }
+    ).addEventListener?.("release", () => {
+      status.wakeLock = false;
+      emit();
+    });
   } catch {
     status.wakeLock = false;
   }

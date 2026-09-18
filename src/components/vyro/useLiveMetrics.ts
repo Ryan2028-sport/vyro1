@@ -12,7 +12,6 @@ type MotionEventFields = {
   [key: string]: unknown;
 };
 
-
 export type LiveMetrics = ReturnType<typeof useLiveMetrics>;
 
 export function useLiveMetrics() {

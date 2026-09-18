@@ -18,7 +18,6 @@ type RemoteSleepRow = {
   [key: string]: unknown;
 };
 
-
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
