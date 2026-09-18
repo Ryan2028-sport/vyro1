@@ -48,6 +48,11 @@ on visibilitychange and re-issue the measurement start.
 
 Bad: `update code`, `fixes`, `asdf`, `final v2`.
 
+The full style guide with examples at every change size lives in
+[docs/COMMIT_STYLE.md](docs/COMMIT_STYLE.md) and is enforced in CI
+(`commit-quality.yml` lints every commit and PR title). Commits describe the
+change, never the tool that produced it — no tool-attribution messages.
+
 ## Pull requests
 
 - One concern per PR. Split refactors from behaviour changes.
