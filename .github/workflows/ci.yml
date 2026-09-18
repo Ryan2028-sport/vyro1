@@ -6,32 +6,80 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  verify:
-    name: Lint · Types · Tests · Build
+  static:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: ESLint
+        run: bun run lint
+      - name: Prettier
+        run: bun run format:check
+
+  types:
+    name: Type check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+
+  build:
+    name: Production build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Report bundle size
+        run: |
+          {
+            echo "### Client bundle"
+            echo ""
+            echo '```'
+            du -ah dist 2>/dev/null | sort -rh | head -20 || echo "no dist directory"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Lint
-        run: bun run lint
-
-      - name: Type check
-        run: bunx tsc --noEmit
-
-      - name: Unit tests
-        run: bunx vitest run
-
-      - name: Build
-        run: bun run build
+  required:
+    name: CI passed
+    if: always()
+    needs: [static, types, test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - run: echo "All checks green."

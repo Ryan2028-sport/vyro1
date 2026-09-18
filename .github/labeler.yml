@@ -1,0 +1,27 @@
+ble:
+  - changed-files:
+      - any-glob-to-any-file: ["src/lib/vyro-ble/**", "src/hooks/use-vyro-band.ts", "docs/BLE.md"]
+
+ui:
+  - changed-files:
+      - any-glob-to-any-file: ["src/components/**", "src/**/*.css"]
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: ["supabase/**", "src/lib/**.functions.ts", "src/lib/**.server.ts"]
+
+ai-video:
+  - changed-files:
+      - any-glob-to-any-file: ["src/lib/video-analysis*", "src/components/vyro/AiVideoView.tsx", "src/lib/vyro-video/**"]
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.md", "docs/**"]
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: [".github/**"]
+
+test:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.test.ts", "**/*.test.tsx", "vitest.config.ts"]

@@ -1,0 +1,34 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      radix:
+        patterns: ["@radix-ui/*"]
+      tanstack:
+        patterns: ["@tanstack/*"]
+      tooling:
+        dependency-type: development
+        patterns: ["eslint*", "prettier*", "typescript*", "vite*", "vitest*", "@types/*"]
+    ignore:
+      # Managed by the Lovable platform — do not bump independently.
+      - dependency-name: "@lovable.dev/*"
+      - dependency-name: "nitro"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci(deps)"

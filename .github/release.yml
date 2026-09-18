@@ -1,0 +1,20 @@
+changelog:
+  exclude:
+    labels: [ignore-for-release]
+  categories:
+    - title: Features
+      labels: ["feat", "enhancement"]
+    - title: Fixes
+      labels: ["fix", "bug"]
+    - title: Band & firmware
+      labels: ["ble", "firmware"]
+    - title: Performance
+      labels: ["perf"]
+    - title: Documentation
+      labels: ["docs"]
+    - title: Maintenance
+      labels: ["chore", "refactor", "ci", "build", "test"]
+    - title: Dependencies
+      labels: ["dependencies"]
+    - title: Other changes
+      labels: ["*"]
