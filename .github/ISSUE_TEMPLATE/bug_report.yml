@@ -1,0 +1,61 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: [bug, needs-triage]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, in one or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in as …
+        2. Open …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Readiness / scores
+        - Vitals
+        - Sleep / Recovery
+        - Sport / Sessions
+        - AI video analysis
+        - Band pairing / BLE
+        - Firmware update (OTA)
+        - Auth / account
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Device, OS and app build
+      placeholder: iPhone 15 Pro · iOS 18.4 · TestFlight 1.4.2
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Band firmware version (if band-related)
+      placeholder: RFH59Pro_1.00.21
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Debug bundle / console output
+      description: Paste the Debug tab bundle or console errors. Remove tokens first.
+      render: text
