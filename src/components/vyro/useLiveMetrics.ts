@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useVyroBandCtx } from "./VyroBandProvider";
 
+/** Structural view of a decoded motion event — the fields this hook reads. */
+type MotionEventFields = {
+  type?: string;
+  intensity?: number;
+  accelPeakG?: { value?: number | null };
+  gyroPeakDps?: { value?: number | null };
+  jerkPeakGps?: { value?: number | null };
+  durationMs?: { value?: number | null };
+  [key: string]: unknown;
+};
+
+
 export type LiveMetrics = ReturnType<typeof useLiveMetrics>;
 
 export function useLiveMetrics() {
@@ -102,7 +114,7 @@ export function useLiveMetrics() {
     let eventsLastMin = 0;
     for (const e of events) {
       if (e.ts >= cutoff) eventsLastMin++;
-      const ev = e.event as Record<string, any>;
+      const ev = e.event as MotionEventFields;
       if (ev.accelPeakG?.value != null) peakG = Math.max(peakG, ev.accelPeakG.value);
       if (ev.gyroPeakDps?.value != null) peakDps = Math.max(peakDps, ev.gyroPeakDps.value);
       if (ev.jerkPeakGps?.value != null) peakJerk = Math.max(peakJerk, ev.jerkPeakGps.value);

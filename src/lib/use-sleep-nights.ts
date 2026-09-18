@@ -8,6 +8,17 @@
 // `useSleepNights()` returns an empty array and the UI renders an empty
 // state ("No sleep data synced yet").
 
+/** Row shape returned by the sleep-nights server function. */
+type RemoteSleepRow = {
+  end_at: string;
+  score: number | null;
+  asleep_min: number | null;
+  in_bed_min: number | null;
+  wakeups: number | null;
+  [key: string]: unknown;
+};
+
+
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -98,7 +109,7 @@ export function useSleepNights() {
 
   useEffect(() => {
     if (!remote || !Array.isArray(remote)) return;
-    const merged: SleepNight[] = remote.map((r: Record<string, any>) => ({
+    const merged: SleepNight[] = remote.map((r: RemoteSleepRow) => ({
       endAt: r.end_at,
       score: r.score,
       asleepMin: r.asleep_min,

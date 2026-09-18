@@ -48,7 +48,7 @@ export function HistoryView() {
           />
         )}
         <div className="space-y-3">
-          {sessions?.map((s: SessionRow) => {
+          {sessions?.map((s) => {
             const summary = (s.summary || {}) as Record<string, unknown>;
             return (
               <div key={s.id} className="rounded-xl border border-vyro-line bg-vyro-elev p-3">
