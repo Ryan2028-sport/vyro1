@@ -8,18 +8,6 @@
 // `useSleepNights()` returns an empty array and the UI renders an empty
 // state ("No sleep data synced yet").
 
-/** Row shape returned by the sleep-nights server function. */
-type RemoteSleepRow = {
-  end_at: string;
-  score: number;
-  asleep_min: number;
-  in_bed_min: number;
-  wakeups: number;
-  stages?: SleepNight["stages"] | null;
-  debt_min?: number | null;
-  hypnogram?: SleepNight["hypnogram"] | null;
-};
-
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -110,15 +98,15 @@ export function useSleepNights() {
 
   useEffect(() => {
     if (!remote || !Array.isArray(remote)) return;
-    const merged: SleepNight[] = remote.map((r: RemoteSleepRow) => ({
+    const merged: SleepNight[] = remote.map((r) => ({
       endAt: r.end_at,
       score: r.score,
       asleepMin: r.asleep_min,
       inBedMin: r.in_bed_min,
       wakeups: r.wakeups,
-      stages: r.stages ?? { awake: 0, light: 0, deep: 0, rem: 0 },
+      stages: (r.stages as SleepNight["stages"] | null) ?? { awake: 0, light: 0, deep: 0, rem: 0 },
       debtMin: r.debt_min ?? undefined,
-      hypnogram: r.hypnogram ?? undefined,
+      hypnogram: (r.hypnogram as SleepNight["hypnogram"] | null) ?? undefined,
     }));
     // Merge with any local unsynced entries.
     const byDay = new Map<string, SleepNight>();
